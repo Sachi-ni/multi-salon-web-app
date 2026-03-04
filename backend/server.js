@@ -1,0 +1,42 @@
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import connectDB from "./config/db.js";
+
+import authRoutes from "./routes/authRoutes.js";
+import staffRoutes from "./routes/staffRoutes.js";
+import salonRoutes from "./routes/salonRoutes.js";
+import serviceRoutes from "./routes/serviceRoutes.js";
+import customerRoutes from "./routes/customerRoutes.js";
+import appointmentRoutes from "./routes/appointmentRoutes.js";
+import billRoutes from "./routes/billRoutes.js";
+import reviewRoutes from "./routes/reviewRoutes.js";
+
+dotenv.config();
+connectDB();
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+// API Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/staff", staffRoutes);
+app.use("/api/salons", salonRoutes);
+app.use("/api/services", serviceRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/appointments", appointmentRoutes);
+app.use("/api/bills", billRoutes);
+app.use("/api/reviews", reviewRoutes);
+
+// Test Route
+app.get("/", (req, res) => {
+  res.send("Salon Management API Running");
+});
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
