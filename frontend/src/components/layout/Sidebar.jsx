@@ -1,30 +1,29 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import "../../App.css";
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen = true }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isActive = (path) => location.pathname === path ? "ni on" : "ni";
+  const isActive = (path) => (location.pathname === path ? "ni on" : "ni");
 
   return (
-    <div id="sidebar">
+    <div id="sidebar" className={isOpen ? "on" : ""}>
 
       <div className="ngrp">Overview</div>
 
       <div
-        className={isActive("/dashboard")}
+        className={isActive("/Dashboard")}
         id="ni-dashboard"
-        onClick={() => navigate("/dashboard")}
+        onClick={() => navigate("/Dashboard")}
       >
         Dashboard
       </div>
 
       <div
-        className={isActive("/analytics")}
-        id="ni-analytics"
-        onClick={() => navigate("/analytics")}
+        className={isActive("/Analytics ")}
+        id="ni-analytics "
+        onClick={() => navigate("/Analytics ")}
       >
         Analytics
       </div>
@@ -32,26 +31,26 @@ const Sidebar = () => {
       <div className="ngrp">Management</div>
 
       <div
-        className={isActive("/salons")}
+        className={isActive("/Salons")}
         id="ni-salons"
-        onClick={() => navigate("/salons")}
+        onClick={() => navigate("/Salons")}
       >
         Salons
         <span className="cnt" id="cnt-s">0</span>
       </div>
 
       <div
-        className={isActive("/staff")}
+        className={isActive("/Staff")}
         id="ni-staff"
-        onClick={() => navigate("/staff")}
+        onClick={() => navigate("/Staff")}
       >
         Staff
       </div>
 
       <div
-        className={isActive("/appointments")}
+        className={isActive("/Appointments")}
         id="ni-appointments"
-        onClick={() => navigate("/appointments")}
+        onClick={() => navigate("/Appointments")}
       >
         Appointments
         <span className="cnt b" id="cnt-a">0</span>
@@ -60,9 +59,9 @@ const Sidebar = () => {
       <div className="ngrp">Finance</div>
 
       <div
-        className={isActive("/revenue")}
+        className={isActive("/Revenue")}
         id="ni-revenue"
-        onClick={() => navigate("/revenue")}
+        onClick={() => navigate("/Revenue")}
       >
         Revenue
       </div>

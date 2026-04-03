@@ -1,10 +1,10 @@
 import React from "react";
-import "../../App.css";
 
-const Header = () => {
+const Header = ({ onToggleSidebar }) => {
 
   const toggleSB = () => {
     console.log("Toggle Sidebar");
+    if (onToggleSidebar) onToggleSidebar();
   };
 
   const showNotifs = () => {
@@ -16,10 +16,10 @@ const Header = () => {
   };
 
   return (
-    <div id="hdr">
+    <div id="hdr" className="on">
 
       {/* Hamburger */}
-      <div className="ham" onClick={toggleSB}>
+      <div className="ham" onClick={onToggleSidebar || toggleSB}>
         <span></span>
         <span></span>
         <span></span>

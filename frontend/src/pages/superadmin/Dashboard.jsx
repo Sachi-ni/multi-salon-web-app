@@ -1,7 +1,8 @@
 import React from "react";
-import "../../App.css";
+import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
 
   // Dummy functions (replace with real logic later)
   const doExport = () => {
@@ -13,7 +14,7 @@ const Dashboard = () => {
   };
 
   const nav = (page) => {
-    console.log("Navigate to:", page);
+    navigate(`/${page}`);
   };
 
   return (
@@ -103,7 +104,7 @@ const Dashboard = () => {
             <button
               className="btn btn-g"
               style={{ justifyContent: "flex-start" }}
-              onClick={() => nav("revenue")}
+              onClick={() => nav("Revenue")}
             >
               Manage Revenue
             </button>
@@ -127,15 +128,12 @@ const Dashboard = () => {
           ></span>
         </h3>
 
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            nav("salons");
-          }}
+        <button
+          className="btn btn-g sm"
+          onClick={() => nav("salons")}
         >
           Manage all salons →
-        </a>
+        </button>
       </div>
 
       <div className="dsal-grid" id="dsal-grid"></div>
