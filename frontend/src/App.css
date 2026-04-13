@@ -285,3 +285,4 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 }
 .ham{display:none;flex-direction:column;gap:4px;cursor:pointer;padding:6px}
 .ham span{width:18px;height:2px;background:var(--text);border-radius:2px}
+
