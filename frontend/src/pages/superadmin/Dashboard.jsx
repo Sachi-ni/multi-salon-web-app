@@ -9,9 +9,7 @@ const Dashboard = () => {
     console.log("Export clicked");
   };
 
-  const openModal = (name) => {
-    console.log("Open modal:", name);
-  };
+  
 
   const nav = (page) => {
     navigate(`/${page}`);
@@ -32,7 +30,7 @@ const Dashboard = () => {
             Export
           </button>
 
-          <button className="btn btn-p" onClick={() => openModal("m-salon")}>
+          <button className="btn btn-p" onClick={() => nav("AddSalon")}>
             Add Salon
           </button>
         </div>
@@ -80,7 +78,7 @@ const Dashboard = () => {
             <button
               className="btn btn-g"
               style={{ justifyContent: "flex-start" }}
-              onClick={() => openModal("m-salon")}
+              onClick={() => nav("AddSalon")}
             >
               Register New Salon
             </button>
@@ -88,7 +86,7 @@ const Dashboard = () => {
             <button
               className="btn btn-g"
               style={{ justifyContent: "flex-start" }}
-              onClick={() => openModal("m-staff")}
+              onClick={() => nav("AddStaff")}
             >
               Add Staff Member
             </button>
@@ -96,7 +94,7 @@ const Dashboard = () => {
             <button
               className="btn btn-g"
               style={{ justifyContent: "flex-start" }}
-              onClick={() => openModal("m-appt")}
+              onClick={() => nav("AddAppointment")}
             >
               Create Appointment
             </button>

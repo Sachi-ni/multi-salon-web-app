@@ -5,16 +5,21 @@ import './App.css';
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import Dashboard from "./pages/superadmin/Dashboard.jsx";
 import Revenue from "./pages/superadmin/Revenue.jsx";
+import AddSalon from "./pages/superadmin/AddSalon.jsx";
+import AddStaff from "./pages/superadmin/AddStaff.jsx";
+import Staff from "./pages/superadmin/Staff.jsx";
+import Appointments from "./pages/superadmin/Appointments.jsx";
+import Analytics from "./pages/superadmin/Analytics.jsx";
+import Salons from "./pages/superadmin/Salons.jsx";
+import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 
 function App() {
   return (
     <BrowserRouter>
+      {/* All Routes MUST be inside this container */}
       <Routes>
-
-        {/* Redirect root */}
         <Route path="/" element={<Navigate to="/Dashboard" />} />
 
-        {/* Dashboard */}
         <Route
           path="/Dashboard"
           element={
@@ -24,8 +29,7 @@ function App() {
           }
         />
 
-        {/* Revenue */}
-        <Route
+       <Route
           path="/Revenue"
           element={
             <DashboardLayout>
@@ -34,10 +38,73 @@ function App() {
           }
         />
 
+        <Route
+          path="/Staff"
+          element={
+            <DashboardLayout>
+              <Staff />
+            </DashboardLayout>
+          }
+        />
+
+        <Route
+          path="/AddSalon"
+          element={
+            <DashboardLayout>
+              <AddSalon />
+            </DashboardLayout>
+          }
+        />
+
+        <Route
+          path="/AddStaff"
+          element={
+            <DashboardLayout>
+              <AddStaff />
+            </DashboardLayout>
+          }
+        />
+
+        <Route
+        path="/Appointments"
+        element={
+          <DashboardLayout>
+            <Appointments />
+          </DashboardLayout>
+        }
+      />
+
+        <Route
+        path="/Analytics"
+        element={
+          <DashboardLayout>
+            <Analytics />
+          </DashboardLayout>
+        }
+      />
+
+      <Route
+        path="/salons"
+        element={
+          <DashboardLayout>
+            <Salons />
+          </DashboardLayout>
+        }
+      />
+
+      <Route
+        path="/AddAppointment"
+        element={
+          <DashboardLayout>
+            <AddAppointment />
+          </DashboardLayout>
+        }
+      />
       </Routes>
+
+
     </BrowserRouter>
   );
 }
 
 export default App;
-
