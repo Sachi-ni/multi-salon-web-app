@@ -40,7 +40,7 @@ const AddAppointment = () => {
     e.preventDefault();
     console.log("Saving Appointment to MongoDB Logic...", formData);
     alert("Appointment Booked Successfully!");
-    navigate("/Appointments");
+    navigate("/");
   };
 
   return (
@@ -144,7 +144,7 @@ const AddAppointment = () => {
           <div style={{ padding: "15px", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
             <button 
               type="button"
-              onClick={() => navigate("/Appointments")}
+              onClick={() => navigate("/customer")}
               style={{ backgroundColor: "#888", color: "#fff", border: "none", padding: "10px 25px", borderRadius: "20px", fontWeight: "bold", cursor: "pointer" }}
             >
               Cancel

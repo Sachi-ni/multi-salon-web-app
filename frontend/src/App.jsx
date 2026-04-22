@@ -23,6 +23,9 @@ import Analytics from "./pages/superadmin/Analytics.jsx";
 import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 
+
+import CustomerAddAppointment from './pages/customer/AddAppointment'; // Correct based on your structure
+
 function App() {
   return (
     <BrowserRouter>
@@ -35,6 +38,8 @@ function App() {
         <Route path="/customer" element={<CustomerHome />} />
         <Route path="/staffadmin" element={<StaffAdminDashboard />} />
         <Route path="/admin" element={<Navigate to="/SuperAdminDashboard" />} />
+
+        <Route path="/customer/add-appointment" element={<CustomerAddAppointment />} />
 
 
         <Route
