@@ -4,7 +4,7 @@ import generateToken from "../utils/generateToken.js";
 
 export const registerAdmin = async (req, res) => {
   try {
-    const { email, password, full_name, username, role } = req.body;
+    const { full_name, username, email, password, role } = req.body;
 
     // Check if admin already exists
     const existingAdmin = await Admin.findOne({ email });
@@ -18,11 +18,11 @@ export const registerAdmin = async (req, res) => {
 
     // Create new admin
     const admin = new Admin({
-      email,
-      password_hash,
       full_name,
       username,
-      role: role || "admin"
+      email,
+      password: password_hash,
+      role
     });
 
     await admin.save();
@@ -31,6 +31,7 @@ export const registerAdmin = async (req, res) => {
       id: admin._id,
       name: admin.full_name,
       email: admin.email,
+      phone: admin.phone,
       role: admin.role,
       token: generateToken(admin._id)
     });
@@ -51,7 +52,7 @@ export const loginAdmin = async (req, res) => {
       return res.status(400).json({ message: "Admin not found" });
     }
 
-    const isMatch = await bcrypt.compare(password, admin.password_hash);
+    const isMatch = await bcrypt.compare(password, admin.password);
 
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid password" });

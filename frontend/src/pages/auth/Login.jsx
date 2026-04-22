@@ -22,7 +22,7 @@ const Login = () => {
           <label>Password</label>
           <input type="password" id="log-p" placeholder="Enter your password" />
         </div>
-        <button className="auth-btn" onClick={() => navigate('../superadmin/profile')}>Sign In</button>
+        <button className="auth-btn" onClick={() => navigate('/Dashboard')}>Sign In</button>
         <div className="auth-switch">
           No account? <span onClick={() => navigate('/signup')} style={{cursor:'pointer', color:'blue'}}>Register here</span>
         </div>
