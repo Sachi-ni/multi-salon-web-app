@@ -13,17 +13,17 @@ const Sidebar = ({ isOpen = true }) => {
       <div className="ngrp">Overview</div>
 
       <div
-        className={isActive("/Dashboard")}
+        className={isActive("/SuperAdminDashboard")}
         id="ni-dashboard"
-        onClick={() => navigate("/Dashboard")}
+        onClick={() => navigate("/SuperAdminDashboard")}
       >
         Dashboard
       </div>
 
       <div
-        className={isActive("/Analytics ")}
-        id="ni-analytics "
-        onClick={() => navigate("/Analytics ")}
+        className={isActive("/Analytics")}
+        id="ni-analytics"
+        onClick={() => navigate("/Analytics")}
       >
         Analytics
       </div>

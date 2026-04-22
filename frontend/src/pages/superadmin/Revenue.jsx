@@ -36,7 +36,7 @@ const Revenue = () => {
           {/* USES NAVIGATE HERE */}
           <button 
             className="btn btn-g sm" 
-            onClick={() => navigate("/Dashboard")}
+            onClick={() => navigate("/SuperAdminDashboard")}
             style={{ cursor: "pointer" }}
           >
             ← Back

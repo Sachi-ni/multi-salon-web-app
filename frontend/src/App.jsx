@@ -8,7 +8,12 @@ import Main from "./pages/dashboard.jsx";
 
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import Profile from "./pages/superadmin/profile.jsx";
-import Dashboard from "./pages/superadmin/Dashboard.jsx";
+
+import CustomerHome from './pages/customer/Dashboard';
+import StaffAdminDashboard from './pages/admin/Dashboard';
+import SuperAdminDashboard from './pages/superadmin/Dashboard';
+
+
 import Revenue from "./pages/superadmin/Revenue.jsx";
 import AddSalon from "./pages/superadmin/AddSalon.jsx";
 import AddStaff from "./pages/superadmin/AddStaff.jsx";
@@ -24,16 +29,19 @@ function App() {
       {/* All Routes MUST be inside this container */}
       <Routes>
         <Route path="/" element={<Main />} />
-
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
 
+        <Route path="/customer" element={<CustomerHome />} />
+        <Route path="/staffadmin" element={<StaffAdminDashboard />} />
+        <Route path="/admin" element={<Navigate to="/SuperAdminDashboard" />} />
+
 
         <Route
-          path="/Dashboard"
+          path="/SuperAdminDashboard"
           element={
             <DashboardLayout>
-              <Dashboard />
+              <SuperAdminDashboard />
             </DashboardLayout>
           }
         />

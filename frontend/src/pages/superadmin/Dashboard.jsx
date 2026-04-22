@@ -43,7 +43,7 @@ const Dashboard = () => {
 
           <button
             className="btn btn-p"
-            onClick={() => openModal("m-salon")}
+            onClick={() => nav("AddSalon")}
           >
             Add Salon
           </button>
@@ -139,7 +139,7 @@ const Dashboard = () => {
             <button
               className="btn btn-g"
               style={{ justifyContent: "flex-start" }}
-              onClick={() => openModal("m-salon")}
+              onClick={() => nav("AddSalon")}
             >
               Register New Salon
             </button>
@@ -147,7 +147,7 @@ const Dashboard = () => {
             <button
               className="btn btn-g"
               style={{ justifyContent: "flex-start" }}
-              onClick={() => openModal("m-staff")}
+              onClick={() => nav("AddStaff")}
             >
               Add Staff Member
             </button>
@@ -155,7 +155,7 @@ const Dashboard = () => {
             <button
               className="btn btn-g"
               style={{ justifyContent: "flex-start" }}
-              onClick={() => openModal("m-appt")}
+              onClick={() => navigate("/AddAppointment")}
             >
               Create Appointment
             </button>
