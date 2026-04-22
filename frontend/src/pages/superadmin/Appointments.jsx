@@ -13,97 +13,130 @@ const Appointments = () => {
     { client: "Sophie Blue", service: "Treatment", salon: "Chic Cuts", staff: "Morgan Fox", time: "2025-12-15 12:00", status: "Confirmed", amount: "$287" },
   ]);
 
-  const filteredData = filter === "All" 
-    ? allAppointments 
-    : allAppointments.filter(app => app.status === filter);
+  const filteredData =
+    filter === "All"
+      ? allAppointments
+      : allAppointments.filter((a) => a.status === filter);
 
-  const getStatusColor = (status) => {
+  const getStatusClass = (status) => {
     switch (status) {
-      case "Confirmed": return "#00d1ff";
-      case "Pending": return "#ff9800";
-      case "Completed": return "#4caf50";
-      case "Canceled": return "#f44336";
-      default: return "white";
+      case "Confirmed":
+        return "pb";
+      case "Pending":
+        return "py";
+      case "Completed":
+        return "pg";
+      case "Canceled":
+        return "pr";
+      default:
+        return "";
     }
   };
 
   return (
-    <div id="pg-appointments" style={{ padding: "20px" }}>
-      
-      {/* Header Section */}
-      <div className="ph" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <h1 style={{ color: "white", margin: 0 }}>Appointments</h1>
-        <button 
-            className="btn btn-p" 
-            style={{ backgroundColor: "#FFD700", color: "black", fontWeight: "bold", borderRadius: "20px", padding: "10px 25px" }}
+    <div className="page on" id="pg-appointments">
+
+      {/* HEADER */}
+      <div className="ph">
+
+        <div>
+          <h1>Appointments</h1>
+          <p>Manage all customer bookings</p>
+        </div>
+
+        <div className="pactions">
+
+          <button
+            className="btn btn-p"
             onClick={() => navigate("/AddAppointment")}
-        >
-          + New Appointment
-        </button>
+          >
+            + New Appointment
+          </button>
+
+        </div>
+
       </div>
 
-      {/* Filter Tabs */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+      {/* FILTER TABS */}
+      <div className="tabs">
+
         {["All", "Pending", "Confirmed", "Completed", "Canceled"].map((tab) => (
-          <button
+          <div
             key={tab}
+            className={`tab ${filter === tab ? "on" : ""}`}
             onClick={() => setFilter(tab)}
-            style={{
-              padding: "12px 30px",
-              borderRadius: "15px",
-              border: "none",
-              fontWeight: "bold",
-              cursor: "pointer",
-              backgroundColor: filter === tab ? "#FFD700" : "white",
-              color: "black",
-              transition: "0.3s"
-            }}
           >
             {tab}
-          </button>
+          </div>
         ))}
+
       </div>
 
-      {/* Appointments Table */}
-      <div className="card" style={{ background: "#0c0c0c", borderRadius: "10px", overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-          <thead style={{ background: "#1a1a1a", color: "#666", fontSize: "0.75rem", textTransform: "uppercase" }}>
+      {/* TABLE */}
+      <div className="tw">
+
+        <table>
+
+          <thead>
+
             <tr>
-              <th style={{ padding: "15px" }}>Client</th>
+              <th>Client</th>
               <th>Service</th>
               <th>Salon</th>
               <th>Staff</th>
-              <th>Date/Time</th>
+              <th>Date / Time</th>
               <th>Status</th>
               <th>Amount</th>
             </tr>
+
           </thead>
-          <tbody style={{ color: "white", fontSize: "0.9rem" }}>
-            {filteredData.map((app, index) => (
-              <tr key={index} style={{ borderBottom: "1px solid #222" }}>
-                <td style={{ padding: "15px" }}>{app.client}</td>
-                <td>{app.service}</td>
-                <td style={{ color: "#aaa" }}>{app.salon}</td>
-                <td>{app.staff}</td>
-                <td>{app.time}</td>
-                <td>
-                  <span style={{ 
-                    color: getStatusColor(app.status), 
-                    background: `${getStatusColor(app.status)}15`, 
-                    padding: "4px 12px", 
-                    borderRadius: "15px", 
-                    fontSize: "0.75rem",
-                    border: `1px solid ${getStatusColor(app.status)}30`
-                  }}>
-                    {app.status}
-                  </span>
+
+          <tbody>
+
+            {filteredData.length === 0 ? (
+              <tr>
+                <td colSpan="7">
+                  No appointments found
                 </td>
-                <td style={{ fontWeight: "bold" }}>{app.amount}</td>
               </tr>
-            ))}
+            ) : (
+              filteredData.map((a, i) => (
+                <tr key={i}>
+
+                  <td style={{ fontWeight: 700 }}>
+                    {a.client}
+                  </td>
+
+                  <td>{a.service}</td>
+
+                  <td style={{ color: "var(--muted2)" }}>
+                    {a.salon}
+                  </td>
+
+                  <td>{a.staff}</td>
+
+                  <td>{a.time}</td>
+
+                  <td>
+                    <span className={`pill ${getStatusClass(a.status)}`}>
+                      {a.status}
+                    </span>
+                  </td>
+
+                  <td style={{ fontWeight: 700 }}>
+                    {a.amount}
+                  </td>
+
+                </tr>
+              ))
+            )}
+
           </tbody>
+
         </table>
+
       </div>
+
     </div>
   );
 };

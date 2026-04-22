@@ -3,65 +3,183 @@ import { useNavigate } from "react-router-dom";
 
 const Salons = () => {
   const navigate = useNavigate();
+
+  const [loading] = useState(false);
+  const [error] = useState("");
+
   const [salonList] = useState([
-    { id: 1, name: "LIYO", owner: "Emma Wilson", revenue: "17.3K", staff: 7, created: "Aug 5, 2022", address: "Kadawatha" },
-    { id: 2, name: "KATHURA", owner: "James Carter", revenue: "14.3K", staff: 5, created: "Oct 9, 2024", address: "Nugegoda" },
-    { id: 3, name: "89", owner: "Sophia Lee", revenue: "10.1K", staff: 4, created: "Feb 5, 2021", address: "Kiribathgoda" },
+    {
+      id: 1,
+      name: "LIYO",
+      owner: "Emma Wilson",
+      revenue: "17.3K",
+      staff: 7,
+      created: "Aug 5, 2022",
+      address: "Kadawatha",
+    },
+    {
+      id: 2,
+      name: "KATHURA",
+      owner: "James Carter",
+      revenue: "14.3K",
+      staff: 5,
+      created: "Oct 9, 2024",
+      address: "Nugegoda",
+    },
+    {
+      id: 3,
+      name: "89",
+      owner: "Sophia Lee",
+      revenue: "10.1K",
+      staff: 4,
+      created: "Feb 5, 2021",
+      address: "Kiribathgoda",
+    },
   ]);
 
   return (
-    <div id="pg-salons" style={{ padding: "20px", color: "white" }}>
-      
-      {/* Header Section */}
-      <div className="ph" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <div>
-          <h1 style={{ margin: 0 }}>Salons</h1>
-          <p style={{ color: "#aaa", fontSize: "0.9rem" }}>All registered salon locations</p>
+    <div className="page on" id="pg-salons">
+
+      {/* HEADER (Revenue style) */}
+      <div className="ph">
+
+        <div className="ph-left">
+
+          <button
+            className="back-btn"
+            onClick={() => navigate("/Dashboard")}
+          >
+            ←
+          </button>
+
+          <div>
+            <h1>Salons</h1>
+            <p>All registered salon locations</p>
+          </div>
+
         </div>
-        <button 
-          className="btn btn-p" 
-          onClick={() => navigate("/AddSalon")}
-          style={{ backgroundColor: "#FFD700", color: "black", fontWeight: "bold", borderRadius: "20px", padding: "10px 25px" }}
-        >
-          + Add Salon
-        </button>
+
+        <div className="pactions">
+
+          <button
+            className="btn btn-p"
+            onClick={() => navigate("/AddSalon")}
+          >
+            + Add Salon
+          </button>
+
+        </div>
+
       </div>
 
-      {/* Salons Grid Table */}
-      <div style={{ border: "2px solid white", overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
-          <thead>
-            <tr style={{ borderBottom: "2px solid white" }}>
-              <th style={{ padding: "15px", borderRight: "2px solid white" }}>Salon</th>
-              <th style={{ borderRight: "2px solid white" }}>Owner</th>
-              <th style={{ borderRight: "2px solid white" }}>Revenue/mo</th>
-              <th style={{ borderRight: "2px solid white" }}>Staff</th>
-              <th style={{ borderRight: "2px solid white" }}>Created</th>
-              <th style={{ borderRight: "2px solid white" }}>Address</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {salonList.map((salon) => (
-              <tr key={salon.id} style={{ borderBottom: "2px solid white" }}>
-                <td style={{ padding: "20px", borderRight: "2px solid white", fontWeight: "bold" }}>{salon.name}</td>
-                <td style={{ borderRight: "2px solid white" }}>{salon.owner}</td>
-                <td style={{ borderRight: "2px solid white" }}>Rs. {salon.revenue}</td>
-                <td style={{ borderRight: "2px solid white" }}>{salon.staff}</td>
-                <td style={{ borderRight: "2px solid white" }}>{salon.created}</td>
-                <td style={{ borderRight: "2px solid white" }}>{salon.address}</td>
-                <td style={{ padding: "10px" }}>
-                  <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-                    <button style={{ backgroundColor: "#FFD700", color: "black", border: "none", padding: "5px 15px", borderRadius: "15px", fontWeight: "bold", cursor: "pointer" }}>view</button>
-                    <button style={{ backgroundColor: "#3498db", color: "black", border: "none", padding: "5px 15px", borderRadius: "15px", fontWeight: "bold", cursor: "pointer" }}>Edit</button>
-                    <button style={{ backgroundColor: "#e74c3c", color: "black", border: "none", padding: "5px 15px", borderRadius: "15px", fontWeight: "bold", cursor: "pointer" }}>Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* ERROR */}
+      {error && (
+        <div className="alert alert-w">
+          {error}
+        </div>
+      )}
+
+      {/* LOADING */}
+      {loading ? (
+        <p>Loading salons...</p>
+      ) : (
+        <>
+
+          {/* TABLE HEADER */}
+          <div className="rev-tbl-hdr">
+
+            <h3>Salon Directory</h3>
+
+            <button className="sort-btn">
+              Sorted by name ▼
+            </button>
+
+          </div>
+
+          {/* TABLE */}
+          <div className="tw">
+
+            <table>
+
+              <thead>
+
+                <tr>
+
+                  <th>Salon</th>
+                  <th>Owner</th>
+                  <th>Revenue</th>
+                  <th>Staff</th>
+                  <th>Created</th>
+                  <th>Address</th>
+                  <th style={{ textAlign: "right" }}>
+                    Actions
+                  </th>
+
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                {salonList.length === 0 ? (
+                  <tr>
+                    <td colSpan="7">
+                      No salons found
+                    </td>
+                  </tr>
+                ) : (
+                  salonList.map((salon) => (
+                    <tr key={salon.id}>
+
+                      <td style={{ fontWeight: 700 }}>
+                        {salon.name}
+                      </td>
+
+                      <td>{salon.owner}</td>
+
+                      <td style={{ color: "var(--yellow)" }}>
+                        Rs. {salon.revenue}
+                      </td>
+
+                      <td>{salon.staff}</td>
+
+                      <td>{salon.created}</td>
+
+                      <td>{salon.address}</td>
+
+                      <td style={{ textAlign: "right" }}>
+
+                        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+
+                          <button className="btn btn-g xs">
+                            View
+                          </button>
+
+                          <button className="btn btn-c xs">
+                            Edit
+                          </button>
+
+                          <button className="btn btn-d xs">
+                            Delete
+                          </button>
+
+                        </div>
+
+                      </td>
+
+                    </tr>
+                  ))
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </>
+      )}
+
     </div>
   );
 };

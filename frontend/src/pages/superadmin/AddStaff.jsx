@@ -3,66 +3,173 @@ import { useNavigate } from "react-router-dom";
 
 const AddStaff = () => {
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
-    firstName: "", lastName: "", email: "", role: "", salon: "", picture: null
+    firstName: "",
+    lastName: "",
+    email: "",
+    role: "",
+    salon: "",
+    picture: null
   });
 
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log("New Staff:", formData);
+
+    navigate("/Staff");
+  };
+
   return (
-    <div id="pg-add-staff" style={{ padding: "20px", color: "#000" }}>
-      <div className="ph" style={{ marginBottom: "20px" }}>
-        <h1 style={{ color: "#fff" }}>Add New Staff</h1>
-      </div>
+    <div className="page on" id="pg-add-staff">
 
-      <div style={{ maxWidth: "500px", margin: "0 auto", border: "2px solid #000", backgroundColor: "#d1d1d1" }}>
-        {/* Header */}
-        <div style={{ padding: "15px", borderBottom: "2px solid #000", textAlign: "center", fontWeight: "bold", fontSize: "1.2rem" }}>
-          Add Staff
-        </div>
+      {/* HEADER */}
+      <div className="ph">
 
-        {/* Form Rows */}
-        {[
-          { label: "First Name", name: "firstName" },
-          { label: "Last Name", name: "lastName" },
-          { label: "Email", name: "email" },
-          { label: "Role", name: "role" },
-          { label: "Salon", name: "salon" }
-        ].map((field) => (
-          <div key={field.name} style={{ display: "flex", borderBottom: "2px solid #000" }}>
-            <div style={{ width: "40%", padding: "12px", borderRight: "2px solid #000", fontWeight: "bold", textAlign: "center" }}>
-              {field.label}
-            </div>
-            <div style={{ width: "60%" }}>
-              <input 
-                type="text" 
-                style={{ width: "100%", background: "transparent", border: "none", padding: "12px", outline: "none" }} 
-                onChange={(e) => setFormData({...formData, [field.name]: e.target.value})}
-              />
-            </div>
-          </div>
-        ))}
+        <div className="ph-left">
 
-        {/* Picture Upload Row */}
-        <div style={{ display: "flex", borderBottom: "2px solid #000" }}>
-          <div style={{ width: "40%", padding: "12px", borderRight: "2px solid #000", fontWeight: "bold", textAlign: "center" }}>
-            Picture
-          </div>
-          <div style={{ width: "60%", padding: "8px", display: "flex", justifyContent: "center" }}>
-            <button style={{ backgroundColor: "#6211ee", color: "#fff", border: "none", padding: "8px 25px", borderRadius: "20px", display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: "bold" }}>
-              <span>⬆</span> Upload
-            </button>
-          </div>
-        </div>
-
-        {/* Save Button Row */}
-        <div style={{ padding: "15px", display: "flex", justifyContent: "flex-end" }}>
-          <button 
-            onClick={() => { console.log(formData); navigate("/Staff"); }}
-            style={{ backgroundColor: "#00c875", color: "#fff", border: "none", padding: "10px 40px", borderRadius: "20px", fontWeight: "bold", cursor: "pointer" }}
+          <button
+            className="back-btn"
+            onClick={() => navigate("/Staff")}
           >
-            Save
+            ←
           </button>
+
+          <div>
+            <h1>Add Staff</h1>
+            <p>Create a new staff member profile</p>
+          </div>
+
         </div>
+
       </div>
+
+      {/* FORM CARD */}
+      <div className="card" style={{ maxWidth: "600px", margin: "0 auto" }}>
+
+        <div className="chdr">
+          <h3>Staff Details</h3>
+          <span className="sub">Fill all required fields</span>
+        </div>
+
+        <form onSubmit={handleSubmit} className="fc">
+
+          {/* First Name */}
+          <div className="fg">
+            <label>First Name</label>
+            <input
+              type="text"
+              name="firstName"
+              placeholder="Enter first name"
+              className="pf-inp"
+              required
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Last Name */}
+          <div className="fg">
+            <label>Last Name</label>
+            <input
+              type="text"
+              name="lastName"
+              placeholder="Enter last name"
+              className="pf-inp"
+              required
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Email */}
+          <div className="fg">
+            <label>Email</label>
+            <input
+              type="email"
+              name="email"
+              placeholder="Enter email"
+              className="pf-inp"
+              required
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Role */}
+          <div className="fg">
+            <label>Role</label>
+            <input
+              type="text"
+              name="role"
+              placeholder="e.g. Hair Stylist"
+              className="pf-inp"
+              required
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Salon */}
+          <div className="fg">
+            <label>Salon</label>
+            <select
+              name="salon"
+              className="pf-inp"
+              required
+              onChange={handleChange}
+            >
+              <option value="">Select Salon...</option>
+              <option value="Liyo">Liyo</option>
+              <option value="Kathura">Kathura</option>
+              <option value="89">89</option>
+            </select>
+          </div>
+
+          {/* Picture Upload */}
+          <div className="fg">
+            <label>Profile Picture</label>
+
+            <input
+              type="file"
+              className="pf-inp"
+              accept="image/*"
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  picture: e.target.files[0]
+                })
+              }
+            />
+          </div>
+
+          {/* ACTIONS */}
+          <div className="mact">
+
+            <button
+              type="button"
+              className="btn btn-g"
+              onClick={() => navigate("/Staff")}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              className="btn btn-p"
+            >
+              Save Staff
+            </button>
+
+          </div>
+
+        </form>
+
+      </div>
+
     </div>
   );
 };

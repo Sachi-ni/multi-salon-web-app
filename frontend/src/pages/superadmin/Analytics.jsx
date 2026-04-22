@@ -2,95 +2,164 @@ import React from "react";
 
 const Analytics = () => {
   const metricCards = [
-    { label: "Total Booking", value: "3,847", change: "+ 18.2%", color: "#00e676" },
-    { label: "Gross Revenue", value: "$427K", change: "+ 9.8%", color: "#00e676" },
-    { label: "Avg Booking Value", value: "$36.90", change: "+ 4.1%", color: "#00e676" },
-    { label: "Client Retention", value: "78%", change: "+ 1.2%", color: "#00e676" },
+    { label: "Total Bookings", value: "3,847", change: "+18.2%" },
+    { label: "Gross Revenue", value: "$427K", change: "+9.8%" },
+    { label: "Avg Booking Value", value: "$36.90", change: "+4.1%" },
+    { label: "Client Retention", value: "78%", change: "+1.2%" },
   ];
 
   const topSalons = [
-    { name: "Kathura", percentage: 75, color: "#9c27b0" },
-    { name: "Liyo", percentage: 45, color: "#00bcd4" },
-    { name: "89", percentage: 35, color: "#ff5722" },
+    { name: "Kathura", percentage: 75, colorClass: "pg" },
+    { name: "Liyo", percentage: 45, colorClass: "pb" },
+    { name: "89", percentage: 35, colorClass: "pr" },
   ];
 
   const services = [
-    { name: "Haircut", percentage: 35, color: "#9c27b0" },
-    { name: "Hair Color", percentage: 25, color: "#00bcd4" },
-    { name: "Highlights", percentage: 18, color: "#4caf50" },
-    { name: "Blowout", percentage: 12, color: "#ffeb3b" },
-    { name: "Other", percentage: 10, color: "#f44336" },
+    { name: "Haircut", percentage: 35, colorClass: "pv" },
+    { name: "Hair Color", percentage: 25, colorClass: "pb" },
+    { name: "Highlights", percentage: 18, colorClass: "pg" },
+    { name: "Blowout", percentage: 12, colorClass: "py" },
+    { name: "Other", percentage: 10, colorClass: "pr" },
   ];
 
   return (
-    <div id="pg-analytics" style={{ padding: "20px", color: "white" }}>
-      <div className="ph" style={{ marginBottom: "25px" }}>
-        <h1 style={{ margin: 0 }}>Analytics</h1>
-        <p style={{ color: "var(--muted2)", fontSize: "0.9rem" }}>Platform-wide performance insights</p>
+    <div className="page on" id="pg-analytics">
+
+      {/* HEADER */}
+      <div className="ph">
+
+        <div>
+          <h1>Analytics</h1>
+          <p>Platform-wide performance insights</p>
+        </div>
+
       </div>
 
-      {/* Top Metric Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px", marginBottom: "30px" }}>
-        {metricCards.map((card, idx) => (
-          <div key={idx} style={{ backgroundColor: "#FFD700", borderRadius: "20px", padding: "20px", textAlign: "center", color: "black" }}>
-            <div style={{ fontWeight: "bold", fontSize: "1.1rem" }}>{card.label}</div>
-            <div style={{ fontSize: "2rem", fontWeight: "900", margin: "10px 0" }}>{card.value}</div>
-            <div style={{ color: "#008000", fontWeight: "bold", fontSize: "0.9rem" }}>{card.change}</div>
+      {/* METRIC CARDS */}
+      <div className="srow mb22">
+
+        {metricCards.map((card, i) => (
+          <div className="sc" key={i}>
+
+            <div className="sc-ico">📊</div>
+
+            <div className="sc-lbl">{card.label}</div>
+
+            <div className="sc-val">{card.value}</div>
+
+            <div className="sc-sub up">
+              ↑ {card.change}
+            </div>
+
           </div>
         ))}
+
       </div>
 
-      {/* Middle Charts Section */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "30px" }}>
-        {/* Top Salons by Revenue */}
-        <div className="card" style={{ border: "1px solid #FFD700", padding: "20px" }}>
-          <h3>Top Salons by Revenue</h3>
-          <div style={{ marginTop: "20px" }}>
-            {topSalons.map((salon, idx) => (
-              <div key={idx} style={{ marginBottom: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
-                  <span>{salon.name}</span>
-                  <span style={{ fontSize: "0.8rem", color: "#666" }}>{salon.percentage}%</span>
-                </div>
-                <div style={{ height: "8px", backgroundColor: "#222", borderRadius: "4px" }}>
-                  <div style={{ height: "100%", width: `${salon.percentage}%`, backgroundColor: salon.color, borderRadius: "4px" }}></div>
-                </div>
-              </div>
-            ))}
+      {/* MIDDLE SECTION */}
+      <div className="g2 mb22">
+
+        {/* TOP SALONS */}
+        <div className="card">
+
+          <div className="chdr">
+            <h3>Top Salons</h3>
+            <span className="sub">Revenue share</span>
           </div>
+
+          <div className="fc">
+
+            {topSalons.map((s, i) => (
+
+              <div key={i}>
+
+                <div className="kv">
+                  <span className="kvk">{s.name}</span>
+                  <span className="kvv">{s.percentage}%</span>
+                </div>
+
+                <div className="prog">
+                  <div
+                    className={`pf ${s.colorClass}`}
+                    style={{ width: `${s.percentage}%` }}
+                  />
+                </div>
+
+              </div>
+
+            ))}
+
+          </div>
+
         </div>
 
-        {/* Service Breakdown */}
-        <div className="card" style={{ padding: "20px" }}>
-          <h3>Service Breakdown</h3>
-          <div style={{ marginTop: "20px" }}>
-            {services.map((service, idx) => (
-              <div key={idx} style={{ marginBottom: "15px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "4px" }}>
-                  <span>{service.name}</span>
-                  <span>{service.percentage}%</span>
-                </div>
-                <div style={{ height: "6px", backgroundColor: "#222", borderRadius: "3px" }}>
-                  <div style={{ height: "100%", width: `${service.percentage}%`, backgroundColor: service.color, borderRadius: "3px" }}></div>
-                </div>
-              </div>
-            ))}
+        {/* SERVICES */}
+        <div className="card">
+
+          <div className="chdr">
+            <h3>Service Breakdown</h3>
+            <span className="sub">Most used services</span>
           </div>
+
+          <div className="fc">
+
+            {services.map((s, i) => (
+
+              <div key={i}>
+
+                <div className="kv">
+                  <span className="kvk">{s.name}</span>
+                  <span className="kvv">{s.percentage}%</span>
+                </div>
+
+                <div className="prog">
+                  <div
+                    className={`pf ${s.colorClass}`}
+                    style={{ width: `${s.percentage}%` }}
+                  />
+                </div>
+
+              </div>
+
+            ))}
+
+          </div>
+
         </div>
+
       </div>
 
-      {/* Bottom Trend Chart Placeholder */}
-      <div className="card" style={{ padding: "20px" }}>
-        <h3>12-Month Revenue Trend</h3>
-        <div style={{ height: "150px", display: "flex", alignItems: "flex-end", gap: "2%", padding: "20px 0" }}>
-          {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month, idx) => (
-            <div key={idx} style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ height: "10px", backgroundColor: "#9c27b0", borderRadius: "5px", marginBottom: "10px" }}></div>
-              <span style={{ fontSize: "0.7rem", color: "#666" }}>{month}</span>
+      {/* TREND CHART */}
+      <div className="card">
+
+        <div className="chdr">
+          <h3>Revenue Trend</h3>
+          <span className="sub">12 month overview</span>
+        </div>
+
+        <div className="rchart">
+
+          {[40, 55, 30, 70, 60, 80, 65, 90, 75, 85, 95, 100].map((h, i) => (
+
+            <div className="rcbw" key={i}>
+
+              <div
+                className="rcb"
+                style={{ height: `${h}px` }}
+              />
+
+              <div className="rcl">
+                {["J","F","M","A","M","J","J","A","S","O","N","D"][i]}
+              </div>
+
             </div>
+
           ))}
+
         </div>
+
       </div>
+
     </div>
   );
 };
