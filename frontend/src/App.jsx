@@ -2,7 +2,12 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import './App.css';
 
+import Login from "./pages/auth/Login.jsx";
+import Signup from "./pages/auth/register.jsx";
+import Main from "./pages/dashboard.jsx";
+
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
+import Profile from "./pages/superadmin/profile.jsx";
 import Dashboard from "./pages/superadmin/Dashboard.jsx";
 import Revenue from "./pages/superadmin/Revenue.jsx";
 import AddSalon from "./pages/superadmin/AddSalon.jsx";
@@ -18,13 +23,26 @@ function App() {
     <BrowserRouter>
       {/* All Routes MUST be inside this container */}
       <Routes>
-        <Route path="/" element={<Navigate to="/Dashboard" />} />
+        <Route path="/" element={<Main />} />
+
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+
 
         <Route
           path="/Dashboard"
           element={
             <DashboardLayout>
               <Dashboard />
+            </DashboardLayout>
+          }
+        />
+
+        <Route
+          path="/Profile"
+          element={
+            <DashboardLayout>
+              <Profile />
             </DashboardLayout>
           }
         />

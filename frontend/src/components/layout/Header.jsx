@@ -1,7 +1,8 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 const Header = ({ onToggleSidebar }) => {
-
+  const navigate = useNavigate();
   const toggleSB = () => {
     console.log("Toggle Sidebar");
     if (onToggleSidebar) onToggleSidebar();
@@ -56,7 +57,7 @@ const Header = ({ onToggleSidebar }) => {
       {/* Avatar */}
       <div
         className="hav"
-        onClick={openProfile}
+        onClick={() => navigate('/profile')}
         title="Profile"
       >
         SA
@@ -66,7 +67,7 @@ const Header = ({ onToggleSidebar }) => {
       <div
         className="hinfo"
         style={{ cursor: "pointer" }}
-        onClick={openProfile}
+        onClick={() => navigate('/profile')}
       >
         <div className="hname">Super Admin</div>
         <div className="hrole">admin@salonhub.com</div>
