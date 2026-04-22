@@ -56,6 +56,8 @@ input,select,textarea{font-family:inherit}
 .hav:hover{background:var(--yellow2)}
 .hinfo .hname{font-size:.82rem;font-weight:700;color:var(--text)}
 .hinfo .hrole{font-size:.67rem;color:var(--muted2)}
+.login{width:80px;height:36px;border-radius:9px;background:var(--yellow);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:900;color:var(--bg);cursor:pointer;flex-shrink:0;transition:.15s}
+.login:hover{background:var(--yellow2)}
 
 /* ── SIDEBAR ── */
 #sidebar{width:var(--sw);background:var(--s1);border-right:1px solid var(--border);position:fixed;top:var(--hh);bottom:0;left:0;z-index:150;display:none;flex-direction:column;overflow-y:auto}
