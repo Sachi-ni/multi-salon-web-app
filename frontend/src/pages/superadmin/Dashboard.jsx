@@ -4,19 +4,12 @@ import { useNavigate } from "react-router-dom";
 const Dashboard = () => {
   const navigate = useNavigate();
 
-  // State (empty for now – will connect backend later)
-  //const [stats, setStats] = useState([]);
+  const goTo = (path) => {
+    navigate(`/${path}`);
+  };
 
   const doExport = () => {
     console.log("Export clicked");
-  };
-
-  const openModal = (name) => {
-    console.log("Open modal:", name);
-  };
-
-  const nav = (page) => {
-    navigate(`/${page.toLowerCase()}`);
   };
 
   const [stats] = useState([
@@ -25,6 +18,10 @@ const Dashboard = () => {
     { ico: "📅", lbl: "Appointments", val: "", sub: "" },
     { ico: "💰", lbl: "Platform Revenue", val: "", sub: "" },
   ]);
+
+  const nav = (page) => {
+    navigate(`/${page.toLowerCase()}`);
+  };
 
   return (
     <div id="pg-dashboard">
@@ -43,53 +40,49 @@ const Dashboard = () => {
 
           <button
             className="btn btn-p"
-            onClick={() => openModal("m-salon")}
+            onClick={() => goTo("AddSalon")}
           >
             Add Salon
           </button>
         </div>
       </div>
 
-      {/* Stats (dynamic placeholder) */}
+      {/* Stats */}
       <div className="srow">
-        {stats.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No data available yet</p>
-        ) : (
-          stats.map((item, index) => {
-            // Map each stat to its page
-            let page = "";
-            switch (item.lbl) {
-              case "Total Salons":
-                page = "salons";
-                break;
-              case "Total Staff":
-                page = "staff";
-                break;
-              case "Appointments":
-                page = "appointments";
-                break;
-              case "Platform Revenue":
-                page = "revenue";
-                break;
-              default:
-                page = "";
-            }
+        {stats.map((item, index) => {
+          let page = "";
 
-            return (
-              <div
-                className="sc"
-                key={index}
-                style={{ cursor: page ? "pointer" : "default" }}
-                onClick={() => page && nav(page)}
-              >
-                <div className="sc-ico">{item.ico}</div>
-                <div className="sc-lbl">{item.lbl}</div>
-                <div className="sc-val">{item.val}</div>
-                <div className="sc-sub">{item.sub}</div>
-              </div>
-            );
-          })
-        )}
+          switch (item.lbl) {
+            case "Total Salons":
+              page = "salons";
+              break;
+            case "Total Staff":
+              page = "staff";
+              break;
+            case "Appointments":
+              page = "appointments";
+              break;
+            case "Platform Revenue":
+              page = "revenue";
+              break;
+            default:
+              page = "";
+          }
+
+          return (
+            <div
+              className="sc"
+              key={index}
+              style={{ cursor: page ? "pointer" : "default" }}
+              onClick={() => page && nav(page)}
+            >
+              <div className="sc-ico">{item.ico}</div>
+              <div className="sc-lbl">{item.lbl}</div>
+              <div className="sc-val">{item.val}</div>
+              <div className="sc-sub">{item.sub}</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Charts Section */}
@@ -98,7 +91,6 @@ const Dashboard = () => {
         <div className="card">
           <div className="chdr">
             <h3>Revenue — Last 7 Days</h3>
-            <span className="sub"></span>
           </div>
           <div className="rchart">
             <p style={{ opacity: 0.6 }}>Chart will load here</p>
@@ -110,9 +102,7 @@ const Dashboard = () => {
             <h3>Top Salons by Revenue</h3>
             <span className="sub">This month</span>
           </div>
-          <div>
-            <p style={{ opacity: 0.6 }}>Data will load here</p>
-          </div>
+          <p style={{ opacity: 0.6 }}>Data will load here</p>
         </div>
 
       </div>
@@ -124,9 +114,7 @@ const Dashboard = () => {
           <div className="chdr">
             <h3>Live Activity</h3>
           </div>
-          <div>
-            <p style={{ opacity: 0.6 }}>Activity will appear here</p>
-          </div>
+          <p style={{ opacity: 0.6 }}>Activity will appear here</p>
         </div>
 
         <div className="card">
@@ -139,7 +127,7 @@ const Dashboard = () => {
             <button
               className="btn btn-g"
               style={{ justifyContent: "flex-start" }}
-              onClick={() => openModal("m-salon")}
+              onClick={() => goTo("AddSalon")}
             >
               Register New Salon
             </button>
@@ -147,7 +135,7 @@ const Dashboard = () => {
             <button
               className="btn btn-g"
               style={{ justifyContent: "flex-start" }}
-              onClick={() => openModal("m-staff")}
+              onClick={() => goTo("AddStaff")}
             >
               Add Staff Member
             </button>
@@ -155,7 +143,7 @@ const Dashboard = () => {
             <button
               className="btn btn-g"
               style={{ justifyContent: "flex-start" }}
-              onClick={() => openModal("m-appt")}
+              onClick={() => goTo("AddAppointment")}
             >
               Create Appointment
             </button>
@@ -175,17 +163,7 @@ const Dashboard = () => {
 
       {/* Salons Section */}
       <div className="dsec-hdr">
-        <h3>
-          🏠 All Salons{" "}
-          <span
-            style={{
-              fontSize: ".72rem",
-              color: "var(--muted2)",
-              fontWeight: 400,
-              marginLeft: "6px",
-            }}
-          ></span>
-        </h3>
+        <h3>🏠 All Salons</h3>
 
         <button
           className="btn btn-g sm"

@@ -1,109 +1,365 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+import {
+  getRevenueStats,
+  getSalonRevenue,
+  getMonthlyRevenue
+} from "../../services/revenueService";
+
 const Revenue = () => {
-  const navigate = useNavigate(); // Now used in the back-btn
-  const [isBlurred, setIsBlurred] = useState(true);
-  const [grossRevenue, setGrossRevenue] = useState(120000);
-  
-  // Removed 'set' functions since we are using static dummy data for these
-  const [pendingPayouts] = useState(6300);
-  const [salons] = useState([
-    { name: 'Salon A', revenue: 25000, transactions: 120, status: 'Active' },
-    { name: 'Salon B', revenue: 30000, transactions: 150, status: 'Active' },
-    { name: 'Salon C', revenue: 20000, transactions: 100, status: 'Inactive' }
-  ]);
+
+  const navigate = useNavigate();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [grossRevenue, setGrossRevenue] = useState(0);
+  const [pendingPayouts, setPendingPayouts] = useState(0);
+  const [grossGrowth, setGrossGrowth] = useState(0);
+  const [pendingOverdue, setPendingOverdue] = useState(0);
+
+  const [salons, setSalons] = useState([]);
+
+  // Format currency
+  const formatCurrency = (value) => {
+    return `Rs. ${Number(value).toLocaleString()}`;
+  };
+
+  // Fetch revenue data
+  const fetchData = async () => {
+
+    try {
+
+      setLoading(true);
+      setError("");
+
+      const statsRes =
+        await getRevenueStats();
+
+      const salonsRes =
+        await getSalonRevenue();
+
+      const monthlyRes =
+        await getMonthlyRevenue();
+
+      setGrossRevenue(
+        statsRes?.data?.grossRevenue || 0
+      );
+
+      setPendingPayouts(
+        statsRes?.data?.pendingPayouts || 0
+      );
+
+      setGrossGrowth(
+        statsRes?.data?.grossGrowth || 0
+      );
+
+      setPendingOverdue(
+        statsRes?.data?.pendingOverdue || 0
+      );
+
+      setSalons(
+        salonsRes?.data || []
+      );
+
+    }
+    catch (err) {
+
+      console.error(err);
+
+      setError(
+        "Failed to load revenue data"
+      );
+
+    }
+    finally {
+
+      setLoading(false);
+
+    }
+
+  };
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setGrossRevenue(prev => prev + Math.floor(Math.random() * 500));
-    }, 10000);
-    return () => clearInterval(interval);
+
+    fetchData();
+
   }, []);
 
-  const handleMonthlyClick = () => {
-    const password = prompt("Enter confirmation password:");
-    if (password === "superadmin") setIsBlurred(false);
-    else alert("Try again");
+  // Export CSV
+  const doExport = () => {
+
+    let csv =
+      "Salon,Revenue,Transactions\n";
+
+    salons.forEach((s) => {
+
+      csv +=
+        `${s.name},${s.revenue},${s.transactions}\n`;
+
+    });
+
+    const blob =
+      new Blob([csv], {
+        type: "text/csv"
+      });
+
+    const link =
+      document.createElement("a");
+
+    link.href =
+      URL.createObjectURL(blob);
+
+    link.download =
+      "revenue.csv";
+
+    link.click();
+
   };
 
   return (
-    <div id="pg-revenue" style={{ padding: "20px" }}>
-      
+
+    <div className="page on" id="pg-revenue">
+
       {/* Header */}
-      <div className="ph" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-          {/* USES NAVIGATE HERE */}
-          <button 
-            className="btn btn-g sm" 
-            onClick={() => navigate("/Dashboard")}
-            style={{ cursor: "pointer" }}
+
+      <div className="ph">
+
+        <div className="ph-left">
+
+          <button
+            className="back-btn"
+            onClick={() =>
+              navigate("/Dashboard")
+            }
           >
-            ← Back
+            ←
           </button>
+
           <div>
-            <h1 style={{ color: "white", margin: 0 }}>Revenue</h1>
+            <h1>Revenue</h1>
+            <p>
+              Financial overview across all salons
+            </p>
           </div>
+
         </div>
-        <button className="btn btn-g sm" onClick={() => console.log("Exporting...")}>
-          Export CSV
-        </button>
+
+        <div className="pactions">
+
+          <button
+            className="btn btn-g sm"
+            onClick={doExport}
+          >
+            Export CSV
+          </button>
+
+        </div>
+
       </div>
 
-      {/* Summary Cards */}
-      <div style={{ display: "flex", gap: "20px", marginBottom: "20px" }}>
-        <div className="card" style={{ flex: 1, padding: "20px", textAlign: "center" }}>
-          <div style={{ fontSize: "0.8rem", color: "var(--muted2)" }}>Gross Revenue</div>
-          <h2 style={{ color: "#FFD700", margin: "10px 0" }}>Rs. {grossRevenue.toLocaleString()}</h2>
-        </div>
-        <div className="card" style={{ flex: 1, padding: "20px", textAlign: "center" }}>
-          <div style={{ fontSize: "0.8rem", color: "var(--muted2)" }}>Pending Payouts</div>
-          <h2 style={{ color: "white", margin: "10px 0" }}>Rs. {pendingPayouts.toLocaleString()}</h2>
-        </div>
-      </div>
+      {error && (
 
-      {/* Blurred Section */}
-      <div 
-        className="card" 
-        style={{ 
-          padding: "20px", 
-          marginBottom: "20px", 
-          filter: isBlurred ? "blur(6px)" : "none",
-          cursor: isBlurred ? "pointer" : "default"
-        }}
-        onClick={isBlurred ? handleMonthlyClick : undefined}
-      >
-        <h3 style={{ color: "white" }}>Monthly Revenue Details</h3>
-        <p style={{ color: "var(--muted2)" }}>Click to unlock super-admin financial data</p>
-      </div>
+        <div className="alert alert-w">
+          {error}
+        </div>
 
-      {/* Table */}
-      <div className="card" style={{ background: "#0c0c0c", borderRadius: "10px", overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-          <thead style={{ background: "#1a1a1a", color: "#666", fontSize: "0.8rem" }}>
-            <tr>
-              <th style={{ padding: "15px" }}>Salon</th>
-              <th>Revenue</th>
-              <th>Status</th>
-              <th style={{ textAlign: "right", paddingRight: "15px" }}>Action</th>
-            </tr>
-          </thead>
-          <tbody style={{ color: "white" }}>
-            {salons.map((salon, index) => (
-              <tr key={index} style={{ borderBottom: "1px solid #222" }}>
-                <td style={{ padding: "15px" }}>{salon.name}</td>
-                <td style={{ color: "#FFD700" }}>Rs. {salon.revenue.toLocaleString()}</td>
-                <td>{salon.status}</td>
-                <td style={{ textAlign: "right", paddingRight: "15px" }}>
-                  <button className="btn btn-g sm">View</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      )}
+
+      {loading ? (
+
+        <p>Loading revenue...</p>
+
+      ) : (
+
+        <>
+
+          {/* TOP CARDS */}
+
+          <div className="rev-top">
+
+            <div className="rev-card">
+
+              <div className="ri">💰</div>
+
+              <div className="rl">
+                GROSS REVENUE
+              </div>
+
+              <div className="rv">
+                {formatCurrency(
+                  grossRevenue
+                )}
+              </div>
+
+              <div className="rc up">
+                ↑ {grossGrowth}%
+              </div>
+
+            </div>
+
+            <div className="rev-card">
+
+              <div className="ri">⏳</div>
+
+              <div className="rl">
+                PENDING PAYOUTS
+              </div>
+
+              <div className="rv">
+                {formatCurrency(
+                  pendingPayouts
+                )}
+              </div>
+
+              <div className="rs">
+                {pendingOverdue} overdue
+              </div>
+
+            </div>
+
+            <div className="period-grp">
+
+              <button className="period-btn">
+                Last 30 days ▼
+              </button>
+
+              <button className="period-btn">
+                This Year ▼
+              </button>
+
+            </div>
+
+          </div>
+
+          {/* TABLE HEADER */}
+
+          <div className="rev-tbl-hdr">
+
+            <h3>
+              Revenue by Salon
+            </h3>
+
+            <button className="sort-btn">
+              Sorted by revenue ▼
+            </button>
+
+          </div>
+
+          {/* TABLE */}
+
+          <div className="tw">
+
+            <table>
+
+              <thead>
+
+                <tr>
+
+                  <th>Salon</th>
+                  <th>Revenue</th>
+                  <th>Transactions</th>
+                  <th>Avg Value</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: "right" }}>
+                    Action
+                  </th>
+
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                {salons.length === 0 ? (
+
+                  <tr>
+
+                    <td colSpan="6">
+                      No data found
+                    </td>
+
+                  </tr>
+
+                ) : (
+
+                  salons.map((salon, i) => {
+
+                    const avg =
+                      salon.transactions > 0
+                        ? salon.revenue /
+                          salon.transactions
+                        : 0;
+
+                    return (
+
+                      <tr key={i}>
+
+                        <td>
+                          {salon.name}
+                        </td>
+
+                        <td style={{
+                          color: "var(--yellow)"
+                        }}>
+                          {formatCurrency(
+                            salon.revenue
+                          )}
+                        </td>
+
+                        <td>
+                          {salon.transactions}
+                        </td>
+
+                        <td>
+                          {formatCurrency(
+                            avg
+                          )}
+                        </td>
+
+                        <td>
+
+                          <span className="pill pg">
+                            {salon.status}
+                          </span>
+
+                        </td>
+
+                        <td
+                          style={{
+                            textAlign: "right"
+                          }}
+                        >
+
+                          <button className="btn btn-g xs">
+                            Pay Out
+                          </button>
+
+                        </td>
+
+                      </tr>
+
+                    );
+
+                  })
+
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </>
+
+      )}
+
     </div>
+
   );
+
 };
 
 export default Revenue;
