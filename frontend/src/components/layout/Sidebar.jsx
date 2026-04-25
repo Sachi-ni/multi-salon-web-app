@@ -36,7 +36,6 @@ const Sidebar = ({ isOpen = true }) => {
         onClick={() => navigate("/Salons")}
       >
         Salons
-        <span className="cnt" id="cnt-s">0</span>
       </div>
 
       <div
@@ -53,7 +52,6 @@ const Sidebar = ({ isOpen = true }) => {
         onClick={() => navigate("/Appointments")}
       >
         Appointments
-        <span className="cnt b" id="cnt-a">0</span>
       </div>
 
       <div className="ngrp">Finance</div>

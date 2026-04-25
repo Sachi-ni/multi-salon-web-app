@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import './App.css';
 
 import Login from "./pages/auth/Login.jsx";
@@ -18,17 +18,19 @@ import Analytics from "./pages/superadmin/Analytics.jsx";
 import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 
+import AdminDashboard from "./pages/admin/Dashboard.jsx";
+
 function App() {
   return (
     <BrowserRouter>
-      {/* All Routes MUST be inside this container */}
       <Routes>
-        <Route path="/" element={<Main />} />
 
+        {/* Public Routes */}
+        <Route path="/" element={<Main />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
 
-
+        {/* Super Admin Routes */}
         <Route
           path="/Dashboard"
           element={
@@ -47,7 +49,7 @@ function App() {
           }
         />
 
-       <Route
+        <Route
           path="/Revenue"
           element={
             <DashboardLayout>
@@ -84,43 +86,48 @@ function App() {
         />
 
         <Route
-        path="/Appointments"
-        element={
-          <DashboardLayout>
-            <Appointments />
-          </DashboardLayout>
-        }
-      />
+          path="/Appointments"
+          element={
+            <DashboardLayout>
+              <Appointments />
+            </DashboardLayout>
+          }
+        />
 
         <Route
-        path="/Analytics"
-        element={
-          <DashboardLayout>
-            <Analytics />
-          </DashboardLayout>
-        }
-      />
+          path="/Analytics"
+          element={
+            <DashboardLayout>
+              <Analytics />
+            </DashboardLayout>
+          }
+        />
 
-      <Route
-        path="/salons"
-        element={
-          <DashboardLayout>
-            <Salons />
-          </DashboardLayout>
-        }
-      />
+        <Route
+          path="/salons"
+          element={
+            <DashboardLayout>
+              <Salons />
+            </DashboardLayout>
+          }
+        />
 
-      <Route
-        path="/AddAppointment"
-        element={
-          <DashboardLayout>
-            <AddAppointment />
-          </DashboardLayout>
-        }
-      />
+        <Route
+          path="/AddAppointment"
+          element={
+            <DashboardLayout>
+              <AddAppointment />
+            </DashboardLayout>
+          }
+        />
+
+        {/* Admin Route */}
+        <Route
+          path="/admin/dashboard/:id"
+          element={<AdminDashboard />}
+        />
+
       </Routes>
-
-
     </BrowserRouter>
   );
 }
