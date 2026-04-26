@@ -1,14 +1,24 @@
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import './App.css';
 
+import { AuthProvider } from "./context/AuthContext";
+
+// General Pages
 import Login from "./pages/auth/Login.jsx";
 import Signup from "./pages/auth/register.jsx";
-import Main from "./pages/dashboard.jsx";
+import Edit from "./pages/auth/edit.jsx";
+//import Main from "./pages/dashboard.jsx";
+import Unauthorized from "./pages/Unauthorized.jsx";
 
+//customer pages
+import'./pages/customer/customer.css';
+import Main from "./pages/customer/Dashboard.jsx";
+
+// Super Admin Pages
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import Profile from "./pages/superadmin/profile.jsx";
-import Dashboard from "./pages/superadmin/Dashboard.jsx";
+import SuperAdminDashboard from "./pages/superadmin/Dashboard.jsx";
 import Revenue from "./pages/superadmin/Revenue.jsx";
 import AddSalon from "./pages/superadmin/AddSalon.jsx";
 import AddStaff from "./pages/superadmin/AddStaff.jsx";
@@ -18,117 +28,148 @@ import Analytics from "./pages/superadmin/Analytics.jsx";
 import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 
-import AdminDashboard from "./pages/admin/Dashboard.jsx";
+import { useAuth } from "./context/AuthContext";
+
+const ProtectedRoute = ({ children, allowedRoles }) => {
+  const { user } = useAuth();
+
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to="/unauthorized" />; // you can make a simple Unauthorized page
+  }
+
+  return children;
+};
+
 
 function App() {
   return (
+    <AuthProvider>
     <BrowserRouter>
+      {/* All Routes MUST be inside this container */}
       <Routes>
-
-        {/* Public Routes */}
         <Route path="/" element={<Main />} />
+
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/editProfile" element={<Edit />} />
+        <Route path="/unauthorized" element={<Unauthorized />} />
 
-        {/* Super Admin Routes */}
         <Route
-          path="/Dashboard"
+          path="/superAdminDashboard"
           element={
-            <DashboardLayout>
-              <Dashboard />
-            </DashboardLayout>
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <SuperAdminDashboard />
+              </DashboardLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
           path="/Profile"
           element={
-            <DashboardLayout>
-              <Profile />
-            </DashboardLayout>
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <Profile />
+              </DashboardLayout>
+            </ProtectedRoute>
           }
         />
 
-        <Route
+       <Route
           path="/Revenue"
           element={
-            <DashboardLayout>
-              <Revenue />
-            </DashboardLayout>
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <Revenue />
+              </DashboardLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
           path="/Staff"
           element={
-            <DashboardLayout>
-              <Staff />
-            </DashboardLayout>
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <Staff />
+              </DashboardLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
           path="/AddSalon"
           element={
-            <DashboardLayout>
-              <AddSalon />
-            </DashboardLayout>
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <AddSalon />
+              </DashboardLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
           path="/AddStaff"
           element={
-            <DashboardLayout>
-              <AddStaff />
-            </DashboardLayout>
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <AddStaff />
+              </DashboardLayout>
+            </ProtectedRoute>
           }
         />
 
         <Route
-          path="/Appointments"
-          element={
+        path="/Appointments"
+        element={
+          <ProtectedRoute allowedRoles={["super-admin"]}>
             <DashboardLayout>
               <Appointments />
             </DashboardLayout>
-          }
-        />
+          </ProtectedRoute>
+        }
+      />
 
         <Route
-          path="/Analytics"
-          element={
+        path="/Analytics"
+        element={
+          <ProtectedRoute allowedRoles={["super-admin"]}>
             <DashboardLayout>
               <Analytics />
             </DashboardLayout>
-          }
-        />
+          </ProtectedRoute>
+        }
+      />
 
-        <Route
-          path="/salons"
-          element={
+      <Route
+        path="/salons"
+        element={
+          <ProtectedRoute allowedRoles={["super-admin"]}>
             <DashboardLayout>
               <Salons />
             </DashboardLayout>
-          }
-        />
+          </ProtectedRoute>
+        }
+      />
 
-        <Route
-          path="/AddAppointment"
-          element={
-            <DashboardLayout>
-              <AddAppointment />
-            </DashboardLayout>
-          }
-        />
-
-        {/* Admin Route */}
-        <Route
-          path="/admin/dashboard/:id"
-          element={<AdminDashboard />}
-        />
-
+      <Route
+        path="/AddAppointment"
+        element={
+          <DashboardLayout>
+            <AddAppointment />
+          </DashboardLayout>
+        }
+      />
       </Routes>
+
+
     </BrowserRouter>
+    </AuthProvider>
   );
 }
 
