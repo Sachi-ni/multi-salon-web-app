@@ -1,8 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { ROLES } from "../../constants/roles";
+import { createStaff } from "../../services/staffService";
+import { getSalons } from "../../services/salonService";
 
 const AddStaff = () => {
   const navigate = useNavigate();
+  const [salons, setSalons] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -13,6 +18,18 @@ const AddStaff = () => {
     picture: null
   });
 
+  useEffect(() => {
+    const fetchSalons = async () => {
+      try {
+        const res = await getSalons();
+        setSalons(res.data || []);
+      } catch (err) {
+        console.error("Failed to load salons");
+      }
+    };
+    fetchSalons();
+  }, []);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -20,11 +37,27 @@ const AddStaff = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("New Staff:", formData);
+    setLoading(true);
 
-    navigate("/Staff");
+    try {
+      const data = new FormData();
+      data.append("name", `${formData.firstName} ${formData.lastName}`);
+      data.append("email", formData.email);
+      data.append("role", formData.role);
+      data.append("salonId", formData.salon);
+      if (formData.picture) {
+        data.append("image", formData.picture);
+      }
+
+      await createStaff(data);
+      navigate("/Staff");
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to add staff");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -70,6 +103,7 @@ const AddStaff = () => {
               placeholder="Enter first name"
               className="pf-inp"
               required
+              value={formData.firstName}
               onChange={handleChange}
             />
           </div>
@@ -83,6 +117,7 @@ const AddStaff = () => {
               placeholder="Enter last name"
               className="pf-inp"
               required
+              value={formData.lastName}
               onChange={handleChange}
             />
           </div>
@@ -96,21 +131,27 @@ const AddStaff = () => {
               placeholder="Enter email"
               className="pf-inp"
               required
+              value={formData.email}
               onChange={handleChange}
             />
           </div>
 
+
           {/* Role */}
           <div className="fg">
             <label>Role</label>
-            <input
-              type="text"
+            <select
               name="role"
-              placeholder="e.g. Hair Stylist"
               className="pf-inp"
               required
               onChange={handleChange}
-            />
+              value={formData.role}
+            >
+              <option value="">Select Role...</option>
+              {ROLES.map((role) => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
           </div>
 
           {/* Salon */}
@@ -120,12 +161,13 @@ const AddStaff = () => {
               name="salon"
               className="pf-inp"
               required
+              value={formData.salon}
               onChange={handleChange}
             >
               <option value="">Select Salon...</option>
-              <option value="Liyo">Liyo</option>
-              <option value="Kathura">Kathura</option>
-              <option value="89">89</option>
+              {salons.map((s) => (
+                <option key={s._id} value={s._id}>{s.name}</option>
+              ))}
             </select>
           </div>
 
@@ -160,8 +202,9 @@ const AddStaff = () => {
             <button
               type="submit"
               className="btn btn-p"
+              disabled={loading}
             >
-              Save Staff
+              {loading ? "Saving..." : "Save Staff"}
             </button>
 
           </div>
