@@ -26,7 +26,7 @@ const Signup = () => {
         username: uname,
         email: email,
         password: password,
-        phone: phone
+        role: "super-admin"
       });
       console.log('Registration successful:', response.data);
       alert('Registration successful! Redirecting to login...');
@@ -108,7 +108,7 @@ const Signup = () => {
             placeholder="••••••••" 
             />
           </div>
-        </div>
+        </div>handleRegister
         <button className="auth-btn" type="submit">
           Register Now
         </button>
