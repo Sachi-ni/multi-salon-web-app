@@ -4,12 +4,18 @@ import './App.css';
 
 import { AuthProvider } from "./context/AuthContext";
 
+// General Pages
 import Login from "./pages/auth/Login.jsx";
 import Signup from "./pages/auth/register.jsx";
 import Edit from "./pages/auth/edit.jsx";
-import Main from "./pages/dashboard.jsx";
+//import Main from "./pages/dashboard.jsx";
 import Unauthorized from "./pages/Unauthorized.jsx";
 
+//customer pages
+import'./pages/customer/customer.css';
+import Main from "./pages/customer/Dashboard.jsx";
+
+// Super Admin Pages
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import Profile from "./pages/superadmin/profile.jsx";
 import SuperAdminDashboard from "./pages/superadmin/Dashboard.jsx";
