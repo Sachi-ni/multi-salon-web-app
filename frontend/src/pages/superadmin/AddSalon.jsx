@@ -1,19 +1,16 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createSalon } from "../../services/salonService";
 
 const AddSalon = () => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    name: "",
+    salonName: "",
     ownerName: "",
     email: "",
     phone: "",
-    location: ""
+    address: ""
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const handleChange = (e) => {
     setFormData({
@@ -22,19 +19,13 @@ const AddSalon = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    console.log("New Salon:", formData);
 
-    try {
-      await createSalon(formData);
-      navigate("/Salons");
-    } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.message || "Failed to create salon");
-      setLoading(false);
-    }
+    // later: API call here
+
+    navigate("/Salons");
   };
 
   return (
@@ -61,13 +52,6 @@ const AddSalon = () => {
 
       </div>
 
-      {/* ERROR */}
-      {error && (
-        <div className="alert alert-w">
-          {error}
-        </div>
-      )}
-
       {/* FORM CARD */}
       <div className="card" style={{ maxWidth: "650px", margin: "0 auto" }}>
 
@@ -83,11 +67,10 @@ const AddSalon = () => {
             <label>Salon Name</label>
             <input
               type="text"
-              name="name"
+              name="salonName"
               placeholder="Enter salon name"
               className="pf-inp"
               required
-              value={formData.name}
               onChange={handleChange}
             />
           </div>
@@ -101,7 +84,6 @@ const AddSalon = () => {
               placeholder="Enter owner name"
               className="pf-inp"
               required
-              value={formData.ownerName}
               onChange={handleChange}
             />
           </div>
@@ -115,7 +97,6 @@ const AddSalon = () => {
               placeholder="Enter email"
               className="pf-inp"
               required
-              value={formData.email}
               onChange={handleChange}
             />
           </div>
@@ -129,7 +110,6 @@ const AddSalon = () => {
               placeholder="Enter phone number"
               className="pf-inp"
               required
-              value={formData.phone}
               onChange={handleChange}
             />
           </div>
@@ -139,25 +119,10 @@ const AddSalon = () => {
             <label>Address</label>
             <input
               type="text"
-              name="location"
+              name="address"
               placeholder="Enter address"
               className="pf-inp"
               required
-              value={formData.location}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/*About US*/}
-          <div className="fg">
-            <label>About</label>
-            <input
-              type="text"
-              name="about"
-              placeholder="Enter about the salon"
-              className="pf-inp"
-              required
-              value={formData.about}
               onChange={handleChange}
             />
           </div>
@@ -169,7 +134,6 @@ const AddSalon = () => {
               type="button"
               className="btn btn-g"
               onClick={() => navigate("/Salons")}
-              disabled={loading}
             >
               Cancel
             </button>
@@ -177,9 +141,8 @@ const AddSalon = () => {
             <button
               type="submit"
               className="btn btn-p"
-              disabled={loading}
             >
-              {loading ? "Adding..." : "Add Salon"}
+              Add Salon
             </button>
 
           </div>
@@ -187,6 +150,7 @@ const AddSalon = () => {
         </form>
 
       </div>
+
     </div>
   );
 };

@@ -21,10 +21,6 @@ const Revenue = () => {
 
   const [salons, setSalons] = useState([]);
 
-  // NEW STATES (ONLY ADDITION)
-  const [sortDesc, setSortDesc] = useState(true);
-  const [period, setPeriod] = useState("30days");
-
   // Format currency
   const formatCurrency = (value) => {
     return `Rs. ${Number(value).toLocaleString()}`;
@@ -192,7 +188,9 @@ const Revenue = () => {
               </div>
 
               <div className="rv">
-                {formatCurrency(grossRevenue)}
+                {formatCurrency(
+                  grossRevenue
+                )}
               </div>
 
               <div className="rc up">
@@ -210,7 +208,9 @@ const Revenue = () => {
               </div>
 
               <div className="rv">
-                {formatCurrency(pendingPayouts)}
+                {formatCurrency(
+                  pendingPayouts
+                )}
               </div>
 
               <div className="rs">
@@ -221,19 +221,11 @@ const Revenue = () => {
 
             <div className="period-grp">
 
-              {/* FIXED BUTTON */}
-              <button
-                className="period-btn"
-                onClick={() => setPeriod("30days")}
-              >
+              <button className="period-btn">
                 Last 30 days ▼
               </button>
 
-              {/* FIXED BUTTON */}
-              <button
-                className="period-btn"
-                onClick={() => setPeriod("year")}
-              >
+              <button className="period-btn">
                 This Year ▼
               </button>
 
@@ -249,12 +241,8 @@ const Revenue = () => {
               Revenue by Salon
             </h3>
 
-            {/* FIXED SORT BUTTON */}
-            <button
-              className="sort-btn"
-              onClick={() => setSortDesc(!sortDesc)}
-            >
-              Sorted by revenue {sortDesc ? "▼" : "▲"}
+            <button className="sort-btn">
+              Sorted by revenue ▼
             </button>
 
           </div>
@@ -294,27 +282,9 @@ const Revenue = () => {
 
                   </tr>
 
-                ) : (() => {
+                ) : (
 
-                  // FILTER LOGIC (ADDED ONLY HERE)
-
-                  let filteredSalons = [...salons];
-
-                  if (period === "30days") {
-                    filteredSalons = filteredSalons.slice(0, 10);
-                  }
-
-                  if (period === "year") {
-                    filteredSalons = filteredSalons;
-                  }
-
-                  filteredSalons.sort((a, b) => {
-                    return sortDesc
-                      ? b.revenue - a.revenue
-                      : a.revenue - b.revenue;
-                  });
-
-                  return filteredSalons.map((salon, i) => {
+                  salons.map((salon, i) => {
 
                     const avg =
                       salon.transactions > 0
@@ -326,35 +296,55 @@ const Revenue = () => {
 
                       <tr key={i}>
 
-                        <td>{salon.name}</td>
-
-                        <td style={{ color: "var(--yellow)" }}>
-                          {formatCurrency(salon.revenue)}
+                        <td>
+                          {salon.name}
                         </td>
 
-                        <td>{salon.transactions}</td>
-
-                        <td>{formatCurrency(avg)}</td>
+                        <td style={{
+                          color: "var(--yellow)"
+                        }}>
+                          {formatCurrency(
+                            salon.revenue
+                          )}
+                        </td>
 
                         <td>
+                          {salon.transactions}
+                        </td>
+
+                        <td>
+                          {formatCurrency(
+                            avg
+                          )}
+                        </td>
+
+                        <td>
+
                           <span className="pill pg">
                             {salon.status}
                           </span>
+
                         </td>
 
-                        <td style={{ textAlign: "right" }}>
+                        <td
+                          style={{
+                            textAlign: "right"
+                          }}
+                        >
+
                           <button className="btn btn-g xs">
                             Pay Out
                           </button>
+
                         </td>
 
                       </tr>
 
                     );
 
-                  });
+                  })
 
-                })()}
+                )}
 
               </tbody>
 
