@@ -1,7 +1,11 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+
 
 const Header = ({ onToggleSidebar }) => {
+  const { user } = useAuth();
+  console.log("User in Header:", user);
   const navigate = useNavigate();
   const toggleSB = () => {
     console.log("Toggle Sidebar");
@@ -12,11 +16,8 @@ const Header = ({ onToggleSidebar }) => {
     console.log("Show Notifications");
   };
 
-  const openProfile = () => {
-    console.log("Open Profile");
-  };
-
   return (
+
     <div id="hdr" className="on">
 
       {/* Hamburger */}
@@ -69,8 +70,8 @@ const Header = ({ onToggleSidebar }) => {
         style={{ cursor: "pointer" }}
         onClick={() => navigate('/profile')}
       >
-        <div className="hname">Super Admin</div>
-        <div className="hrole">admin@salonhub.com</div>
+        <div className="hname">{user?.name || "Super Admin"}</div>
+        <div className="hrole">{user?.email || "admin@salonhub.com"}</div>
       </div>
 
     </div>
