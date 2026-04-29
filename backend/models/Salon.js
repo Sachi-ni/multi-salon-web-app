@@ -16,4 +16,4 @@ const salonSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-export default mongoose.model("Salon", salonSchema);
+export default mongoose.model("Branch", salonSchema, "salons");

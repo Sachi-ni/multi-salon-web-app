@@ -11,6 +11,7 @@ import customerRoutes from "./routes/customerRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
 import billRoutes from "./routes/billRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
+import availabilityRoutes from "./routes/availabilityRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -19,6 +20,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // API Routes
 app.use("/api/auth", authRoutes);
@@ -29,6 +31,7 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/bills", billRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/availability", availabilityRoutes);
 
 // Test Route
 app.get("/", (req, res) => {

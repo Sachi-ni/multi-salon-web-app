@@ -7,14 +7,27 @@ const staffSchema = new mongoose.Schema({
   role: { type: String, required: true },
   specification: { type: String, default: "" },
   commission_rate: { type: Number, default: 0 },
-  status: { type: String, default: "Active", enum: ["Active", "Inactive"] },
+  status: { type: String, enum: ["Active", "Inactive"], default: "Active" },
+
   salon_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Salon",
+    ref: "Branch",
     required: true
   },
+
+  // 🔥 ADD THIS
+  services: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Service"
+  }],
+
+  // 🔥 ADD THIS
+  workingHours: {
+    start: { type: String, default: "09:00" },
+    end: { type: String, default: "18:00" }
+  },
+
   image: { type: String, default: "" }
 });
 
 export default mongoose.model("Staff", staffSchema);
-

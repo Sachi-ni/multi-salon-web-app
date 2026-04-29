@@ -5,10 +5,6 @@ const serviceSchema = new mongoose.Schema({
   base_price: Number,
   description: String,
   duration: Number,
-  staff_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Staff"
-  },
   category_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "ServiceCategory"

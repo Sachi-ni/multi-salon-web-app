@@ -14,6 +14,7 @@ import Unauthorized from "./pages/Unauthorized.jsx";
 //customer pages
 import'./pages/customer/customer.css';
 import Main from "./pages/customer/Dashboard.jsx";
+import BookingPage from "./pages/customer/BookService.jsx";
 
 // Super Admin Pages
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
@@ -164,6 +165,15 @@ function App() {
             <AddAppointment />
           </DashboardLayout>
         }
+      />
+
+      <Route 
+      path="/book" 
+      element={
+        <DashboardLayout>
+          <BookingPage />
+        </DashboardLayout>     
+      }
       />
       </Routes>
 
