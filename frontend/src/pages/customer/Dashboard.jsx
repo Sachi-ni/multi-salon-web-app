@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import LoginHeader from "../../components/layout/loginHeader";
+import "./customer.css";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ const Dashboard = () => {
   };
 
   return (
-    <>
+    <div className="customer-page">
       <LoginHeader />
     <div id="screen-home" className="screen active">
     <div className="hero">
@@ -48,8 +49,8 @@ const Dashboard = () => {
         <span className="strip-item">GROOMING</span>
     </div>
     </div>
-    </>
+    </div>
         );
     };  
 
-export default Dashboard;
+export default Dashboard;

@@ -3,6 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { ROLES } from "../../constants/roles";
 import { createStaff } from "../../services/staffService";
 import { getSalons } from "../../services/salonService";
+import PageHeader from "../../components/ui/PageHeader";
+import Card from "../../components/ui/Card";
+import Input from "../../components/ui/Input";
+import Button from "../../components/ui/Button";
 
 const AddStaff = () => {
   const navigate = useNavigate();
@@ -10,12 +14,7 @@ const AddStaff = () => {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    role: "",
-    salon: "",
-    picture: null
+    firstName: "", lastName: "", email: "", role: "", salon: "", picture: null,
   });
 
   useEffect(() => {
@@ -31,26 +30,19 @@ const AddStaff = () => {
   }, []);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       const data = new FormData();
       data.append("name", `${formData.firstName} ${formData.lastName}`);
       data.append("email", formData.email);
       data.append("role", formData.role);
       data.append("salonId", formData.salon);
-      if (formData.picture) {
-        data.append("image", formData.picture);
-      }
-
+      if (formData.picture) data.append("image", formData.picture);
       await createStaff(data);
       navigate("/Staff");
     } catch (err) {
@@ -61,91 +53,28 @@ const AddStaff = () => {
   };
 
   return (
-    <div className="page on" id="pg-add-staff">
+    <div>
+      <PageHeader title="Add Staff" subtitle="Create a new staff member profile" backTo="/Staff" />
 
-      {/* HEADER */}
-      <div className="ph">
+      <Card className="max-w-[600px] mx-auto" accent>
+        <Card.Header>
+          <Card.Title>Staff Details</Card.Title>
+          <Card.Subtitle>Fill all required fields</Card.Subtitle>
+        </Card.Header>
 
-        <div className="ph-left">
+        <form onSubmit={handleSubmit}>
+          <Input label="First Name" name="firstName" placeholder="Enter first name" required value={formData.firstName} onChange={handleChange} />
+          <Input label="Last Name" name="lastName" placeholder="Enter last name" required value={formData.lastName} onChange={handleChange} />
+          <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={handleChange} />
 
-          <button
-            className="back-btn"
-            onClick={() => navigate("/Staff")}
-          >
-            ←
-          </button>
-
-          <div>
-            <h1>Add Staff</h1>
-            <p>Create a new staff member profile</p>
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* FORM CARD */}
-      <div className="card" style={{ maxWidth: "600px", margin: "0 auto" }}>
-
-        <div className="chdr">
-          <h3>Staff Details</h3>
-          <span className="sub">Fill all required fields</span>
-        </div>
-
-        <form onSubmit={handleSubmit} className="fc">
-
-          {/* First Name */}
-          <div className="fg">
-            <label>First Name</label>
-            <input
-              type="text"
-              name="firstName"
-              placeholder="Enter first name"
-              className="pf-inp"
-              required
-              value={formData.firstName}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* Last Name */}
-          <div className="fg">
-            <label>Last Name</label>
-            <input
-              type="text"
-              name="lastName"
-              placeholder="Enter last name"
-              className="pf-inp"
-              required
-              value={formData.lastName}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* Email */}
-          <div className="fg">
-            <label>Email</label>
-            <input
-              type="email"
-              name="email"
-              placeholder="Enter email"
-              className="pf-inp"
-              required
-              value={formData.email}
-              onChange={handleChange}
-            />
-          </div>
-
-
-          {/* Role */}
-          <div className="fg">
-            <label>Role</label>
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Role</label>
             <select
               name="role"
-              className="pf-inp"
               required
-              onChange={handleChange}
               value={formData.role}
+              onChange={handleChange}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent cursor-pointer"
             >
               <option value="">Select Role...</option>
               {ROLES.map((role) => (
@@ -154,15 +83,14 @@ const AddStaff = () => {
             </select>
           </div>
 
-          {/* Salon */}
-          <div className="fg">
-            <label>Salon</label>
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Salon</label>
             <select
               name="salon"
-              className="pf-inp"
               required
               value={formData.salon}
               onChange={handleChange}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent cursor-pointer"
             >
               <option value="">Select Salon...</option>
               {salons.map((s) => (
@@ -171,48 +99,22 @@ const AddStaff = () => {
             </select>
           </div>
 
-          {/* Picture Upload */}
-          <div className="fg">
-            <label>Profile Picture</label>
-
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Profile Picture</label>
             <input
               type="file"
-              className="pf-inp"
               accept="image/*"
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  picture: e.target.files[0]
-                })
-              }
+              onChange={(e) => setFormData({ ...formData, picture: e.target.files[0] })}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
             />
           </div>
 
-          {/* ACTIONS */}
-          <div className="mact">
-
-            <button
-              type="button"
-              className="btn btn-g"
-              onClick={() => navigate("/Staff")}
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              className="btn btn-p"
-              disabled={loading}
-            >
-              {loading ? "Saving..." : "Save Staff"}
-            </button>
-
+          <div className="flex gap-2.5 justify-end mt-5 pt-4 border-t border-border">
+            <Button variant="ghost" type="button" onClick={() => navigate("/Staff")}>Cancel</Button>
+            <Button variant="primary" type="submit" loading={loading}>{loading ? "Saving..." : "Save Staff"}</Button>
           </div>
-
         </form>
-
-      </div>
-
+      </Card>
     </div>
   );
 };
