@@ -12,7 +12,6 @@ import Edit from "./pages/auth/edit.jsx";
 import Unauthorized from "./pages/Unauthorized.jsx";
 
 //customer pages
-import'./pages/customer/customer.css';
 import Main from "./pages/customer/Dashboard.jsx";
 
 // Super Admin Pages

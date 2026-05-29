@@ -1,33 +1,33 @@
 import React, { useState } from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
+import clsx from "clsx";
 
-const MainLayout = ({ children }) => {
+const DashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
+  const closeSidebar = () => setSidebarOpen(false);
 
   return (
-    <>
+    <div className="min-h-screen bg-primary">
       <Header onToggleSidebar={toggleSidebar} />
-      <Sidebar isOpen={sidebarOpen} />
-      <div
-        style={{
-          marginLeft: sidebarOpen ? "var(--sw)" : "0",
-          paddingTop: "var(--hh)",
-          paddingLeft: "20px",
-          paddingRight: "20px",
-          paddingBottom: "20px",
-          minHeight: "100vh",
-          transition: "margin-left 0.2s ease",
-          background: "var(--bg)",
-        }}
+      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
+
+      {/* Main Content */}
+      <main
+        className={clsx(
+          "pt-header min-h-screen transition-[margin] duration-300 ease-in-out",
+          "lg:ml-sidebar",
+          "px-4 sm:px-5 pb-5"
+        )}
       >
-        <div style={{ padding: "10px", maxWidth: "1500px", margin: "0 auto" }}>
+        <div className="py-5 max-w-[1500px] mx-auto animate-fade-up">
           {children}
         </div>
-      </div>
-    </>
+      </main>
+    </div>
   );
 };
 
-export default MainLayout;
+export default DashboardLayout;
