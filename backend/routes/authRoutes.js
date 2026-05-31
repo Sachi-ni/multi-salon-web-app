@@ -1,6 +1,6 @@
 import express from "express";
 import {loginAdmin, registerAdmin} from "../controllers/authController.js";
-import protect from "../middleware/authMiddleware.js";
+import { protect } from "../middleware/authMiddleware.js";
 import { updateProfile } from "../controllers/authController.js";
 
 

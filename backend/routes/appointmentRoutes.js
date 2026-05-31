@@ -1,15 +1,24 @@
 import express from "express";
-import { createAppointment, getAppointments, updateAppointment } from "../controllers/appointmentController.js";
+import {
+  getAvailableStaff,
+  createAppointment,
+  getSalonAppointments,
+  updateAppointmentStatus,
+  getMyAppointments
+} from "../controllers/appointmentController.js";
+import { protect } from "../middleware/authMiddleware.js";
+import { authorizeRoles } from "../middleware/roleMiddleware.js";
+
 
 const router = express.Router();
 
-// Get all appointments
-router.get("/", getAppointments);
+// Customer routes
+router.get("/available-staff", protect, getAvailableStaff);
+router.post("/",              protect, createAppointment);
+router.get("/my",             protect, getMyAppointments);
 
-// Create appointment
-router.post("/", createAppointment);
-
-// Update appointment
-router.put("/:id", updateAppointment);
+// Admin routes
+router.get("/",               protect, authorizeRoles("super-admin", "staff-admin"), getSalonAppointments);
+router.patch("/:id/status",   protect, authorizeRoles("super-admin", "staff-admin"), updateAppointmentStatus);
 
 export default router;

@@ -27,6 +27,10 @@ import Analytics from "./pages/superadmin/Analytics.jsx";
 import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 
+import BookAppointment from "./pages/customer/BookAppointment.jsx";
+import MyAppointments from "./pages/customer/MyAppointments.jsx";
+import AdminBookings from "./pages/admin/AdminBookings.jsx";
+
 import { useAuth } from "./context/AuthContext";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -162,6 +166,36 @@ function App() {
           <DashboardLayout>
             <AddAppointment />
           </DashboardLayout>
+        }
+      />
+
+      <Route
+        path="/book"
+        element={
+          <ProtectedRoute allowedRoles={["customer"]}>
+            <BookAppointment />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/my-appointments"
+        element={
+          <ProtectedRoute allowedRoles={["customer"]}>
+            <MyAppointments />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Admin Bookings */}
+      <Route
+        path="/admin/bookings"
+        element={
+          <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
+            <DashboardLayout>
+              <AdminBookings />
+            </DashboardLayout>
+          </ProtectedRoute>
         }
       />
       </Routes>

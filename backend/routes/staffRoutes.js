@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
-import protect from "../middleware/authMiddleware.js";
-import authorize from "../middleware/roleMiddleware.js";
+import { protect } from "../middleware/authMiddleware.js";
+import { authorizeRoles } from "../middleware/roleMiddleware.js";
 import {
 	createStaff,
 	getStaff,
@@ -15,9 +15,9 @@ const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
 // Only Superadmin can create or view staff
-router.post("/", protect, authorize("super-admin"), upload.single("image"), createStaff);
-router.get("/", protect, authorize("super-admin"), getStaff);
-router.put("/:id", protect, authorize("super-admin"), updateStaff);
-router.delete("/:id", protect, authorize("super-admin"), deleteStaff);
+router.post("/", protect, authorizeRoles("super-admin"), upload.single("image"), createStaff);
+router.get("/", protect, authorizeRoles("super-admin"), getStaff);
+router.put("/:id", protect, authorizeRoles("super-admin"), updateStaff);
+router.delete("/:id", protect, authorizeRoles("super-admin"), deleteStaff);
 
 export default router;

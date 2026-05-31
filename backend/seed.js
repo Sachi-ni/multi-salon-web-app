@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Service from "./models/Service.js";
 import dotenv from "dotenv";
 
+
 dotenv.config();
 
 const seed = async () => {

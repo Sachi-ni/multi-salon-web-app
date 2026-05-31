@@ -9,8 +9,10 @@ import salonRoutes from "./routes/salonRoutes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
 import customerRoutes from "./routes/customerRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
+
 import billRoutes from "./routes/billRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
+import staffAvailabilityRoutes from "./routes/staffAvailabilityRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -28,6 +30,7 @@ app.use("/api/salons", salonRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/appointments", appointmentRoutes);
+app.use("/api/availability", staffAvailabilityRoutes);
 app.use("/api/bills", billRoutes);
 app.use("/api/reviews", reviewRoutes);
 
@@ -41,3 +44,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
