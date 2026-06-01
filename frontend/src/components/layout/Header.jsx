@@ -23,7 +23,7 @@ const Header = ({ onToggleSidebar }) => {
 
   const handleLogout = () => {
     logout();
-    navigate("/login");
+    navigate("/");
   };
 
   const roleBadgeColor = {

@@ -12,7 +12,7 @@ const Profile = () => {
 
   const handleLogout = () => {
     logout();
-    navigate("/login");
+    navigate("/");
   };
 
   const initials = user?.name
