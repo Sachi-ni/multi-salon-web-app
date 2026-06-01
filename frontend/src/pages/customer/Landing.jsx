@@ -12,7 +12,7 @@ const Dashboard = () => {
     if (user?.role === "customer" || user?.role === "user") {
       navigate("/book");
     } else {
-      navigate("/register");
+      navigate("/customer/register");
     }
   };
 
