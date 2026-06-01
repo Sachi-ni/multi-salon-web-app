@@ -1,182 +1,148 @@
-import React, { useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
+import { Building2, Users, Calendar, Wallet, Plus, Download, ArrowRight, Store, UserPlus, CalendarPlus, DollarSign } from "lucide-react";
+import { motion } from "framer-motion";
+import PageHeader from "../../components/ui/PageHeader";
+import StatCard from "../../components/ui/StatCard";
+import Card from "../../components/ui/Card";
+import Button from "../../components/ui/Button";
+import EmptyState from "../../components/ui/EmptyState";
 
 const Dashboard = () => {
   const navigate = useNavigate();
 
-  const goTo = (path) => {
-    navigate(`/${path}`);
-  };
+  const stats = [
+    { icon: Building2, label: "Total Salons", value: "", trend: "", subtitle: "active locations" },
+    { icon: Users, label: "Total Staff", value: "", trend: "", subtitle: "across all salons" },
+    { icon: Calendar, label: "Appointments", value: "", trend: "", subtitle: "this month" },
+    { icon: Wallet, label: "Platform Revenue", value: "", trend: "", subtitle: "this month" },
+  ];
 
-  const doExport = () => {
-    console.log("Export clicked");
-  };
+  const statPages = ["salons", "Staff", "Appointments", "Revenue"];
 
-  const [stats] = useState([
-    { ico: "🏠", lbl: "Total Salons", val: "", sub: "" },
-    { ico: "👥", lbl: "Total Staff", val: "", sub: "" },
-    { ico: "📅", lbl: "Appointments", val: "", sub: "" },
-    { ico: "💰", lbl: "Platform Revenue", val: "", sub: "" },
-  ]);
-
-  const nav = (page) => {
-    navigate(`/${page.toLowerCase()}`);
-  };
+  const quickActions = [
+    { label: "Register New Salon", icon: Store, path: "AddSalon" },
+    { label: "Add Staff Member", icon: UserPlus, path: "AddStaff" },
+    { label: "Create Appointment", icon: CalendarPlus, path: "AddAppointment" },
+    { label: "Manage Revenue", icon: DollarSign, path: "Revenue" },
+  ];
 
   return (
-    <div id="pg-dashboard">
-
+    <div>
       {/* Header */}
-      <div className="ph">
-        <div>
-          <h1>Dashboard</h1>
-          <p id="dgreet">Welcome back, Super Admin</p>
-        </div>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Welcome back, Super Admin"
+      >
+        <Button variant="ghost" size="sm" icon={Download}>
+          Export
+        </Button>
+        <Button variant="primary" size="md" icon={Plus} onClick={() => navigate("/AddSalon")}>
+          Add Salon
+        </Button>
+      </PageHeader>
 
-        <div className="pactions">
-          <button className="btn btn-g sm" onClick={doExport}>
-            Export
-          </button>
-
-          <button
-            className="btn btn-p"
-            onClick={() => goTo("AddSalon")}
+      {/* Stats Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-6">
+        {stats.map((s, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.08 }}
           >
-            Add Salon
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="srow">
-        {stats.map((item, index) => {
-          let page = "";
-
-          switch (item.lbl) {
-            case "Total Salons":
-              page = "salons";
-              break;
-            case "Total Staff":
-              page = "staff";
-              break;
-            case "Appointments":
-              page = "appointments";
-              break;
-            case "Platform Revenue":
-              page = "revenue";
-              break;
-            default:
-              page = "";
-          }
-
-          return (
-            <div
-              className="sc"
-              key={index}
-              style={{ cursor: page ? "pointer" : "default" }}
-              onClick={() => page && nav(page)}
-            >
-              <div className="sc-ico">{item.ico}</div>
-              <div className="sc-lbl">{item.lbl}</div>
-              <div className="sc-val">{item.val}</div>
-              <div className="sc-sub">{item.sub}</div>
-            </div>
-          );
-        })}
+            <StatCard
+              icon={s.icon}
+              label={s.label}
+              value={s.value}
+              trend={s.trend}
+              subtitle={s.subtitle}
+              onClick={() => navigate(`/${statPages[i]}`)}
+            />
+          </motion.div>
+        ))}
       </div>
 
       {/* Charts Section */}
-      <div className="g2 mb22">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <Card>
+          <Card.Header>
+            <Card.Title>Revenue — Last 7 Days</Card.Title>
+          </Card.Header>
+          <EmptyState
+            title="No revenue data"
+            description="Revenue chart will appear here once data is available."
+            icon={Wallet}
+          />
+        </Card>
 
-        <div className="card">
-          <div className="chdr">
-            <h3>Revenue — Last 7 Days</h3>
-          </div>
-          <div className="rchart">
-            <p style={{ opacity: 0.6 }}>Chart will load here</p>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="chdr">
-            <h3>Top Salons by Revenue</h3>
-            <span className="sub">This month</span>
-          </div>
-          <p style={{ opacity: 0.6 }}>Data will load here</p>
-        </div>
-
+        <Card>
+          <Card.Header>
+            <Card.Title>Top Salons by Revenue</Card.Title>
+            <Card.Subtitle>This month</Card.Subtitle>
+          </Card.Header>
+          <EmptyState
+            title="No salon data"
+            description="Top performing salons will be shown here."
+            icon={Building2}
+          />
+        </Card>
       </div>
 
       {/* Activity + Quick Actions */}
-      <div className="g2 mb16">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <Card>
+          <Card.Header>
+            <Card.Title>Live Activity</Card.Title>
+          </Card.Header>
+          <EmptyState
+            title="No recent activity"
+            description="Activity feed will populate as events occur."
+            icon={Calendar}
+          />
+        </Card>
 
-        <div className="card">
-          <div className="chdr">
-            <h3>Live Activity</h3>
+        <Card>
+          <Card.Header>
+            <Card.Title>Quick Actions</Card.Title>
+          </Card.Header>
+          <div className="flex flex-col gap-2">
+            {quickActions.map((action, i) => (
+              <button
+                key={i}
+                onClick={() => navigate(`/${action.path}`)}
+                className="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-surface-2 border border-border text-left text-sm font-semibold text-muted-2 hover:text-white hover:border-accent/30 hover:bg-accent-dim/30 transition-all duration-200 group"
+              >
+                <action.icon className="w-4 h-4 text-accent flex-shrink-0" />
+                <span className="flex-1">{action.label}</span>
+                <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200 text-accent" />
+              </button>
+            ))}
           </div>
-          <p style={{ opacity: 0.6 }}>Activity will appear here</p>
-        </div>
-
-        <div className="card">
-          <div className="chdr">
-            <h3>Quick Actions</h3>
-          </div>
-
-          <div className="fc">
-
-            <button
-              className="btn btn-g"
-              style={{ justifyContent: "flex-start" }}
-              onClick={() => goTo("AddSalon")}
-            >
-              Register New Salon
-            </button>
-
-            <button
-              className="btn btn-g"
-              style={{ justifyContent: "flex-start" }}
-              onClick={() => goTo("AddStaff")}
-            >
-              Add Staff Member
-            </button>
-
-            <button
-              className="btn btn-g"
-              style={{ justifyContent: "flex-start" }}
-              onClick={() => goTo("AddAppointment")}
-            >
-              Create Appointment
-            </button>
-
-            <button
-              className="btn btn-g"
-              style={{ justifyContent: "flex-start" }}
-              onClick={() => nav("revenue")}
-            >
-              Manage Revenue
-            </button>
-
-          </div>
-        </div>
-
+        </Card>
       </div>
 
       {/* Salons Section */}
-      <div className="dsec-hdr">
-        <h3>🏠 All Salons</h3>
-
-        <button
-          className="btn btn-g sm"
-          onClick={() => nav("salons")}
-        >
-          Manage all salons →
-        </button>
+      <div className="flex items-center justify-between mb-3.5">
+        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-accent" />
+          All Salons
+        </h3>
+        <Button variant="ghost" size="sm" onClick={() => navigate("/salons")}>
+          Manage all salons
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Button>
       </div>
 
-      <div className="dsal-grid">
-        <p style={{ opacity: 0.6 }}>Salon data will load here</p>
-      </div>
-
+      <Card padding="p-6">
+        <EmptyState
+          title="No salons registered"
+          description="Start by adding your first salon location."
+          actionLabel="Add Salon"
+          onAction={() => navigate("/AddSalon")}
+          icon={Store}
+        />
+      </Card>
     </div>
   );
 };

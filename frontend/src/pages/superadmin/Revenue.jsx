@@ -1,375 +1,165 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-
-import {
-  getRevenueStats,
-  getSalonRevenue,
-  getMonthlyRevenue
-} from "../../services/revenueService";
+import { getRevenueStats, getSalonRevenue } from "../../services/revenueService";
+import { Download, ArrowUpDown } from "lucide-react";
+import PageHeader from "../../components/ui/PageHeader";
+import Button from "../../components/ui/Button";
+import Card from "../../components/ui/Card";
+import Table from "../../components/ui/Table";
+import Badge from "../../components/ui/Badge";
+import Spinner from "../../components/ui/Spinner";
 
 const Revenue = () => {
-
-  const navigate = useNavigate();
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
   const [grossRevenue, setGrossRevenue] = useState(0);
   const [pendingPayouts, setPendingPayouts] = useState(0);
   const [grossGrowth, setGrossGrowth] = useState(0);
   const [pendingOverdue, setPendingOverdue] = useState(0);
-
   const [salons, setSalons] = useState([]);
-
-  // NEW STATES (ONLY ADDITION)
   const [sortDesc, setSortDesc] = useState(true);
   const [period, setPeriod] = useState("30days");
 
-  // Format currency
-  const formatCurrency = (value) => {
-    return `Rs. ${Number(value).toLocaleString()}`;
-  };
+  const formatCurrency = (value) => `Rs. ${Number(value).toLocaleString()}`;
 
-  // Fetch revenue data
   const fetchData = async () => {
-
     try {
-
       setLoading(true);
       setError("");
+      const statsRes = await getRevenueStats();
+      const salonsRes = await getSalonRevenue();
 
-      const statsRes =
-        await getRevenueStats();
-
-      const salonsRes =
-        await getSalonRevenue();
-
-      const monthlyRes =
-        await getMonthlyRevenue();
-
-      setGrossRevenue(
-        statsRes?.data?.grossRevenue || 0
-      );
-
-      setPendingPayouts(
-        statsRes?.data?.pendingPayouts || 0
-      );
-
-      setGrossGrowth(
-        statsRes?.data?.grossGrowth || 0
-      );
-
-      setPendingOverdue(
-        statsRes?.data?.pendingOverdue || 0
-      );
-
-      setSalons(
-        salonsRes?.data || []
-      );
-
-    }
-    catch (err) {
-
+      setGrossRevenue(statsRes?.data?.grossRevenue || 0);
+      setPendingPayouts(statsRes?.data?.pendingPayouts || 0);
+      setGrossGrowth(statsRes?.data?.grossGrowth || 0);
+      setPendingOverdue(statsRes?.data?.pendingOverdue || 0);
+      setSalons(salonsRes?.data || []);
+    } catch (err) {
       console.error(err);
-
-      setError(
-        "Failed to load revenue data"
-      );
-
-    }
-    finally {
-
+      setError("Failed to load revenue data");
+    } finally {
       setLoading(false);
-
     }
-
   };
 
-  useEffect(() => {
+  useEffect(() => { fetchData(); }, []);
 
-    fetchData();
-
-  }, []);
-
-  // Export CSV
   const doExport = () => {
-
-    let csv =
-      "Salon,Revenue,Transactions\n";
-
-    salons.forEach((s) => {
-
-      csv +=
-        `${s.name},${s.revenue},${s.transactions}\n`;
-
-    });
-
-    const blob =
-      new Blob([csv], {
-        type: "text/csv"
-      });
-
-    const link =
-      document.createElement("a");
-
-    link.href =
-      URL.createObjectURL(blob);
-
-    link.download =
-      "revenue.csv";
-
+    let csv = "Salon,Revenue,Transactions\n";
+    salons.forEach((s) => { csv += `${s.name},${s.revenue},${s.transactions}\n`; });
+    const blob = new Blob([csv], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "revenue.csv";
     link.click();
+  };
 
+  const getSortedSalons = () => {
+    let filtered = [...salons];
+    if (period === "30days") filtered = filtered.slice(0, 10);
+    filtered.sort((a, b) => sortDesc ? b.revenue - a.revenue : a.revenue - b.revenue);
+    return filtered;
   };
 
   return (
-
-    <div className="page on" id="pg-revenue">
-
-      {/* Header */}
-
-      <div className="ph">
-
-        <div className="ph-left">
-
-          <button
-            className="back-btn"
-            onClick={() =>
-              navigate("/Dashboard")
-            }
-          >
-            ←
-          </button>
-
-          <div>
-            <h1>Revenue</h1>
-            <p>
-              Financial overview across all salons
-            </p>
-          </div>
-
-        </div>
-
-        <div className="pactions">
-
-          <button
-            className="btn btn-g sm"
-            onClick={doExport}
-          >
-            Export CSV
-          </button>
-
-        </div>
-
-      </div>
+    <div>
+      <PageHeader title="Revenue" subtitle="Financial overview across all salons" backTo="/superAdminDashboard">
+        <Button variant="ghost" size="sm" icon={Download} onClick={doExport}>
+          Export CSV
+        </Button>
+      </PageHeader>
 
       {error && (
-
-        <div className="alert alert-w">
+        <div className="px-4 py-3 rounded-lg bg-accent-dim border border-accent-muted text-sm text-white mb-4">
           {error}
         </div>
-
       )}
 
       {loading ? (
-
-        <p>Loading revenue...</p>
-
+        <Spinner.FullPage />
       ) : (
-
         <>
+          {/* Revenue Cards + Period Filter */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3.5 mb-6">
+            <Card>
+              <div className="text-2xl mb-2">💰</div>
+              <div className="text-[0.65rem] font-bold tracking-widest uppercase text-muted-2 mb-2">Gross Revenue</div>
+              <div className="text-3xl font-black text-white mb-1">{formatCurrency(grossRevenue)}</div>
+              <div className="text-xs font-bold text-success">↑ {grossGrowth}%</div>
+            </Card>
 
-          {/* TOP CARDS */}
+            <Card>
+              <div className="text-2xl mb-2">⏳</div>
+              <div className="text-[0.65rem] font-bold tracking-widest uppercase text-muted-2 mb-2">Pending Payouts</div>
+              <div className="text-3xl font-black text-white mb-1">{formatCurrency(pendingPayouts)}</div>
+              <div className="text-xs font-semibold text-danger">{pendingOverdue} overdue</div>
+            </Card>
 
-          <div className="rev-top">
-
-            <div className="rev-card">
-
-              <div className="ri">💰</div>
-
-              <div className="rl">
-                GROSS REVENUE
-              </div>
-
-              <div className="rv">
-                {formatCurrency(grossRevenue)}
-              </div>
-
-              <div className="rc up">
-                ↑ {grossGrowth}%
-              </div>
-
-            </div>
-
-            <div className="rev-card">
-
-              <div className="ri">⏳</div>
-
-              <div className="rl">
-                PENDING PAYOUTS
-              </div>
-
-              <div className="rv">
-                {formatCurrency(pendingPayouts)}
-              </div>
-
-              <div className="rs">
-                {pendingOverdue} overdue
-              </div>
-
-            </div>
-
-            <div className="period-grp">
-
-              {/* FIXED BUTTON */}
-              <button
-                className="period-btn"
+            <div className="flex flex-col gap-2">
+              <Button
+                variant={period === "30days" ? "primary" : "warning"}
+                size="md"
                 onClick={() => setPeriod("30days")}
               >
                 Last 30 days ▼
-              </button>
-
-              {/* FIXED BUTTON */}
-              <button
-                className="period-btn"
+              </Button>
+              <Button
+                variant={period === "year" ? "primary" : "warning"}
+                size="md"
                 onClick={() => setPeriod("year")}
               >
                 This Year ▼
-              </button>
-
+              </Button>
             </div>
-
           </div>
 
-          {/* TABLE HEADER */}
-
-          <div className="rev-tbl-hdr">
-
-            <h3>
-              Revenue by Salon
-            </h3>
-
-            {/* FIXED SORT BUTTON */}
-            <button
-              className="sort-btn"
-              onClick={() => setSortDesc(!sortDesc)}
-            >
+          {/* Table Header */}
+          <div className="flex items-center justify-between mb-3.5">
+            <h3 className="text-sm font-bold text-white">Revenue by Salon</h3>
+            <Button variant="primary" size="sm" icon={ArrowUpDown} onClick={() => setSortDesc(!sortDesc)}>
               Sorted by revenue {sortDesc ? "▼" : "▲"}
-            </button>
-
+            </Button>
           </div>
 
-          {/* TABLE */}
-
-          <div className="tw">
-
-            <table>
-
-              <thead>
-
+          {/* Revenue Table */}
+          <Table>
+            <Table.Head>
+              <Table.Th>Salon</Table.Th>
+              <Table.Th>Revenue</Table.Th>
+              <Table.Th>Transactions</Table.Th>
+              <Table.Th>Avg Value</Table.Th>
+              <Table.Th>Status</Table.Th>
+              <Table.Th align="right">Action</Table.Th>
+            </Table.Head>
+            <Table.Body>
+              {getSortedSalons().length === 0 ? (
                 <tr>
-
-                  <th>Salon</th>
-                  <th>Revenue</th>
-                  <th>Transactions</th>
-                  <th>Avg Value</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: "right" }}>
-                    Action
-                  </th>
-
+                  <Table.Td className="text-center text-muted-2" colSpan="6">
+                    No data found
+                  </Table.Td>
                 </tr>
-
-              </thead>
-
-              <tbody>
-
-                {salons.length === 0 ? (
-
-                  <tr>
-
-                    <td colSpan="6">
-                      No data found
-                    </td>
-
-                  </tr>
-
-                ) : (() => {
-
-                  // FILTER LOGIC (ADDED ONLY HERE)
-
-                  let filteredSalons = [...salons];
-
-                  if (period === "30days") {
-                    filteredSalons = filteredSalons.slice(0, 10);
-                  }
-
-                  if (period === "year") {
-                    filteredSalons = filteredSalons;
-                  }
-
-                  filteredSalons.sort((a, b) => {
-                    return sortDesc
-                      ? b.revenue - a.revenue
-                      : a.revenue - b.revenue;
-                  });
-
-                  return filteredSalons.map((salon, i) => {
-
-                    const avg =
-                      salon.transactions > 0
-                        ? salon.revenue /
-                          salon.transactions
-                        : 0;
-
-                    return (
-
-                      <tr key={i}>
-
-                        <td>{salon.name}</td>
-
-                        <td style={{ color: "var(--yellow)" }}>
-                          {formatCurrency(salon.revenue)}
-                        </td>
-
-                        <td>{salon.transactions}</td>
-
-                        <td>{formatCurrency(avg)}</td>
-
-                        <td>
-                          <span className="pill pg">
-                            {salon.status}
-                          </span>
-                        </td>
-
-                        <td style={{ textAlign: "right" }}>
-                          <button className="btn btn-g xs">
-                            Pay Out
-                          </button>
-                        </td>
-
-                      </tr>
-
-                    );
-
-                  });
-
-                })()}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
+              ) : (
+                getSortedSalons().map((salon, i) => {
+                  const avg = salon.transactions > 0 ? salon.revenue / salon.transactions : 0;
+                  return (
+                    <tr key={i}>
+                      <Table.Td bold>{salon.name}</Table.Td>
+                      <Table.Td className="text-accent font-semibold">{formatCurrency(salon.revenue)}</Table.Td>
+                      <Table.Td>{salon.transactions}</Table.Td>
+                      <Table.Td>{formatCurrency(avg)}</Table.Td>
+                      <Table.Td><Badge variant="success">{salon.status}</Badge></Table.Td>
+                      <Table.Td align="right">
+                        <Button variant="ghost" size="xs">Pay Out</Button>
+                      </Table.Td>
+                    </tr>
+                  );
+                })
+              )}
+            </Table.Body>
+          </Table>
         </>
-
       )}
-
     </div>
-
   );
-
 };
 
 export default Revenue;

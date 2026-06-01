@@ -1,125 +1,126 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "../../App.css";
 import axios from "axios";
+import { motion } from "framer-motion";
 
 const Signup = () => {
-  const [fname, setFname] = React.useState("");
-  const [uname, setUname] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [phone, setPhone] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [fname, setFname] = useState("");
+  const [uname, setUname] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    
     if (password !== confirmPassword) {
-      alert('Passwords do not match!');
+      alert("Passwords do not match!");
       return;
     }
-
+    setLoading(true);
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', {
+      const response = await axios.post("http://localhost:5000/api/auth/register", {
         full_name: fname,
         username: uname,
         email: email,
         password: password,
-        role: "super-admin"
+        role: "super-admin",
       });
-      console.log('Registration successful:', response.data);
-      alert('Registration successful! Redirecting to login...');
-      navigate('/login');
+      console.log("Registration successful:", response.data);
+      alert("Registration successful! Redirecting to login...");
+      navigate("/login");
     } catch (error) {
-      console.error('Registration error:', error);
-      alert(error.response?.data?.message || 'Registration failed. Please try again.');
+      console.error("Registration error:", error);
+      alert(error.response?.data?.message || "Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const inputClass =
+    "w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30";
+
   return (
-    <div className="auth-scene on" id="pg-reg">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <div className="auth-logo-icon">S</div>
-          <div className="auth-logo-text">SalonHub</div>
+    <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg">
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className="relative z-10 w-[460px] max-w-[96vw] bg-surface border border-border rounded-2xl p-10 shadow-modal max-h-[95vh] overflow-y-auto"
+      >
+        {/* Top accent bar */}
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />
+
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <div className="w-9 h-9 bg-accent rounded-lg flex items-center justify-center text-base font-black text-primary flex-shrink-0">
+            S
+          </div>
+          <span className="text-xl font-black text-accent tracking-tight">SalonHub</span>
         </div>
-        <div className="auth-title">Create Account</div>
+
+        <h1 className="text-2xl font-extrabold text-white mb-6">Create Account</h1>
+
         <form onSubmit={handleRegister}>
-        <div className="fg">
-          <label>Full Name</label>
-          <input 
-          type="text" 
-          id="reg-name" 
-          placeholder="Enter your full name" 
-          onChange={(e) => setFname(e.target.value)}
-          value={fname}
-          />
-        </div>
-        <div className="fr">
-          <div className="fg">
-            <label>Username</label>
-            <input 
-            type="text" 
-            id="reg-user" 
-            placeholder="Username" 
-            onChange={(e) => setUname(e.target.value)}
-            value={uname}
-            />
+          {/* Full Name */}
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Full Name</label>
+            <input type="text" placeholder="Enter your full name" value={fname} onChange={(e) => setFname(e.target.value)} className={inputClass} required />
           </div>
-        </div>
-        <div className="fg">
-          <label>Email</label>
-          <input 
-          type="email" 
-          id="reg-email" 
-          placeholder="your@email.com" 
-          onChange={(e) => setEmail(e.target.value)}
-          value={email}
-          />
-        </div>
-        <div className="fg">
-          <label>Phone</label>
-          <input 
-          type="tel" 
-          id="reg-phone" 
-          placeholder="07---XXXXXX" 
-          onChange={(e) => setPhone(e.target.value)}
-          value={phone}
-          />
-        </div>
-        <div className="fr">
-          <div className="fg">
-            <label>Password</label>
-            <input 
-            type="password" 
-            id="reg-pass" 
-            placeholder="••••••••" 
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            />
+
+          {/* Username */}
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Username</label>
+            <input type="text" placeholder="Username" value={uname} onChange={(e) => setUname(e.target.value)} className={inputClass} required />
           </div>
-          <div className="fg">
-            <label>Confirm</label>
-            <input 
-            type="password" 
-            id="reg-conf" 
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="••••••••" 
-            />
+
+          {/* Email */}
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Email</label>
+            <input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} required />
           </div>
-        </div>handleRegister
-        <button className="auth-btn" type="submit">
-          Register Now
-        </button>
+
+          {/* Phone */}
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Phone</label>
+            <input type="tel" placeholder="07---XXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+          </div>
+
+          {/* Passwords Row */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Password</label>
+              <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} required />
+            </div>
+            <div>
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Confirm</label>
+              <input type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass} required />
+            </div>
+          </div>
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-1.5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase cursor-pointer transition-all duration-200 hover:bg-accent-hover hover:shadow-glow hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Registering..." : "Register Now"}
+          </button>
         </form>
-        <div className="auth-switch">
-          Already have an account?{' '}
-          <span onClick={() => navigate('/login')} style={{ cursor: 'pointer', color: 'blue' }}>
+
+        {/* Switch */}
+        <div className="text-center mt-4 text-[0.82rem] text-muted-2">
+          Already have an account?{" "}
+          <span
+            onClick={() => navigate("/login")}
+            className="text-accent cursor-pointer font-bold hover:underline"
+          >
             Sign in here
           </span>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

@@ -12,7 +12,6 @@ import Edit from "./pages/auth/edit.jsx";
 import Unauthorized from "./pages/Unauthorized.jsx";
 
 //customer pages
-import'./pages/customer/customer.css';
 import Main from "./pages/customer/Dashboard.jsx";
 
 // Super Admin Pages
@@ -34,7 +33,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user } = useAuth();
 
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/" />;
   }
 
   if (!allowedRoles.includes(user.role)) {

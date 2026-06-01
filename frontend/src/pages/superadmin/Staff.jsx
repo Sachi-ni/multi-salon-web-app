@@ -2,20 +2,234 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getSalons } from "../../services/salonService";
+import { Plus, Search, Users, Star, MapPin, Briefcase, Calendar, MoreVertical, Power, Trash2, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import PageHeader from "../../components/ui/PageHeader";
+import Button from "../../components/ui/Button";
+import Badge from "../../components/ui/Badge";
+import EmptyState from "../../components/ui/EmptyState";
+import clsx from "clsx";
 
+const API_BASE = "http://localhost:5000";
+
+/* ── Skeleton Card ── */
+const SkeletonStaffCard = () => (
+  <div className="bg-surface border border-border rounded-xl p-5 animate-pulse">
+    <div className="flex items-center gap-4 mb-4">
+      <div className="w-20 h-20 rounded-2xl bg-surface-2" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-28 rounded bg-surface-2" />
+        <div className="h-3 w-20 rounded bg-surface-2" />
+      </div>
+    </div>
+    <div className="space-y-2">
+      <div className="h-3 w-full rounded bg-surface-2" />
+      <div className="h-3 w-3/4 rounded bg-surface-2" />
+    </div>
+  </div>
+);
+
+/* ── Staff Card Actions Menu ── */
+const ActionsMenu = ({ staff, onToggleStatus, onDelete }) => {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [open]);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-2 hover:bg-surface-2 hover:text-white transition-all duration-150"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-1 w-44 bg-surface border border-border rounded-xl shadow-modal py-1.5 z-50"
+          >
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleStatus(staff); setOpen(false); }}
+              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-muted-2 hover:text-white"
+            >
+              <Power className="w-3.5 h-3.5" />
+              {staff.status === "Active" ? "Deactivate" : "Activate"}
+            </button>
+            <div className="my-1 border-t border-border" />
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(staff._id); setOpen(false); }}
+              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-danger-dim text-danger"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Remove Staff
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+/* ── Staff Card Component ── */
+const StaffCard = ({ staff, index, onToggleStatus, onDelete }) => {
+  const initials = staff.name
+    ? staff.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : "S";
+  const salonName = staff.salon?.name || staff.salonName || "Unassigned";
+  const isActive = staff.status === "Active";
+
+  // Build image URL from the uploaded path
+  const imageUrl = staff.image
+    ? `${API_BASE}/${staff.image.replace(/\\/g, "/")}`
+    : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05, duration: 0.3 }}
+      className="group bg-surface border border-border rounded-xl overflow-hidden transition-all duration-250 hover:border-accent/40 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(245,200,0,0.06)]"
+    >
+      {/* Top Accent Line */}
+      <div className={clsx(
+        "h-[2px] transition-all duration-300",
+        isActive
+          ? "bg-gradient-to-r from-accent via-accent-hover to-accent"
+          : "bg-gradient-to-r from-muted via-muted-2 to-muted"
+      )} />
+
+      <div className="p-5">
+        {/* Header Row: Avatar + Name + Actions */}
+        <div className="flex items-start gap-3.5 mb-4">
+          {/* Avatar / Photo */}
+          <div className="relative flex-shrink-0">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={staff.name}
+                className="w-20 h-20 rounded-2xl object-cover border-2 border-border group-hover:border-accent/40 transition-colors duration-200"
+                onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
+              />
+            ) : null}
+            <div
+              className={clsx(
+                "w-20 h-20 rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 border-2 border-border group-hover:border-accent/40 items-center justify-center text-accent font-black text-2xl transition-colors duration-200",
+                imageUrl ? "hidden" : "flex"
+              )}
+            >
+              {initials}
+            </div>
+            {/* Status Dot */}
+            <span
+              className={clsx(
+                "absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-surface",
+                isActive ? "bg-success animate-pulse-dot" : "bg-muted"
+              )}
+            />
+          </div>
+
+          {/* Name + Role */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[0.9rem] font-bold text-white leading-tight truncate">
+              {staff.name}
+            </h3>
+            <div className="mt-1">
+              <Badge variant="info" dot={false}>
+                {staff.role}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Actions Menu */}
+          <ActionsMenu
+            staff={staff}
+            onToggleStatus={onToggleStatus}
+            onDelete={onDelete}
+          />
+        </div>
+
+        {/* Details Grid */}
+        <div className="space-y-2.5 mb-4">
+          {/* Salon */}
+          <div className="flex items-center gap-2 text-xs">
+            <MapPin className="w-3.5 h-3.5 text-muted flex-shrink-0" />
+            <span className="text-muted-2 truncate">{salonName}</span>
+          </div>
+          {/* Bookings */}
+          <div className="flex items-center gap-2 text-xs">
+            <Calendar className="w-3.5 h-3.5 text-muted flex-shrink-0" />
+            <span className="text-muted-2">
+              <span className="text-white font-semibold">{staff.bookings || 0}</span> bookings
+            </span>
+          </div>
+          {/* Status */}
+          <div className="flex items-center gap-2 text-xs">
+            <Briefcase className="w-3.5 h-3.5 text-muted flex-shrink-0" />
+            <Badge variant={isActive ? "success" : "warning"} dot>
+              {staff.status}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Footer: Rating + Quick Actions */}
+        <div className="flex items-center justify-between pt-3.5 border-t border-border">
+          {/* Rating */}
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-0.5">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={clsx(
+                    "w-3 h-3",
+                    star <= Math.round(parseFloat(staff.rating) || 0)
+                      ? "fill-accent text-accent"
+                      : "text-border"
+                  )}
+                />
+              ))}
+            </div>
+            <span className="text-[0.7rem] font-bold text-muted-2">
+              {staff.rating || "0.0"}
+            </span>
+          </div>
+
+          {/* Quick Toggle */}
+          <button
+            onClick={() => onToggleStatus(staff)}
+            className={clsx(
+              "px-3 py-1 rounded-md text-[0.65rem] font-bold uppercase tracking-wider transition-all duration-200",
+              isActive
+                ? "bg-success-dim text-success border border-success-border hover:bg-success/20"
+                : "bg-accent-dim text-accent border border-accent-muted hover:bg-accent-muted"
+            )}
+          >
+            {isActive ? "Active" : "Inactive"}
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+/* ── Main Staff Page ── */
 const Staff = () => {
   const navigate = useNavigate();
   const [staffList, setStaffList] = useState([]);
   const [salons, setSalons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState("All Roles");
   const [selectedSalon, setSelectedSalon] = useState("All Salons");
-
-  const [editStaff, setEditStaff] = useState(null);
-  const [editForm, setEditForm] = useState({});
 
   const fetchData = async () => {
     try {
@@ -30,13 +244,7 @@ const Staff = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const getStatusClass = (status) => {
-    return status === "Active" ? "pg" : "py";
-  };
+  useEffect(() => { fetchData(); }, []);
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to remove this staff member?")) {
@@ -63,175 +271,119 @@ const Staff = () => {
     const staffName = s.name || "";
     const matchesSearch = staffName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === "All Roles" || s.role === selectedRole;
-    const salonName = (typeof s.salon === 'object' ? s.salon?.name : s.salonName) || "";
+    const salonName = (typeof s.salon === "object" ? s.salon?.name : s.salonName) || "";
     const matchesSalon = selectedSalon === "All Salons" || salonName === selectedSalon;
-    
     return matchesSearch && matchesRole && matchesSalon;
   });
 
+  const activeCount = filteredStaff.filter((s) => s.status === "Active").length;
+
   return (
-    <div className="page on" id="pg-staff">
+    <div>
+      <PageHeader title="Staff" subtitle="All staff across all salons" backTo="/superAdminDashboard">
+        <Button variant="primary" icon={Plus} onClick={() => navigate("/AddStaff")}>
+          Add Staff
+        </Button>
+      </PageHeader>
 
-      {/* HEADER */}
-      <div className="ph">
+      {/* Error Alert */}
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-accent-dim border border-accent-muted text-sm text-white mb-4">
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError("")} className="text-muted-2 hover:text-white text-lg leading-none">&times;</button>
+        </div>
+      )}
 
-        <div className="ph-left">
-          <button className="back-btn" onClick={() => navigate("/superAdminDashboard")}>
-            ←
-          </button>
-          <div>
-            <h1>Staff</h1>
-            <p>All staff across all salons</p>
+      {/* Stats Bar */}
+      {!loading && staffList.length > 0 && (
+        <div className="flex flex-wrap gap-3 mb-5">
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+            <Users className="w-4 h-4 text-accent" />
+            <span className="text-xs text-muted-2">Total</span>
+            <span className="text-sm font-black text-white">{filteredStaff.length}</span>
+          </div>
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-success" />
+            <span className="text-xs text-muted-2">Active</span>
+            <span className="text-sm font-black text-success">{activeCount}</span>
+          </div>
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-muted" />
+            <span className="text-xs text-muted-2">Inactive</span>
+            <span className="text-sm font-black text-muted-2">{filteredStaff.length - activeCount}</span>
           </div>
         </div>
+      )}
 
-        <div className="pactions">
-
-          <button
-            className="btn btn-p"
-            onClick={() => navigate("/AddStaff")}
-          >
-            + Add Staff
-          </button>
-
-        </div>
-
-      </div>
-
-      {/* FILTER BAR */}
-      <div className="fb">
-
-        <div className="srch">
-
-          <svg className="i" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="M21 21l-4.3-4.3"></path>
-          </svg>
-
-          <input 
-            placeholder="Search staff..." 
+      {/* Filter Bar */}
+      <div className="flex flex-wrap gap-2 mb-5">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-2" />
+          <input
+            placeholder="Search by name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-surface border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
           />
-
         </div>
-
-        <select 
-          className="fsel" 
-          value={selectedRole} 
-          onChange={(e) => setSelectedRole(e.target.value)}
-        >
-          <option>All Roles</option>
-          {Array.from(new Set(staffList.map(s => s.role))).map(role => (
-            <option key={role} value={role}>{role}</option>
-          ))}
-        </select>
-
-        <select 
-          className="fsel"
-          value={selectedSalon}
-          onChange={(e) => setSelectedSalon(e.target.value)}
-        >
-          <option>All Salons</option>
-          {salons.map(s => (
-            <option key={s._id} value={s.name}>{s.name}</option>
-          ))}
-        </select>
-
+        <div className="relative">
+          <select
+            className="appearance-none bg-surface border border-border rounded-xl px-4 pr-9 py-2.5 text-xs font-bold text-white outline-none cursor-pointer transition-all duration-200 focus:border-accent uppercase tracking-wider"
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value)}
+          >
+            <option>All Roles</option>
+            {Array.from(new Set(staffList.map((s) => s.role))).map((role) => (
+              <option key={role} value={role}>{role}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-2 pointer-events-none" />
+        </div>
+        <div className="relative">
+          <select
+            className="appearance-none bg-surface border border-border rounded-xl px-4 pr-9 py-2.5 text-xs font-bold text-white outline-none cursor-pointer transition-all duration-200 focus:border-accent uppercase tracking-wider"
+            value={selectedSalon}
+            onChange={(e) => setSelectedSalon(e.target.value)}
+          >
+            <option>All Salons</option>
+            {salons.map((s) => (
+              <option key={s._id} value={s.name}>{s.name}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-2 pointer-events-none" />
+        </div>
       </div>
 
-      {/* TABLE */}
-      <div className="tw">
-
-        <table>
-
-          <thead>
-
-            <tr>
-              <th>Name</th>
-              <th>Role</th>
-              <th>Salon</th>
-              <th>Status</th>
-              <th>Bookings</th>
-              <th>Rating</th>
-              <th style={{ textAlign: "right" }}>Actions</th>
-            </tr>
-
-          </thead>
-
-          <tbody>
-
-            {loading ? (
-              <tr><td colSpan="7">Loading...</td></tr>
-            ) : filteredStaff.length === 0 ? (
-              <tr>
-                <td colSpan="7">No staff found</td>
-              </tr>
-            ) : (
-              filteredStaff.map((s) => (
-                <tr key={s._id}>
-
-                  <td style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: 700 }}>
-
-                    <div className="av" style={{ background: "var(--s2)" }}>
-                      {s.name ? s.name.split(" ").map(n => n[0]).join("") : "S"}
-                    </div>
-
-                    {s.name}
-
-                  </td>
-
-                  <td>
-                    <span className="pill pb">
-                      {s.role}
-                    </span>
-                  </td>
-
-                  <td style={{ color: "var(--muted2)" }}>
-                    {s.salon?.name || s.salonName || "-"}
-                  </td>
-
-                  <td>
-                    <span className={`pill ${getStatusClass(s.status)}`}>
-                      {s.status}
-                    </span>
-                  </td>
-
-                  <td>{s.bookings || 0}</td>
-
-                  <td style={{ color: "var(--yellow)" }}>
-                    ⭐ {s.rating || "0.0"}
-                  </td>
-
-                  <td style={{ textAlign: "right" }}>
-
-                    <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-
-                      <button className="btn btn-s xs" onClick={() => handleToggleStatus(s)}>
-                        {s.status === "Active" ? "Deactivate" : "Activate"}
-                      </button>
-
-                      <button className="btn btn-d xs" onClick={() => handleDelete(s._id)}>
-                        Remove
-                      </button>
-
-                    </div>
-
-                  </td>
-
-                </tr>
-              ))
-            )}
-
-          </tbody>
-
-        </table>
-
-      </div>
-
+      {/* Staff Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonStaffCard key={i} />
+          ))}
+        </div>
+      ) : filteredStaff.length === 0 ? (
+        <EmptyState
+          title="No staff found"
+          description="No staff members match your current filters."
+          icon={Users}
+          actionLabel="Add Staff"
+          onAction={() => navigate("/AddStaff")}
+        />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredStaff.map((s, i) => (
+            <StaffCard
+              key={s._id}
+              staff={s}
+              index={i}
+              onToggleStatus={handleToggleStatus}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
 export default Staff;
-

@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base Layer ─── */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    @apply font-sans bg-primary text-white min-h-screen overflow-x-hidden antialiased;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #333333;
+    border-radius: 9px;
+  }
+
+  /* Form elements inherit font */
+  button {
+    cursor: pointer;
+    font-family: inherit;
+  }
+  input, select, textarea {
+    font-family: inherit;
+  }
+}
+
+/* ─── Component Layer ─── */
+@layer components {
+
+  /* Glass Card */
+  .glass-card {
+    @apply bg-surface/80 backdrop-blur-glass border border-border rounded-xl;
+  }
+
+  /* Gradient accent top bar on card */
+  .card-accent {
+    @apply relative;
+  }
+  .card-accent::before {
+    content: '';
+    @apply absolute top-0 left-0 right-0 h-[3px] bg-accent rounded-t-xl;
+  }
+
+  /* Transition utilities */
+  .transition-default {
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  .transition-slow {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  /* Hover lift effect */
+  .hover-lift {
+    @apply transition-default;
+  }
+  .hover-lift:hover {
+    @apply -translate-y-0.5;
+  }
+
+  /* Glow on hover */
+  .hover-glow {
+    @apply transition-default;
+  }
+  .hover-glow:hover {
+    @apply shadow-glow;
+  }
+
+  /* Text gradient */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-accent to-accent-hover;
+  }
+
+  /* Grid background pattern for auth pages */
+  .grid-bg::before {
+    content: '';
+    @apply absolute inset-0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(245,200,0,0.03) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(245,200,0,0.03) 40px);
+  }
+}
