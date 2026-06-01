@@ -27,11 +27,18 @@ import Analytics from "./pages/superadmin/Analytics.jsx";
 import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 
-import BookAppointment from "./pages/customer/BookAppointment.jsx";
-import MyAppointments from "./pages/customer/MyAppointments.jsx";
+import CustomerLayout   from "./components/layout/CustomerLayout.jsx";
+import CustomerDashboard from "./pages/customer/Dashboard.jsx";
+import Branches         from "./pages/customer/Branches.jsx";
+import CustomerServices from "./pages/customer/Services.jsx";
+import CustomerStaff    from "./pages/customer/Staff.jsx";
+import BookAppointment  from "./pages/customer/BookAppointment.jsx";
+import MyAppointments   from "./pages/customer/MyAppointments.jsx";
+
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
 
 import { useAuth } from "./context/AuthContext";
+import CustomerRegister from "./pages/auth/CustomerRegister.jsx";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user } = useAuth();
@@ -60,6 +67,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/editProfile" element={<Edit />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
+        <Route path="/register" element={<CustomerRegister />} />
 
         <Route
           path="/superAdminDashboard"
@@ -169,23 +177,41 @@ function App() {
         }
       />
 
-      <Route
-        path="/book"
-        element={
-          <ProtectedRoute allowedRoles={["customer"]}>
-            <BookAppointment />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/customer/dashboard" element={
+        <ProtectedRoute allowedRoles={["customer", "user"]}>
+          <CustomerLayout><CustomerDashboard /></CustomerLayout>
+        </ProtectedRoute>
+      } />
 
-      <Route
-        path="/my-appointments"
-        element={
-          <ProtectedRoute allowedRoles={["customer"]}>
-            <MyAppointments />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/customer/branches" element={
+        <ProtectedRoute allowedRoles={["customer", "user"]}>
+          <CustomerLayout><Branches /></CustomerLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/customer/services" element={
+        <ProtectedRoute allowedRoles={["customer", "user"]}>
+          <CustomerLayout><CustomerServices /></CustomerLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/customer/staff" element={
+        <ProtectedRoute allowedRoles={["customer", "user"]}>
+          <CustomerLayout><CustomerStaff /></CustomerLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/book" element={
+        <ProtectedRoute allowedRoles={["customer", "user"]}>
+          <CustomerLayout><BookAppointment /></CustomerLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/my-appointments" element={
+        <ProtectedRoute allowedRoles={["customer", "user"]}>
+          <CustomerLayout><MyAppointments /></CustomerLayout>
+        </ProtectedRoute>
+      } />
 
       {/* Admin Bookings */}
       <Route

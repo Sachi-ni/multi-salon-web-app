@@ -1,56 +1,135 @@
-import React from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import LoginHeader from "../../components/layout/loginHeader";
-import "./customer.css";
+import { useAuth } from "../../context/AuthContext";
+import { getMyAppointments } from "../../services/appointmentService";
+import { Calendar, PlusCircle, Clock, CheckCircle } from "lucide-react";
 
-const Dashboard = () => {
-  const navigate = useNavigate();
+const STATUS_COLORS = {
+  pending:   "bg-warning-dim text-warning border-warning-border",
+  confirmed: "bg-success-dim text-success border-success-border",
+  cancelled: "bg-danger-dim text-danger border-danger-border",
+  completed: "bg-info-dim text-info border-info-border",
+};
 
-  const doExport = () => {
-    console.log("Export clicked");
-  };
+export default function CustomerDashboard() {
+  const { user }    = useAuth();
+  const navigate    = useNavigate();
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading]           = useState(true);
+
+  useEffect(() => {
+    getMyAppointments()
+      .then(res => setAppointments(res.data))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const pending   = appointments.filter(a => a.status === "pending").length;
+  const confirmed = appointments.filter(a => a.status === "confirmed").length;
+  const completed = appointments.filter(a => a.status === "completed").length;
+  const recent    = appointments.slice(0, 3);
 
   return (
-    <div className="customer-page">
-      <LoginHeader />
-    <div id="screen-home" className="screen active">
-    <div className="hero">
-        <div className="hero-left">
-        <div className="hero-tag">Premium Grooming Studio</div>
-        <div className="hero-title">LOOK<br /><span>SHARP.</span><br />FEEL<br />GREAT.</div>
-        <p className="hero-sub">Expert cuts, flawless styling, and premium grooming services — crafted for the modern individual. Walk out a new you.</p>
-        <div className="hero-btns">
-            <button className="btn-primary" onClick={() => navigate('/branches')}>Book Appointment</button>
-            <button className="btn-outline">View Services</button>
-        </div>
-        </div>
-        <div className="hero-right">
-        <div className="hero-art">
-            <div className="hero-circle"></div>
-            <div className="hero-circle"></div>
-            <div className="hero-scissors">✂</div>
-            <div className="hero-stat-grid">
-            <div className="stat"><div className="stat-num">2K+</div><div className="stat-label">Clients</div></div>
-            <div className="stat"><div className="stat-num">12</div><div className="stat-label">Stylists</div></div>
-            <div className="stat"><div className="stat-num">2</div><div className="stat-label">Branches</div></div>
+    <div>
+      {/* Welcome */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-black text-white">
+          Welcome back, <span className="text-accent">{user?.name?.split(" ")[0]}</span> 👋
+        </h1>
+        <p className="text-muted-2 text-sm mt-1">Manage your salon appointments</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {[
+          { label: "Pending",   value: pending,   icon: Clock,         color: "text-warning", bg: "bg-warning-dim border-warning-border" },
+          { label: "Confirmed", value: confirmed, icon: CheckCircle,   color: "text-success", bg: "bg-success-dim border-success-border" },
+          { label: "Completed", value: completed, icon: Calendar,      color: "text-info",    bg: "bg-info-dim border-info-border" },
+        ].map(stat => (
+          <div key={stat.label} className="bg-surface border border-border rounded-2xl p-5 shadow-card">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-muted-2 text-sm font-bold">{stat.label}</span>
+              <div className={`w-9 h-9 rounded-lg border flex items-center justify-center ${stat.bg}`}>
+                <stat.icon className={`w-4 h-4 ${stat.color}`} />
+              </div>
             </div>
-        </div>
-        </div>
-    </div>
+            <p className="text-3xl font-black text-white">{stat.value}</p>
+          </div>
+        ))}
+      </div>
 
-    <div className="services-strip">
-        <span className="strip-item">HAIR CUT</span><span className="strip-dot">◆</span>
-        <span className="strip-item">BEARD TRIM</span><span className="strip-dot">◆</span>
-        <span className="strip-item">FACIAL</span><span className="strip-dot">◆</span>
-        <span className="strip-item">HAIR COLOUR</span><span className="strip-dot">◆</span>
-        <span className="strip-item">HAIR WASH</span><span className="strip-dot">◆</span>
-        <span className="strip-item">MASSAGE</span><span className="strip-dot">◆</span>
-        <span className="strip-item">DRESSING</span><span className="strip-dot">◆</span>
-        <span className="strip-item">GROOMING</span>
-    </div>
-    </div>
-    </div>
-        );
-    };  
+      {/* Quick actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <button
+          onClick={() => navigate("/book")}
+          className="bg-accent hover:bg-accent-hover text-primary font-extrabold rounded-2xl p-5 text-left transition-all duration-200 hover:shadow-glow hover:-translate-y-0.5 flex items-center gap-4"
+        >
+          <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <PlusCircle className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-lg font-black">New Booking</p>
+            <p className="text-sm font-medium opacity-75">Book an appointment now</p>
+          </div>
+        </button>
 
-export default Dashboard;
+        <button
+          onClick={() => navigate("/my-appointments")}
+          className="bg-surface hover:bg-surface-2 border border-border hover:border-border-hover text-white font-extrabold rounded-2xl p-5 text-left transition-all duration-200 hover:-translate-y-0.5 flex items-center gap-4"
+        >
+          <div className="w-12 h-12 bg-accent-dim border border-accent/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Calendar className="w-6 h-6 text-accent" />
+          </div>
+          <div>
+            <p className="text-lg font-black">My Bookings</p>
+            <p className="text-sm font-medium text-muted-2">View all your appointments</p>
+          </div>
+        </button>
+      </div>
+
+      {/* Recent appointments */}
+      <div className="bg-surface border border-border rounded-2xl p-5 shadow-card">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-white font-extrabold">Recent Appointments</h2>
+          <button
+            onClick={() => navigate("/my-appointments")}
+            className="text-accent text-xs font-bold hover:underline"
+          >
+            View all →
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : recent.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-2 text-sm">No appointments yet.</p>
+            <button
+              onClick={() => navigate("/book")}
+              className="mt-3 px-4 py-2 bg-accent text-primary text-xs font-extrabold rounded-lg hover:bg-accent-hover transition-all"
+            >
+              Book Now
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {recent.map(a => (
+              <div key={a._id} className="bg-surface-2 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-white font-bold text-sm">{a.salon_id?.name}</p>
+                  <p className="text-muted-2 text-xs mt-0.5">
+                    {a.date} · {a.services.map(s => s.service_id?.service_name).join(", ")}
+                  </p>
+                </div>
+                <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border ${STATUS_COLORS[a.status]}`}>
+                  {a.status.toUpperCase()}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

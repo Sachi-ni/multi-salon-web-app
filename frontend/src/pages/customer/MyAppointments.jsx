@@ -25,7 +25,7 @@ export default function MyAppointments() {
   );
 
   return (
-    <div className="min-h-screen bg-primary px-4 py-10">
+    <div>
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
           <h1 className="text-2xl font-black text-white">My Appointments</h1>

@@ -24,7 +24,7 @@ export default function BookAppointment() {
   const back = () => setStep(s => s - 1);
 
   return (
-    <div className="min-h-screen bg-primary px-4 py-10">
+    <div>
       <div className="max-w-2xl mx-auto">
 
         {/* Header */}

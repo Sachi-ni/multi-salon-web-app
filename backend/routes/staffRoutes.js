@@ -14,10 +14,10 @@ const router = express.Router();
 // Configure multer for simple disk storage
 const upload = multer({ dest: "uploads/" });
 
-// Only Superadmin can create or view staff
-router.post("/", protect, authorizeRoles("super-admin"), upload.single("image"), createStaff);
-router.get("/", protect, authorizeRoles("super-admin"), getStaff);
-router.put("/:id", protect, authorizeRoles("super-admin"), updateStaff);
-router.delete("/:id", protect, authorizeRoles("super-admin"), deleteStaff);
+// Customers can view staff — only admins can create/edit/delete
+router.get("/",       protect, getStaff);
+router.post("/",      protect, authorizeRoles("super-admin", "staff-admin"), upload.single("image"), createStaff);
+router.put("/:id",    protect, authorizeRoles("super-admin", "staff-admin"), updateStaff);
+router.delete("/:id", protect, authorizeRoles("super-admin", "staff-admin"), deleteStaff);
 
 export default router;
