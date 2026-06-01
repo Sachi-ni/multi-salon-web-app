@@ -49,9 +49,9 @@ const CustomerSidebar = ({ isOpen, onClose }) => {
   };
 
   const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  logout();
+  window.location.href = "/"; // hard redirect instead of navigate
+};
 
   return (
     <>

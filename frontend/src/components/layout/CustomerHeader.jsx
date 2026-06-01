@@ -19,7 +19,10 @@ const CustomerHeader = ({ onToggleSidebar }) => {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const handleLogout = () => { logout(); navigate("/login"); };
+  const handleLogout = () => {
+  logout();
+  window.location.href = "/"; // hard redirect instead of navigate
+};
 
   const initials = user?.name
     ? user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()

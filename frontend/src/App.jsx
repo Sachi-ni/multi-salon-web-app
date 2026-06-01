@@ -12,7 +12,7 @@ import Edit from "./pages/auth/edit.jsx";
 import Unauthorized from "./pages/Unauthorized.jsx";
 
 //customer pages
-import Main from "./pages/customer/Dashboard.jsx";
+import Landing from "./pages/customer/Landing.jsx";
 
 // Super Admin Pages
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
@@ -61,7 +61,7 @@ function App() {
     <BrowserRouter>
       {/* All Routes MUST be inside this container */}
       <Routes>
-        <Route path="/" element={<Main />} />
+        <Route path="/" element={<Landing />} />
 
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
