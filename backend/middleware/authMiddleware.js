@@ -1,32 +1,30 @@
 import jwt from "jsonwebtoken";
 import Admin from "../models/Admin.js";
-import Customer from "../models/Customer.js";
 
-export const protect = async (req, res, next) => {
-  let token;
+const protect = async(req,res,next)=>{
 
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-    try {
-      token = req.headers.authorization.split(" ")[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+   let token;
 
-      // Try Admin first, then Customer
-      let user = await Admin.findById(decoded.id).select("-password");
-      if (!user) {
-        user = await Customer.findById(decoded.id).select("-password");
+   if(req.headers.authorization && req.headers.authorization.startsWith("Bearer")){
+
+      try {
+         token = req.headers.authorization.split(" ")[1];
+
+         const decoded = jwt.verify(token,process.env.JWT_SECRET);
+
+         req.user = await Admin.findById(decoded.id);
+
+         next();
+      } catch (error) {
+         res.status(401).json({message:"Not authorized, token failed"});
       }
 
-      if (!user) {
-        return res.status(401).json({ message: "User not found" });
-      }
+   }else{
 
-      req.user = user;
-      req.user.id = user._id.toString(); // normalize id access
-      next();
-    } catch (error) {
-      res.status(401).json({ message: "Not authorized, token failed" });
-    }
-  } else {
-    res.status(401).json({ message: "Not authorized, no token" });
-  }
+      res.status(401).json({message:"Not authorized, no token"});
+
+   }
+
 };
+
+export default protect;

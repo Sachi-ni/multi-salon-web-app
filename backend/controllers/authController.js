@@ -40,7 +40,6 @@ export const registerAdmin = async (req, res) => {
       email: admin.email,
       phone: admin.phone,
       role: admin.role,
-      salon_id: admin.salon_id,
       token: generateToken(admin._id)
     });
 
@@ -70,7 +69,6 @@ export const loginAdmin = async (req, res) => {
       email: admin.email,
       phone: admin.phone,
       role: admin.role,
-      salon_id: admin.salon_id,
       token: generateToken(admin._id)
     });
 

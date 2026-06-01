@@ -1,19 +1,21 @@
-import api from "./api";
+import axios from "axios";
+
+const API = axios.create({
+  baseURL: "http://localhost:5000/api"
+});
 
 export const getSalons = () =>
-  api.get("/salons");
+  API.get("/salons");
 
 export const getSalon = (id) =>
-  api.get(`/salons/${id}`);
+  API.get(`/salons/${id}`);
 
 export const createSalon = (data) =>
-  api.post("/salons", data);
+  API.post("/salons", data);
 
 export const updateSalon = (id, data) =>
-  api.put(`/salons/${id}`, data);
+  API.put(`/salons/${id}`, data);
 
 export const deleteSalon = (id) =>
-  api.delete(`/salons/${id}`);
+  API.delete(`/salons/${id}`);
 
-export const getSalonServices = (salonId) =>
-  api.get("/services", { params: { salonId } });

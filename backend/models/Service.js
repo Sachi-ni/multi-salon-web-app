@@ -1,18 +1,17 @@
 import mongoose from "mongoose";
 
 const serviceSchema = new mongoose.Schema({
-  service_name: { type: String, required: true },
-  base_price:   { type: Number, required: true },
-  description:  { type: String, default: "" },
-  duration:     { type: Number, required: true }, // in minutes
+  service_name: String,
+  base_price: Number,
+  description: String,
+  duration: Number,
+  staff_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Staff"
+  },
   category_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "ServiceCategory"
-  },
-  salon_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Salon",
-    required: true
   }
 });
 

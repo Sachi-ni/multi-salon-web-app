@@ -1,6 +1,5 @@
 import express from "express";
 import Customer from "../models/Customer.js";
-import { registerCustomer, loginCustomer } from "../controllers/customerAuthController.js"
 
 const router = express.Router();
 
@@ -23,8 +22,5 @@ router.post("/", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
-router.post("/register", registerCustomer);
-router.post("/login",    loginCustomer);
 
 export default router;

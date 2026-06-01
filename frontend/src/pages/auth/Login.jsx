@@ -11,53 +11,33 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-  setLoading(true);
-  try {
-    // Try admin login first
-    let res = await fetch("http://localhost:5000/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    let data = await res.json();
-
-    // If admin login fails, try customer login
-    if (!res.ok) {
-      res = await fetch("http://localhost:5000/api/customers/login", {
+    setLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      data = await res.json();
-    }
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || "Login failed");
+        setLoading(false);
+        return;
+      }
+      const { token, ...userData } = data;
+      login(userData, token);
 
-    if (!res.ok) {
-      alert(data.message || "Login failed");
+      if (data.role === "super-admin") {
+        navigate("/superAdminDashboard");
+      } else {
+        navigate("/");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      alert("Something went wrong. Please try again.");
       setLoading(false);
-      return;
     }
-
-    const { token, ...userData } = data;
-    login(userData, token);
-
-    // Redirect based on role
-    if (data.role === "super-admin") {
-      navigate("/superAdminDashboard");
-    } else if (data.role === "staff-admin") {
-      navigate("/admin/bookings");
-    } else if (data.role === "customer" || data.role === "user") {
-      navigate("/customer/dashboard");
-    } else {
-      navigate("/");
-    }
-
-  } catch (error) {
-    console.error("Login error:", error);
-    alert("Something went wrong. Please try again.");
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg">
@@ -131,7 +111,7 @@ const Login = () => {
         <div className="text-center mt-4 text-[0.82rem] text-muted-2">
           No account?{" "}
           <span
-            onClick={() => navigate("/register")}
+            onClick={() => navigate("/signup")}
             className="text-accent cursor-pointer font-bold hover:underline"
           >
             Register here
