@@ -3,15 +3,19 @@ import Staff from "../models/Staff.js";
 export const createStaff = async (req, res) => {
   try {
     // Map frontend fields to model fields
+    
+
     const staffData = {
       full_name: req.body.name,
       email: req.body.email,
+      phone: req.body.phone,
       role: req.body.role,
       specification: req.body.specification,
       commission_rate: req.body.commission_rate,
       salon_id: req.body.salonId,
-      image: req.file ? req.file.path : null,
-    };
+      services: req.body.services || [],
+  image:           req.file ? req.file.path : null,
+};
 
     const staff = await Staff.create(staffData);
     res.status(201).json(staff);
@@ -22,14 +26,10 @@ export const createStaff = async (req, res) => {
 
 export const getStaff = async (req, res) => {
   try {
-    const staff = await Staff.find().populate("salon_id", "name");
-    // Map full_name to name and salon_id to salon for frontend compatibility
-    const staffWithName = staff.map(s => ({
-      ...s.toObject(),
-      name: s.full_name,
-      salon: s.salon_id
-    }));
-    res.json(staffWithName);
+    const { salonId } = req.query;
+    const filter = salonId ? { salon_id: salonId } : {};
+    const staff = await Staff.find(filter).populate("salon_id", "name");
+    res.json(staff);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
