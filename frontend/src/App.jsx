@@ -67,7 +67,8 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/editProfile" element={<Edit />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
-        <Route path="/register" element={<CustomerRegister />} />
+        <Route path="/register" element={<Signup />} />
+        <Route path="/customer/register" element={<CustomerRegister />} />
 
         <Route
           path="/superAdminDashboard"
