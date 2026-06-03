@@ -26,6 +26,7 @@ import Appointments from "./pages/superadmin/Appointments.jsx";
 import Analytics from "./pages/superadmin/Analytics.jsx";
 import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
+import Services from "./pages/superadmin/Services.jsx";
 
 import CustomerLayout   from "./components/layout/CustomerLayout.jsx";
 import CustomerDashboard from "./pages/customer/Dashboard.jsx";
@@ -109,6 +110,17 @@ function App() {
             <ProtectedRoute allowedRoles={["super-admin"]}>
               <DashboardLayout>
                 <Staff />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/Services"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <Services />
               </DashboardLayout>
             </ProtectedRoute>
           }

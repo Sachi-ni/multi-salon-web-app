@@ -1,20 +1,23 @@
-import axios from "axios";
+import api from "./api";
 
-const API = axios.create({
-  baseURL: "http://localhost:5000/api"
-});
+// ── Services ──
 
-// Add token to requests
-API.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-export const getServices = () =>
-  API.get("/services");
+export const getServices = (salonId) =>
+  api.get("/services", { params: salonId ? { salonId } : {} });
 
 export const createService = (data) =>
-  API.post("/services", data);
+  api.post("/services", data);
+
+export const updateService = (id, data) =>
+  api.put(`/services/${id}`, data);
+
+export const deleteService = (id) =>
+  api.delete(`/services/${id}`);
+
+// ── Service Categories ──
+
+export const getServiceCategories = () =>
+  api.get("/services/categories");
+
+export const createServiceCategory = (data) =>
+  api.post("/services/categories", data);
