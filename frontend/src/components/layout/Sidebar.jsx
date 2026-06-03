@@ -6,6 +6,7 @@ import {
   BarChart3,
   Store,
   Users,
+  Scissors,
   Calendar,
   DollarSign,
   LogOut,
@@ -25,6 +26,7 @@ const navItems = [
     items: [
       { label: "Salons", path: "/salons", icon: Store, countId: "cnt-s" },
       { label: "Staff", path: "/Staff", icon: Users },
+      { label: "Services", path: "/Services", icon: Scissors },
       { label: "Appointments", path: "/Appointments", icon: Calendar, countId: "cnt-a" },
     ],
   },
