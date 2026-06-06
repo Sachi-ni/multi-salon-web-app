@@ -119,7 +119,7 @@ export default function CustomerDashboard() {
                 <div>
                   <p className="text-white font-bold text-sm">{a.salon_id?.name}</p>
                   <p className="text-muted-2 text-xs mt-0.5">
-                    {a.date} · {a.services.map(s => s.service_id?.service_name).join(", ")}
+                    {a.appointment_date} · {a.service_id?.service_name}
                   </p>
                 </div>
                 <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border ${STATUS_COLORS[a.status]}`}>
