@@ -37,6 +37,8 @@ import BookAppointment  from "./pages/customer/BookAppointment.jsx";
 import MyAppointments   from "./pages/customer/MyAppointments.jsx";
 
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
+import AdminDailySchedule from "./pages/admin/AdminDailySchedule.jsx";
+import AdminStaffSchedule from "./pages/admin/AdminStaffSchedule.jsx";
 
 import { useAuth } from "./context/AuthContext";
 import CustomerRegister from "./pages/auth/CustomerRegister.jsx";
@@ -233,6 +235,30 @@ function App() {
           <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
             <DashboardLayout>
               <AdminBookings />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Admin Daily Schedule */}
+      <Route
+        path="/admin/daily-schedule"
+        element={
+          <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
+            <DashboardLayout>
+              <AdminDailySchedule />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Admin Staff Schedule */}
+      <Route
+        path="/admin/staff-schedule"
+        element={
+          <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
+            <DashboardLayout>
+              <AdminStaffSchedule />
             </DashboardLayout>
           </ProtectedRoute>
         }

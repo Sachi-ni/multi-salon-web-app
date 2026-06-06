@@ -1,16 +1,21 @@
 import { useState, useEffect } from "react";
 import { getSalons } from "../../services/salonService";
-import StepServices from "./steps/StepServices";
-import StepStaff from "./steps/StepStaff";
-import StepConfirm from "./steps/StepConfirm";
+import StepSelectService  from "./steps/StepSelectService";
+import StepSelectStaff    from "./steps/StepSelectStaff";
+import StepSelectTimeSlot from "./steps/StepSelectTimeSlot";
+import StepBookingConfirm from "./steps/StepBookingConfirm";
 
-const STEPS = ["Salon", "Date & Time", "Services", "Staff", "Confirm"];
+const STEPS = ["Salon", "Date", "Service", "Staff", "Time Slot", "Confirm"];
 
 export default function BookAppointment() {
   const [step, setStep]     = useState(0);
   const [salons, setSalons] = useState([]);
   const [booking, setBooking] = useState({
-    salonId: "", salonName: "", date: "", services: [],
+    salonId: "", salonName: "",
+    date: "",
+    serviceId: "", serviceName: "", serviceDuration: 0, servicePrice: 0,
+    staffId: "", staffName: "", staffSpecification: "",
+    startTime: "", endTime: "",
   });
 
   useEffect(() => {
@@ -21,7 +26,30 @@ export default function BookAppointment() {
     setBooking(prev => ({ ...prev, ...data }));
     setStep(s => s + 1);
   };
-  const back = () => setStep(s => s - 1);
+
+  const back = () => {
+    // Clear downstream selections when going back
+    if (step === 3) {
+      // Going back from Staff → clear staff + time
+      setBooking(prev => ({
+        ...prev,
+        staffId: "", staffName: "", staffSpecification: "",
+        startTime: "", endTime: "",
+      }));
+    } else if (step === 4) {
+      // Going back from Time Slot → clear time
+      setBooking(prev => ({ ...prev, startTime: "", endTime: "" }));
+    } else if (step === 2) {
+      // Going back from Service → clear service + staff + time
+      setBooking(prev => ({
+        ...prev,
+        serviceId: "", serviceName: "", serviceDuration: 0, servicePrice: 0,
+        staffId: "", staffName: "", staffSpecification: "",
+        startTime: "", endTime: "",
+      }));
+    }
+    setStep(s => s - 1);
+  };
 
   return (
     <div>
@@ -137,9 +165,17 @@ export default function BookAppointment() {
             </div>
           )}
 
-          {step === 2 && <StepServices booking={booking} onNext={next} onBack={back} />}
-          {step === 3 && <StepStaff    booking={booking} onNext={next} onBack={back} />}
-          {step === 4 && <StepConfirm  booking={booking} onBack={back} />}
+          {/* Step 2 — Service */}
+          {step === 2 && <StepSelectService  booking={booking} onNext={next} onBack={back} />}
+
+          {/* Step 3 — Staff */}
+          {step === 3 && <StepSelectStaff    booking={booking} onNext={next} onBack={back} />}
+
+          {/* Step 4 — Time Slot */}
+          {step === 4 && <StepSelectTimeSlot booking={booking} onNext={next} onBack={back} />}
+
+          {/* Step 5 — Confirm */}
+          {step === 5 && <StepBookingConfirm booking={booking} onBack={back} />}
         </div>
       </div>
     </div>

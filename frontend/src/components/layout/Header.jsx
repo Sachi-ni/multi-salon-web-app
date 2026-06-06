@@ -1,20 +1,33 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
+import { Bell, Menu, LogOut, User, ChevronDown, Check } from "lucide-react";
 import clsx from "clsx";
+import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
 
 const Header = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
+
+  useEffect(() => {
+    if (user) {
+      getNotifications().then(res => setNotifications(res.data)).catch(console.error);
+    }
+  }, [user]);
 
   // Close dropdown on outside click
   useEffect(() => {
     const handleClick = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClick);
@@ -25,6 +38,26 @@ const Header = ({ onToggleSidebar }) => {
     logout();
     navigate("/");
   };
+
+  const handleReadNotification = async (id) => {
+    try {
+      await markNotificationAsRead(id);
+      setNotifications(prev => prev.map(n => n._id === id ? { ...n, is_read: true } : n));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleReadAll = async () => {
+    try {
+      await markAllNotificationsAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const roleBadgeColor = {
     "super-admin": "bg-accent-muted border-accent/35 text-accent",
@@ -65,9 +98,56 @@ const Header = ({ onToggleSidebar }) => {
       <div className="flex-1" />
 
       {/* Notification */}
-      <button className="w-9 h-9 rounded-lg bg-transparent border border-border flex items-center justify-center text-muted-2 hover:bg-surface-2 hover:text-white hover:border-border-hover transition-all duration-150 relative">
-        <Bell className="w-4 h-4" />
-      </button>
+      <div className="relative" ref={notifRef}>
+        <button 
+          onClick={() => setNotifOpen(!notifOpen)}
+          className="w-9 h-9 rounded-lg bg-transparent border border-border flex items-center justify-center text-muted-2 hover:bg-surface-2 hover:text-white hover:border-border-hover transition-all duration-150 relative"
+        >
+          <Bell className="w-4 h-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-accent text-primary text-[0.6rem] font-black rounded-full flex items-center justify-center">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+
+        {notifOpen && (
+          <div className="absolute right-0 top-full mt-2 w-80 bg-surface border border-border rounded-xl shadow-modal py-2 animate-scale-in z-50">
+            <div className="flex items-center justify-between px-4 pb-2 border-b border-border">
+              <h3 className="text-white font-extrabold text-sm">Notifications</h3>
+              {unreadCount > 0 && (
+                <button onClick={handleReadAll} className="text-accent text-xs font-bold hover:underline">
+                  Mark all as read
+                </button>
+              )}
+            </div>
+            <div className="max-h-80 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="p-4 text-center text-muted-2 text-xs">No notifications yet</div>
+              ) : (
+                notifications.map(n => (
+                  <div 
+                    key={n._id} 
+                    onClick={() => !n.is_read && handleReadNotification(n._id)}
+                    className={clsx(
+                      "p-3 border-b border-border/50 hover:bg-surface-2 transition-colors cursor-pointer",
+                      !n.is_read ? "bg-accent/5" : ""
+                    )}
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <p className={clsx("text-xs font-bold", !n.is_read ? "text-accent" : "text-white")}>{n.title}</p>
+                      <span className="text-[0.6rem] text-muted-2 whitespace-nowrap ml-2">
+                        {new Date(n.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-2 leading-snug">{n.message}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Separator */}
       <div className="w-px h-5 bg-border mx-0.5" />
