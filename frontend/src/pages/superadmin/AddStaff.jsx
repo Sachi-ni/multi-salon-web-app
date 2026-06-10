@@ -7,14 +7,17 @@ import PageHeader from "../../components/ui/PageHeader";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
+import { useParams } from "react-router-dom";
 
 const AddStaff = () => {
   const navigate = useNavigate();
+  const { salonId } = useParams();
   const [salons, setSalons] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    firstName: "", lastName: "", email: "", role: "", salon: "", picture: null,
+    firstName: "", lastName: "", email: "", role: "", 
+    salon: salonId || "", picture: null,
   });
 
   useEffect(() => {

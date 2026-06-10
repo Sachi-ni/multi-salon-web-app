@@ -21,6 +21,7 @@ import SuperAdminDashboard from "./pages/superadmin/Dashboard.jsx";
 import Revenue from "./pages/superadmin/Revenue.jsx";
 import AddSalon from "./pages/superadmin/AddSalon.jsx";
 import AddStaff from "./pages/superadmin/AddStaff.jsx";
+import AddService from "./pages/superadmin/Services.jsx";
 import Staff from "./pages/superadmin/Staff.jsx";
 import Appointments from "./pages/superadmin/Appointments.jsx";
 import Analytics from "./pages/superadmin/Analytics.jsx";
@@ -145,6 +146,30 @@ function App() {
             <ProtectedRoute allowedRoles={["super-admin"]}>
               <DashboardLayout>
                 <AddStaff />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        // This route is for adding service to a specific salon, so it includes a salonId param
+
+        <Route
+          path="/AddStaff/:salonId"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <AddStaff />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/AddService/:salonId"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <AddService />
               </DashboardLayout>
             </ProtectedRoute>
           }
