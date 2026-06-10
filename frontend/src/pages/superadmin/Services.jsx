@@ -25,6 +25,7 @@ import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
+import { useParams } from "react-router-dom";
 
 /* ─────────── Skeleton Card ─────────── */
 const SkeletonServiceCard = () => (
@@ -320,6 +321,18 @@ const Services = () => {
     salon_id: "",
   };
   const [formData, setFormData] = useState(emptyForm);
+
+  // Get salonId from URL if present (for direct navigation to Add Service for a specific salon)
+  const { salonId } = useParams();
+
+  useEffect(() => {
+    if (salonId) {
+      // If we navigated to /AddService/:salonId, open modal for adding
+      setEditingService(null);
+      setFormData({ ...emptyForm, salon_id: salonId });
+      setModalOpen(true);
+    }
+  }, [salonId]);
 
   /* ── Data Fetching ── */
   const fetchData = useCallback(async () => {
