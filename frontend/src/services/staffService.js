@@ -20,7 +20,11 @@ export const createStaff = (data) =>
   API.post("/staff", data);
 
 export const updateStaff = (id, data) =>
-  API.put(`/staff/${id}`, data);
+  API.put(`/staff/${id}`, data, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
 
 export const deleteStaff = (id) =>
   API.delete(`/staff/${id}`);
