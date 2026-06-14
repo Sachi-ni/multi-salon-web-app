@@ -17,3 +17,6 @@ export const deleteSalon = (id) =>
 
 export const getSalonServices = (salonId) =>
   api.get("/services", { params: { salonId } });
+
+export const getSalonById = (id) =>
+  api.get(`/salons/${id}`); // ✅ FIXED

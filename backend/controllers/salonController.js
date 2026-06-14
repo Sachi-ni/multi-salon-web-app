@@ -79,11 +79,7 @@ export const getSalonById = async(req,res)=>{
    try {
       const salon = await Salon.findById(req.params.id);
       if(!salon) return res.status(404).json({ message: "Salon not found" });
-      const manager = await Staff.findOne({ salon_id: salon._id, role: "manager" }).select("full_name email phone");
-      const obj = salon.toObject();
-      obj.managerName = manager ? manager.full_name : null;
-      obj.manager = manager || null;
-      res.json(obj);
+      res.json(salon);
    } catch (error) {
       res.status(500).json({ message: error.message });
    }
