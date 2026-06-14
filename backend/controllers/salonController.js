@@ -18,14 +18,22 @@ export const getSalons = async(req,res)=>{
    }
 };
 
-export const getSalonById = async(req,res)=>{
-   try {
-      const salon = await Salon.findById(req.params.id);
-      if(!salon) return res.status(404).json({ message: "Salon not found" });
-      res.json(salon);
-   } catch (error) {
-      res.status(500).json({ message: error.message });
-   }
+export const getSalonById = async (req, res) => {
+  try {
+    const salon = await Salon.findById(req.params.id);
+
+    if (!salon) {
+      return res.status(404).json({
+        message: "Salon not found"
+      });
+    }
+
+    res.json(salon);
+  } catch (error) {
+    res.status(500).json({
+      message: error.message
+    });
+  }
 };
 
 export const updateSalon = async(req,res)=>{
