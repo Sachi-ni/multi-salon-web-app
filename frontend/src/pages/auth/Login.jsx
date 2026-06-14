@@ -56,7 +56,7 @@ const Login = () => {
       navigate("/superAdminDashboard");
     } else if (data.role === "staff-admin" || data.role === "manager") {
       navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
-    } else if (data.role === "customer" || data.role === "user") {
+    } else if (data.role === "customer") {
       navigate("/customer/dashboard");
     } else {
       navigate("/");
@@ -141,7 +141,7 @@ const Login = () => {
         <div className="text-center mt-4 text-[0.82rem] text-muted-2">
           No account?{" "}
           <span
-            onClick={() => navigate("/register")}
+            onClick={() => navigate("/customer/register")}
             className="text-accent cursor-pointer font-bold hover:underline"
           >
             Register here
