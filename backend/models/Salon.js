@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 
 const salonSchema = new mongoose.Schema({
   name: String,
-  ownerName: String,
   location: String,
   contact_info: String,
   phone: String,
