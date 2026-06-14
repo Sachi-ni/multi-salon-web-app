@@ -37,9 +37,14 @@ import CustomerStaff    from "./pages/customer/Staff.jsx";
 import BookAppointment  from "./pages/customer/BookAppointment.jsx";
 import MyAppointments   from "./pages/customer/MyAppointments.jsx";
 
+// Admin pages
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
 import AdminDailySchedule from "./pages/admin/AdminDailySchedule.jsx";
 import AdminStaffSchedule from "./pages/admin/AdminStaffSchedule.jsx";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import SalonAdminShell from "./pages/admin/SalonAdminShell";
+import AdminSalonLayout from "./components/layout/AdminSalonLayout";
+
 
 import { useAuth } from "./context/AuthContext";
 import CustomerRegister from "./pages/auth/CustomerRegister.jsx";
@@ -74,7 +79,7 @@ function App() {
         <Route path="/register" element={<Signup />} />
         <Route path="/customer/register" element={<CustomerRegister />} />
 
-        <Route
+       <Route
           path="/superAdminDashboard"
           element={
             <ProtectedRoute allowedRoles={["super-admin"]}>
@@ -84,6 +89,20 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Salon Admin Shell (full salon website for selected salon) */}
+        <Route
+          path="/salon-admin/:salonId/*"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
+              <AdminSalonLayout>
+                <SalonAdminShell />
+              </AdminSalonLayout>
+            </ProtectedRoute>
+          }
+        />
+
+
 
         <Route
           path="/Profile"
@@ -176,121 +195,95 @@ function App() {
         />
 
         <Route
-        path="/Appointments"
-        element={
-          <ProtectedRoute allowedRoles={["super-admin"]}>
-            <DashboardLayout>
-              <Appointments />
-            </DashboardLayout>
-          </ProtectedRoute>
-        }
-      />
+          path="/Appointments"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <Appointments />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
 
         <Route
-        path="/Analytics"
-        element={
-          <ProtectedRoute allowedRoles={["super-admin"]}>
+          path="/Analytics"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <Analytics />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/salons"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <Salons />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/AddAppointment"
+          element={
             <DashboardLayout>
-              <Analytics />
+              <AddAppointment />
             </DashboardLayout>
+          }
+        />
+
+        <Route path="/customer/dashboard" element={
+          <ProtectedRoute allowedRoles={["customer", "user"]}>
+            <CustomerLayout><CustomerDashboard /></CustomerLayout>
           </ProtectedRoute>
-        }
-      />
+        } />
 
-      <Route
-        path="/salons"
-        element={
-          <ProtectedRoute allowedRoles={["super-admin"]}>
-            <DashboardLayout>
-              <Salons />
-            </DashboardLayout>
+        <Route path="/customer/branches" element={
+          <ProtectedRoute allowedRoles={["customer", "user"]}>
+            <CustomerLayout><Branches /></CustomerLayout>
           </ProtectedRoute>
-        }
-      />
+        } />
 
-      <Route
-        path="/AddAppointment"
-        element={
-          <DashboardLayout>
-            <AddAppointment />
-          </DashboardLayout>
-        }
-      />
-
-      <Route path="/customer/dashboard" element={
-        <ProtectedRoute allowedRoles={["customer", "user"]}>
-          <CustomerLayout><CustomerDashboard /></CustomerLayout>
-        </ProtectedRoute>
-      } />
-
-      <Route path="/customer/branches" element={
-        <ProtectedRoute allowedRoles={["customer", "user"]}>
-          <CustomerLayout><Branches /></CustomerLayout>
-        </ProtectedRoute>
-      } />
-
-      <Route path="/customer/services" element={
-        <ProtectedRoute allowedRoles={["customer", "user"]}>
-          <CustomerLayout><CustomerServices /></CustomerLayout>
-        </ProtectedRoute>
-      } />
-
-      <Route path="/customer/staff" element={
-        <ProtectedRoute allowedRoles={["customer", "user"]}>
-          <CustomerLayout><CustomerStaff /></CustomerLayout>
-        </ProtectedRoute>
-      } />
-
-      <Route path="/book" element={
-        <ProtectedRoute allowedRoles={["customer", "user"]}>
-          <CustomerLayout><BookAppointment /></CustomerLayout>
-        </ProtectedRoute>
-      } />
-
-      <Route path="/my-appointments" element={
-        <ProtectedRoute allowedRoles={["customer", "user"]}>
-          <CustomerLayout><MyAppointments /></CustomerLayout>
-        </ProtectedRoute>
-      } />
-
-      {/* Admin Bookings */}
-      <Route
-        path="/admin/bookings"
-        element={
-          <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
-            <DashboardLayout>
-              <AdminBookings />
-            </DashboardLayout>
+        <Route path="/customer/services" element={
+          <ProtectedRoute allowedRoles={["customer", "user"]}>
+            <CustomerLayout><CustomerServices /></CustomerLayout>
           </ProtectedRoute>
-        }
-      />
+        } />
 
-      {/* Admin Daily Schedule */}
-      <Route
-        path="/admin/daily-schedule"
-        element={
-          <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
-            <DashboardLayout>
-              <AdminDailySchedule />
-            </DashboardLayout>
+        <Route path="/customer/staff" element={
+          <ProtectedRoute allowedRoles={["customer", "user"]}>
+            <CustomerLayout><CustomerStaff /></CustomerLayout>
           </ProtectedRoute>
-        }
-      />
+        } />
 
-      {/* Admin Staff Schedule */}
-      <Route
-        path="/admin/staff-schedule"
-        element={
-          <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
-            <DashboardLayout>
-              <AdminStaffSchedule />
-            </DashboardLayout>
+        <Route path="/book" element={
+          <ProtectedRoute allowedRoles={["customer", "user"]}>
+            <CustomerLayout><BookAppointment /></CustomerLayout>
           </ProtectedRoute>
-        }
-      />
+        } />
+
+        <Route path="/my-appointments" element={
+          <ProtectedRoute allowedRoles={["customer", "user"]}>
+            <CustomerLayout><MyAppointments /></CustomerLayout>
+          </ProtectedRoute>
+        } />
+
+        {/* Admin Bookings */}
+        <Route
+          path="/admin/bookings"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
+              <DashboardLayout>
+                <AdminBookings />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
       </Routes>
-
-
     </BrowserRouter>
     </AuthProvider>
   );

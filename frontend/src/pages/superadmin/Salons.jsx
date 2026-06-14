@@ -139,7 +139,8 @@ const Salons = () => {
     return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   };
 
-  const handleView = (id) => navigate(`/admin/dashboard/${id}`);
+  const handleView = (id) => navigate(`/salon-admin/${id}/adminDashboard`);
+
 
   const handleEditOpen = async (id) => {
     try {
