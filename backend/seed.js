@@ -75,7 +75,6 @@ const seed = async () => {
     const salons = await Salon.insertMany([
       {
         name: "Colombo Branch",
-        ownerName: "Admin Colombo",
         location: "Colombo, Sri Lanka",
         contact_info: "No. 12, Galle Road, Colombo 03",
         phone: "0112345678",
@@ -87,7 +86,6 @@ const seed = async () => {
       },
       {
         name: "Negombo Branch",
-        ownerName: "Admin Negombo",
         location: "Negombo, Sri Lanka",
         contact_info: "No. 45, Lewis Place, Negombo",
         phone: "0312345678",
@@ -99,7 +97,6 @@ const seed = async () => {
       },
       {
         name: "Jaffna Branch",
-        ownerName: "Admin Jaffna",
         location: "Jaffna, Sri Lanka",
         contact_info: "No. 88, Hospital Road, Jaffna",
         phone: "0212345678",
