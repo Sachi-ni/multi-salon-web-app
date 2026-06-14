@@ -1,4 +1,5 @@
 import Admin from "../models/Admin.js";
+import Staff from "../models/Staff.js";
 import bcrypt from "bcryptjs";
 import generateToken from "../utils/generateToken.js";
 
@@ -79,6 +80,34 @@ export const loginAdmin = async (req, res) => {
       token: generateToken(admin._id)
     });
 
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const loginStaff = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const staff = await Staff.findOne({ email });
+    if (!staff) {
+      return res.status(404).json({ message: "Staff not found" });
+    }
+
+    const isMatch = await bcrypt.compare(password, staff.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid password" });
+    }
+
+    res.json({
+      id: staff._id,
+      name: staff.full_name,
+      email: staff.email,
+      phone: staff.phone,
+      role: staff.role,
+      salon_id: staff.salon_id,
+      token: generateToken(staff._id)
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -1,1 +1,3 @@
-here
+create login logic for manager
+
+once the person who owned the role:manager enter his password and email according to his salon_id direct to specific salon  dashboard
