@@ -94,7 +94,7 @@ function App() {
         <Route
           path="/salon-admin/:salonId/*"
           element={
-            <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
+            <ProtectedRoute allowedRoles={["super-admin", "manager"]}>
               <AdminSalonLayout>
                 <SalonAdminShell />
               </AdminSalonLayout>
@@ -276,7 +276,7 @@ function App() {
         <Route
           path="/admin/bookings"
           element={
-            <ProtectedRoute allowedRoles={["super-admin", "staff-admin"]}>
+            <ProtectedRoute allowedRoles={["super-admin", "manager"]}>
               <DashboardLayout>
                 <AdminBookings />
               </DashboardLayout>
