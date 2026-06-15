@@ -2,9 +2,7 @@ import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import AdminDashboard from "./AdminDashboard";
-import AdminBookings from "./AdminBookings";
 import AdminDailySchedule from "./AdminDailySchedule";
-import AdminStaffSchedule from "./AdminStaffSchedule";
 import Services from "./Services";
 import Staff from "./Staff";
 import AdminStaffScheduleFallback from "./AdminStaffSchedule";
@@ -19,12 +17,12 @@ export default function SalonAdminShell() {
       <Route path="adminDashboard" element={<AdminDashboard />} />
 
       <Route path="adminAppointments" element={<AdminDailySchedule />} />
-      <Route path="adminStaff" element={<AdminStaffScheduleFallback />} />
+      <Route path="adminStaff" element={<Staff />} />
       <Route path="adminServices" element={<Services />} />
 
       {/* Support routes referenced by AdminDashboard quick actions */}
       <Route path="AddAppointment" element={<AdminDailySchedule />} />
-      <Route path="AddStaff" element={<AdminStaffScheduleFallback />} />
+      <Route path="AddStaff" element={<Staff />} />
       <Route path="Billing" element={<div className="text-white">Billing page not implemented yet.</div>} />
       <Route path="Reports" element={<div className="text-white">Reports page not implemented yet.</div>} />
 
@@ -39,4 +37,3 @@ export default function SalonAdminShell() {
     </Routes>
   );
 }
-
