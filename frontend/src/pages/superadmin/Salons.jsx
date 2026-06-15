@@ -35,11 +35,11 @@ const SalonCard = ({ salon, onView, onEdit, onDelete }) => {
     
       <p className="text-sm text-muted-2 mb-3">{salon.location || "No address"}</p>
 
-      {/* Owner + Revenue */}
+      {/* Manager + Revenue */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2 text-sm text-muted-2">
           <User className="w-4 h-4" />
-          {salon.ownerName || "Unknown Owner"}
+          {salon.managerName || "Unknown Manager"}
         </div>
         <div className="flex items-center gap-1 text-sm font-semibold text-accent">
           <DollarSign className="w-4 h-4" />
@@ -139,7 +139,8 @@ const Salons = () => {
     return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   };
 
-  const handleView = (id) => navigate(`/admin/dashboard/${id}`);
+  const handleView = (id) => navigate(`/salon-admin/${id}/adminDashboard`);
+
 
   const handleEditOpen = async (id) => {
     try {
@@ -254,7 +255,6 @@ const Salons = () => {
       <Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="Edit Salon">
         <form onSubmit={handleEditSubmit}>
           <Input label="Salon Name" name="name" value={editForm.name || ""} onChange={handleEditChange} required />
-          <Input label="Owner Name" name="ownerName" value={editForm.ownerName || ""} onChange={handleEditChange} />
           <Input label="Email" name="email" type="email" value={editForm.email || ""} onChange={handleEditChange} />
           <Input label="Phone" name="phone" value={editForm.phone || ""} onChange={handleEditChange} />
           <Input label="Address" name="location" value={editForm.location || ""} onChange={handleEditChange} />

@@ -1,18 +1,75 @@
+import bcrypt from "bcryptjs";
 import Salon from "../models/Salon.js";
+import Staff from "../models/Staff.js";
 
 export const createSalon = async(req,res)=>{
    try {
-      const salon = await Salon.create(req.body);
-      res.status(201).json(salon);
+         console.log("createSalon called with body:", req.body);
+      const {
+        name,
+        email,
+        phone,
+        location,
+        about,
+        managerName,
+        managerEmail,
+        managerPhone,
+        managerPassword
+      } = req.body;
+
+      if (!managerName || !managerEmail || !managerPassword) {
+        return res.status(400).json({ message: "Manager name, email and password are required." });
+      }
+
+         const salon = await Salon.create({
+            name,
+            location,
+            contact_info: email,
+            phone,
+            email,
+            about,
+         });
+
+      const salt = await bcrypt.genSalt(10);
+      const password_hash = await bcrypt.hash(managerPassword, salt);
+
+      const manager = await Staff.create({
+        full_name: managerName,
+        email: managerEmail,
+        phone: managerPhone,
+        password_hash,
+        role: "manager",
+        status: "Active",
+        salon_id: salon._id,
+      });
+
+      salon.staffCount = 1;
+      await salon.save();
+
+      res.status(201).json({ salon, manager });
    } catch (error) {
-      res.status(500).json({ message: error.message });
+      console.error("createSalon error:", error);
+      if (process.env.NODE_ENV !== "production") {
+        res.status(500).json({ message: error.message, stack: error.stack });
+      } else {
+        res.status(500).json({ message: "Server error" });
+      }
    }
 };
 
 export const getSalons = async(req,res)=>{
    try {
       const salons = await Salon.find();
-      res.json(salons);
+
+      // attach manager name for each salon
+      const salonsWithManagers = await Promise.all(salons.map(async (s) => {
+        const manager = await Staff.findOne({ salon_id: s._id, role: "manager" }).select("full_name");
+        const obj = s.toObject();
+        obj.managerName = manager ? manager.full_name : null;
+        return obj;
+      }));
+
+      res.json(salonsWithManagers);
    } catch (error) {
       res.status(500).json({ message: error.message });
    }

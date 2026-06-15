@@ -1,0 +1,184 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base Layer ─── */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    @apply font-sans bg-black text-white min-h-screen overflow-x-hidden antialiased;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #111111;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #facc15;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #eab308;
+  }
+
+  button {
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+}
+
+/* ─── Components Layer ─── */
+@layer components {
+
+  /* Dashboard Cards */
+  .admin-card {
+    @apply bg-[#161616] border border-yellow-500/20 rounded-xl shadow-lg;
+  }
+
+  /* Glass Effect */
+  .glass-card {
+    @apply bg-[#161616]/80 backdrop-blur-md border border-yellow-500/20 rounded-xl;
+  }
+
+  /* Accent Border */
+  .card-accent {
+    @apply relative overflow-hidden;
+  }
+
+  .card-accent::before {
+    content: "";
+    @apply absolute top-0 left-0 w-full h-1 bg-yellow-400;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply bg-yellow-400 text-black font-semibold px-4 py-2 rounded-lg transition-all duration-200;
+  }
+
+  .btn-primary:hover {
+    @apply bg-yellow-500 shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply bg-[#222] text-white border border-yellow-500/30 px-4 py-2 rounded-lg transition-all duration-200;
+  }
+
+  .btn-secondary:hover {
+    @apply border-yellow-400 text-yellow-400;
+  }
+
+  /* Sidebar */
+  .admin-sidebar {
+    @apply bg-black border-r border-yellow-500/20;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 transition-all duration-200;
+  }
+
+  .sidebar-link:hover {
+    @apply bg-yellow-500/10 text-yellow-400;
+  }
+
+  .sidebar-link.active {
+    @apply bg-yellow-500/15 text-yellow-400 border-l-4 border-yellow-400;
+  }
+
+  /* Table */
+  .admin-table {
+    @apply w-full border-collapse;
+  }
+
+  .admin-table thead {
+    @apply bg-[#1d1d1d];
+  }
+
+  .admin-table th {
+    @apply text-yellow-400 text-sm font-semibold p-4 text-left;
+  }
+
+  .admin-table td {
+    @apply p-4 border-t border-gray-800;
+  }
+
+  .admin-table tbody tr:hover {
+    @apply bg-yellow-500/5;
+  }
+
+  /* Statistics Cards */
+  .stat-card {
+    @apply bg-[#161616] border border-yellow-500/20 rounded-xl p-5;
+  }
+
+  .stat-value {
+    @apply text-3xl font-bold text-yellow-400;
+  }
+
+  .stat-label {
+    @apply text-sm text-gray-400 uppercase tracking-wide;
+  }
+
+  /* Text Gradient */
+  .text-gradient {
+    @apply bg-gradient-to-r from-yellow-300 to-yellow-500 bg-clip-text text-transparent;
+  }
+
+  /* Hover Effects */
+  .hover-lift {
+    @apply transition-all duration-200;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 20px rgba(250, 204, 21, 0.35);
+  }
+
+  /* Inputs */
+  .admin-input {
+    @apply bg-[#111111] border border-gray-700 rounded-lg px-4 py-2 text-white outline-none transition-all duration-200;
+  }
+
+  .admin-input:focus {
+    @apply border-yellow-400 ring-2 ring-yellow-400/20;
+  }
+
+  /* Background Pattern */
+  .grid-bg::before {
+    content: "";
+    @apply absolute inset-0;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 39px,
+        rgba(250, 204, 21, 0.04) 40px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 39px,
+        rgba(250, 204, 21, 0.04) 40px
+      );
+  }
+}

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getSalons } from "../../services/salonService";
-import { Plus, Search, Users, Star, MapPin, Briefcase, Calendar, MoreVertical, Power, Trash2, ChevronDown } from "lucide-react";
+import { getServices } from "../../services/serviceService";
+import { Plus, Search, Users, Star, MapPin, Briefcase, Calendar, MoreVertical, Power, Pencil, Trash2, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
@@ -30,7 +31,7 @@ const SkeletonStaffCard = () => (
 );
 
 /* ── Staff Card Actions Menu ── */
-const ActionsMenu = ({ staff, onToggleStatus, onDelete }) => {
+const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -64,6 +65,17 @@ const ActionsMenu = ({ staff, onToggleStatus, onDelete }) => {
               <Power className="w-3.5 h-3.5" />
               {staff.status === "Active" ? "Deactivate" : "Activate"}
             </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+                setOpen(false);
+              }}
+              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-muted-2 hover:text-white"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit Staff
+            </button>
             <div className="my-1 border-t border-border" />
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(staff._id); setOpen(false); }}
@@ -80,12 +92,13 @@ const ActionsMenu = ({ staff, onToggleStatus, onDelete }) => {
 };
 
 /* ── Staff Card Component ── */
-const StaffCard = ({ staff, index, onToggleStatus, onDelete }) => {
+const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete, }) => {
   const initials = staff.name
     ? staff.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
     : "S";
-  const salonName = staff.salon?.name || staff.salonName || "Unassigned";
+  const salonName = staff.salon_id?.name || staff.salonName || "Unassigned";
   const isActive = staff.status === "Active";
+  const staffServices = staff.services || [];
 
   // Build image URL from the uploaded path
   const imageUrl = staff.image
@@ -140,7 +153,7 @@ const StaffCard = ({ staff, index, onToggleStatus, onDelete }) => {
           {/* Name + Role */}
           <div className="flex-1 min-w-0">
             <h3 className="text-[0.9rem] font-bold text-white leading-tight truncate">
-              {staff.name}
+              {staff.full_name}
             </h3>
             <div className="mt-1">
               <Badge variant="info" dot={false}>
@@ -152,6 +165,7 @@ const StaffCard = ({ staff, index, onToggleStatus, onDelete }) => {
           {/* Actions Menu */}
           <ActionsMenu
             staff={staff}
+            onEdit={onEdit}
             onToggleStatus={onToggleStatus}
             onDelete={onDelete}
           />
@@ -177,6 +191,23 @@ const StaffCard = ({ staff, index, onToggleStatus, onDelete }) => {
             <Badge variant={isActive ? "success" : "warning"} dot>
               {staff.status}
             </Badge>
+          </div>
+          <div className="flex items-start gap-2 text-xs">
+            <Briefcase className="w-3.5 h-3.5 text-muted flex-shrink-0 mt-0.5" />
+            {staffServices.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {staffServices.map((service) => (
+                  <span
+                    key={service._id || service}
+                    className="px-2 py-1 rounded-md bg-accent-dim border border-accent-muted text-[0.65rem] font-bold text-accent"
+                  >
+                    {service.service_name || service}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-muted-2">No services assigned</span>
+            )}
           </div>
         </div>
 
@@ -225,11 +256,42 @@ const Staff = () => {
   const navigate = useNavigate();
   const [staffList, setStaffList] = useState([]);
   const [salons, setSalons] = useState([]);
+  const [services, setServices] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState("All Roles");
   const [selectedSalon, setSelectedSalon] = useState("All Salons");
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState(null);
+
+  const handleEdit = (staff) => {
+    const names = (staff.name || "").split(" ");
+
+    // staff.services may be populated objects ({_id, service_name}) or raw ids
+    const assignedServices = (staff.services || []).map((service) => {
+      if (!service) return null;
+      if (typeof service === "string") return service;
+      if (service._id) return service._id;
+      return service;
+    }).filter(Boolean);
+
+
+    setEditingStaff({
+      id: staff._id,
+      firstName: names[0] || "",
+      lastName: names.slice(1).join(" "),
+      email: staff.email || "",
+      salon: staff.salon_id?._id || staff.salon || "",
+      services: assignedServices,
+      status: staff.status || "Active",
+      picture: null,
+      currentImage: staff.image || "",
+    });
+
+    setEditModalOpen(true);
+  };
 
   const fetchData = async () => {
     try {
@@ -245,6 +307,48 @@ const Staff = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    if (!editModalOpen || !editingStaff?.salon) {
+      setServices([]);
+      return;
+    }
+
+    const fetchSalonServices = async () => {
+      try {
+        setServicesLoading(true);
+        const res = await getServices(editingStaff.salon);
+        setServices(res.data || []);
+      } catch (err) {
+        console.error("Failed to load services");
+        setServices([]);
+      } finally {
+        setServicesLoading(false);
+      }
+    };
+
+    fetchSalonServices();
+  }, [editModalOpen, editingStaff?.salon]);
+
+  const handleEditSalonChange = (salonId) => {
+    setEditingStaff({
+      ...editingStaff,
+      salon: salonId,
+      services: [],
+    });
+  };
+
+  const handleEditServiceToggle = (serviceId) => {
+    setEditingStaff((current) => {
+      const isSelected = current.services.includes(serviceId);
+      return {
+        ...current,
+        services: isSelected
+          ? current.services.filter((id) => id !== serviceId)
+          : [...current.services, serviceId],
+      };
+    });
+  };
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to remove this staff member?")) {
@@ -266,13 +370,69 @@ const Staff = () => {
       alert("Update failed");
     }
   };
+  const handleUpdateStaff = async () => {
+    try {
+      const data = new FormData();
+
+      data.append(
+        "name",
+        `${editingStaff.firstName} ${editingStaff.lastName}`
+      );
+
+      data.append("email", editingStaff.email);
+      data.append("salonId", editingStaff.salon);
+      data.append("status", editingStaff.status);
+      if (editingStaff.services.length > 0) {
+        editingStaff.services.forEach((serviceId) => {
+          data.append("services", serviceId);
+        });
+      }
+
+
+      if (editingStaff.picture) {
+        data.append("image", editingStaff.picture);
+      }
+
+      // DEBUG: Check what is being sent
+      for (let pair of data.entries()) {
+        console.log(pair[0], pair[1]);
+      }
+
+      const res = await updateStaff(editingStaff.id, data);
+
+      // DEBUG: Check response from backend
+      console.log("UPDATE RESPONSE:", res.data);
+
+      setEditModalOpen(false);
+      setEditingStaff(null);
+
+      fetchData();
+
+      alert("Staff updated successfully");
+    } catch (err) {
+      console.error("UPDATE ERROR:", err);
+      alert(
+        err.response?.data?.message || "Failed to update staff"
+      );
+    }
+  };
 
   const filteredStaff = staffList.filter((s) => {
     const staffName = s.name || "";
-    const matchesSearch = staffName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = selectedRole === "All Roles" || s.role === selectedRole;
-    const salonName = (typeof s.salon === "object" ? s.salon?.name : s.salonName) || "";
-    const matchesSalon = selectedSalon === "All Salons" || salonName === selectedSalon;
+
+    const matchesSearch =
+      staffName.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesRole =
+      selectedRole === "All Roles" ||
+      s.role === selectedRole;
+
+    const salonName = s.salon_id?.name || "";
+
+    const matchesSalon =
+      selectedSalon === "All Salons" ||
+      salonName === selectedSalon;
+
     return matchesSearch && matchesRole && matchesSalon;
   });
 
@@ -376,12 +536,193 @@ const Staff = () => {
               key={s._id}
               staff={s}
               index={i}
+              onEdit={() => handleEdit(s)}
               onToggleStatus={handleToggleStatus}
               onDelete={handleDelete}
             />
           ))}
         </div>
       )}
+
+      {/* Edit Staff Modal */}
+      {editModalOpen && editingStaff && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-surface rounded-xl p-6 w-[600px] max-h-[90vh] overflow-y-auto">
+
+            <h2 className="text-xl font-bold text-white mb-4">
+              Edit Staff
+            </h2>
+
+            {/* First Name */}
+            <div className="mb-3">
+              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">First Name</label>
+              <input
+                type="text"
+                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
+                value={editingStaff.firstName}
+                onChange={(e) =>
+                  setEditingStaff({
+                    ...editingStaff,
+                    firstName: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            {/* Last Name */}
+            <div className="mb-3">
+              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Last Name</label>
+              <input
+                type="text"
+                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
+                value={editingStaff.lastName}
+                onChange={(e) =>
+                  setEditingStaff({
+                    ...editingStaff,
+                    lastName: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            {/* Email */}
+            <div className="mb-3">
+              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Email</label>
+              <input
+                type="email"
+                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
+                value={editingStaff.email}
+                onChange={(e) =>
+                  setEditingStaff({
+                    ...editingStaff,
+                    email: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            {/* Salon */}
+            <div className="mb-3">
+              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Salon</label>
+              <select
+                value={editingStaff.salon}
+                onChange={(e) => handleEditSalonChange(e.target.value)}
+                className="w-full p-2 rounded bg-surface-2 text-white"
+              >
+                <option value="">Select Salon</option>
+
+                {salons.map((salon) => (
+                  <option key={salon._id} value={salon._id}>
+                    {salon.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Services */}
+            <div className="mb-3">
+              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Services</label>
+              <div className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3">
+                {!editingStaff.salon ? (
+                  <p className="text-xs text-muted-2">Select a salon to choose services.</p>
+                ) : servicesLoading ? (
+                  <p className="text-xs text-muted-2">Loading services...</p>
+                ) : services.length === 0 ? (
+                  <p className="text-xs text-muted-2">No services found for this salon.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {services.map((service) => (
+                      <label
+                        key={service._id}
+                        className="flex items-center gap-2.5 rounded-md border border-border bg-surface px-3 py-2 text-sm text-white cursor-pointer hover:border-accent/50 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editingStaff.services.includes(service._id)}
+                          onChange={() => handleEditServiceToggle(service._id)}
+                          className="h-4 w-4 accent-yellow-400"
+                        />
+                        <span className="truncate">{service.service_name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Status */}
+            <div className="mb-3">
+              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Status</label>
+              <select
+                value={editingStaff.status}
+                onChange={(e) =>
+                  setEditingStaff({
+                    ...editingStaff,
+                    status: e.target.value,
+                  })
+                }
+                className="w-full p-2 rounded bg-surface-2 text-white"
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+
+            {/* Current Image */}
+            {editingStaff.currentImage && (
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
+                  Current Image
+                </label>
+
+                <img
+                  src={`${API_BASE}/${editingStaff.currentImage}`}
+                  alt="staff"
+                  className="w-24 h-24 rounded-lg object-cover border"
+                />
+              </div>
+            )}
+
+            {/* Upload New Image */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
+                Change Profile Picture
+              </label>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setEditingStaff({
+                    ...editingStaff,
+                    picture: e.target.files[0],
+                  })
+                }
+                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-2.5 justify-end mt-5 pt-4 border-t border-border">
+              <button
+                onClick={() => setEditModalOpen(false)}
+                className="px-4 py-2 rounded bg-gray-600 text-white"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleUpdateStaff}
+                className="px-4 py-2 rounded bg-accent text-black font-semibold"
+              >
+                Save Changes
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

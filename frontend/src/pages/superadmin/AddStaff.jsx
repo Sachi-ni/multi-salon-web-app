@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ROLES } from "../../constants/roles";
 import { createStaff } from "../../services/staffService";
 import { getSalons } from "../../services/salonService";
+import { getServices } from "../../services/serviceService";
 import PageHeader from "../../components/ui/PageHeader";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
@@ -13,11 +13,13 @@ const AddStaff = () => {
   const navigate = useNavigate();
   const { salonId } = useParams();
   const [salons, setSalons] = useState([]);
+  const [services, setServices] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    firstName: "", lastName: "", email: "", role: "", 
-    salon: salonId || "", picture: null,
+    firstName: "", lastName: "", email: "", password: "",
+    salon: salonId || "", services: [], picture: null,
   });
 
   useEffect(() => {
@@ -32,8 +34,47 @@ const AddStaff = () => {
     fetchSalons();
   }, []);
 
+  useEffect(() => {
+    if (!formData.salon) {
+      setServices([]);
+      setFormData((current) => ({ ...current, services: [] }));
+      return;
+    }
+
+    const fetchServices = async () => {
+      try {
+        setServicesLoading(true);
+        const res = await getServices(formData.salon);
+        setServices(res.data || []);
+      } catch (err) {
+        console.error("Failed to load services");
+        setServices([]);
+      } finally {
+        setServicesLoading(false);
+      }
+    };
+
+    fetchServices();
+  }, [formData.salon]);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSalonChange = (e) => {
+    setFormData({ ...formData, salon: e.target.value, services: [] });
+  };
+
+  const handleServiceToggle = (serviceId) => {
+    setFormData((current) => {
+      const isSelected = current.services.includes(serviceId);
+      return {
+        ...current,
+        services: isSelected
+          ? current.services.filter((id) => id !== serviceId)
+          : [...current.services, serviceId],
+      };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -43,8 +84,11 @@ const AddStaff = () => {
       const data = new FormData();
       data.append("name", `${formData.firstName} ${formData.lastName}`);
       data.append("email", formData.email);
-      data.append("role", formData.role);
+      data.append("password", formData.password);
       data.append("salonId", formData.salon);
+      formData.services.forEach((serviceId) => {
+        data.append("services", serviceId);
+      });
       if (formData.picture) data.append("image", formData.picture);
       await createStaff(data);
       navigate("/Staff");
@@ -69,22 +113,7 @@ const AddStaff = () => {
           <Input label="First Name" name="firstName" placeholder="Enter first name" required value={formData.firstName} onChange={handleChange} />
           <Input label="Last Name" name="lastName" placeholder="Enter last name" required value={formData.lastName} onChange={handleChange} />
           <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={handleChange} />
-
-          <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Role</label>
-            <select
-              name="role"
-              required
-              value={formData.role}
-              onChange={handleChange}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent cursor-pointer"
-            >
-              <option value="">Select Role...</option>
-              {ROLES.map((role) => (
-                <option key={role} value={role}>{role}</option>
-              ))}
-            </select>
-          </div>
+          <Input label="Password" name="password" type="password" placeholder="Enter password" required value={formData.password} onChange={handleChange} />
 
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Salon</label>
@@ -92,7 +121,7 @@ const AddStaff = () => {
               name="salon"
               required
               value={formData.salon}
-              onChange={handleChange}
+              onChange={handleSalonChange}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent cursor-pointer"
             >
               <option value="">Select Salon...</option>
@@ -100,6 +129,36 @@ const AddStaff = () => {
                 <option key={s._id} value={s._id}>{s.name}</option>
               ))}
             </select>
+          </div>
+
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Services</label>
+            <div className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3">
+              {!formData.salon ? (
+                <p className="text-xs text-muted-2">Select a salon to choose services.</p>
+              ) : servicesLoading ? (
+                <p className="text-xs text-muted-2">Loading services...</p>
+              ) : services.length === 0 ? (
+                <p className="text-xs text-muted-2">No services found for this salon.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {services.map((service) => (
+                    <label
+                      key={service._id}
+                      className="flex items-center gap-2.5 rounded-md border border-border bg-surface px-3 py-2 text-sm text-white cursor-pointer hover:border-accent/50 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.services.includes(service._id)}
+                        onChange={() => handleServiceToggle(service._id)}
+                        className="h-4 w-4 accent-yellow-400"
+                      />
+                      <span className="truncate">{service.service_name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mb-3.5">
