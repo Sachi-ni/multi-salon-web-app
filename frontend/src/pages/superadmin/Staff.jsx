@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getSalons } from "../../services/salonService";
+import { getServices } from "../../services/serviceService";
 import { Plus, Search, Users, Star, MapPin, Briefcase, Calendar, MoreVertical, Power, Pencil, Trash2, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
@@ -9,7 +10,6 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import clsx from "clsx";
-import { ROLES } from "../../constants/roles";
 
 const API_BASE = "http://localhost:5000";
 
@@ -98,6 +98,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete, }) => {
     : "S";
   const salonName = staff.salon_id?.name || staff.salonName || "Unassigned";
   const isActive = staff.status === "Active";
+  const staffServices = staff.services || [];
 
   // Build image URL from the uploaded path
   const imageUrl = staff.image
@@ -191,6 +192,23 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete, }) => {
               {staff.status}
             </Badge>
           </div>
+          <div className="flex items-start gap-2 text-xs">
+            <Briefcase className="w-3.5 h-3.5 text-muted flex-shrink-0 mt-0.5" />
+            {staffServices.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {staffServices.map((service) => (
+                  <span
+                    key={service._id || service}
+                    className="px-2 py-1 rounded-md bg-accent-dim border border-accent-muted text-[0.65rem] font-bold text-accent"
+                  >
+                    {service.service_name || service}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-muted-2">No services assigned</span>
+            )}
+          </div>
         </div>
 
         {/* Footer: Rating + Quick Actions */}
@@ -238,6 +256,8 @@ const Staff = () => {
   const navigate = useNavigate();
   const [staffList, setStaffList] = useState([]);
   const [salons, setSalons] = useState([]);
+  const [services, setServices] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -249,13 +269,22 @@ const Staff = () => {
   const handleEdit = (staff) => {
     const names = (staff.name || "").split(" ");
 
+    // staff.services may be populated objects ({_id, service_name}) or raw ids
+    const assignedServices = (staff.services || []).map((service) => {
+      if (!service) return null;
+      if (typeof service === "string") return service;
+      if (service._id) return service._id;
+      return service;
+    }).filter(Boolean);
+
+
     setEditingStaff({
       id: staff._id,
       firstName: names[0] || "",
       lastName: names.slice(1).join(" "),
       email: staff.email || "",
-      role: staff.role || "",
       salon: staff.salon_id?._id || staff.salon || "",
+      services: assignedServices,
       status: staff.status || "Active",
       picture: null,
       currentImage: staff.image || "",
@@ -278,6 +307,48 @@ const Staff = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    if (!editModalOpen || !editingStaff?.salon) {
+      setServices([]);
+      return;
+    }
+
+    const fetchSalonServices = async () => {
+      try {
+        setServicesLoading(true);
+        const res = await getServices(editingStaff.salon);
+        setServices(res.data || []);
+      } catch (err) {
+        console.error("Failed to load services");
+        setServices([]);
+      } finally {
+        setServicesLoading(false);
+      }
+    };
+
+    fetchSalonServices();
+  }, [editModalOpen, editingStaff?.salon]);
+
+  const handleEditSalonChange = (salonId) => {
+    setEditingStaff({
+      ...editingStaff,
+      salon: salonId,
+      services: [],
+    });
+  };
+
+  const handleEditServiceToggle = (serviceId) => {
+    setEditingStaff((current) => {
+      const isSelected = current.services.includes(serviceId);
+      return {
+        ...current,
+        services: isSelected
+          ? current.services.filter((id) => id !== serviceId)
+          : [...current.services, serviceId],
+      };
+    });
+  };
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to remove this staff member?")) {
@@ -309,9 +380,14 @@ const Staff = () => {
       );
 
       data.append("email", editingStaff.email);
-      data.append("role", editingStaff.role);
       data.append("salonId", editingStaff.salon);
       data.append("status", editingStaff.status);
+      if (editingStaff.services.length > 0) {
+        editingStaff.services.forEach((serviceId) => {
+          data.append("services", serviceId);
+        });
+      }
+
 
       if (editingStaff.picture) {
         data.append("image", editingStaff.picture);
@@ -490,7 +566,6 @@ const Staff = () => {
                     firstName: e.target.value,
                   })
                 }
-                className="w-full p-2 rounded bg-surface-2 text-white"
               />
             </div>
 
@@ -507,7 +582,6 @@ const Staff = () => {
                     lastName: e.target.value,
                   })
                 }
-                className="w-full p-2 rounded bg-surface-2 text-white"
               />
             </div>
 
@@ -524,31 +598,7 @@ const Staff = () => {
                     email: e.target.value,
                   })
                 }
-                className="w-full p-2 rounded bg-surface-2 text-white"
               />
-            </div>
-
-            {/* Role */}
-            <div className="mb-3">
-              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Role</label>
-              <select
-                value={editingStaff.role}
-                onChange={(e) =>
-                  setEditingStaff({
-                    ...editingStaff,
-                    role: e.target.value,
-                  })
-                }
-                className="w-full p-2 rounded bg-surface-2 text-white"
-              >
-                <option value="">Select Role</option>
-
-                {ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-              </select>
             </div>
 
             {/* Salon */}
@@ -556,12 +606,7 @@ const Staff = () => {
               <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Salon</label>
               <select
                 value={editingStaff.salon}
-                onChange={(e) =>
-                  setEditingStaff({
-                    ...editingStaff,
-                    salon: e.target.value,
-                  })
-                }
+                onChange={(e) => handleEditSalonChange(e.target.value)}
                 className="w-full p-2 rounded bg-surface-2 text-white"
               >
                 <option value="">Select Salon</option>
@@ -572,6 +617,37 @@ const Staff = () => {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Services */}
+            <div className="mb-3">
+              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Services</label>
+              <div className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3">
+                {!editingStaff.salon ? (
+                  <p className="text-xs text-muted-2">Select a salon to choose services.</p>
+                ) : servicesLoading ? (
+                  <p className="text-xs text-muted-2">Loading services...</p>
+                ) : services.length === 0 ? (
+                  <p className="text-xs text-muted-2">No services found for this salon.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {services.map((service) => (
+                      <label
+                        key={service._id}
+                        className="flex items-center gap-2.5 rounded-md border border-border bg-surface px-3 py-2 text-sm text-white cursor-pointer hover:border-accent/50 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editingStaff.services.includes(service._id)}
+                          onChange={() => handleEditServiceToggle(service._id)}
+                          className="h-4 w-4 accent-yellow-400"
+                        />
+                        <span className="truncate">{service.service_name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Status */}
