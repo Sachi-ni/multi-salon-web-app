@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getSalons, getSalon, updateSalon, deleteSalon } from "../../services/salonService";
 import { Plus, ArrowUpDown, Store } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader";
@@ -105,6 +105,7 @@ const SalonCard = ({ salon, onView, onEdit, onDelete }) => {
 
 const Salons = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -130,7 +131,16 @@ const Salons = () => {
     }
   };
 
-  useEffect(() => { fetchSalons(); }, []);
+  useEffect(() => { 
+    fetchSalons(); 
+  }, []);
+
+  // Refetch data when returning from AddStaff
+  useEffect(() => {
+    if (location.state?.refreshData) {
+      fetchSalons();
+    }
+  }, [location]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";

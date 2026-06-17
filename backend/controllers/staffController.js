@@ -1,4 +1,5 @@
 import Staff from "../models/Staff.js";
+import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 
 export const createStaff = async (req, res) => {
@@ -31,6 +32,15 @@ export const createStaff = async (req, res) => {
     };
 
     const staff = await Staff.create(staffData);
+
+    // Increment salon's staffCount
+    if (req.body.salonId) {
+      await Salon.findByIdAndUpdate(
+        req.body.salonId,
+        { $inc: { staffCount: 1 } }
+      );
+    }
+
     const staffResponse = staff.toObject();
     delete staffResponse.password_hash;
 
@@ -100,6 +110,12 @@ export const updateStaff = async (req, res) => {
     console.log("Updating Staff ID:", req.params.id);
     console.log("Request Body:", req.body);
 
+    // Get original staff to check if salon is changing
+    const originalStaff = await Staff.findById(req.params.id);
+    if (!originalStaff) {
+      return res.status(404).json({ message: "Staff not found" });
+    }
+
     const updateData = {};
     const services = (Array.isArray(req.body.services)
       ? req.body.services
@@ -119,6 +135,21 @@ export const updateStaff = async (req, res) => {
 
     if (req.file) {
       updateData.image = req.file.path;
+    }
+
+    // Handle salon changes for staffCount
+    if (req.body.salonId && req.body.salonId !== originalStaff.salon_id.toString()) {
+      // Decrement old salon's staffCount
+      await Salon.findByIdAndUpdate(
+        originalStaff.salon_id,
+        { $inc: { staffCount: -1 } }
+      );
+      
+      // Increment new salon's staffCount
+      await Salon.findByIdAndUpdate(
+        req.body.salonId,
+        { $inc: { staffCount: 1 } }
+      );
     }
 
     const staff = await Staff.findByIdAndUpdate(
@@ -145,6 +176,15 @@ export const deleteStaff = async (req, res) => {
   try {
     const staff = await Staff.findByIdAndDelete(req.params.id);
     if (!staff) return res.status(404).json({ message: "Staff not found" });
+
+    // Decrement salon's staffCount
+    if (staff.salon_id) {
+      await Salon.findByIdAndUpdate(
+        staff.salon_id,
+        { $inc: { staffCount: -1 } }
+      );
+    }
+
     res.json({ message: "Staff removed successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
