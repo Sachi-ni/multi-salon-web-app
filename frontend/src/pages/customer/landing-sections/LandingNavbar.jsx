@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const LandingNavbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -24,14 +25,25 @@ const LandingNavbar = () => {
     { name: "Home", href: "#home" },
     { name: "About", href: "#about" },
     { name: "Services", href: "#services" },
-    { name: "Salons", href: "#salons" },
-    { name: "Team", href: "#team" },
+    { name: "Salons", href: "/our-salons" },
+    { name: "Our Team", href: "/team" },
     { name: "Testimonials", href: "#testimonials" },
     { name: "Contact", href: "#contact" },
   ];
 
   const scrollToSection = (href) => {
     setIsMobileMenuOpen(false);
+    
+    if (href.startsWith("/")) {
+      navigate(href);
+      return;
+    }
+
+    if (location.pathname !== "/") {
+      navigate("/" + href);
+      return;
+    }
+
     const element = document.querySelector(href);
     if (element) {
       const offsetTop = element.getBoundingClientRect().top + window.scrollY - 80;
@@ -52,7 +64,7 @@ const LandingNavbar = () => {
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
         {/* Logo */}
-        <div className="flex items-center gap-2 text-xl font-black text-accent tracking-tight cursor-pointer" onClick={() => window.scrollTo(0, 0)}>
+        <div className="flex items-center gap-2 text-xl font-black text-accent tracking-tight cursor-pointer" onClick={() => location.pathname !== "/" ? navigate("/") : window.scrollTo(0, 0)}>
           <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center text-lg font-black text-primary flex-shrink-0">
             S
           </div>
@@ -81,7 +93,7 @@ const LandingNavbar = () => {
             Log In
           </button>
           <button
-            onClick={() => navigate("/book")}
+            onClick={() => navigate("/login")}
             className="px-6 py-2.5 bg-accent text-primary rounded-xl text-sm font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-glow transition-all duration-200 hover:-translate-y-0.5"
           >
             Book Appointment
@@ -126,7 +138,7 @@ const LandingNavbar = () => {
                 Log In
               </button>
               <button
-                onClick={() => navigate("/book")}
+                onClick={() => navigate("/login")}
                 className="text-center text-lg font-extrabold text-primary bg-accent py-3 rounded-xl hover:bg-accent-hover transition-colors"
               >
                 Book Appointment
