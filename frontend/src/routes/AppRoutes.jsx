@@ -4,10 +4,10 @@ import RoleBasedRoute from "./RoleBasedRoute";
 
 import BookAppointment from "../pages/customer/BookAppointment";
 import MyAppointments from "../pages/customer/MyAppointments";
-import AdminBookings from "../pages/admin/AdminBookings";
-
-import Dashboard from "../pages/superadmin/Dashboard";
 import TeamPage from "../pages/customer/TeamPage";
+
+import AdminBookings from "../pages/admin/AdminBookings";
+import Dashboard from "../pages/superadmin/Dashboard";
 import Login from "../pages/Login";
 
 import NotFound from "../pages/NotFound";
@@ -58,6 +58,15 @@ export default function AppRoutes() {
           element={
             <RoleBasedRoute roles={["super-admin", "staff-admin"]}>
               <AdminBookings />
+            </RoleBasedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/dashboard"
+          element={
+            <RoleBasedRoute roles={["super-admin"]}>
+              <Dashboard />
             </RoleBasedRoute>
           }
         />

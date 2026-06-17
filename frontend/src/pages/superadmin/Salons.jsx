@@ -1,14 +1,107 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSalons, getSalon, updateSalon, deleteSalon } from "../../services/salonService";
 import { Plus, ArrowUpDown, Store } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
-import Table from "../../components/ui/Table";
 import Modal from "../../components/ui/Modal";
 import Input from "../../components/ui/Input";
 import EmptyState from "../../components/ui/EmptyState";
 import Skeleton from "../../components/ui/Skeleton";
+import { MoreVertical, MapPin, User, DollarSign, Pencil, Trash2, Eye } from "lucide-react";
+
+const SalonCard = ({ salon, onView, onEdit, onDelete }) => {
+  const navigate = useNavigate();
+  const [openMenu, setOpenMenu] = useState(false);
+  const menuRef = useRef(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  return (
+    <div className="group relative bg-surface border border-border rounded-xl p-5 hover:shadow-lg transition-all">
+      {/* Salon Name */}
+      <h3 className="text-lg font-bold text-white mb-1">{salon.name}</h3>
+    
+      <p className="text-sm text-muted-2 mb-3">{salon.location || "No address"}</p>
+
+      {/* Manager + Revenue */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-sm text-muted-2">
+          <User className="w-4 h-4" />
+          {salon.managerName || "Unknown Manager"}
+        </div>
+        <div className="flex items-center gap-1 text-sm font-semibold text-accent">
+          <DollarSign className="w-4 h-4" />
+          Rs. {salon.revenue ? salon.revenue.toLocaleString() : "0"}
+        </div>
+      </div>
+
+      {/* Staff Count + Created Date */}
+      <div className="flex items-center justify-between text-xs text-muted-2 mb-4">
+        <span>Staff: {salon.staffCount || 0}</span>
+        <span>Created: {new Date(salon.createdAt).toLocaleDateString()}</span>
+      </div>
+
+
+
+      {/* Actions */}
+      <div className="flex gap-5">
+        <Button variant="primary" size="sm" onClick={() => navigate(`/AddStaff/${salon._id}`)}>
+          Add Staff
+        </Button>
+        <Button variant="primary" size="sm" onClick={() => navigate(`/AddService/${salon._id}`)}>
+          Add Service
+        </Button>
+      </div>
+      
+      {/* View Button */}
+      <div className="absolute bottom-6 right-6">
+        <div onClick={() => onView(salon._id)} title="View">
+          <Eye className="w-4 h-4 text-blue-500" />
+        </div>
+      </div>
+      
+
+
+      {/* Three-dot menu trigger */}
+      <div className="absolute top-4 right-4" ref={menuRef}>
+        <button onClick={() => setOpenMenu(!openMenu)}>
+          <MoreVertical className="w-5 h-5 text-muted-2 hover:text-white" />
+        </button>
+
+        {/* Dropdown menu */}
+        {openMenu && (
+          <div className="absolute right-0 mt-2 w-32 bg-surface-2 border border-border rounded-md shadow-lg">
+            <button
+              onClick={() => onEdit(salon._id)}
+              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface"
+            >
+              <Pencil className="w-4 h-4 text-yellow-500" /> Edit
+            </button>
+            <button
+              onClick={() => onDelete(salon._id)}
+              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface"
+            >
+              <Trash2 className="w-4 h-4 text-red-500" /> Delete
+            </button>
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+};
 
 const Salons = () => {
   const navigate = useNavigate();
@@ -46,7 +139,8 @@ const Salons = () => {
     return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   };
 
-  const handleView = (id) => navigate(`/admin/dashboard/${id}`);
+  const handleView = (id) => navigate(`/salon-admin/${id}/adminDashboard`);
+
 
   const handleEditOpen = async (id) => {
     try {
@@ -141,39 +235,19 @@ const Salons = () => {
               icon={Store}
             />
           ) : (
-            <Table>
-              <Table.Head>
-                <Table.Th>Salon</Table.Th>
-                <Table.Th>Owner</Table.Th>
-                <Table.Th>Revenue</Table.Th>
-                <Table.Th>Staff</Table.Th>
-                <Table.Th>Created</Table.Th>
-                <Table.Th>Address</Table.Th>
-                <Table.Th align="right">Actions</Table.Th>
-              </Table.Head>
-              <Table.Body>
-                {salonList.map((salon) => (
-                  <tr key={salon._id}>
-                    <Table.Td bold>{salon.name}</Table.Td>
-                    <Table.Td>{salon.ownerName || "-"}</Table.Td>
-                    <Table.Td className="text-accent font-semibold">
-                      Rs. {salon.revenue ? salon.revenue.toLocaleString() : "0"}
-                    </Table.Td>
-                    <Table.Td>{salon.staffCount || 0}</Table.Td>
-                    <Table.Td>{formatDate(salon.createdAt)}</Table.Td>
-                    <Table.Td className="text-muted-2">{salon.location || "-"}</Table.Td>
-                    <Table.Td align="right">
-                      <div className="flex gap-1.5 justify-end">
-                        <Button variant="ghost" size="xs" onClick={() => handleView(salon._id)}>View</Button>
-                        <Button variant="info" size="xs" onClick={() => handleEditOpen(salon._id)}>Edit</Button>
-                        <Button variant="danger" size="xs" onClick={() => setDeleteId(salon._id)}>Delete</Button>
-                      </div>
-                    </Table.Td>
-                  </tr>
-                ))}
-              </Table.Body>
-            </Table>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {salonList.map((salon) => (
+                <SalonCard
+                  key={salon._id}
+                  salon={salon}
+                  onView={handleView}
+                  onEdit={handleEditOpen}
+                  onDelete={setDeleteId}
+                />
+              ))}
+            </div>
           )}
+
         </>
       )}
 
@@ -181,7 +255,6 @@ const Salons = () => {
       <Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="Edit Salon">
         <form onSubmit={handleEditSubmit}>
           <Input label="Salon Name" name="name" value={editForm.name || ""} onChange={handleEditChange} required />
-          <Input label="Owner Name" name="ownerName" value={editForm.ownerName || ""} onChange={handleEditChange} />
           <Input label="Email" name="email" type="email" value={editForm.email || ""} onChange={handleEditChange} />
           <Input label="Phone" name="phone" value={editForm.phone || ""} onChange={handleEditChange} />
           <Input label="Address" name="location" value={editForm.location || ""} onChange={handleEditChange} />

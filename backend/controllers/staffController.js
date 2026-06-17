@@ -1,24 +1,40 @@
 import Staff from "../models/Staff.js";
+import bcrypt from "bcryptjs";
 
 export const createStaff = async (req, res) => {
   try {
-    // Map frontend fields to model fields
-    
+    const { password } = req.body;
+    const services = Array.isArray(req.body.services)
+      ? req.body.services
+      : req.body.services
+        ? [req.body.services]
+        : [];
+
+    if (!password) {
+      return res.status(400).json({ message: "Password is required" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(password, salt);
 
     const staffData = {
       full_name: req.body.name,
       email: req.body.email,
+      password_hash,
       phone: req.body.phone,
-      role: req.body.role,
+      role: req.body.role || "Staff",
       specification: req.body.specification,
       commission_rate: req.body.commission_rate,
       salon_id: req.body.salonId,
-      services: req.body.services || [],
-  image:           req.file ? req.file.path : null,
-};
+      services,
+      image: req.file ? req.file.path : null,
+    };
 
     const staff = await Staff.create(staffData);
-    res.status(201).json(staff);
+    const staffResponse = staff.toObject();
+    delete staffResponse.password_hash;
+
+    res.status(201).json(staffResponse);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -28,10 +44,22 @@ export const getStaff = async (req, res) => {
   try {
     const { salonId } = req.query;
     const filter = salonId ? { salon_id: salonId } : {};
-    const staff = await Staff.find(filter).populate("salon_id", "name");
-    res.json(staff);
+
+    const staff = await Staff.find(filter)
+      .select("-password_hash")
+      .populate("salon_id", "name")
+      .populate("services", "service_name");
+
+    const formattedStaff = staff.map((member) => ({
+      ...member.toObject(),
+      name: member.full_name,
+    }));
+
+    res.json(formattedStaff);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
@@ -68,13 +96,48 @@ export const getTeam = async (req, res) => {
 
 export const updateStaff = async (req, res) => {
   try {
-    const staff = await Staff.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
-    if (!staff) return res.status(404).json({ message: "Staff not found" });
+
+    console.log("Updating Staff ID:", req.params.id);
+    console.log("Request Body:", req.body);
+
+    const updateData = {};
+    const services = (Array.isArray(req.body.services)
+      ? req.body.services
+      : req.body.services
+        ? [req.body.services]
+        : undefined
+    )?.filter(Boolean);
+
+    if (req.body.name !== undefined) updateData.full_name = req.body.name;
+    if (req.body.email !== undefined) updateData.email = req.body.email;
+    if (req.body.role !== undefined) updateData.role = req.body.role;
+    if (req.body.salonId !== undefined) updateData.salon_id = req.body.salonId;
+    if (req.body.status !== undefined) updateData.status = req.body.status;
+    if (services !== undefined) updateData.services = services;
+
+    console.log("Update Data:", updateData);
+
+    if (req.file) {
+      updateData.image = req.file.path;
+    }
+
+    const staff = await Staff.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      {
+        returnDocument: "after"
+      }
+    ).select("-password_hash");
+
+    console.log("Updated Staff:", staff);
+
     res.json(staff);
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(error);
+    res.status(500).json({
+      message: error.message
+    });
   }
 };
 

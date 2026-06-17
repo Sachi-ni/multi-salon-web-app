@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import Admin from "../models/Admin.js";
 import Customer from "../models/Customer.js";
+import Staff from "../models/Staff.js";
 
 export const protect = async (req, res, next) => {
   let token;
@@ -13,7 +14,10 @@ export const protect = async (req, res, next) => {
       // Try Admin first, then Customer
       let user = await Admin.findById(decoded.id).select("-password");
       if (!user) {
-        user = await Customer.findById(decoded.id).select("-password");
+        user = await Customer.findById(decoded.id).select("-password_hash");
+      }
+      if (!user) {
+        user = await Staff.findById(decoded.id).select("-password_hash");
       }
 
       if (!user) {
