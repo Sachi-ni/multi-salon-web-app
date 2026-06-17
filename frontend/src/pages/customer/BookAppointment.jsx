@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { getSalons } from "../../services/salonService";
 import StepSelectService  from "./steps/StepSelectService";
 import StepSelectStaff    from "./steps/StepSelectStaff";
@@ -18,9 +19,30 @@ export default function BookAppointment() {
     startTime: "", endTime: "",
   });
 
+  const location = useLocation();
+
   useEffect(() => {
     getSalons().then(res => setSalons(res.data));
-  }, []);
+    
+    if (location.state?.staff) {
+      const staff = location.state.staff;
+      setBooking(prev => ({
+        ...prev,
+        salonId: staff.salon_id?._id || "",
+        salonName: staff.salon_id?.name || "",
+        staffId: staff._id,
+        staffName: staff.name,
+        staffSpecification: staff.specification || "",
+      }));
+    } else if (location.state?.salon) {
+      const salon = location.state.salon;
+      setBooking(prev => ({
+        ...prev,
+        salonId: salon._id || "",
+        salonName: salon.name || ""
+      }));
+    }
+  }, [location.state]);
 
   const next = (data) => {
     setBooking(prev => ({ ...prev, ...data }));

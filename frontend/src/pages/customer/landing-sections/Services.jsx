@@ -84,22 +84,15 @@ const Services = () => {
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-primary/40 group-hover:bg-primary/20 transition-colors duration-300" />
-                <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-primary to-transparent flex justify-between items-end">
-                    <span className="text-accent font-bold bg-primary/80 backdrop-blur-md px-3 py-1 rounded-lg text-sm">{service.price}</span>
-                    <span className="text-white/80 text-sm font-medium">{service.duration}</span>
-                </div>
               </div>
               <div className="p-6">
                 <div className="text-white mb-4 bg-surface-3 w-12 h-12 rounded-xl flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-primary transition-colors duration-300">
                   {service.icon}
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-accent transition-colors">{service.title}</h3>
-                <p className="text-white/60 leading-relaxed mb-6">
+                <p className="text-white/60 leading-relaxed mb-2">
                   {service.description}
                 </p>
-                <button className="text-white font-bold uppercase tracking-wider text-sm flex items-center gap-2 group-hover:text-accent transition-colors">
-                  Book Now <span className="transition-transform group-hover:translate-x-1">→</span>
-                </button>
               </div>
             </motion.div>
           ))}
