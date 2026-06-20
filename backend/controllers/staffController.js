@@ -3,7 +3,7 @@ import Staff from "../models/Staff.js";
 export const createStaff = async (req, res) => {
   try {
     // Map frontend fields to model fields
-    
+
 
     const staffData = {
       full_name: req.body.name,
@@ -14,8 +14,8 @@ export const createStaff = async (req, res) => {
       commission_rate: req.body.commission_rate,
       salon_id: req.body.salonId,
       services: req.body.services || [],
-  image:           req.file ? req.file.path : null,
-};
+      image: req.file ? req.file.path : null,
+    };
 
     const staff = await Staff.create(staffData);
     res.status(201).json(staff);
@@ -38,9 +38,9 @@ export const getStaff = async (req, res) => {
 export const getTeam = async (req, res) => {
   try {
     const { salonId, serviceId } = req.query;
-    
+
     const filter = { status: "Active" };
-    
+
     if (salonId) {
       filter.salon_id = salonId;
     }
