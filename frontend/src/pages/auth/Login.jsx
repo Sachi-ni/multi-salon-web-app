@@ -22,7 +22,17 @@ const Login = () => {
 
     let data = await res.json();
 
-    // If admin login fails, try customer login
+    // If admin login fails, try staff login
+    if (!res.ok) {
+      res = await fetch("http://localhost:5000/api/staff/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      data = await res.json();
+    }
+
+    // If staff login fails, try customer login
     if (!res.ok) {
       res = await fetch("http://localhost:5000/api/customers/login", {
         method: "POST",
@@ -44,9 +54,9 @@ const Login = () => {
     // Redirect based on role
     if (data.role === "super-admin") {
       navigate("/superAdminDashboard");
-    } else if (data.role === "staff-admin") {
-      navigate("/admin/bookings");
-    } else if (data.role === "customer" || data.role === "user") {
+    } else if (data.role === "staff-admin" || data.role === "manager") {
+      navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
+    } else if (data.role === "customer") {
       navigate("/customer/dashboard");
     } else {
       navigate("/");
@@ -131,7 +141,7 @@ const Login = () => {
         <div className="text-center mt-4 text-[0.82rem] text-muted-2">
           No account?{" "}
           <span
-            onClick={() => navigate("/register")}
+            onClick={() => navigate("/customer/register")}
             className="text-accent cursor-pointer font-bold hover:underline"
           >
             Register here
