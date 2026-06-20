@@ -76,9 +76,9 @@ export const getStaff = async (req, res) => {
 export const getTeam = async (req, res) => {
   try {
     const { salonId, serviceId } = req.query;
-    
+
     const filter = { status: "Active" };
-    
+
     if (salonId) {
       filter.salon_id = salonId;
     }

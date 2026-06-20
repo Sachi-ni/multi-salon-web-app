@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import LandingNavbar from './landing-sections/LandingNavbar';
 import Footer from './landing-sections/Footer';
-import { getSalonById } from '../../services/salonService';
+import { getSalon } from '../../services/salonService';
 import { getTeam } from '../../services/staffService';
 import { MapPin, Clock, Phone, Star, ChevronLeft } from 'lucide-react';
 
@@ -16,7 +16,7 @@ export default function SalonDetailsPage() {
 
   useEffect(() => {
     Promise.all([
-      getSalonById(id),
+      getSalon(id),
       getTeam(id) // fetch staff for this salon
     ])
     .then(([salonRes, staffRes]) => {

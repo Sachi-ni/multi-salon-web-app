@@ -1,7 +1,36 @@
-import React from "react";
+import React, { useState } from "react";
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
+import api from "../../../services/api";
 
 const Contact = () => {
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    message: ""
+  });
+  const [status, setStatus] = useState("idle"); // 'idle', 'loading', 'success', 'error'
+  const [statusMessage, setStatusMessage] = useState("");
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setStatus("loading");
+    try {
+      const res = await api.post("/contact", formData);
+      setStatus("success");
+      setStatusMessage(res.data.message || "Message sent successfully!");
+      setFormData({ firstName: "", lastName: "", email: "", message: "" });
+    } catch (error) {
+      console.error(error);
+      setStatus("error");
+      setStatusMessage(error.response?.data?.message || "Failed to send message.");
+    }
+  };
+
   return (
     <section id="contact" className="py-24 bg-surface-2 relative">
       <div className="max-w-7xl mx-auto px-6">
@@ -53,12 +82,26 @@ const Contact = () => {
           {/* Contact Form */}
           <div className="glass-card p-8 md:p-10 border-accent/10">
             <h3 className="text-2xl font-bold text-white mb-6">Send us a message</h3>
-            <form className="space-y-6">
+            {status === "success" && (
+              <div className="mb-6 p-4 bg-green-500/20 border border-green-500 text-green-400 rounded-xl">
+                {statusMessage}
+              </div>
+            )}
+            {status === "error" && (
+              <div className="mb-6 p-4 bg-red-500/20 border border-red-500 text-red-400 rounded-xl">
+                {statusMessage}
+              </div>
+            )}
+            <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-white/80">First Name</label>
                   <input 
                     type="text" 
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    required
                     className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
                     placeholder="John"
                   />
@@ -67,6 +110,10 @@ const Contact = () => {
                   <label className="text-sm font-medium text-white/80">Last Name</label>
                   <input 
                     type="text" 
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    required
                     className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
                     placeholder="Doe"
                   />
@@ -77,6 +124,10 @@ const Contact = () => {
                 <label className="text-sm font-medium text-white/80">Email Address</label>
                 <input 
                   type="email" 
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
                   className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
                   placeholder="john@example.com"
                 />
@@ -86,16 +137,21 @@ const Contact = () => {
                 <label className="text-sm font-medium text-white/80">Message</label>
                 <textarea 
                   rows="4"
+                  name="message"
+                  value={formData.message}
+                  onChange={handleChange}
+                  required
                   className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors resize-none"
                   placeholder="How can we help you?"
                 ></textarea>
               </div>
 
               <button 
-                type="button"
-                className="w-full py-4 bg-white text-primary rounded-xl font-bold hover:bg-accent transition-colors"
+                type="submit"
+                disabled={status === "loading"}
+                className="w-full py-4 bg-white text-primary rounded-xl font-bold hover:bg-accent transition-colors disabled:opacity-70"
               >
-                Send Message
+                {status === "loading" ? "Sending..." : "Send Message"}
               </button>
             </form>
           </div>
