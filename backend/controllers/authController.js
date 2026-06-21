@@ -42,7 +42,7 @@ export const registerAdmin = async (req, res) => {
       phone: admin.phone,
       role: admin.role,
       salon_id: admin.salon_id,
-      token: generateToken(admin._id)
+      token: generateToken(admin)
     });
 
   } catch (error) {
@@ -77,7 +77,7 @@ export const loginAdmin = async (req, res) => {
       phone: admin.phone,
       role: admin.role,
       salon_id: admin.salon_id,
-      token: generateToken(admin._id)
+      token: generateToken(admin)
     });
 
   } catch (error) {
@@ -106,7 +106,7 @@ export const loginStaff = async (req, res) => {
       phone: staff.phone,
       role: staff.role,
       salon_id: staff.salon_id,
-      token: generateToken(staff._id)
+      token: generateToken(staff)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -165,6 +165,8 @@ export const updateProfile = async (req, res) => {
       phone: user.phone,
       username: user.username,
       role: user.role,
+      salon_id: user.salon_id,
+      token: generateToken(user)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

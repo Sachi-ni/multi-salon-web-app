@@ -11,11 +11,7 @@ export const protect = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Try Admin first, then Customer
       let user = await Admin.findById(decoded.id).select("-password");
-      if (!user) {
-        user = await Customer.findById(decoded.id).select("-password_hash");
-      }
       if (!user) {
         user = await Staff.findById(decoded.id).select("-password_hash");
       }
@@ -24,8 +20,18 @@ export const protect = async (req, res, next) => {
         return res.status(401).json({ message: "User not found" });
       }
 
-      req.user = user;
-      req.user.id = user._id.toString(); // normalize id access
+      req.user = {
+        id: user._id,
+        role: user.role,
+        salon_id: user.salon_id,
+      };
+
+      // DEBUG: log auth user role for permission troubleshooting
+      console.log("[authMiddleware] decoded.id=", decoded.id);
+      console.log("[authMiddleware] decoded.role=", decoded.role);
+      console.log("[authMiddleware] req.user.role=", req.user.role);
+      console.log("[authMiddleware] req.user.salon_id=", req.user.salon_id);
+
       next();
     } catch (error) {
       res.status(401).json({ message: "Not authorized, token failed" });
