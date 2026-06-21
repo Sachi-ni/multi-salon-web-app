@@ -17,9 +17,29 @@ const upload = multer({ dest: "uploads/" });
 
 // Customers can view staff — only admins can create/edit/delete
 router.post("/login", loginStaff);
-router.get("/",       protect, getStaff);
-router.post("/",      protect, authorizeRoles("super-admin", "staff-admin"), upload.single("image"), createStaff);
-router.put("/:id",    protect, authorizeRoles("super-admin", "staff-admin"), upload.single("image"), updateStaff);
-router.delete("/:id", protect, authorizeRoles("super-admin", "staff-admin"), deleteStaff);
+router.get("/", protect, getStaff);
+router.post(
+  "/",
+  protect,
+  // managers need to be able to create/update staff inside their own salon
+  authorizeRoles("super-admin", "manager"),
+  upload.single("image"),
+  createStaff
+);
+
+router.put(
+  "/:id",
+  protect,
+  authorizeRoles("super-admin", "manager"),
+  upload.single("image"),
+  updateStaff
+);
+
+router.delete(
+  "/:id",
+  protect,
+  authorizeRoles("super-admin", "manager"),
+  deleteStaff
+);
 
 export default router;

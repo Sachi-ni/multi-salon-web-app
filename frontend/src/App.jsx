@@ -44,7 +44,7 @@ import AdminStaffSchedule from "./pages/admin/AdminStaffSchedule.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import SalonAdminShell from "./pages/admin/SalonAdminShell";
 import AdminSalonLayout from "./components/layout/AdminSalonLayout";
-
+import AdminAddStaff from "./pages/admin/AddStaff.jsx";
 
 import { useAuth } from "./context/AuthContext";
 import CustomerRegister from "./pages/auth/CustomerRegister.jsx";
@@ -283,6 +283,18 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/salon-admin/:salonId/AddStaff"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin", "manager"]}>
+              <AdminSalonLayout>
+                <AdminAddStaff />
+              </AdminSalonLayout>
+            </ProtectedRoute>
+          }
+        />
+        
       </Routes>
     </BrowserRouter>
     </AuthProvider>
