@@ -61,11 +61,17 @@ export const getSalons = async(req,res)=>{
    try {
       const salons = await Salon.find();
 
-      // attach manager name for each salon
+      // attach manager name and calculate actual staffCount for each salon
       const salonsWithManagers = await Promise.all(salons.map(async (s) => {
         const manager = await Staff.findOne({ salon_id: s._id, role: "manager" }).select("full_name");
+        
+        // Count actual staff members in the database for this salon
+        const actualStaffCount = await Staff.countDocuments({ salon_id: s._id });
+        
         const obj = s.toObject();
         obj.managerName = manager ? manager.full_name : null;
+        obj.staffCount = actualStaffCount; // Use actual count from database
+        
         return obj;
       }));
 
@@ -79,7 +85,14 @@ export const getSalonById = async(req,res)=>{
    try {
       const salon = await Salon.findById(req.params.id);
       if(!salon) return res.status(404).json({ message: "Salon not found" });
-      res.json(salon);
+      
+      // Count actual staff members for this salon
+      const actualStaffCount = await Staff.countDocuments({ salon_id: salon._id });
+      
+      const salonObj = salon.toObject();
+      salonObj.staffCount = actualStaffCount;
+      
+      res.json(salonObj);
    } catch (error) {
       res.status(500).json({ message: error.message });
    }

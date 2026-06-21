@@ -91,7 +91,8 @@ const AddStaff = () => {
       });
       if (formData.picture) data.append("image", formData.picture);
       await createStaff(data);
-      navigate("/Staff");
+      // Navigate back to Salons page to show updated staffCount
+      navigate("/Salons", { state: { refreshData: true } });
     } catch (err) {
       alert(err.response?.data?.message || "Failed to add staff");
     } finally {

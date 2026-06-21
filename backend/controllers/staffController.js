@@ -1,4 +1,5 @@
 import Staff from "../models/Staff.js";
+import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 
 export const createStaff = async (req, res) => {
@@ -18,13 +19,13 @@ export const createStaff = async (req, res) => {
     const password_hash = await bcrypt.hash(password, salt);
 
     const role = req.user?.role?.toLowerCase();
-    const isSalonAdmin = role === "manager" || role === "super-admin";
+    const isManager = role === "manager";
+    const isSuperAdmin = role === "super-admin";
 
-    // staff-admin cannot create staff for another salon
-    const salonId = isSalonAdmin ? req.user.salon_id : req.body.salonId;
-    if (!isSalonAdmin && existing.salon_id?.toString() !== req.user.salon_id?.toString()) {
-      return res.status(403).json({ message: "Forbidden: salon not assigned" });
-    }
+    // Manager can only create staff in their own salon
+    const salonId = isManager
+      ? req.user.salon_id
+      : req.body.salonId;
 
     const staffData = {
       full_name: req.body.name,
@@ -45,6 +46,15 @@ export const createStaff = async (req, res) => {
     }
 
     const staff = await Staff.create(staffData);
+
+    // Increment salon's staffCount
+    if (req.body.salonId) {
+      await Salon.findByIdAndUpdate(
+        req.body.salonId,
+        { $inc: { staffCount: 1 } }
+      );
+    }
+
     const staffResponse = staff.toObject();
     delete staffResponse.password_hash;
 
@@ -99,68 +109,178 @@ export const getStaff = async (req, res) => {
   }
 };
 
-export const updateStaff = async (req, res) => {
+export const getTeam = async (req, res) => {
   try {
-    const isSalonAdmin = req.user?.role?.toLowerCase() === "manager" || req.user?.role?.toLowerCase() === "super-admin";
+    const { salonId, serviceId } = req.query;
 
-    const existing = await Staff.findById(req.params.id);
-    if (!existing) return res.status(404).json({ message: "Staff not found" });
+    const filter = { status: "Active" };
 
-    // salon admin can only update staff in their salon
-    if (isSalonAdmin && existing.salon_id?.toString() !== req.user.salon_id?.toString()) {
-      return res.status(403).json({ message: "Forbidden: cannot update staff for another salon" });
+    if (salonId) {
+      filter.salon_id = salonId;
+    }
+    if (serviceId) {
+      filter.services = serviceId;
     }
 
+    const staff = await Staff.find(filter)
+      .select("-password_hash")
+      .populate("salon_id", "name")
+      .populate("services", "service_name");
+
+    const formattedStaff = staff.map((member) => ({
+      ...member.toObject(),
+      name: member.full_name,
+    }));
+
+    res.json(formattedStaff);
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+export const updateStaff = async (req, res) => {
+  try {
+    const userRole = req.user?.role?.toLowerCase();
+    const isManager = userRole === "manager";
+    const isSuperAdmin = userRole === "super-admin";
+
+    console.log("Updating Staff ID:", req.params.id);
+    console.log("Request Body:", req.body);
+
+    const existing = await Staff.findById(req.params.id);
+
+    if (!existing) {
+      return res.status(404).json({ message: "Staff not found" });
+    }
+
+    // Manager can only update staff in their own salon
+    if (
+      isManager &&
+      existing.salon_id?.toString() !== req.user.salon_id?.toString()
+    ) {
+      return res.status(403).json({
+        message: "Forbidden: cannot update staff for another salon",
+      });
+    }
+
+    const originalStaff = existing;
+
     const updateData = {};
-    const services = (Array.isArray(req.body.services)
-      ? req.body.services
-      : req.body.services
+
+    const services = (
+      Array.isArray(req.body.services)
+        ? req.body.services
+        : req.body.services
         ? [req.body.services]
         : undefined
     )?.filter(Boolean);
 
-    if (req.body.name !== undefined) updateData.full_name = req.body.name;
-    if (req.body.email !== undefined) updateData.email = req.body.email;
-    if (req.body.role !== undefined) updateData.role = req.body.role;
+    if (req.body.name !== undefined)
+      updateData.full_name = req.body.name;
 
-    // prevent salon admin from re-assigning salon_id
-    if (!isSalonAdmin && req.body.salonId !== undefined) updateData.salon_id = req.body.salonId;
+    if (req.body.email !== undefined)
+      updateData.email = req.body.email;
 
-    if (req.body.status !== undefined) updateData.status = req.body.status;
-    if (services !== undefined) updateData.services = services;
+    if (req.body.role !== undefined)
+      updateData.role = req.body.role;
+
+    // Only super-admin can change salon assignment
+    if (
+      isSuperAdmin &&
+      req.body.salonId !== undefined
+    ) {
+      updateData.salon_id = req.body.salonId;
+    }
+
+    if (req.body.status !== undefined)
+      updateData.status = req.body.status;
+
+    if (services !== undefined)
+      updateData.services = services;
 
     if (req.file) {
       updateData.image = req.file.path;
     }
 
-    const staff = await Staff.findByIdAndUpdate(req.params.id, updateData, {
-      returnDocument: "after"
-    }).select("-password_hash");
+    console.log("Update Data:", updateData);
+
+    // Handle salon changes and maintain staff counts
+    if (
+      isSuperAdmin &&
+      req.body.salonId &&
+      req.body.salonId !== originalStaff.salon_id?.toString()
+    ) {
+      await Salon.findByIdAndUpdate(
+        originalStaff.salon_id,
+        { $inc: { staffCount: -1 } }
+      );
+
+      await Salon.findByIdAndUpdate(
+        req.body.salonId,
+        { $inc: { staffCount: 1 } }
+      );
+    }
+
+    const staff = await Staff.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      {
+        returnDocument: "after",
+      }
+    ).select("-password_hash");
+
+    console.log("Updated Staff:", staff);
 
     res.json(staff);
-
   } catch (error) {
     console.error(error);
     res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 };
 
 export const deleteStaff = async (req, res) => {
   try {
-    const isSalonAdmin = req.user?.role?.toLowerCase() === "manager" || req.user?.role?.toLowerCase() === "super-admin";
+    const userRole = req.user?.role?.toLowerCase();
+    const isManager = userRole === "manager";
 
-    const existing = await Staff.findById(req.params.id);
-    if (!existing) return res.status(404).json({ message: "Staff not found" });
+    const staff = await Staff.findById(req.params.id);
 
-    if (isSalonAdmin && existing.salon_id?.toString() !== req.user.salon_id?.toString()) {
-      return res.status(403).json({ message: "Forbidden: cannot delete staff for another salon" });
+    if (!staff) {
+      return res.status(404).json({
+        message: "Staff not found",
+      });
+    }
+
+    // Manager can only delete staff in their own salon
+    if (
+      isManager &&
+      staff.salon_id?.toString() !== req.user.salon_id?.toString()
+    ) {
+      return res.status(403).json({
+        message: "Forbidden: cannot delete staff for another salon",
+      });
     }
 
     await Staff.findByIdAndDelete(req.params.id);
-    res.json({ message: "Staff removed successfully" });
+
+    // Maintain salon staff count
+    if (staff.salon_id) {
+      await Salon.findByIdAndUpdate(
+        staff.salon_id,
+        { $inc: { staffCount: -1 } }
+      );
+    }
+
+    res.json({
+      message: "Staff removed successfully",
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };

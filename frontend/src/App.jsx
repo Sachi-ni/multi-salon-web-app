@@ -13,6 +13,9 @@ import Unauthorized from "./pages/Unauthorized.jsx";
 
 //customer pages
 import Landing from "./pages/customer/Landing.jsx";
+import TeamPage from "./pages/customer/TeamPage.jsx";
+import SalonsPage from "./pages/customer/SalonsPage.jsx";
+import SalonDetailsPage from "./pages/customer/SalonDetailsPage.jsx";
 
 // Super Admin Pages
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
@@ -71,6 +74,9 @@ function App() {
       {/* All Routes MUST be inside this container */}
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/team" element={<TeamPage />} />
+        <Route path="/our-salons" element={<SalonsPage />} />
+        <Route path="/our-salons/:id" element={<SalonDetailsPage />} />
 
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
