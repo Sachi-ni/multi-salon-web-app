@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import PageHeader from "../../components/ui/PageHeader";
+import { useNavigate } from "react-router-dom";
 import {
   getSalonAppointments,
   confirmAppointment,
@@ -21,6 +23,7 @@ const STATUS_COLORS = {
 
 export default function Appointments() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   const [appointments, setAppointments] = useState([]);
   const [filter, setFilter]             = useState("all");
@@ -136,10 +139,11 @@ export default function Appointments() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-black text-white">All Appointments</h1>
-        <p className="text-muted-2 text-sm mt-1">Manage and view all customer bookings across all salons</p>
-      </div>
+      <PageHeader
+        title="All Appointments"
+        subtitle="Manage and view all customer bookings across all salons"
+        backTo="/superAdminDashboard"
+      />
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
