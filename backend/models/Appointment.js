@@ -4,8 +4,10 @@ const appointmentSchema = new mongoose.Schema({
   customer_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Customer",
-    required: true
+    required: false
   },
+  guest_name: { type: String, default: "" },
+  guest_phone: { type: String, default: "" },
   salon_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Salon",

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   getSalonAppointments,
@@ -21,6 +22,7 @@ const STATUS_COLORS = {
 
 export default function Appointments() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   const [appointments, setAppointments] = useState([]);
   const [filter, setFilter]             = useState("all");
@@ -136,9 +138,20 @@ export default function Appointments() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-black text-white">All Appointments</h1>
-        <p className="text-muted-2 text-sm mt-1">Manage and view all customer bookings across all salons</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-white">All Appointments</h1>
+          <p className="text-muted-2 text-sm mt-1">Manage and view all customer bookings across all salons</p>
+        </div>
+        <button
+          onClick={() => navigate("/AddAppointment")}
+          className="px-5 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 hover:shadow-glow flex items-center gap-2 w-fit"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+          Create Appointment
+        </button>
       </div>
 
       {/* Filter tabs */}
@@ -189,10 +202,17 @@ export default function Appointments() {
               {/* Header — Customer + Status */}
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <p className="text-white font-extrabold">{a.customer_id?.name || "Unknown Customer"}</p>
+                  <p className="text-white font-extrabold flex items-center gap-2">
+                    <span>{a.customer_id?.name || a.guest_name || "Unknown Customer"}</span>
+                    {!a.customer_id && a.guest_name && (
+                      <span className="text-[0.6rem] bg-accent/20 text-accent px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">
+                        Guest
+                      </span>
+                    )}
+                  </p>
                   <p className="text-muted-2 text-xs mt-0.5">
-                    {a.customer_id?.email || "No email provided"}
-                    {a.customer_id?.phone ? ` · ${a.customer_id.phone}` : ""}
+                    {a.customer_id?.email || (a.guest_name ? "Guest Booking" : "No email provided")}
+                    {(a.customer_id?.phone || a.guest_phone) ? ` · ${a.customer_id?.phone || a.guest_phone}` : ""}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">

@@ -1,6 +1,7 @@
 import Appointment from "../models/Appointment.js";
 import StaffAvailability from "../models/StaffAvailability.js";
 import Staff from "../models/Staff.js";
+import Salon from "../models/Salon.js";
 import Service from "../models/Service.js";
 import Notification from "../models/Notification.js";
 import Admin from "../models/Admin.js";
@@ -52,41 +53,19 @@ export const getAvailableStaff = async (req, res) => {
       salon_id: salonId,
       services: serviceId,
       status: "Active"
-    });
+    })
+      .populate("salon_id", "name")
+      .populate("services", "service_name");
 
-    if (!staffList.length) {
-      return res.status(200).json([]);
-    }
-
-    const staffIds = staffList.map(s => s._id);
-
-    // Normalize date range for query
-    const queryDate = new Date(date);
-    queryDate.setHours(0, 0, 0, 0);
-    const nextDay = new Date(queryDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-
-    // Find availability records for those staff on that date
-    const availabilityRecords = await StaffAvailability.find({
-      staff_id: { $in: staffIds },
-      available_date: { $gte: queryDate, $lt: nextDay }
-    });
-
-    // Build response — only staff with at least one free slot
-    const result = availabilityRecords
-      .filter(record => record.slots.some(slot => !slot.is_booked))
-      .map(record => {
-        const staff = staffList.find(s => s._id.equals(record.staff_id));
-        return {
-          staff_id:       staff._id,
-          full_name:      staff.full_name,
-          role:           staff.role,
-          specification:  staff.specification,
-          image:          staff.image,
-          availabilityId: record._id,
-          free_slots:     record.slots.filter(s => !s.is_booked)
-        };
-      });
+    const result = staffList.map(staff => ({
+      staff_id:       staff._id,
+      full_name:      staff.full_name,
+      role:           staff.role,
+      specification:  staff.specification,
+      image:          staff.image,
+      salon:          staff.salon_id,
+      services:       staff.services
+    }));
 
     res.status(200).json(result);
   } catch (err) {
@@ -101,6 +80,7 @@ export const getAvailableStaff = async (req, res) => {
 export const getAvailableSlots = async (req, res) => {
   try {
     const { staffId, date, serviceId, salonId } = req.query;
+    console.log("getAvailableSlots query:", req.query);
 
     if (!staffId || !date || !serviceId) {
       return res.status(400).json({ message: "staffId, date, and serviceId are required" });
@@ -119,13 +99,39 @@ export const getAvailableSlots = async (req, res) => {
     const nextDay = new Date(queryDate);
     nextDay.setDate(nextDay.getDate() + 1);
 
-    const availability = await StaffAvailability.findOne({
+    let availability = await StaffAvailability.findOne({
       staff_id: staffId,
       available_date: { $gte: queryDate, $lt: nextDay }
     });
 
     if (!availability) {
-      return res.status(200).json([]);
+      // 2.5 Generate default slots based on salon's working hours
+      const salon = await Salon.findById(salonId);
+      const openTime = (salon && salon.open_time) ? salon.open_time : "09:00";
+      const closeTime = (salon && salon.close_time) ? salon.close_time : "17:00";
+      
+      const generatedSlots = [];
+      let [currentH, currentM] = openTime.split(":").map(Number);
+      const [closeH, closeM] = closeTime.split(":").map(Number);
+
+      while (currentH < closeH || (currentH === closeH && currentM < closeM)) {
+        const start_time = `${String(currentH).padStart(2, "0")}:${String(currentM).padStart(2, "0")}`;
+        let nextH = currentH + 1;
+        let nextM = currentM;
+        const end_time = `${String(nextH).padStart(2, "0")}:${String(nextM).padStart(2, "0")}`;
+        
+        if (nextH > closeH || (nextH === closeH && nextM > closeM)) {
+          break;
+        }
+
+        generatedSlots.push({
+          start_time,
+          end_time,
+          is_booked: false
+        });
+        currentH = nextH;
+      }
+      availability = { slots: generatedSlots };
     }
 
     // 3. Get all confirmed/pending appointments for this staff on this date
@@ -133,7 +139,7 @@ export const getAvailableSlots = async (req, res) => {
     const existingAppointments = await Appointment.find({
       staff_id: staffId,
       appointment_date: date,
-      status: { $in: ["confirmed"] }
+      status: { $in: ["confirmed", "pending"] }
     });
 
     // 4. Build list of occupied time ranges from confirmed appointments
@@ -156,9 +162,10 @@ export const getAvailableSlots = async (req, res) => {
     });
 
     // 6. For current date, remove past time slots
-    const today = new Date().toISOString().split("T")[0];
-    const currentHour = new Date().getHours();
-    const currentMinute = new Date().getMinutes();
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
     const filteredSlots = date === today
       ? freeSlots.filter(slot => {
           const [slotH, slotM] = slot.start_time.split(":").map(Number);
@@ -198,8 +205,10 @@ export const getAvailableSlots = async (req, res) => {
       }
     }
 
+    console.log("Returning validStartTimes:", validStartTimes);
     res.status(200).json(validStartTimes);
   } catch (err) {
+    console.error("Error in getAvailableSlots:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -209,10 +218,16 @@ export const getAvailableSlots = async (req, res) => {
 // Body: { salon_id, service_id, staff_id, appointment_date, start_time, notes }
 export const createAppointment = async (req, res) => {
   try {
-    const { salon_id, service_id, staff_id, appointment_date, start_time, notes } = req.body;
+    const { salon_id, service_id, staff_id, appointment_date, start_time, notes, guest_name, guest_phone } = req.body;
     let customer_id = req.user.id;
-    if (req.user.role !== "customer" && req.user.role !== "user" && req.body.customer_id) {
-      customer_id = req.body.customer_id;
+    
+    // If admin is creating the appointment
+    if (req.user.role !== "customer" && req.user.role !== "user") {
+      if (req.body.customer_id) {
+        customer_id = req.body.customer_id;
+      } else if (guest_name) {
+        customer_id = undefined; // Guest appointment
+      }
     }
 
     if (!salon_id || !service_id || !staff_id || !appointment_date || !start_time) {
@@ -230,8 +245,25 @@ export const createAppointment = async (req, res) => {
     const durationHours = Math.ceil(service.duration / 60);
     const end_time = addHours(start_time, durationHours);
 
+    // Final availability check
+    const existingAppointments = await Appointment.find({
+      staff_id,
+      appointment_date,
+      status: { $in: ["confirmed", "pending"] }
+    });
+
+    const isConflict = existingAppointments.some(appt => 
+      timesOverlap(start_time, end_time, appt.start_time, appt.end_time)
+    );
+
+    if (isConflict) {
+      return res.status(409).json({ message: "The selected time slot is no longer available." });
+    }
+
     const appointment = await Appointment.create({
       customer_id,
+      guest_name: guest_name || "",
+      guest_phone: guest_phone || "",
       salon_id,
       service_id,
       staff_id,
@@ -424,24 +456,20 @@ export const confirmAppointment = async (req, res) => {
       available_date: { $gte: queryDate, $lt: nextDay }
     });
 
-    if (!availability) {
-      return res.status(409).json({
-        message: "Unable to confirm. Staff has no availability record for this date."
-      });
-    }
-
-    // 3. Verify each required slot is available (not booked)
-    for (const startTime of slotStartTimes) {
-      const slot = availability.slots.find(s => s.start_time === startTime);
-      if (!slot) {
-        return res.status(409).json({
-          message: `Unable to confirm. Required time slot ${startTime} does not exist in staff availability.`
-        });
-      }
-      if (slot.is_booked) {
-        return res.status(409).json({
-          message: "Unable to confirm. Required consecutive time slots are no longer available."
-        });
+    if (availability) {
+      // 3. Verify each required slot is available (not booked)
+      for (const startTime of slotStartTimes) {
+        const slot = availability.slots.find(s => s.start_time === startTime);
+        if (!slot) {
+          return res.status(409).json({
+            message: `Unable to confirm. Required time slot ${startTime} does not exist in staff availability.`
+          });
+        }
+        if (slot.is_booked) {
+          return res.status(409).json({
+            message: "Unable to confirm. Required consecutive time slots are no longer available."
+          });
+        }
       }
     }
 
@@ -466,15 +494,17 @@ export const confirmAppointment = async (req, res) => {
     }
 
     // 5. All checks passed — mark slots as booked
-    for (const startTime of slotStartTimes) {
-      await StaffAvailability.updateOne(
-        {
-          staff_id: appointment.staff_id,
-          available_date: { $gte: queryDate, $lt: nextDay },
-          "slots.start_time": startTime
-        },
-        { $set: { "slots.$.is_booked": true } }
-      );
+    if (availability) {
+      for (const startTime of slotStartTimes) {
+        await StaffAvailability.updateOne(
+          {
+            staff_id: appointment.staff_id,
+            available_date: { $gte: queryDate, $lt: nextDay },
+            "slots.start_time": startTime
+          },
+          { $set: { "slots.$.is_booked": true } }
+        );
+      }
     }
 
     // 6. Update appointment status
