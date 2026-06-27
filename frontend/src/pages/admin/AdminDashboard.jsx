@@ -163,7 +163,15 @@ const AdminDashboard = () => {
           {quickActions.map((action, index) => (
             <button
               key={index}
-              onClick={() => navigate(`/salon-admin/${salonId}${action.path}`)}
+              onClick={() => {
+                // Ensure appointment creation is salon-scoped (no salon selection step)
+                if (action.path === "/AddAppointment") {
+                  navigate(`/salon-admin/${salonId}/AddAppointment`);
+                  return;
+                }
+
+                navigate(`/salon-admin/${salonId}${action.path}`);
+              }}
 
               className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface-2 hover:border-accent/30 transition-all"
             >
