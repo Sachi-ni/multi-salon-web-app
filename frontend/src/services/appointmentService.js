@@ -19,8 +19,8 @@ export const cancelAppointment = (id) =>
 
 // ── Admin endpoints ─────────────────────────────────────────────────────────
 
-export const getSalonAppointments = (salonId, status = "") =>
-  api.get("/appointments", { params: { salonId, status } });
+export const getSalonAppointments = (salonId, status = "", date = "") =>
+  api.get("/appointments", { params: { salonId, status, date } });
 
 export const confirmAppointment = (id) =>
   api.patch(`/appointments/${id}/confirm`);
@@ -42,3 +42,6 @@ export const getStaffAppointments = (staffId, status = "", date = "") =>
 
 export const getDailySchedule = (salonId, date) =>
   api.get("/appointments/daily-schedule", { params: { salonId, date } });
+
+export const deleteAppointment = (id) =>
+  api.delete(`/appointments/${id}`);
