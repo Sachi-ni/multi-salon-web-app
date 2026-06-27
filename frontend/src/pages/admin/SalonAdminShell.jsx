@@ -6,6 +6,8 @@ import AdminDailySchedule from "./AdminDailySchedule";
 import Services from "./Services";
 import Staff from "./Staff";
 import AdminStaffScheduleFallback from "./AdminStaffSchedule";
+import AddApointmnet from "./AddApointmnet";
+
 
 export default function SalonAdminShell() {
   return (
@@ -21,9 +23,13 @@ export default function SalonAdminShell() {
       <Route path="adminServices" element={<Services />} />
 
       {/* Support routes referenced by AdminDashboard quick actions */}
-      <Route path="AddAppointment" element={<AdminDailySchedule />} />
+      <Route path="AddAppointment" element={<AddApointmnet />} />
+
+
       <Route path="AddStaff" element={<Staff />} />
       <Route path="Billing" element={<div className="text-white">Billing page not implemented yet.</div>} />
+
+
       <Route path="Reports" element={<div className="text-white">Reports page not implemented yet.</div>} />
 
 

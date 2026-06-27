@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { getRevenueStats, getSalonRevenue } from "../../services/revenueService";
-import { Download, ArrowUpDown } from "lucide-react";
+import { Download, ArrowUpDown, DollarSign, Clock3 } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Table from "../../components/ui/Table";
 import Badge from "../../components/ui/Badge";
 import Spinner from "../../components/ui/Spinner";
+
+
 
 const Revenue = () => {
   const [loading, setLoading] = useState(true);
@@ -81,14 +83,14 @@ const Revenue = () => {
           {/* Revenue Cards + Period Filter */}
           <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3.5 mb-6">
             <Card>
-              <div className="text-2xl mb-2">💰</div>
+              <DollarSign className="w-8 h-8 text-accent mb-2" />
               <div className="text-[0.65rem] font-bold tracking-widest uppercase text-muted-2 mb-2">Gross Revenue</div>
               <div className="text-3xl font-black text-white mb-1">{formatCurrency(grossRevenue)}</div>
               <div className="text-xs font-bold text-success">↑ {grossGrowth}%</div>
             </Card>
 
             <Card>
-              <div className="text-2xl mb-2">⏳</div>
+              <Clock3 className="w-8 h-8 text-accent mb-2" />
               <div className="text-[0.65rem] font-bold tracking-widest uppercase text-muted-2 mb-2">Pending Payouts</div>
               <div className="text-3xl font-black text-white mb-1">{formatCurrency(pendingPayouts)}</div>
               <div className="text-xs font-semibold text-danger">{pendingOverdue} overdue</div>

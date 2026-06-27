@@ -123,7 +123,7 @@ const Dashboard = () => {
       </div>
 
       {/* Salons Section */}
-      <div className="flex items-center justify-between mb-3.5">
+      {/* <div className="flex items-center justify-between mb-3.5">
         <h3 className="text-sm font-bold text-white flex items-center gap-2">
           <Building2 className="w-4 h-4 text-accent" />
           All Salons
@@ -142,7 +142,7 @@ const Dashboard = () => {
           onAction={() => navigate("/AddSalon")}
           icon={Store}
         />
-      </Card>
+      </Card> */}
     </div>
   );
 };
