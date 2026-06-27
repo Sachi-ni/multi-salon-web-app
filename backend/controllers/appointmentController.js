@@ -295,7 +295,7 @@ export const createAppointment = async (req, res) => {
         recipient_id: admin._id,
         recipient_model: "Admin",
         title: "New Booking Received",
-        message: `A new booking was made by ${populated.customer_id?.name} for ${populated.service_id?.service_name}.`,
+        message: `A new booking was made by ${populated.customer_id?.name || appointment.guest_name || 'Guest'} for ${populated.service_id?.service_name}.`,
         appointment_id: appointment._id
       }));
       if (notifications.length > 0) {
@@ -368,7 +368,7 @@ export const cancelAppointment = async (req, res) => {
 // Query: ?salonId=xxx&status=pending
 export const getSalonAppointments = async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, date } = req.query;
 
     const salon_id = req.user.role === "super-admin"
       ? req.query.salonId || null
@@ -383,6 +383,7 @@ export const getSalonAppointments = async (req, res) => {
       filter.salon_id = salon_id;
     }
     if (status) filter.status = status;
+    if (date) filter.appointment_date = date;
 
     console.log("=== GET SALON APPOINTMENTS DEBUG ===");
     console.log("req.query:", req.query);
@@ -395,7 +396,7 @@ export const getSalonAppointments = async (req, res) => {
       .populate("service_id", "service_name base_price duration description")
       .populate("staff_id", "full_name specification image role")
       .populate("salon_id", "name location")
-      .sort({ appointment_date: 1, start_time: 1 })
+      .sort({ createdAt: -1 })
       .lean();
 
     // Manually populate customer_id to fallback to Admin collection if user registered via admin auth
@@ -771,6 +772,31 @@ export const getDailySchedule = async (req, res) => {
       salon_id,
       schedule: Object.values(grouped)
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/appointments/:id
+// Admin — deletes an appointment from the database (only if completed, rejected, or cancelled)
+export const deleteAppointment = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    const allowedStatuses = ["completed", "rejected", "cancelled"];
+    if (!allowedStatuses.includes(appointment.status)) {
+      return res.status(400).json({
+        message: `Cannot delete appointment with status: ${appointment.status}. Only completed, rejected, or cancelled appointments can be deleted.`
+      });
+    }
+
+    await Appointment.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({ message: "Appointment deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

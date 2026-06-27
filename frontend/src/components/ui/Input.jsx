@@ -17,7 +17,7 @@ const Input = ({
     <div className={clsx("mb-3.5", containerClassName)}>
       {label && (
         <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-          {label}
+          {label} {props.required && <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>}
         </label>
       )}
       {type === "textarea" ? (

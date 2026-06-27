@@ -87,6 +87,21 @@ const AdminHeader = ({ onToggleSidebar }) => {
     }
   };
 
+  const handleNotificationClick = async (n) => {
+    if (!n.is_read) {
+      await handleReadNotification(n._id);
+    }
+    setNotifOpen(false);
+    
+    if (n.appointment_id) {
+      if (user?.role === "super-admin") {
+        navigate(`/Appointments?highlight=${n.appointment_id}`);
+      } else {
+        navigate(`/admin/bookings?highlight=${n.appointment_id}`);
+      }
+    }
+  };
+
   const unreadCount = notifications.filter(
     (n) => !n.is_read
   ).length;
@@ -175,7 +190,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
                 notifications.map(n => (
                   <div 
                     key={n._id} 
-                    onClick={() => !n.is_read && handleReadNotification(n._id)}
+                    onClick={() => handleNotificationClick(n)}
                     className={clsx(
                       "p-3 border-b border-border/50 hover:bg-surface-2 transition-colors cursor-pointer",
                       !n.is_read ? "bg-accent/5" : ""

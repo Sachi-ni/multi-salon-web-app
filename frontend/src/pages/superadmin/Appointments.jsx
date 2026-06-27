@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import PageHeader from "../../components/ui/PageHeader";
-import { useNavigate } from "react-router-dom";
 import {
   getSalonAppointments,
   confirmAppointment,
   rejectAppointment,
   completeAppointment,
   adminCancelAppointment,
-  updateAppointmentDuration
+  updateAppointmentDuration,
+  deleteAppointment
 } from "../../services/appointmentService";
 
 const STATUS_FILTERS = ["all", "pending", "confirmed", "completed", "rejected", "cancelled"];
@@ -28,6 +28,7 @@ export default function Appointments() {
   
   const [appointments, setAppointments] = useState([]);
   const [filter, setFilter]             = useState("all");
+  const [dateFilter, setDateFilter]     = useState("");
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState("");
   const [actionLoading, setActionLoading] = useState("");
@@ -37,11 +38,14 @@ export default function Appointments() {
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
 
+  const [searchParams] = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+
   const fetchAppointments = () => {
     setLoading(true);
     setError("");
     // Superadmin doesn't need to pass a specific salonId to get all appointments now
-    getSalonAppointments("all", filter === "all" ? "" : filter)
+    getSalonAppointments("all", filter === "all" ? "" : filter, dateFilter)
       .then(res => setAppointments(res.data))
       .catch((err) => {
         console.error("API Error in fetchAppointments:", err, err.response);
@@ -50,7 +54,20 @@ export default function Appointments() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchAppointments(); }, [filter]);
+  useEffect(() => { fetchAppointments(); }, [filter, dateFilter]);
+
+  useEffect(() => {
+    if (highlightId && !loading && appointments.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`appointment-${highlightId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add("ring-2", "ring-accent", "ring-offset-2", "ring-offset-background", "transition-all", "duration-1000");
+          setTimeout(() => el.classList.remove("ring-2", "ring-accent", "ring-offset-2", "ring-offset-background"), 3000);
+        }
+      }, 100); // small delay to ensure DOM is ready
+    }
+  }, [highlightId, loading, appointments]);
 
   // Convert 24h time to 12h format
   const formatTime = (time) => {
@@ -116,6 +133,20 @@ export default function Appointments() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to permanently delete this appointment? This action cannot be undone.")) return;
+    setActionLoading(id);
+    setActionError("");
+    try {
+      await deleteAppointment(id);
+      fetchAppointments();
+    } catch {
+      setActionError(`${id}:Failed to delete appointment.`);
+    } finally {
+      setActionLoading("");
+    }
+  };
+
   const handleSaveDuration = async (id) => {
     setActionLoading(id);
     setActionError("");
@@ -156,21 +187,51 @@ export default function Appointments() {
         </button>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {STATUS_FILTERS.map(s => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`px-4 py-1.5 rounded-lg text-xs font-extrabold border transition-all duration-200
-              ${filter === s
-                ? "bg-accent text-primary border-accent"
-                : "bg-surface-2 text-muted-2 border-border hover:border-border-hover"
+      {/* FILTERS */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-lg text-sm font-bold capitalize transition-all duration-200 ${
+                filter === f
+                  ? "bg-accent text-primary shadow-glow"
+                  : "bg-surface text-muted-2 hover:bg-surface-hover hover:text-white"
               }`}
-          >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        
+        {/* Date Filter */}
+        <div className="flex items-center gap-3 bg-surface-2 p-1.5 pl-4 rounded-xl border border-surface group focus-within:border-accent transition-all duration-300">
+          <label className="text-sm font-bold text-muted-2 whitespace-nowrap flex items-center gap-2">
+            <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Date:
+          </label>
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            style={{ colorScheme: 'dark' }}
+            className="bg-transparent text-white text-sm font-bold focus:outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+          />
+          {dateFilter && (
+            <button
+              onClick={() => setDateFilter("")}
+              title="Clear date filter"
+              className="w-7 h-7 rounded-lg bg-danger-dim text-danger hover:bg-danger hover:text-white flex items-center justify-center transition-all duration-200"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {loading && (
@@ -193,14 +254,19 @@ export default function Appointments() {
 
       <div className="space-y-4">
         {appointments.map(a => {
-          const durationHours = Math.ceil((a.duration || 60) / 60);
-          const requiredSlots = durationHours;
-          const appointmentError = getActionError(a._id);
           const isActionLoading = actionLoading === a._id;
+          const appointmentError = getActionError(a._id);
+
+          const requiredSlots = a.duration ? Math.ceil(a.duration / 60) : 1;
+          const durationHours = a.duration ? (a.duration / 60).toFixed(1).replace(/\.0$/, "") : "1";
 
           return (
-            <div key={a._id} className="bg-surface border border-border rounded-2xl p-5 shadow-card">
-
+            <div
+              key={a._id}
+              id={`appointment-${a._id}`}
+              className={`bg-surface border border-surface rounded-xl overflow-hidden transition-all duration-200 
+                hover:shadow-modal hover:-translate-y-1 hover:border-accent/30 flex flex-col relative p-5`}
+            >
               {/* Header — Customer + Status */}
               <div className="flex items-start justify-between mb-4">
                 <div>
@@ -347,6 +413,18 @@ export default function Appointments() {
                         Cancel
                       </button>
                     </>
+                  )}
+                  {["completed", "rejected", "cancelled"].includes(a.status) && (
+                    <button
+                      onClick={() => handleDelete(a._id)}
+                      disabled={isActionLoading}
+                      className="px-4 py-1.5 bg-danger-dim text-danger border border-danger-border text-xs font-extrabold rounded-lg hover:bg-danger hover:text-white transition-all duration-200 disabled:opacity-40 flex items-center gap-1"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete
+                    </button>
                   )}
                 </div>
               </div>

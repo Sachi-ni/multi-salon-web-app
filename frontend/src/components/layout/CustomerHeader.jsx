@@ -54,6 +54,17 @@ const CustomerHeader = ({ onToggleSidebar }) => {
     }
   };
 
+  const handleNotificationClick = async (n) => {
+    if (!n.is_read) {
+      await handleReadNotification(n._id);
+    }
+    setNotifOpen(false);
+    
+    if (n.appointment_id) {
+      navigate(`/customer/dashboard?highlight=${n.appointment_id}`);
+    }
+  };
+
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const initials = user?.name
@@ -111,7 +122,7 @@ const CustomerHeader = ({ onToggleSidebar }) => {
                 notifications.map(n => (
                   <div 
                     key={n._id} 
-                    onClick={() => !n.is_read && handleReadNotification(n._id)}
+                    onClick={() => handleNotificationClick(n)}
                     className={clsx(
                       "p-3 border-b border-border/50 hover:bg-surface-2 transition-colors cursor-pointer",
                       !n.is_read ? "bg-accent/5" : ""
