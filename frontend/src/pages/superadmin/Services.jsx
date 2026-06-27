@@ -202,7 +202,7 @@ const ServiceForm = ({
       {/* Salon */}
       <div>
         <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-          Salon *
+          Salon <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
         </label>
         <div className="relative">
           <select
@@ -228,7 +228,7 @@ const ServiceForm = ({
       {/* Service Name */}
       <div>
         <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-          Service Name *
+          Service Name <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
         </label>
         <input
           type="text"
@@ -238,6 +238,7 @@ const ServiceForm = ({
           onChange={(e) =>
             setFormData({ ...formData, service_name: e.target.value })
           }
+          autoComplete="off"
           required
         />
       </div>
@@ -246,7 +247,7 @@ const ServiceForm = ({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-            Base Price (Rs.) *
+            Base Price (Rs.) <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
           </label>
           <input
             type="number"
@@ -262,7 +263,7 @@ const ServiceForm = ({
         </div>
         <div>
           <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-            Duration (mins) *
+            Duration (mins) <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
           </label>
           <input
             type="number"
@@ -281,7 +282,7 @@ const ServiceForm = ({
       {/* Description */}
       <div>
         <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-          Description
+          Description <span className="text-muted-2/50 lowercase tracking-widest ml-1 font-bold">(optional)</span>
         </label>
         <textarea
           rows={3}
@@ -291,6 +292,7 @@ const ServiceForm = ({
           onChange={(e) =>
             setFormData({ ...formData, description: e.target.value })
           }
+          autoComplete="off"
         />
       </div>
     </div>

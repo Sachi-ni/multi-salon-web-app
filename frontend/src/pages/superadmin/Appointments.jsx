@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import PageHeader from "../../components/ui/PageHeader";
-import { useNavigate } from "react-router-dom";
 import {
   getSalonAppointments,
   confirmAppointment,

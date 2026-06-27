@@ -507,7 +507,8 @@ export default function AddAppointment() {
               value={booking.date}
               min={new Date().toISOString().split("T")[0]}
               onChange={(e) => setBooking((prev) => ({ ...prev, date: e.target.value }))}
-              className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-accent focus:bg-accent-dim/20 transition-all duration-200 cursor-pointer"
+              style={{ colorScheme: "dark" }}
+              className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-accent focus:bg-accent-dim/20 transition-all duration-200 cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:hover:opacity-80"
             />
             <div className="flex justify-between mt-6">
               <button onClick={back} className="px-6 py-2.5 bg-surface-2 text-muted-2 text-sm font-bold rounded-lg border border-border hover:border-border-hover transition-all duration-200">
