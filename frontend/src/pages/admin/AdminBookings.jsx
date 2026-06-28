@@ -282,13 +282,15 @@ export default function AdminBookings() {
                 <div className="flex gap-2">
                   {a.status === "pending" && (
                     <>
-                      <button
-                        onClick={() => handleConfirm(a._id)}
-                        disabled={isActionLoading}
-                        className="px-4 py-1.5 bg-success-dim text-success border border-success-border text-xs font-extrabold rounded-lg hover:bg-success/20 transition-all duration-200 disabled:opacity-40"
-                      >
-                        {isActionLoading ? "..." : "Accept"}
-                      </button>
+                      {user?.role === "super-admin" && (
+                        <button
+                          onClick={() => handleConfirm(a._id)}
+                          disabled={isActionLoading}
+                          className="px-4 py-1.5 bg-success-dim text-success border border-success-border text-xs font-extrabold rounded-lg hover:bg-success/20 transition-all duration-200 disabled:opacity-40"
+                        >
+                          {isActionLoading ? "..." : "Accept"}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleReject(a._id)}
                         disabled={isActionLoading}

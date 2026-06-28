@@ -2,7 +2,7 @@ import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import AdminDashboard from "./AdminDashboard";
-import AdminDailySchedule from "./AdminDailySchedule";
+import AdminBookings from "./AdminBookings";
 import Services from "./Services";
 import Staff from "./Staff";
 import AdminStaffScheduleFallback from "./AdminStaffSchedule";
@@ -18,7 +18,7 @@ export default function SalonAdminShell() {
       {/* Sidebar button "Dashboard" points to /adminDashboard */}
       <Route path="adminDashboard" element={<AdminDashboard />} />
 
-      <Route path="adminAppointments" element={<AdminDailySchedule />} />
+      <Route path="adminAppointments" element={<AdminBookings />} />
       <Route path="adminStaff" element={<Staff />} />
       <Route path="adminServices" element={<Services />} />
 

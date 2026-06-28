@@ -263,11 +263,17 @@ const Salons = () => {
 
       {/* Edit Modal */}
       <Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="Edit Salon">
-        <form onSubmit={handleEditSubmit}>
+        <form onSubmit={handleEditSubmit} autoComplete="off">
           <Input label="Salon Name" name="name" value={editForm.name || ""} onChange={handleEditChange} required />
-          <Input label="Email" name="email" type="email" value={editForm.email || ""} onChange={handleEditChange} />
           <Input label="Phone" name="phone" value={editForm.phone || ""} onChange={handleEditChange} />
           <Input label="Address" name="location" value={editForm.location || ""} onChange={handleEditChange} />
+
+          <div className="mt-6 pt-4 border-t border-border">
+            <h4 className="text-sm font-bold text-white mb-3">Manager Details</h4>
+            <Input label="Manager Email" name="managerEmail" type="email" value={editForm.managerEmail || ""} onChange={handleEditChange} />
+            <Input label="Manager Password" name="managerPassword" type="password" placeholder="Leave blank to keep unchanged" value={editForm.managerPassword || ""} onChange={handleEditChange} />
+          </div>
+
           <Modal.Actions>
             <Button variant="ghost" type="button" onClick={() => setEditSalon(null)} disabled={editLoading}>Cancel</Button>
             <Button variant="primary" type="submit" loading={editLoading}>Save</Button>

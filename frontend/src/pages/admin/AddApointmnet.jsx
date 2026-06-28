@@ -178,7 +178,7 @@ export default function AddApointmnet() {
           notes: "Booked by Admin",
         });
 
-        navigate("/admin/bookings");
+        navigate(`/salon-admin/${booking.salonId}/adminAppointments`);
       } catch (err) {
         alert(err.response?.data?.message || "Booking failed. Please check slot availability.");
       }

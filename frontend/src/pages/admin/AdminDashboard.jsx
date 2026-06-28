@@ -111,7 +111,7 @@ const AdminDashboard = () => {
         <Button
           variant="primary"
           icon={CalendarPlus}
-          onClick={() => navigate("/AddAppointment")}
+          onClick={() => navigate(`/salon-admin/${salonId}/AddAppointment`)}
         >
           New Appointment
         </Button>
@@ -123,11 +123,11 @@ const AdminDashboard = () => {
           <Building2 className="w-10 h-10 text-accent" />
 
           <div>
-            <h2 className="text-xl font-bold text-white">
+            <h2 className="text-lg font-bold text-white">
               {salon?.name}
             </h2>
 
-            <p className="text-muted-2">
+            <p className="text-sm font-medium text-muted-2 mt-0.5">
               {salon?.location || salon?.address}
             </p>
           </div>
@@ -159,7 +159,7 @@ const AdminDashboard = () => {
           <Card.Title>Quick Actions</Card.Title>
         </Card.Header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="flex flex-col gap-2">
           {quickActions.map((action, index) => (
             <button
               key={index}
@@ -173,15 +173,15 @@ const AdminDashboard = () => {
                 navigate(`/salon-admin/${salonId}${action.path}`);
               }}
 
-              className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface-2 hover:border-accent/30 transition-all"
+              className="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-surface-2 border border-border text-left text-sm font-semibold text-muted-2 hover:text-white hover:border-accent/30 hover:bg-accent-dim/30 transition-all duration-200 group"
             >
-              <action.icon className="w-5 h-5 text-accent" />
+              <action.icon className="w-4 h-4 text-accent flex-shrink-0" />
 
-              <span className="flex-1 text-left text-white">
+              <span className="flex-1 text-left">
                 {action.label}
               </span>
 
-              <ArrowRight className="w-4 h-4 text-accent" />
+              <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200 text-accent" />
             </button>
           ))}
         </div>

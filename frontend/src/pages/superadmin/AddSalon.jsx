@@ -11,7 +11,6 @@ const AddSalon = () => {
 
   const [formData, setFormData] = useState({
     name: "",
-    email: "",
     phone: "",
     location: "",
     about: "",
@@ -57,12 +56,11 @@ const AddSalon = () => {
           <Card.Subtitle>Fill all required fields</Card.Subtitle>
         </Card.Header>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="off">
           <Input label="Salon Name" name="name" placeholder="Enter salon name" required value={formData.name} onChange={handleChange} />
-          <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={handleChange} />
           <Input label="Phone" name="phone" placeholder="Enter phone number" required value={formData.phone} onChange={handleChange} />
           <Input label="Address" name="location" placeholder="Enter address" required value={formData.location} onChange={handleChange} />
-          <Input label="About" name="about" placeholder="Enter about the salon" required value={formData.about} onChange={handleChange} />
+          <Input label="About" name="about" placeholder="Enter about the salon" value={formData.about} onChange={handleChange} />
 
           <div className="mt-8 mb-3.5 border-t border-border pt-6">
             <h2 className="text-lg font-bold text-white mb-3">Salon Manager Details</h2>
