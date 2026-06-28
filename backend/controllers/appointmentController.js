@@ -5,6 +5,7 @@ import Salon from "../models/Salon.js";
 import Service from "../models/Service.js";
 import Notification from "../models/Notification.js";
 import Admin from "../models/Admin.js";
+import Customer from "../models/Customer.js";
 import mongoose from "mongoose";
 
 // ─── Helper: add hours to a "HH:MM" string ──────────────────────────────────
@@ -288,7 +289,7 @@ export const createAppointment = async (req, res) => {
       const adminsToNotify = await Admin.find({
         $or: [
           { role: "super-admin" },
-          { role: "staff-admin", salon_id: salon_id }
+          { role: { $in: ["staff-admin", "manager"] }, salon_id: salon_id }
         ]
       });
       const notifications = adminsToNotify.map(admin => ({
@@ -522,8 +523,24 @@ export const confirmAppointment = async (req, res) => {
         message: `Your booking for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed.`,
         appointment_id: appointment._id
       });
+      
+      // Notify the salon manager
+      const adminsToNotify = await Admin.find({
+        role: { $in: ["staff-admin", "manager"] },
+        salon_id: appointment.salon_id
+      });
+      const notifications = adminsToNotify.map(admin => ({
+        recipient_id: admin._id,
+        recipient_model: "Admin",
+        title: "Booking Confirmed",
+        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed.`,
+        appointment_id: appointment._id
+      }));
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+      }
     } catch (notifErr) {
-      console.error("Failed to send customer notification:", notifErr);
+      console.error("Failed to send customer/admin notification:", notifErr);
     }
 
     // 7. Return populated appointment
@@ -600,8 +617,24 @@ export const rejectAppointment = async (req, res) => {
         message: `Your booking for ${appointment.appointment_date} at ${appointment.start_time} has been rejected by the salon.`,
         appointment_id: appointment._id
       });
+
+      // Notify the salon manager
+      const adminsToNotify = await Admin.find({
+        role: { $in: ["staff-admin", "manager"] },
+        salon_id: appointment.salon_id
+      });
+      const notifications = adminsToNotify.map(admin => ({
+        recipient_id: admin._id,
+        recipient_model: "Admin",
+        title: "Booking Rejected",
+        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been rejected.`,
+        appointment_id: appointment._id
+      }));
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+      }
     } catch (notifErr) {
-      console.error("Failed to send customer notification:", notifErr);
+      console.error("Failed to send customer/admin notification:", notifErr);
     }
 
     res.status(200).json(appointment);
@@ -638,8 +671,24 @@ export const completeAppointment = async (req, res) => {
         message: `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} has been marked as completed. Thank you for visiting!`,
         appointment_id: appointment._id
       });
+
+      // Notify the salon manager
+      const adminsToNotify = await Admin.find({
+        role: { $in: ["staff-admin", "manager"] },
+        salon_id: appointment.salon_id
+      });
+      const notifications = adminsToNotify.map(admin => ({
+        recipient_id: admin._id,
+        recipient_model: "Admin",
+        title: "Booking Completed",
+        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been marked as completed.`,
+        appointment_id: appointment._id
+      }));
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+      }
     } catch (notifErr) {
-      console.error("Failed to send customer notification:", notifErr);
+      console.error("Failed to send customer/admin notification:", notifErr);
     }
 
     res.status(200).json(appointment);
@@ -695,8 +744,24 @@ export const adminCancelAppointment = async (req, res) => {
         message: `Your confirmed booking for ${appointment.appointment_date} at ${appointment.start_time} has been cancelled by the salon.`,
         appointment_id: appointment._id
       });
+
+      // Notify the salon manager
+      const adminsToNotify = await Admin.find({
+        role: { $in: ["staff-admin", "manager"] },
+        salon_id: appointment.salon_id
+      });
+      const notifications = adminsToNotify.map(admin => ({
+        recipient_id: admin._id,
+        recipient_model: "Admin",
+        title: "Booking Cancelled",
+        message: `A confirmed appointment for ${appointment.appointment_date} at ${appointment.start_time} has been cancelled.`,
+        appointment_id: appointment._id
+      }));
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+      }
     } catch (notifErr) {
-      console.error("Failed to send customer notification:", notifErr);
+      console.error("Failed to send customer/admin notification:", notifErr);
     }
 
     res.status(200).json(appointment);

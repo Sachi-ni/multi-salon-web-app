@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getDailySchedule } from "../../services/appointmentService";
 
 export default function AdminDailySchedule() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const salonId = user?.salon_id || "";
 
   const [date, setDate]         = useState(new Date().toISOString().split("T")[0]);
@@ -16,7 +18,10 @@ export default function AdminDailySchedule() {
     setError("");
     getDailySchedule(salonId, date)
       .then(res => setSchedule(res.data.schedule || []))
-      .catch(() => setError("Failed to load schedule."))
+      .catch((err) => {
+        console.error("fetchSchedule error:", err);
+        setError("Failed to load schedule.");
+      })
       .finally(() => setLoading(false));
   };
 
@@ -33,9 +38,20 @@ export default function AdminDailySchedule() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-black text-white">Daily Schedule</h1>
-        <p className="text-muted-2 text-sm mt-1">View all confirmed appointments for a day</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-white">Daily Schedule</h1>
+          <p className="text-muted-2 text-sm mt-1">View all confirmed appointments for a day</p>
+        </div>
+        <button
+          onClick={() => navigate(`/salon-admin/${salonId}/AddAppointment`)}
+          className="px-5 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 hover:shadow-glow flex items-center gap-2 w-fit"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+          Create Appointment
+        </button>
       </div>
 
       {/* Date picker */}

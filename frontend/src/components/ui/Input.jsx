@@ -33,6 +33,7 @@ const Input = ({
         <input
           type={type}
           className={clsx(baseInput, className)}
+          autoComplete={props.autoComplete || "new-password"}
           {...props}
         />
       )}

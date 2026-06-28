@@ -67,7 +67,7 @@ const Header = ({ onToggleSidebar }) => {
       if (user?.role === "super-admin") {
         navigate(`/Appointments?highlight=${n.appointment_id}`);
       } else {
-        navigate(`/admin/bookings?highlight=${n.appointment_id}`);
+        navigate(`/salon-admin/${user.salon_id}/adminAppointments?highlight=${n.appointment_id}`);
       }
     }
   };
@@ -115,7 +115,12 @@ const Header = ({ onToggleSidebar }) => {
       {/* Notification */}
       <div className="relative" ref={notifRef}>
         <button 
-          onClick={() => setNotifOpen(!notifOpen)}
+          onClick={() => {
+            setNotifOpen(!notifOpen);
+            if (!notifOpen && user) {
+              getNotifications().then(res => setNotifications(res.data)).catch(console.error);
+            }
+          }}
           className="w-9 h-9 rounded-lg bg-transparent border border-border flex items-center justify-center text-muted-2 hover:bg-surface-2 hover:text-white hover:border-border-hover transition-all duration-150 relative"
         >
           <Bell className="w-4 h-4" />
