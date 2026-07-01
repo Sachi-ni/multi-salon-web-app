@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "../../App.css";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 
@@ -50,35 +49,98 @@ const Edit = () => {
   };
 
   return (
-    <div className="auth-scene on" id="pg-edit">
-      <div className="auth-card">
-        <div className="auth-title">Edit Profile</div>
+    <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg">
+      <div className="relative z-10 w-[460px] max-w-[96vw] bg-surface border border-border rounded-2xl p-10 shadow-modal">
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />
+
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <div className="w-9 h-9 bg-accent rounded-lg flex items-center justify-center text-base font-black text-primary flex-shrink-0">
+            S
+          </div>
+          <span className="text-xl font-black text-accent tracking-tight">SalonHub</span>
+        </div>
+
+        <h1 className="text-2xl font-extrabold text-white mb-6">Edit Profile</h1>
+
         <form onSubmit={handleUpdate}>
-          <div className="fg">
-            <label>Full Name</label>
-            <input type="text" value={fname} onChange={(e) => setFname(e.target.value)} />
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              Full Name
+            </label>
+            <input
+              type="text"
+              value={fname}
+              onChange={(e) => setFname(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+            />
           </div>
-          <div className="fg">
-            <label>Username</label>
-            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} />
+
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              Username
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+            />
           </div>
-          <div className="fg">
-            <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+            />
           </div>
-          <div className="fg">
-            <label>Phone</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              Phone
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+            />
           </div>
-          <div className="fg">
-            <label>Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+            />
           </div>
-          <div className="fg">
-            <label>Confirm Password</label>
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+
+          <div className="mb-4">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              Confirm Password
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+            />
           </div>
-          <button className="auth-btn" type="submit">Save Changes</button>
+
+          <button
+            className="w-full mt-1.5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase cursor-pointer transition-all duration-200 hover:bg-accent-hover hover:shadow-glow hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
+            type="submit"
+          >
+            Save Changes
+          </button>
         </form>
       </div>
     </div>
