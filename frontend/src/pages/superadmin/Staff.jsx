@@ -286,6 +286,8 @@ const Staff = () => {
       salon: staff.salon_id?._id || staff.salon || "",
       services: assignedServices,
       status: staff.status || "Active",
+      salaryPaymentFrequency: staff.salary_payment_frequency || "monthly",
+      salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 1,
       picture: null,
       currentImage: staff.image || "",
     });
@@ -382,6 +384,8 @@ const Staff = () => {
       data.append("email", editingStaff.email);
       data.append("salonId", editingStaff.salon);
       data.append("status", editingStaff.status);
+      data.append("salaryPaymentFrequency", editingStaff.salaryPaymentFrequency);
+      data.append("salaryPaymentCountPerDay", editingStaff.salaryPaymentCountPerDay);
       if (editingStaff.services.length > 0) {
         editingStaff.services.forEach((serviceId) => {
           data.append("services", serviceId);
@@ -599,6 +603,31 @@ const Staff = () => {
                   })
                 }
               />
+            </div>
+
+            {/* Salary Payment */}
+            <div className="mb-3">
+              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Salary Payment</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <select
+                  value={editingStaff.salaryPaymentFrequency}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, salaryPaymentFrequency: e.target.value })}
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+
+                <input
+                  type="number"
+                  min="1"
+                  value={editingStaff.salaryPaymentCountPerDay}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, salaryPaymentCountPerDay: e.target.value })}
+                  placeholder="Amount of salary per day"
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
+                />
+              </div>
             </div>
 
             {/* Salon */}

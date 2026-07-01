@@ -171,11 +171,8 @@ export default function Appointments() {
 
   return (
     <div>
+      <PageHeader title="All Appointments" subtitle="Manage and view all customer bookings across all salons" backTo="/superAdminDashboard"></PageHeader>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-white">All Appointments</h1>
-          <p className="text-muted-2 text-sm mt-1">Manage and view all customer bookings across all salons</p>
-        </div>
         <button
           onClick={() => navigate("/AddAppointment")}
           className="px-5 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 hover:shadow-glow flex items-center gap-2 w-fit"

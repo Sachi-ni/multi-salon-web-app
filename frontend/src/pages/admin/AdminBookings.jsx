@@ -8,6 +8,7 @@ import {
   adminCancelAppointment,
   updateAppointmentDuration
 } from "../../services/appointmentService";
+import PageHeader from "../../components/ui/PageHeader";
 
 const STATUS_FILTERS = ["all", "pending", "confirmed", "completed", "rejected", "cancelled"];
 
@@ -133,10 +134,12 @@ export default function AdminBookings() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-black text-white">Appointments</h1>
-        <p className="text-muted-2 text-sm mt-1">Manage and confirm customer bookings</p>
-      </div>
+      <PageHeader 
+        title="Appointments"
+        subtitle="Manage and confirm customer bookings"
+
+        backTo={`/salon-admin/${salonId}/adminDashboard`}
+      ></PageHeader>
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">

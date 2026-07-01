@@ -16,6 +16,7 @@ import staffAvailabilityRoutes from "./routes/staffAvailabilityRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
+import salaryRoutes from "./routes/salaryRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -39,6 +40,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/salary", salaryRoutes);
 
 // Test Route
 app.get("/", (req, res) => {
