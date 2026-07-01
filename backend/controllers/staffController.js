@@ -1,6 +1,7 @@
 import Staff from "../models/Staff.js";
 import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
+import Salary from "../models/Salary.js";
 
 export const createStaff = async (req, res) => {
   try {
@@ -27,6 +28,8 @@ export const createStaff = async (req, res) => {
       ? req.user.salon_id
       : req.body.salonId;
 
+    const salaryPaymentCountPerDay = Number(req.body.salaryPaymentCountPerDay || 1);
+
     const staffData = {
       full_name: req.body.name,
       email: req.body.email,
@@ -35,6 +38,8 @@ export const createStaff = async (req, res) => {
       role: req.body.role || "Staff",
       specification: req.body.specification,
       commission_rate: req.body.commission_rate,
+      salary_payment_frequency: req.body.salaryPaymentFrequency || "monthly",
+      salary_payment_count_per_day: Number.isFinite(salaryPaymentCountPerDay) && salaryPaymentCountPerDay > 0 ? salaryPaymentCountPerDay : 1,
       salon_id: salonId,
       services,
       image: req.file ? req.file.path : null,
@@ -53,6 +58,34 @@ export const createStaff = async (req, res) => {
         req.body.salonId,
         { $inc: { staffCount: 1 } }
       );
+    }
+    // Auto-generate salary rows for current month for this staff (best-effort)
+    try {
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      // We generate only for this staff by invoking Salary logic directly:
+      // If controller exists, we could call it, but here we simply ensure a record exists.
+      // Salary generation logic lives in salaryController; for simplicity we just leave it to /generate-monthly.
+      // Create a placeholder now with basicSalary=0; controller will update snapshot/basicSalary when generate-monthly is called.
+      await Salary.findOneAndUpdate(
+        { salon_id: salonId, staff_id: staff._id, month: monthKey },
+        {
+          $setOnInsert: {
+            salon_id: salonId,
+            staff_id: staff._id,
+            month: monthKey,
+            servicesSnapshot: [],
+            basicSalary: 0,
+            commission: 0,
+            totalSalary: 0,
+            status: "Not Paid",
+            paidAt: null,
+          },
+        },
+        { upsert: true, new: true }
+      );
+    } catch (e) {
+      // ignore
     }
 
     const staffResponse = staff.toObject();
@@ -177,6 +210,8 @@ export const updateStaff = async (req, res) => {
         : undefined
     )?.filter(Boolean);
 
+    const willUpdateServices = services !== undefined;
+
     if (req.body.name !== undefined)
       updateData.full_name = req.body.name;
 
@@ -185,6 +220,14 @@ export const updateStaff = async (req, res) => {
 
     if (req.body.role !== undefined)
       updateData.role = req.body.role;
+
+    if (req.body.salaryPaymentFrequency !== undefined)
+      updateData.salary_payment_frequency = req.body.salaryPaymentFrequency;
+
+    if (req.body.salaryPaymentCountPerDay !== undefined) {
+      const parsedCount = Number(req.body.salaryPaymentCountPerDay);
+      updateData.salary_payment_count_per_day = Number.isFinite(parsedCount) && parsedCount > 0 ? parsedCount : 1;
+    }
 
     // Only super-admin can change salon assignment
     if (
@@ -230,6 +273,24 @@ export const updateStaff = async (req, res) => {
         returnDocument: "after",
       }
     ).select("-password_hash");
+
+    // If staff services changed, ensure salary row basics are refreshed for current month (best-effort)
+    if (willUpdateServices) {
+      try {
+        const now = new Date();
+        const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        await Salary.findOneAndUpdate(
+          { salon_id: staff.salon_id, staff_id: staff._id, month: monthKey },
+          {
+            $set: { commission: 0, totalSalary: 0, status: "Not Paid" },
+            $unset: { servicesSnapshot: "" },
+          },
+          { upsert: true, new: true }
+        );
+      } catch {
+        // ignore
+      }
+    }
 
     console.log("Updated Staff:", staff);
 

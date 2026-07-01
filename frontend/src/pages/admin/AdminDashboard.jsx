@@ -64,7 +64,7 @@ const AdminDashboard = () => {
       icon: Users,
       label: "Staff",
       value: salon?.staffCount || 0,
-      subtitle: "Active Staff",
+      subtitle: "Total Staff",
     },
     {
       icon: Star,
@@ -107,7 +107,7 @@ const AdminDashboard = () => {
 
   return (
     <div>
-      <PageHeader title="Salon Dashboard" subtitle={`Welcome back, ${salon?.name || "Salon Owner"}!`}>
+      <PageHeader title="Salon Dashboard" subtitle={`Welcome back, ${salon?.name || "Salon Owner"}!`} >
         <Button
           variant="primary"
           icon={CalendarPlus}
