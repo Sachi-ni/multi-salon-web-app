@@ -65,19 +65,6 @@ const Profile = () => {
           defaultValue={user?.phone || "+1234567890"}
           readOnly
         />
-        <div className="mb-3.5">
-          <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-            Timezone
-          </label>
-          <select
-            className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent cursor-pointer"
-          >
-            <option>UTC</option>
-            <option>EST</option>
-            <option>PST</option>
-            <option>IST</option>
-          </select>
-        </div>
 
         <Button
           variant="primary"

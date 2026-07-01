@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 
 const Edit = () => {
-  const { user, setUser } = useAuth();
+  const { user, setUser, token, login } = useAuth();
   const navigate = useNavigate();
 
   const [fname, setFname] = useState(user?.name || "");
@@ -26,10 +26,10 @@ const Edit = () => {
       const res = await axios.put(
         `http://localhost:5000/api/auth/user/${user.id}`,
         { full_name: fname, email, phone, username, password },
-        { headers: { Authorization: `Bearer ${user.token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Update context + localStorage
+      // Update context + localStorage and refresh token if provided
       const updatedUser = {
         ...user,
         name: res.data.name,
@@ -37,8 +37,14 @@ const Edit = () => {
         phone: res.data.phone,
         username: res.data.username,
       };
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+
+      // If backend returned a new token, use login to sync both user + token
+      if (res.data.token) {
+        login(updatedUser, res.data.token);
+      } else {
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+      }
 
       alert("Profile updated successfully!");
       navigate("/Profile");
