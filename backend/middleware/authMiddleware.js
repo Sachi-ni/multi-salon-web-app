@@ -24,9 +24,9 @@ export const protect = async (req, res, next) => {
       }
 
       req.user = {
-        id: user._id,
+        id: String(user._id),
         role: user.role,
-        salon_id: user.salon_id,
+        salon_id: user.salon_id ? String(user.salon_id) : null,
       };
 
       // DEBUG: log auth user role for permission troubleshooting
