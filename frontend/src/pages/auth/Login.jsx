@@ -11,63 +11,67 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-  setLoading(true);
-  try {
-    // Try admin login first
-    let res = await fetch("http://localhost:5000/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    let data = await res.json();
-
-    // If admin login fails, try staff login
-    if (!res.ok) {
-      res = await fetch("http://localhost:5000/api/staff/login", {
+    setLoading(true);
+    try {
+      // Try admin login first
+      let res = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      data = await res.json();
-    }
 
-    // If staff login fails, try customer login
-    if (!res.ok) {
-      res = await fetch("http://localhost:5000/api/customers/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      data = await res.json();
-    }
+      let data = await res.json();
 
-    if (!res.ok) {
-      alert(data.message || "Login failed");
+      // If admin login fails, try staff login
+      if (!res.ok) {
+        res = await fetch("http://localhost:5000/api/staff/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        data = await res.json();
+      }
+
+      // If staff login fails, try customer login
+      if (!res.ok) {
+        res = await fetch("http://localhost:5000/api/customers/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        data = await res.json();
+      }
+
+      if (!res.ok) {
+        alert(data.message || "Login failed");
+        setLoading(false);
+        return;
+      }
+
+      const { token, ...userData } = data;
+      login(userData, token);
+
+      // Redirect based on role
+      if (data.role === "super-admin") {
+        navigate("/superAdminDashboard");
+      } else if (data.role === "staff-admin" || data.role === "manager") {
+        navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
+      } else if (data.role === "customer") {
+        navigate("/customer/dashboard");
+      } else {
+        navigate("/");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      alert("Something went wrong. Please try again.");
       setLoading(false);
-      return;
     }
+  };
 
-    const { token, ...userData } = data;
-    login(userData, token);
-
-    // Redirect based on role
-    if (data.role === "super-admin") {
-      navigate("/superAdminDashboard");
-    } else if (data.role === "staff-admin" || data.role === "manager") {
-      navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
-    } else if (data.role === "customer") {
-      navigate("/customer/dashboard");
-    } else {
-      navigate("/");
-    }
-
-  } catch (error) {
-    console.error("Login error:", error);
-    alert("Something went wrong. Please try again.");
-    setLoading(false);
-  }
-};
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    await handleLogin();
+  };
 
   return (
     <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg">
@@ -90,54 +94,56 @@ const Login = () => {
 
         <h1 className="text-2xl font-extrabold text-white mb-6">Welcome Back</h1>
 
-        {/* Email */}
-        <div className="mb-3.5">
-          <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-            Email
-          </label>
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
-            autoComplete="new-email"
-          />
-        </div>
+        <form onSubmit={handleSubmit}>
+          {/* Email */}
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              Email
+            </label>
+            <input
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+              autoComplete="new-email"
+            />
+          </div>
 
-        {/* Password */}
-        <div className="mb-4">
-          <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-            Password
-          </label>
-          <input
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
-            autoComplete="new-password"
-          />
-        </div>
+          {/* Password */}
+          <div className="mb-4">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              Password
+            </label>
+            <input
+              type="password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+              autoComplete="new-password"
+            />
+          </div>
 
-        {/* Submit Button */}
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          className="w-full mt-1.5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase cursor-pointer transition-all duration-200 hover:bg-accent-hover hover:shadow-glow hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Signing In...
-            </span>
-          ) : (
-            "Sign In"
-          )}
-        </button>
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-1.5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase cursor-pointer transition-all duration-200 hover:bg-accent-hover hover:shadow-glow hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Signing In...
+              </span>
+            ) : (
+              "Sign In"
+            )}
+          </button>
+        </form>
 
         {/* Switch */}
         <div className="text-center mt-4 text-[0.82rem] text-muted-2">
