@@ -171,18 +171,17 @@ export default function Appointments() {
 
   return (
     <div>
-      <PageHeader title="All Appointments" subtitle="Manage and view all customer bookings across all salons" backTo="/superAdminDashboard"></PageHeader>
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <PageHeader title="All Appointments" subtitle="Manage and view all customer bookings across all salons" backTo="/superAdminDashboard">
         <button
           onClick={() => navigate("/AddAppointment")}
-          className="px-5 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 hover:shadow-glow flex items-center gap-2 w-fit"
+          className="px-5 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 hover:shadow-glow flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
           </svg>
           Create Appointment
         </button>
-      </div>
+      </PageHeader>
 
       {/* FILTERS */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

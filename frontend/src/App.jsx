@@ -45,6 +45,7 @@ import AdminBookings from "./pages/admin/AdminBookings.jsx";
 import AdminDailySchedule from "./pages/admin/AdminDailySchedule.jsx";
 import AdminStaffSchedule from "./pages/admin/AdminStaffSchedule.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import Billing from "./pages/admin/Billing.jsx";
 import SalonAdminShell from "./pages/admin/SalonAdminShell";
 import AdminSalonLayout from "./components/layout/AdminSalonLayout";
 import AdminAddStaff from "./pages/admin/AddStaff.jsx";
@@ -119,12 +120,23 @@ function App() {
           }
         />
 
-       <Route
+        <Route
           path="/Revenue"
           element={
             <ProtectedRoute allowedRoles={["super-admin"]}>
               <DashboardLayout>
                 <Revenue />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/superAdminBilling"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <Billing />
               </DashboardLayout>
             </ProtectedRoute>
           }
