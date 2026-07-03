@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   getSalonAppointments,
@@ -21,6 +22,7 @@ const STATUS_COLORS = {
 };
 
 export default function AdminBookings() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const salonId  = user?.salon_id || "";
 
@@ -137,9 +139,18 @@ export default function AdminBookings() {
       <PageHeader 
         title="Appointments"
         subtitle="Manage and confirm customer bookings"
-
         backTo={`/salon-admin/${salonId}/adminDashboard`}
-      ></PageHeader>
+      >
+        <button
+          onClick={() => navigate(`/salon-admin/${salonId}/AddAppointment`)}
+          className="px-5 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 hover:shadow-glow flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+          Create Appointment
+        </button>
+      </PageHeader>
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">

@@ -10,6 +10,7 @@ import {
   Calendar,
   DollarSign,
   LogOut,
+  Receipt,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -34,6 +35,7 @@ const navItems = [
     group: "Finance",
     items: [
       { label: "Revenue", path: "/Revenue", icon: DollarSign },
+      { label: "Billing", path: "/superAdminBilling", icon: Receipt },
     ],
   },
 ];
