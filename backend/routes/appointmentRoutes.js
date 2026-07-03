@@ -15,15 +15,15 @@ import {
   updateAppointmentDuration,
   deleteAppointment
 } from "../controllers/appointmentController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, optionalProtect } from "../middleware/authMiddleware.js";
 import { authorizeRoles } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
 // ── Customer routes ─────────────────────────────────────────────────────────
-router.get("/available-staff", protect, getAvailableStaff);
-router.get("/available-slots", protect, getAvailableSlots);
-router.post("/", protect, createAppointment);
+router.get("/available-staff", optionalProtect, getAvailableStaff);
+router.get("/available-slots", optionalProtect, getAvailableSlots);
+router.post("/", optionalProtect, createAppointment);
 router.get("/my", protect, getMyAppointments);
 router.patch("/:id/cancel", protect, cancelAppointment);
 

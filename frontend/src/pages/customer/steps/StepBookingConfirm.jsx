@@ -1,11 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../../context/AuthContext";
 import { createAppointment } from "../../../services/appointmentService";
 
 export default function StepBookingConfirm({ booking, onBack }) {
   const navigate          = useNavigate();
+  const { user }          = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
+  
+  // Guest details state
+  const [guestName, setGuestName]   = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
 
   const durationHours = Math.ceil(booking.serviceDuration / 60);
 
@@ -19,6 +25,11 @@ export default function StepBookingConfirm({ booking, onBack }) {
   };
 
   const handleSubmit = async () => {
+    if (!user && (!guestName || !guestPhone)) {
+      setError("Please provide your Name and Phone Number to complete the booking.");
+      return;
+    }
+    
     setLoading(true);
     setError("");
     try {
@@ -29,8 +40,16 @@ export default function StepBookingConfirm({ booking, onBack }) {
         appointment_date: booking.date,
         start_time:       booking.startTime,
         notes:            "",
+        guest_name:       !user ? guestName : undefined,
+        guest_phone:      !user ? guestPhone : undefined,
       });
-      navigate("/my-appointments");
+      
+      if (!user) {
+        window.alert("Your booking has been submitted as pending! Our salon will review and confirm it shortly.");
+        navigate("/");
+      } else {
+        navigate("/my-appointments");
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Booking failed. Please try again.");
       setLoading(false);
@@ -110,6 +129,37 @@ export default function StepBookingConfirm({ booking, onBack }) {
           <p className="text-accent text-xl font-black">LKR {booking.servicePrice}</p>
         </div>
       </div>
+
+      {/* Guest Booking Details */}
+      {!user && (
+        <div className="mt-6 bg-surface-2 border border-border rounded-xl p-4">
+          <h3 className="text-white font-bold text-sm mb-3">Your Details</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-muted-2 mb-1.5 uppercase tracking-wider">Full Name *</label>
+              <input
+                type="text"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full bg-surface-3 border border-border rounded-lg px-4 py-2.5 text-white text-sm focus:border-accent focus:outline-none transition-colors"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-muted-2 mb-1.5 uppercase tracking-wider">Phone Number *</label>
+              <input
+                type="tel"
+                value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)}
+                placeholder="Enter your phone number"
+                className="w-full bg-surface-3 border border-border rounded-lg px-4 py-2.5 text-white text-sm focus:border-accent focus:outline-none transition-colors"
+                required
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status note */}
       <div className="mt-3 p-3 bg-info-dim border border-info-border rounded-lg flex items-start gap-2">

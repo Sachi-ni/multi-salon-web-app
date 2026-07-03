@@ -220,15 +220,24 @@ export const getAvailableSlots = async (req, res) => {
 export const createAppointment = async (req, res) => {
   try {
     const { salon_id, service_id, staff_id, appointment_date, start_time, notes, guest_name, guest_phone } = req.body;
-    let customer_id = req.user.id;
     
-    // If admin is creating the appointment
-    if (req.user.role !== "customer" && req.user.role !== "user") {
-      if (req.body.customer_id) {
-        customer_id = req.body.customer_id;
-      } else if (guest_name) {
-        customer_id = undefined; // Guest appointment
+    let customer_id = req.user?.id;
+    
+    if (req.user) {
+      // If admin is creating the appointment
+      if (req.user.role !== "customer" && req.user.role !== "user") {
+        if (req.body.customer_id) {
+          customer_id = req.body.customer_id;
+        } else if (guest_name) {
+          customer_id = undefined; // Guest appointment
+        }
       }
+    } else {
+      // Unauthenticated guest booking
+      if (!guest_name || !guest_phone) {
+        return res.status(400).json({ message: "Guest name and phone are required for unauthenticated bookings" });
+      }
+      customer_id = undefined;
     }
 
     if (!salon_id || !service_id || !staff_id || !appointment_date || !start_time) {
