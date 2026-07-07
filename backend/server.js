@@ -18,6 +18,8 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import salaryRoutes from "./routes/salaryRoutes.js";
+import revenueRoutes from "./routes/revenueRoutes.js";
+
 
 dotenv.config();
 connectDB();
@@ -43,6 +45,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/salary", salaryRoutes);
+app.use("/api/revenue", revenueRoutes);
 
 // Test Route
 app.get("/", (req, res) => {
@@ -54,3 +57,6 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+
+

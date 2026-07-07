@@ -24,26 +24,26 @@ const Revenue = () => {
   const formatCurrency = (value) => `Rs. ${Number(value).toLocaleString()}`;
 
   const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const statsRes = await getRevenueStats();
-      const salonsRes = await getSalonRevenue();
+  try {
+    setLoading(true);
+    setError("");
+    const statsRes = await getRevenueStats(period);
+    const salonsRes = await getSalonRevenue(period);
 
-      setGrossRevenue(statsRes?.data?.grossRevenue || 0);
-      setPendingPayouts(statsRes?.data?.pendingPayouts || 0);
-      setGrossGrowth(statsRes?.data?.grossGrowth || 0);
-      setPendingOverdue(statsRes?.data?.pendingOverdue || 0);
-      setSalons(salonsRes?.data || []);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load revenue data");
-    } finally {
-      setLoading(false);
-    }
-  };
+    setGrossRevenue(statsRes?.data?.grossRevenue || 0);
+    setPendingPayouts(statsRes?.data?.pendingPayouts || 0);
+    setGrossGrowth(statsRes?.data?.grossGrowth || 0);
+    setPendingOverdue(statsRes?.data?.pendingOverdue || 0);
+    setSalons(salonsRes?.data || []);
+  } catch (err) {
+    console.error(err);
+    setError("Failed to load revenue data");
+  } finally {
+    setLoading(false);
+  }
+};
 
-  useEffect(() => { fetchData(); }, []);
+useEffect(() => { fetchData(); }, [period]);
 
   const doExport = () => {
     let csv = "Salon,Revenue,Transactions\n";
@@ -56,11 +56,10 @@ const Revenue = () => {
   };
 
   const getSortedSalons = () => {
-    let filtered = [...salons];
-    if (period === "30days") filtered = filtered.slice(0, 10);
-    filtered.sort((a, b) => sortDesc ? b.revenue - a.revenue : a.revenue - b.revenue);
-    return filtered;
-  };
+  let filtered = [...salons];
+  filtered.sort((a, b) => sortDesc ? b.revenue - a.revenue : a.revenue - b.revenue);
+  return filtered;
+};
 
   return (
     <div>
