@@ -39,6 +39,7 @@ import CustomerServices from "./pages/customer/Services.jsx";
 import CustomerStaff    from "./pages/customer/Staff.jsx";
 import BookAppointment  from "./pages/customer/BookAppointment.jsx";
 import MyAppointments   from "./pages/customer/MyAppointments.jsx";
+import GiveFeedback    from "./pages/customer/GiveFeedback.jsx";
 
 // Admin pages
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
@@ -285,6 +286,12 @@ function App() {
         <Route path="/my-appointments" element={
           <ProtectedRoute allowedRoles={["customer", "user"]}>
             <CustomerLayout><MyAppointments /></CustomerLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/customer/give-feedback/:appointmentId" element={
+          <ProtectedRoute allowedRoles={["customer", "user"]}>
+            <CustomerLayout><GiveFeedback /></CustomerLayout>
           </ProtectedRoute>
         } />
 
