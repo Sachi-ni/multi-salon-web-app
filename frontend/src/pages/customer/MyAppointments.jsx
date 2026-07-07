@@ -142,6 +142,17 @@ export default function MyAppointments() {
                         Confirmed {a.confirmed_at ? `on ${new Date(a.confirmed_at).toLocaleDateString()}` : ""}
                       </span>
                     )}
+                    {a.status === "completed" && !a.feedback_submitted && (
+                      <button
+                        onClick={() => window.location.href = `/customer/give-feedback/${a._id}`}
+                        className="px-4 py-1.5 bg-accent text-primary border border-accent text-xs font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200"
+                      >
+                        Give Feedback
+                      </button>
+                    )}
+                    {a.status === "completed" && a.feedback_submitted && (
+                      <span className="text-info text-xs font-bold">Feedback submitted</span>
+                    )}
                     {a.status === "rejected" && (
                       <span className="text-danger text-xs font-bold">
                         Rejected {a.rejected_at ? `on ${new Date(a.rejected_at).toLocaleDateString()}` : ""}

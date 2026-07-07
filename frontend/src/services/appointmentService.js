@@ -14,6 +14,9 @@ export const createAppointment = (data) =>
 export const getMyAppointments = () =>
   api.get("/appointments/my");
 
+export const getAppointment = (id) =>
+  api.get(`/appointments/${id}`);
+
 export const cancelAppointment = (id) =>
   api.patch(`/appointments/${id}/cancel`);
 

@@ -9,6 +9,7 @@ import AdminSalary from "./AdminSalary";
 import AdminStaffScheduleFallback from "./AdminStaffSchedule";
 import AddApointmnet from "./AddApointmnet";
 import Billing from "./Billing";
+import AdminReviews from "./AdminReviews";
 
 
 export default function SalonAdminShell() {
@@ -31,7 +32,7 @@ export default function SalonAdminShell() {
 
       {/* Business */}
       <Route path="adminBilling" element={<Billing />} />
-      <Route path="adminReviews" element={<div className="text-white">Reviews page not implemented yet.</div>} />
+      <Route path="adminReviews" element={<AdminReviews />} />
       <Route path="adminSalary" element={<AdminSalary />} />
 
       <Route path="*" element={<Navigate to="adminDashboard" replace />} />

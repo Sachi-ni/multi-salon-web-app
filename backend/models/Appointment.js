@@ -37,6 +37,7 @@ const appointmentSchema = new mongoose.Schema({
   confirmed_at:  { type: Date, default: null },
   rejected_at:   { type: Date, default: null },
   cancelled_at:  { type: Date, default: null },
+  feedback_submitted: { type: Boolean, default: false },
 }, { timestamps: true });
 
 // Compound index for fast conflict detection queries

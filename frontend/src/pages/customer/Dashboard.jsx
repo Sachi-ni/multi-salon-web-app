@@ -122,9 +122,22 @@ export default function CustomerDashboard() {
                     {a.appointment_date} · {a.service_id?.service_name}
                   </p>
                 </div>
-                <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border ${STATUS_COLORS[a.status]}`}>
-                  {a.status.toUpperCase()}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border ${STATUS_COLORS[a.status]}`}>
+                    {a.status.toUpperCase()}
+                  </span>
+                  {a.status === "completed" && !a.feedback_submitted && (
+                    <button
+                      onClick={() => navigate(`/customer/give-feedback/${a._id}`, { state: { appointment: a } })}
+                      className="px-3 py-1.5 bg-accent text-primary text-xs font-extrabold rounded-lg hover:bg-accent-hover"
+                    >
+                      Give Feedback
+                    </button>
+                  )}
+                  {a.status === "completed" && a.feedback_submitted && (
+                    <span className="text-info text-xs font-bold">Feedback submitted</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
