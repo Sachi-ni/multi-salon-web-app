@@ -4,6 +4,7 @@ import {
   getAvailableSlots,
   createAppointment,
   getMyAppointments,
+  getAppointment,
   cancelAppointment,
   getSalonAppointments,
   confirmAppointment,
@@ -25,6 +26,7 @@ router.get("/available-staff", optionalProtect, getAvailableStaff);
 router.get("/available-slots", optionalProtect, getAvailableSlots);
 router.post("/", optionalProtect, createAppointment);
 router.get("/my", protect, getMyAppointments);
+router.get("/:id", protect, getAppointment);
 router.patch("/:id/cancel", protect, cancelAppointment);
 
 // ── Admin routes ────────────────────────────────────────────────────────────

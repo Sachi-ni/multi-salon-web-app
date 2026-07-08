@@ -1,14 +1,12 @@
-import axios from "axios";
 
-const API = axios.create({
-  baseURL: "http://localhost:5000/api"
-});
 
-export const getRevenueStats = () =>
-  API.get("/revenue/stats");
+import api from "./api";
 
-export const getSalonRevenue = () =>
-  API.get("/revenue/salons");
+export const getRevenueStats = (period = "30days") =>
+  api.get(`/revenue/stats?period=${period}`);
+
+export const getSalonRevenue = (period = "30days") =>
+  api.get(`/revenue/salons?period=${period}`);
 
 export const getMonthlyRevenue = () =>
-  API.get("/revenue/monthly");
+  api.get("/revenue/monthly");

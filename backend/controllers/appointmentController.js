@@ -337,6 +337,29 @@ export const getMyAppointments = async (req, res) => {
   }
 };
 
+// GET /api/appointments/:id
+// Customer views a single appointment by id
+export const getAppointment = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id)
+      .populate("salon_id", "name location")
+      .populate("service_id", "service_name base_price duration description")
+      .populate("staff_id", "full_name specification image");
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found." });
+    }
+
+    if (appointment.customer_id?.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to view this appointment." });
+    }
+
+    res.status(200).json(appointment);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // PATCH /api/appointments/:id/cancel
 // Customer cancels their own pending appointment
 export const cancelAppointment = async (req, res) => {
