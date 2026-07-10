@@ -26,7 +26,7 @@ const LandingNavbar = () => {
   const navLinks = [
     { name: "Home", href: "#home" },
     { name: "About", href: "#about" },
-    { name: "Services", href: "#services" },
+    { name: "Services", href: "/services" },
     { name: "Salons", href: "/our-salons" },
     { name: "Our Team", href: "/team" },
     { name: "Testimonials", href: "#testimonials" },
@@ -133,7 +133,7 @@ const LandingNavbar = () => {
             </button>
           )}
           <button
-            onClick={() => navigate(user ? "/book" : "/login")}
+            onClick={() => navigate("/book")}
             className="px-6 py-2.5 bg-accent text-primary rounded-xl text-sm font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-glow transition-all duration-200 hover:-translate-y-0.5"
           >
             Book Appointment
@@ -216,7 +216,7 @@ const LandingNavbar = () => {
                 </button>
               )}
               <button
-                onClick={() => navigate(user ? "/book" : "/login")}
+                onClick={() => navigate("/book")}
                 className="text-center text-lg font-extrabold text-primary bg-accent py-3 rounded-xl hover:bg-accent-hover transition-colors"
               >
                 Book Appointment

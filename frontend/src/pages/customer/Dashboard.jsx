@@ -1,24 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { getMyAppointments, cancelAppointment } from "../../services/appointmentService";
-import { Calendar, PlusCircle, Clock, CheckCircle, XCircle } from "lucide-react";
+import { getMyAppointments, cancelAppointment, deleteAppointment } from "../../services/appointmentService";
+import { 
+  Calendar, Plus, Clock, CheckCircle2, XCircle, 
+  MapPin, Search, Star, Scissors
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import CustomerDashboardBackground from "../../components/ui/CustomerDashboardBackground";
 
 const STATUS_COLORS = {
-  pending:   "bg-warning-dim text-warning border-warning-border",
-  confirmed: "bg-success-dim text-success border-success-border",
-  cancelled: "bg-danger-dim text-danger border-danger-border",
-  rejected:  "bg-danger-dim text-danger border-danger-border",
-  completed: "bg-info-dim text-info border-info-border",
+  pending:   "text-warning bg-warning/10 border-warning/30",
+  confirmed: "text-success bg-success/10 border-success/30",
+  cancelled: "text-danger bg-danger/10 border-danger/30",
+  rejected:  "text-danger bg-danger/10 border-danger/30",
+  completed: "text-info bg-info/10 border-info/30",
 };
 
 const STATUS_ICONS = {
-  pending:   "⏳",
-  confirmed: "✓",
-  cancelled: "✕",
-  rejected:  "✕",
-  completed: "★",
+  pending:   <Clock className="w-3.5 h-3.5" />,
+  confirmed: <CheckCircle2 className="w-3.5 h-3.5" />,
+  cancelled: <XCircle className="w-3.5 h-3.5" />,
+  rejected:  <XCircle className="w-3.5 h-3.5" />,
+  completed: <Star className="w-3.5 h-3.5" />,
 };
+
+const TABS = ["All", "Pending", "Confirmed", "Completed", "Cancelled"];
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
@@ -26,6 +33,10 @@ export default function CustomerDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState("");
+  const [deleting, setDeleting] = useState("");
+  
+  const [activeTab, setActiveTab] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchAppointments = () => {
     setLoading(true);
@@ -49,6 +60,19 @@ export default function CustomerDashboard() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to permanently delete this appointment record?")) return;
+    setDeleting(id);
+    try {
+      await deleteAppointment(id);
+      fetchAppointments();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete appointment.");
+    } finally {
+      setDeleting("");
+    }
+  };
+
   const formatTime = (time) => {
     if (!time) return "";
     const [h, m] = time.split(":").map(Number);
@@ -57,166 +81,265 @@ export default function CustomerDashboard() {
     return `${hour12}:${String(m).padStart(2, "0")} ${suffix}`;
   };
 
-  const pending = appointments.filter(a => a.status === "pending").length;
-  const confirmed = appointments.filter(a => a.status === "confirmed").length;
-  const completed = appointments.filter(a => a.status === "completed").length;
-  const cancelled = appointments.filter(a => a.status === "cancelled" || a.status === "rejected").length;
+  const filteredAppointments = useMemo(() => {
+    let filtered = appointments;
+
+    // Filter by Tab
+    if (activeTab !== "All") {
+      filtered = filtered.filter(a => a.status.toLowerCase() === activeTab.toLowerCase());
+    }
+
+    // Filter by Search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(a => 
+        a.salon_id?.name?.toLowerCase().includes(q) ||
+        a.service_id?.service_name?.toLowerCase().includes(q) ||
+        a.staff_id?.full_name?.toLowerCase().includes(q)
+      );
+    }
+
+    return filtered;
+  }, [appointments, activeTab, searchQuery]);
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-black text-white">My Appointments</h1>
-        <p className="text-muted-2 text-sm mt-1">View and manage your salon appointments.</p>
-      </div>
+    <div className="min-h-screen bg-primary pt-28 pb-20 relative overflow-hidden">
+      {/* Premium Salon-Themed Background */}
+      <CustomerDashboardBackground />
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: "Pending",   value: pending,   icon: Clock,       color: "text-warning", bg: "bg-warning-dim border-warning-border" },
-          { label: "Confirmed", value: confirmed, icon: CheckCircle, color: "text-success", bg: "bg-success-dim border-success-border" },
-          { label: "Completed", value: completed, icon: Calendar,    color: "text-info",    bg: "bg-info-dim border-info-border" },
-          { label: "Cancelled", value: cancelled, icon: XCircle,     color: "text-danger",  bg: "bg-danger-dim border-danger-border" },
-        ].map(stat => (
-          <div key={stat.label} className="bg-surface border border-border rounded-2xl p-5 shadow-card">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-muted-2 text-sm font-bold">{stat.label}</span>
-              <div className={`w-9 h-9 rounded-lg border flex items-center justify-center ${stat.bg}`}>
-                <stat.icon className={`w-4 h-4 ${stat.color}`} />
-              </div>
-            </div>
-            <p className="text-3xl font-black text-white">{stat.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Book New Appointment CTA */}
-      <div className="mb-8">
-        <button
-          onClick={() => navigate("/book")}
-          className="w-full sm:w-auto px-8 py-4 bg-accent hover:bg-accent-hover text-primary font-extrabold rounded-2xl transition-all duration-200 hover:shadow-glow hover:-translate-y-0.5 flex items-center justify-center gap-3 text-lg"
-        >
-          <PlusCircle className="w-6 h-6" />
-          Book New Appointment
-        </button>
-      </div>
-
-      {/* Appointments List */}
-      <div>
-        <h2 className="text-xl font-extrabold text-white mb-5">Your Appointments</h2>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 relative z-10">
         
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-display font-black text-white tracking-tight mb-3 drop-shadow-[0_0_20px_rgba(255,255,255,0.15)]">
+              My Appointments
+            </h1>
+            <p className="text-muted-2 text-sm md:text-base font-medium">
+              View, manage and track all your salon appointments.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/book")}
+            className="w-full md:w-auto px-6 py-3.5 bg-gradient-to-r from-[#d4af37] to-[#aa8123] text-primary font-bold rounded-xl transition-all hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 shrink-0 border border-yellow-300/30"
+          >
+            <Plus className="w-5 h-5" />
+            Book New Appointment
+          </button>
+        </div>
+
+        {/* Filters & Search */}
+        <div className="flex flex-col lg:flex-row gap-6 mb-10">
+          {/* Tabs */}
+          <div className="flex overflow-x-auto gap-3 pb-2 lg:pb-0 flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {TABS.map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-sm border ${
+                  activeTab === tab 
+                    ? "bg-white text-primary border-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]" 
+                    : "bg-surface/80 backdrop-blur-md text-muted-2 border-border hover:bg-surface-2 hover:text-white"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          {/* Search */}
+          <div className="relative w-full lg:w-80 shrink-0">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-2" />
+            <input 
+              type="text"
+              placeholder="Search salon, service or staff..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-surface/80 backdrop-blur-md border border-border rounded-full text-sm text-white placeholder:text-muted-2 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all shadow-sm"
+            />
+          </div>
+        </div>
+
+        {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-12 bg-surface border border-border rounded-2xl">
-            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : appointments.length === 0 ? (
-          <div className="bg-surface border border-border rounded-2xl p-10 text-center shadow-card">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-2 border border-border flex items-center justify-center">
-              <Calendar className="w-8 h-8 text-muted-2" />
-            </div>
-            <p className="text-white font-bold text-base mb-1">No Appointments Yet</p>
-            <p className="text-muted-2 text-sm">Book your first appointment to get started!</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {appointments.map(a => {
-              const durationHours = Math.ceil((a.duration || 60) / 60);
-              return (
-                <div key={a._id} className="bg-surface border border-border rounded-2xl p-5 shadow-card">
-                  {/* Header — Salon + Status */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                    <div>
-                      <p className="text-white font-extrabold text-lg">{a.salon_id?.name}</p>
-                      <p className="text-muted-2 text-sm mt-0.5">{a.appointment_date}</p>
-                    </div>
-                    <span className={`self-start sm:self-auto px-3 py-1.5 rounded-lg text-xs font-extrabold border flex items-center gap-1.5 ${STATUS_COLORS[a.status]}`}>
-                      <span>{STATUS_ICONS[a.status]}</span>
-                      {a.status.toUpperCase()}
-                    </span>
-                  </div>
-
-                  {/* Service details */}
-                  <div className="bg-surface-2 rounded-xl p-4 mb-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                      <p className="text-white font-bold">{a.service_id?.service_name}</p>
-                      <p className="text-accent font-extrabold text-lg">LKR {a.total_price || a.service_id?.base_price}</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-2">
-                      <span className="flex items-center gap-1.5">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        {a.staff_id?.full_name}
-                      </span>
-                      <span className="hidden sm:inline">·</span>
-                      <span className="flex items-center gap-1.5">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {formatTime(a.start_time)} — {formatTime(a.end_time)}
-                      </span>
-                      <span className="hidden sm:inline">·</span>
-                      <span>{durationHours} {durationHours === 1 ? "hr" : "hrs"}</span>
-                    </div>
-                  </div>
-
-                  {/* Footer — Actions */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-border">
-                    <p className="text-muted-2 text-sm">
-                      Booked {new Date(a.createdAt).toLocaleDateString()}
-                    </p>
-                    
-                    <div className="flex items-center gap-3">
-                      {a.status === "pending" && (
-                        <button
-                          onClick={() => handleCancel(a._id)}
-                          disabled={cancelling === a._id}
-                          className="px-5 py-2 bg-danger-dim text-danger border border-danger-border text-sm font-extrabold rounded-xl hover:bg-danger/20 transition-all duration-200 disabled:opacity-40"
-                        >
-                          {cancelling === a._id ? "Cancelling..." : "Cancel Booking"}
-                        </button>
-                      )}
-                      
-                      {a.status === "confirmed" && (
-                        <span className="text-success text-sm font-bold flex items-center gap-1.5">
-                          <CheckCircle className="w-4 h-4" />
-                          Confirmed {a.confirmed_at ? `on ${new Date(a.confirmed_at).toLocaleDateString()}` : ""}
-                        </span>
-                      )}
-                      
-                      {a.status === "completed" && !a.feedback_submitted && (
-                        <button
-                          onClick={() => navigate(`/customer/give-feedback/${a._id}`, { state: { appointment: a } })}
-                          className="px-5 py-2 bg-accent text-primary text-sm font-extrabold rounded-xl hover:bg-accent-hover transition-all duration-200"
-                        >
-                          Give Feedback
-                        </button>
-                      )}
-                      
-                      {a.status === "completed" && a.feedback_submitted && (
-                        <span className="text-info text-sm font-bold">Feedback submitted</span>
-                      )}
-                      
-                      {a.status === "rejected" && (
-                        <span className="text-danger text-sm font-bold flex items-center gap-1.5">
-                          <XCircle className="w-4 h-4" />
-                          Rejected {a.rejected_at ? `on ${new Date(a.rejected_at).toLocaleDateString()}` : ""}
-                        </span>
-                      )}
-
-                      {(a.status === "cancelled" || a.status === "rejected") && (
-                        <button
-                          onClick={() => navigate("/book")}
-                          className="px-5 py-2 bg-surface-2 text-white border border-border hover:border-border-hover text-sm font-extrabold rounded-xl transition-all duration-200"
-                        >
-                          Book Again
-                        </button>
-                      )}
-                    </div>
+          <div className="space-y-6">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-surface/50 rounded-2xl p-4 sm:p-6 border border-border/50 animate-pulse flex flex-col md:flex-row gap-6">
+                <div className="w-full md:w-72 h-56 bg-surface-2/50 rounded-xl shrink-0" />
+                <div className="flex-1 space-y-4 py-4">
+                  <div className="h-8 bg-surface-2/50 rounded-md w-1/3" />
+                  <div className="h-5 bg-surface-2/50 rounded-md w-1/4" />
+                  <div className="flex gap-4 pt-6">
+                    <div className="h-10 bg-surface-2/50 rounded-lg w-32" />
+                    <div className="h-10 bg-surface-2/50 rounded-lg w-32" />
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
+          </div>
+        ) : filteredAppointments.length === 0 ? (
+          <div className="bg-surface/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-12 md:p-16 text-center flex flex-col items-center shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+            <div className="w-24 h-24 mb-6 rounded-full bg-surface-2 flex items-center justify-center border border-white/5 shadow-inner">
+              <Calendar className="w-12 h-12 text-accent/70" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-3">You don't have any appointments yet.</h3>
+            <p className="text-muted-2 text-base max-w-sm mx-auto mb-8">
+              {searchQuery || activeTab !== "All" 
+                ? "Try adjusting your filters or search terms." 
+                : "Book your first appointment to experience premium salon services."}
+            </p>
+            {(!searchQuery && activeTab === "All") && (
+              <button
+                onClick={() => navigate("/book")}
+                className="px-8 py-4 bg-gradient-to-r from-[#d4af37] to-[#aa8123] text-primary font-bold rounded-xl transition-all hover:scale-[1.02] flex items-center gap-2 shadow-[0_0_20px_rgba(212,175,55,0.3)] border border-yellow-300/30"
+              >
+                <Plus className="w-5 h-5" />
+                Book New Appointment
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <AnimatePresence>
+              {filteredAppointments.map((a) => {
+                const durationHours = Math.ceil((a.duration || 60) / 60);
+                return (
+                  <motion.div 
+                    layout
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.3 }}
+                    key={a._id}
+                    className="relative bg-gradient-to-r from-surface to-surface-2/80 border border-white/10 hover:border-accent/40 rounded-3xl overflow-hidden transition-all duration-500 shadow-[0_8px_30px_rgb(0,0,0,0.4)] hover:shadow-[0_0_25px_rgba(212,175,55,0.15)] group"
+                  >
+                    <div className="flex flex-col md:flex-row">
+                      {/* Left Image Section */}
+                      <div className="w-full md:w-80 h-64 md:h-auto shrink-0 relative overflow-hidden">
+                        {/* Beautiful Placeholder Image */}
+                        <img 
+                          src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80" 
+                          alt="Salon Interior" 
+                          className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay group-hover:scale-105 transition-transform duration-700"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/40 to-transparent" />
+                        
+                        {/* Metallic Scissor Icon Overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                           <div className="w-24 h-24 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                             <Scissors className="w-12 h-12 text-[#d4af37] drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]" />
+                           </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="absolute top-5 left-5 z-10">
+                          <span className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 backdrop-blur-md border shadow-lg ${STATUS_COLORS[a.status]}`}>
+                            {STATUS_ICONS[a.status]}
+                            {a.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Right Content Section */}
+                      <div className="flex-1 p-6 md:p-8 flex flex-col justify-between relative z-10">
+                        <div>
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+                            <div>
+                              <div className="flex items-center gap-1.5 text-[#d4af37] text-xs font-bold uppercase tracking-widest mb-2 drop-shadow-sm">
+                                <MapPin className="w-3.5 h-3.5" />
+                                {a.salon_id?.name || "Unknown Salon"}
+                              </div>
+                              <h3 className="text-3xl font-display font-black text-white mb-1 drop-shadow-sm">
+                                {a.service_id?.service_name || "Unknown Service"}
+                              </h3>
+                              <p className="text-base text-muted-2 font-medium">
+                                with {a.staff_id?.full_name || "Any Stylist"}
+                              </p>
+                            </div>
+                            <div className="text-left sm:text-right shrink-0">
+                              <p className="text-2xl font-black text-[#d4af37] drop-shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+                                LKR {a.total_price || a.service_id?.base_price}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Time & Date Info */}
+                          <div className="flex flex-wrap gap-3 mt-8">
+                            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/5 shadow-inner">
+                              <Calendar className="w-4 h-4 text-[#d4af37]" />
+                              <span className="text-white/90 text-sm font-semibold">
+                                {new Date(a.appointment_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/5 shadow-inner">
+                              <Clock className="w-4 h-4 text-[#d4af37]" />
+                              <span className="text-white/90 text-sm font-semibold">
+                                {formatTime(a.start_time)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/5 shadow-inner">
+                              <span className="text-muted-2 text-sm font-medium">Duration:</span>
+                              <span className="text-white/90 text-sm font-semibold">
+                                {durationHours} {durationHours === 1 ? "hr" : "hrs"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions Footer */}
+                        <div className="mt-8 pt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-5 border-t border-white/5">
+                          <p className="text-xs text-muted-2 font-medium uppercase tracking-widest">
+                            Booked on {new Date(a.createdAt).toLocaleDateString()}
+                          </p>
+                          
+                          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+
+                            {a.status === "pending" && (
+                              <button
+                                onClick={() => handleCancel(a._id)}
+                                disabled={cancelling === a._id}
+                                className="flex-1 sm:flex-none px-6 py-2.5 bg-gradient-to-r from-red-950/40 to-red-900/20 text-red-400 border border-red-500/20 hover:from-red-900/60 hover:to-red-800/40 hover:text-red-300 text-sm font-semibold rounded-xl transition-all disabled:opacity-50 text-center shadow-inner"
+                              >
+                                {cancelling === a._id ? "Cancelling..." : "Cancel Appointment"}
+                              </button>
+                            )}
+
+                            {a.status === "completed" && !a.feedback_submitted && (
+                              <button
+                                onClick={() => navigate(`/customer/give-feedback/${a._id}`, { state: { appointment: a } })}
+                                className="flex-1 sm:flex-none px-6 py-2.5 bg-black/40 hover:bg-black/60 text-white text-sm font-semibold rounded-xl transition-all border border-white/10 text-center shadow-inner"
+                              >
+                                Leave Feedback
+                              </button>
+                            )}
+
+                            {(a.status === "cancelled" || a.status === "rejected" || a.status === "completed") && (
+                              <button
+                                onClick={() => navigate("/book")}
+                                className="flex-1 sm:flex-none px-7 py-2.5 bg-gradient-to-r from-[#d4af37] to-[#aa8123] text-primary text-sm font-bold rounded-xl transition-all hover:scale-[1.02] text-center border border-yellow-300/30 shadow-[0_0_15px_rgba(212,175,55,0.2)]"
+                              >
+                                Book Again
+                              </button>
+                            )}
+
+                            {(a.status === "cancelled" || a.status === "rejected") && (
+                              <button
+                                onClick={() => handleDelete(a._id)}
+                                disabled={deleting === a._id}
+                                className="flex-1 sm:flex-none px-6 py-2.5 bg-black/40 text-danger hover:bg-red-950/40 border border-red-500/10 hover:border-red-500/30 text-sm font-semibold rounded-xl transition-all disabled:opacity-50 text-center shadow-inner"
+                              >
+                                {deleting === a._id ? "Deleting..." : "Delete"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
         )}
       </div>

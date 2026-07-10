@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { getAvailableSlots } from "../../../services/appointmentService";
 
 export default function StepSelectTimeSlot({ booking, onNext, onBack }) {
-  const [slots, setSlots]       = useState([]);
+  const [slots, setSlots] = useState([]);
   const [selected, setSelected] = useState(booking.startTime || "");
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const durationHours = Math.ceil(booking.serviceDuration / 60);
 
@@ -21,7 +21,7 @@ export default function StepSelectTimeSlot({ booking, onNext, onBack }) {
     if (!slot) return;
     onNext({
       startTime: slot.start_time,
-      endTime:   slot.end_time,
+      endTime: slot.end_time,
     });
   };
 

@@ -11,6 +11,7 @@ import {
   DollarSign,
   LogOut,
   Receipt,
+  Star,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -29,6 +30,7 @@ const navItems = [
       { label: "Staff", path: "/Staff", icon: Users },
       { label: "Services", path: "/Services", icon: Scissors },
       { label: "Appointments", path: "/Appointments", icon: Calendar, countId: "cnt-a" },
+      { label: "Reviews", path: "/superAdminReviews", icon: Star },
     ],
   },
   {

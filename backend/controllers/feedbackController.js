@@ -83,7 +83,10 @@ export const getSalonFeedback = async (req, res) => {
       return res.status(400).json({ message: "salonId is required." });
     }
 
-    const filter = { salon_id };
+    const filter = {};
+    if (salon_id !== "all") {
+      filter.salon_id = salon_id;
+    }
     if (req.query.staffId) filter.staff_id = req.query.staffId;
     if (req.query.serviceId) filter.service_id = req.query.serviceId;
 
