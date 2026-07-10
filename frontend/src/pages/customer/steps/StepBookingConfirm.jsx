@@ -4,13 +4,13 @@ import { useAuth } from "../../../context/AuthContext";
 import { createAppointment } from "../../../services/appointmentService";
 
 export default function StepBookingConfirm({ booking, onBack }) {
-  const navigate          = useNavigate();
-  const { user }          = useAuth();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-  
+  const [error, setError] = useState("");
+
   // Guest details state
-  const [guestName, setGuestName]   = useState("");
+  const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
 
   const durationHours = Math.ceil(booking.serviceDuration / 60);
@@ -29,26 +29,26 @@ export default function StepBookingConfirm({ booking, onBack }) {
       setError("Please provide your Name and Phone Number to complete the booking.");
       return;
     }
-    
+
     setLoading(true);
     setError("");
     try {
       await createAppointment({
-        salon_id:         booking.salonId,
-        service_id:       booking.serviceId,
-        staff_id:         booking.staffId,
+        salon_id: booking.salonId,
+        service_id: booking.serviceId,
+        staff_id: booking.staffId,
         appointment_date: booking.date,
-        start_time:       booking.startTime,
-        notes:            "",
-        guest_name:       !user ? guestName : undefined,
-        guest_phone:      !user ? guestPhone : undefined,
+        start_time: booking.startTime,
+        notes: "",
+        guest_name: !user ? guestName : undefined,
+        guest_phone: !user ? guestPhone : undefined,
       });
-      
+
       if (!user) {
         window.alert("Your booking has been submitted as pending! Our salon will review and confirm it shortly.");
         navigate("/");
       } else {
-        navigate("/my-appointments");
+        navigate("/customer/dashboard");
       }
     } catch (err) {
       setError(err.response?.data?.message || "Booking failed. Please try again.");

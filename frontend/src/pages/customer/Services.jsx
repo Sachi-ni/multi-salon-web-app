@@ -1,75 +1,98 @@
 import { useEffect, useState } from "react";
 import { getSalons, getSalonServices } from "../../services/salonService";
 import { Scissors } from "lucide-react";
+import LandingNavbar from "./landing-sections/LandingNavbar";
+import Footer from "./landing-sections/Footer";
 
 export default function CustomerServices() {
-  const [salons, setSalons]     = useState([]);
+  const [salons, setSalons] = useState([]);
   const [services, setServices] = useState([]);
-  const [selected, setSelected] = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [selected, setSelected] = useState("all");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     getSalons().then(res => {
       setSalons(res.data);
-      if (res.data.length > 0) {
-        setSelected(res.data[0]._id);
-      }
     });
   }, []);
 
   useEffect(() => {
-    if (!selected) return;
     setLoading(true);
-    getSalonServices(selected)
+    getSalonServices(selected === "all" ? "" : selected)
       .then(res => setServices(res.data))
       .finally(() => setLoading(false));
   }, [selected]);
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-black text-white">Services</h1>
-        <p className="text-muted-2 text-sm mt-1">Browse available services by branch</p>
-      </div>
+    <div className="min-h-screen bg-primary">
+      <LandingNavbar />
+      
+      <div className="pt-32 pb-20 px-6 max-w-7xl mx-auto">
+        
+        {/* Header Section */}
+        <div className="mb-12 text-center animate-fade-up">
+          <div className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20 mb-4">
+            <Scissors className="text-accent w-4 h-4" />
+            <span className="text-xs font-bold text-accent uppercase tracking-wider">Our Offerings</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black text-white mb-4">Our <span className="text-accent">Services</span></h1>
+          <p className="text-muted-2 text-lg max-w-2xl mx-auto">Discover our premium range of grooming and beauty services, available across our luxury studio locations.</p>
+        </div>
 
-      {/* Branch filter */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {salons.map(s => (
+        {/* Branch filter */}
+        <div className="flex gap-2 mb-8 flex-wrap justify-center animate-fade-up" style={{ animationDelay: "100ms" }}>
           <button
-            key={s._id}
-            onClick={() => setSelected(s._id)}
-            className={`px-4 py-1.5 rounded-lg text-xs font-extrabold border transition-all duration-200
-              ${selected === s._id
-                ? "bg-accent text-primary border-accent"
-                : "bg-surface-2 text-muted-2 border-border hover:border-border-hover"
+            onClick={() => setSelected("all")}
+            className={`px-6 py-2 rounded-xl text-sm font-extrabold border transition-all duration-300
+              ${selected === "all"
+                ? "bg-accent text-primary border-accent shadow-glow"
+                : "bg-surface border-border text-white hover:border-accent/50"
               }`}
           >
-            {s.name}
+            All Branches
           </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {services.map(s => (
-            <div key={s._id} className="bg-surface border border-border rounded-2xl p-5 shadow-card hover:border-border-hover transition-all duration-200">
-              <div className="w-10 h-10 bg-accent-dim border border-accent/20 rounded-xl flex items-center justify-center mb-4">
-                <Scissors className="w-5 h-5 text-accent" />
-              </div>
-              <h3 className="text-white font-extrabold mb-1">{s.service_name}</h3>
-              {s.description && <p className="text-muted-2 text-xs mb-3">{s.description}</p>}
-              <div className="flex items-center justify-between pt-3 border-t border-border">
-                <span className="text-muted-2 text-xs">{s.duration} min</span>
-                <span className="text-accent font-extrabold text-sm">LKR {s.base_price}</span>
-              </div>
-            </div>
+          {salons.map(s => (
+            <button
+              key={s._id}
+              onClick={() => setSelected(s._id)}
+              className={`px-6 py-2 rounded-xl text-sm font-extrabold border transition-all duration-300
+                ${selected === s._id
+                  ? "bg-accent text-primary border-accent shadow-glow"
+                  : "bg-surface border-border text-white hover:border-accent/50"
+                }`}
+            >
+              {s.name}
+            </button>
           ))}
         </div>
-      )}
+
+        {/* Services Grid */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-fade-up" style={{ animationDelay: "200ms" }}>
+            {services.map(s => (
+              <div key={s._id} className="bg-surface border border-border rounded-2xl p-6 shadow-card hover:border-accent/50 hover:shadow-glow transition-all duration-300 group">
+                <div className="w-12 h-12 bg-accent/10 border border-accent/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <Scissors className="w-6 h-6 text-accent" />
+                </div>
+                <h3 className="text-xl text-white font-black mb-2">{s.service_name}</h3>
+                {s.description && <p className="text-muted-2 text-sm mb-6 line-clamp-2">{s.description}</p>}
+                
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                  <span className="text-white/60 text-sm font-medium">{s.duration} min</span>
+                  <span className="text-accent font-black text-lg">LKR {s.base_price}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+      </div>
+      
+      <Footer />
     </div>
   );
 }

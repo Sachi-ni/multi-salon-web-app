@@ -59,13 +59,13 @@ export const getAvailableStaff = async (req, res) => {
       .populate("services", "service_name");
 
     const result = staffList.map(staff => ({
-      staff_id:       staff._id,
-      full_name:      staff.full_name,
-      role:           staff.role,
-      specification:  staff.specification,
-      image:          staff.image,
-      salon:          staff.salon_id,
-      services:       staff.services
+      staff_id: staff._id,
+      full_name: staff.full_name,
+      role: staff.role,
+      specification: staff.specification,
+      image: staff.image,
+      salon: staff.salon_id,
+      services: staff.services
     }));
 
     res.status(200).json(result);
@@ -110,7 +110,7 @@ export const getAvailableSlots = async (req, res) => {
       const salon = await Salon.findById(salonId);
       const openTime = (salon && salon.open_time) ? salon.open_time : "09:00";
       const closeTime = (salon && salon.close_time) ? salon.close_time : "17:00";
-      
+
       const generatedSlots = [];
       let [currentH, currentM] = openTime.split(":").map(Number);
       const [closeH, closeM] = closeTime.split(":").map(Number);
@@ -120,7 +120,7 @@ export const getAvailableSlots = async (req, res) => {
         let nextH = currentH + 1;
         let nextM = currentM;
         const end_time = `${String(nextH).padStart(2, "0")}:${String(nextM).padStart(2, "0")}`;
-        
+
         if (nextH > closeH || (nextH === closeH && nextM > closeM)) {
           break;
         }
@@ -169,9 +169,9 @@ export const getAvailableSlots = async (req, res) => {
     const currentMinute = now.getMinutes();
     const filteredSlots = date === today
       ? freeSlots.filter(slot => {
-          const [slotH, slotM] = slot.start_time.split(":").map(Number);
-          return slotH > currentHour || (slotH === currentHour && slotM > currentMinute);
-        })
+        const [slotH, slotM] = slot.start_time.split(":").map(Number);
+        return slotH > currentHour || (slotH === currentHour && slotM > currentMinute);
+      })
       : freeSlots;
 
     // 7. Sort slots by start_time
@@ -185,7 +185,7 @@ export const getAvailableSlots = async (req, res) => {
 
       for (let j = 0; j < requiredSlots - 1; j++) {
         const currentEnd = filteredSlots[i + j].end_time;
-        const nextStart  = filteredSlots[i + j + 1].start_time;
+        const nextStart = filteredSlots[i + j + 1].start_time;
 
         if (currentEnd !== nextStart) {
           consecutive = false;
@@ -195,7 +195,7 @@ export const getAvailableSlots = async (req, res) => {
 
       if (consecutive) {
         const startTime = filteredSlots[i].start_time;
-        const endTime   = filteredSlots[i + requiredSlots - 1].end_time;
+        const endTime = filteredSlots[i + requiredSlots - 1].end_time;
 
         validStartTimes.push({
           start_time: startTime,
@@ -220,9 +220,9 @@ export const getAvailableSlots = async (req, res) => {
 export const createAppointment = async (req, res) => {
   try {
     const { salon_id, service_id, staff_id, appointment_date, start_time, notes, guest_name, guest_phone } = req.body;
-    
+
     let customer_id = req.user?.id;
-    
+
     if (req.user) {
       // If admin is creating the appointment
       if (req.user.role !== "customer" && req.user.role !== "user") {
@@ -262,7 +262,7 @@ export const createAppointment = async (req, res) => {
       status: { $in: ["confirmed", "pending"] }
     });
 
-    const isConflict = existingAppointments.some(appt => 
+    const isConflict = existingAppointments.some(appt =>
       timesOverlap(start_time, end_time, appt.start_time, appt.end_time)
     );
 
@@ -441,12 +441,12 @@ export const getSalonAppointments = async (req, res) => {
           // Fallback to Admin collection if not found
           const admin = await mongoose.model("Admin").findById(appt.customer_id, "full_name email phone").lean();
           if (admin) {
-             customer = {
-               _id: admin._id,
-               name: admin.full_name,
-               email: admin.email,
-               phone: admin.phone
-             };
+            customer = {
+              _id: admin._id,
+              name: admin.full_name,
+              email: admin.email,
+              phone: admin.phone
+            };
           }
         }
         appt.customer_id = customer || null;
@@ -555,7 +555,7 @@ export const confirmAppointment = async (req, res) => {
         message: `Your booking for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed.`,
         appointment_id: appointment._id
       });
-      
+
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
         role: { $in: ["staff-admin", "manager"] },
@@ -882,6 +882,12 @@ export const deleteAppointment = async (req, res) => {
 
     if (!appointment) {
       return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    // Allow admins to delete any appointment, but customers can only delete their own
+    const isAdmin = ["super-admin", "staff-admin", "manager"].includes(req.user.role);
+    if (!isAdmin && appointment.customer_id?.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to delete this appointment" });
     }
 
     const allowedStatuses = ["completed", "rejected", "cancelled"];

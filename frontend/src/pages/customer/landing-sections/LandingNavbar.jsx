@@ -2,10 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../../../context/AuthContext";
 
 const LandingNavbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -24,7 +26,7 @@ const LandingNavbar = () => {
   const navLinks = [
     { name: "Home", href: "#home" },
     { name: "About", href: "#about" },
-    { name: "Services", href: "#services" },
+    { name: "Services", href: "/services" },
     { name: "Salons", href: "/our-salons" },
     { name: "Our Team", href: "/team" },
     { name: "Testimonials", href: "#testimonials" },
@@ -86,12 +88,50 @@ const LandingNavbar = () => {
 
         {/* Action Buttons */}
         <div className="hidden md:flex items-center gap-4">
-          <button
-            onClick={() => navigate("/login")}
-            className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
-          >
-            Log In
-          </button>
+          {!user ? (
+            <>
+              <button
+                onClick={() => navigate("/login")}
+                className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
+              >
+                Login
+              </button>
+              <button
+                onClick={() => navigate("/signup")}
+                className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
+              >
+                Sign Up
+              </button>
+            </>
+          ) : user.role === "customer" ? (
+            <>
+              <button
+                onClick={() => navigate("/customer/dashboard")}
+                className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
+              >
+                My Appointments
+              </button>
+              <button
+                onClick={() => {
+                  logout();
+                  navigate("/");
+                }}
+                className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => {
+                logout();
+                navigate("/");
+              }}
+              className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
+            >
+              Logout
+            </button>
+          )}
           <button
             onClick={() => navigate("/book")}
             className="px-6 py-2.5 bg-accent text-primary rounded-xl text-sm font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-glow transition-all duration-200 hover:-translate-y-0.5"
@@ -131,12 +171,50 @@ const LandingNavbar = () => {
             </nav>
             <div className="h-px bg-border w-full" />
             <div className="flex flex-col gap-4">
-              <button
-                onClick={() => navigate("/login")}
-                className="text-center text-lg font-bold text-white py-3 rounded-xl border border-border hover:bg-surface-2 transition-colors"
-              >
-                Log In
-              </button>
+              {!user ? (
+                <>
+                  <button
+                    onClick={() => navigate("/login")}
+                    className="text-center text-lg font-bold text-white py-3 rounded-xl border border-border hover:bg-surface-2 transition-colors"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => navigate("/signup")}
+                    className="text-center text-lg font-bold text-white py-3 rounded-xl border border-border hover:bg-surface-2 transition-colors"
+                  >
+                    Sign Up
+                  </button>
+                </>
+              ) : user.role === "customer" ? (
+                <>
+                  <button
+                    onClick={() => navigate("/customer/dashboard")}
+                    className="text-center text-lg font-bold text-white py-3 rounded-xl border border-border hover:bg-surface-2 transition-colors"
+                  >
+                    My Appointments
+                  </button>
+                  <button
+                    onClick={() => {
+                      logout();
+                      navigate("/");
+                    }}
+                    className="text-center text-lg font-bold text-white py-3 rounded-xl border border-border hover:bg-surface-2 transition-colors"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    logout();
+                    navigate("/");
+                  }}
+                  className="text-center text-lg font-bold text-white py-3 rounded-xl border border-border hover:bg-surface-2 transition-colors"
+                >
+                  Logout
+                </button>
+              )}
               <button
                 onClick={() => navigate("/book")}
                 className="text-center text-lg font-extrabold text-primary bg-accent py-3 rounded-xl hover:bg-accent-hover transition-colors"

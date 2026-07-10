@@ -3,9 +3,9 @@ import { getAvailableStaff } from "../../../services/appointmentService";
 
 export default function StepSelectStaff({ booking, onNext, onBack }) {
   const [staffList, setStaffList] = useState([]);
-  const [selected, setSelected]  = useState(booking.staffId || "");
-  const [loading, setLoading]    = useState(true);
-  const [error, setError]        = useState("");
+  const [selected, setSelected] = useState(booking.staffId || "");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     getAvailableStaff(booking.date, booking.serviceId, booking.salonId)
@@ -18,8 +18,8 @@ export default function StepSelectStaff({ booking, onNext, onBack }) {
     const staff = staffList.find(s => s.staff_id === selected);
     if (!staff) return;
     onNext({
-      staffId:            staff.staff_id,
-      staffName:          staff.full_name,
+      staffId: staff.staff_id,
+      staffName: staff.full_name,
       staffSpecification: staff.specification,
     });
   };

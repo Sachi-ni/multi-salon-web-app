@@ -31,6 +31,7 @@ import Analytics from "./pages/superadmin/Analytics.jsx";
 import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 import Services from "./pages/superadmin/Services.jsx";
+import SuperAdminReviews from "./pages/superadmin/SuperAdminReviews.jsx";
 
 import CustomerLayout   from "./components/layout/CustomerLayout.jsx";
 import CustomerDashboard from "./pages/customer/Dashboard.jsx";
@@ -223,6 +224,17 @@ function App() {
         />
 
         <Route
+          path="/superAdminReviews"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <SuperAdminReviews />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/Analytics"
           element={
             <ProtectedRoute allowedRoles={["super-admin"]}>
@@ -265,10 +277,8 @@ function App() {
           </ProtectedRoute>
         } />
 
-        <Route path="/customer/services" element={
-          <ProtectedRoute allowedRoles={["customer", "user"]}>
-            <CustomerLayout><CustomerServices /></CustomerLayout>
-          </ProtectedRoute>
+        <Route path="/services" element={
+          <CustomerServices />
         } />
 
         <Route path="/customer/staff" element={

@@ -4,8 +4,8 @@ import { getSalonServices } from "../../../services/salonService";
 export default function StepSelectService({ booking, onNext, onBack }) {
   const [services, setServices] = useState([]);
   const [selected, setSelected] = useState(booking.serviceId || "");
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     getSalonServices(booking.salonId)
@@ -18,10 +18,10 @@ export default function StepSelectService({ booking, onNext, onBack }) {
     const svc = services.find(s => s._id === selected);
     if (!svc) return;
     onNext({
-      serviceId:       svc._id,
-      serviceName:     svc.service_name,
+      serviceId: svc._id,
+      serviceName: svc.service_name,
       serviceDuration: svc.duration,
-      servicePrice:    svc.base_price,
+      servicePrice: svc.base_price,
     });
   };
 
@@ -35,8 +35,8 @@ export default function StepSelectService({ booking, onNext, onBack }) {
 
   return (
     <div>
-      <h2 className="text-lg font-extrabold text-white mb-1">Select a Service</h2>
-      <p className="text-muted-2 text-sm mb-5">Choose the service you'd like to book</p>
+      <h2 className="text-lg font-extrabold text-white mb-1">Select Services</h2>
+      <p className="text-muted-2 text-sm mb-5">Choose the services you'd like to book (select one or more)</p>
 
       <div className="space-y-3">
         {services.map(s => {

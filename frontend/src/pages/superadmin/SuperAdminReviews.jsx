@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams } from "react-router-dom";
 import PageHeader from "../../components/ui/PageHeader";
 import { getSalonFeedback } from "../../services/feedbackService";
-import { Star, MessageSquare, User, Scissors, Calendar, Clock, Quote } from "lucide-react";
+import { getSalons } from "../../services/salonService";
+import { Star, MessageSquare, User, Scissors, Calendar, Clock, Quote, Store, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 function StarDisplay({ rating, max = 5 }) {
@@ -18,20 +18,28 @@ function StarDisplay({ rating, max = 5 }) {
   );
 }
 
-export default function AdminReviews() {
-  const { salonId } = useParams();
+export default function SuperAdminReviews() {
   const [feedbacks, setFeedbacks] = useState([]);
+  const [salons, setSalons] = useState([]);
+  const [selectedSalon, setSelectedSalon] = useState("all");
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    getSalons()
+      .then(res => setSalons(res.data))
+      .catch(err => console.error("Failed to fetch salons", err));
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
     setError("");
-    getSalonFeedback(salonId)
+    getSalonFeedback(selectedSalon)
       .then(res => setFeedbacks(res.data))
       .catch(err => setError(err.response?.data?.message || "Failed to load feedbacks."))
       .finally(() => setLoading(false));
-  }, [salonId]);
+  }, [selectedSalon]);
 
   const stats = useMemo(() => {
     if (!feedbacks.length) return null;
@@ -46,7 +54,32 @@ export default function AdminReviews() {
 
   return (
     <div className="max-w-6xl mx-auto pb-12">
-      <PageHeader title="Reviews" subtitle="Customer feedback for your salon" backTo={`/salon-admin/${salonId}/adminDashboard`} />
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-8">
+        <PageHeader 
+          title="All Reviews" 
+          subtitle="Monitor customer feedback across your entire network" 
+          hideBack 
+        />
+        
+        {/* Salon Filter Dropdown */}
+        <div className="w-full sm:w-64 shrink-0">
+           <label className="block text-muted-2 text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
+             <Store className="w-3.5 h-3.5 text-accent" />
+             Filter by Salon
+           </label>
+           <select
+             value={selectedSalon}
+             onChange={(e) => setSelectedSalon(e.target.value)}
+             className="w-full bg-surface border border-border text-white text-sm font-semibold rounded-xl px-4 py-3 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all appearance-none cursor-pointer hover:bg-surface-2"
+             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239CA3AF'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
+           >
+             <option value="all">All Salons</option>
+             {salons.map(s => (
+               <option key={s._id} value={s._id}>{s.name}</option>
+             ))}
+           </select>
+        </div>
+      </div>
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -65,15 +98,15 @@ export default function AdminReviews() {
           <div className="w-16 h-16 rounded-full bg-surface-2 flex items-center justify-center mb-4">
              <MessageSquare className="w-8 h-8 text-muted-2" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">No Reviews Yet</h3>
-          <p className="text-muted-2 text-sm max-w-sm">When customers leave feedback after their appointments, it will appear here.</p>
+          <h3 className="text-xl font-bold text-white mb-2">No Reviews Found</h3>
+          <p className="text-muted-2 text-sm max-w-sm">There is no feedback available for the selected filters.</p>
         </div>
       ) : (
         <div className="space-y-8 mt-6">
           
           {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             <div className="bg-surface border border-border rounded-3xl p-6 flex items-center gap-6">
+             <div className="bg-surface border border-border rounded-3xl p-6 flex items-center gap-6 shadow-card">
                 <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center border border-accent/20 shrink-0">
                    <Star className="w-8 h-8 text-accent fill-accent" />
                 </div>
@@ -84,7 +117,7 @@ export default function AdminReviews() {
                 </div>
              </div>
              
-             <div className="bg-surface border border-border rounded-3xl p-6 flex flex-col justify-center md:col-span-2">
+             <div className="bg-surface border border-border rounded-3xl p-6 flex flex-col justify-center md:col-span-2 shadow-card">
                 <div className="max-w-md">
                     <div className="flex items-center justify-between mb-2">
                     <p className="text-white font-bold text-sm">Average Service Rating</p>
@@ -112,23 +145,30 @@ export default function AdminReviews() {
                 const customerName = f.customer_id?.name || 'Guest User';
                 const initials = customerName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
                 
+                // For superadmin, we should ideally show the salon name if we have it
+                const salonName = salons.find(s => s._id === f.salon_id)?.name || "Unknown Salon";
+                
                 return (
                   <motion.div 
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05 }}
                     key={f._id} 
-                    className="bg-surface border border-border hover:border-white/10 transition-colors rounded-3xl p-6 md:p-8"
+                    className="bg-surface border border-border hover:border-white/10 transition-colors rounded-3xl p-6 md:p-8 shadow-card"
                   >
                     <div className="flex flex-col md:flex-row gap-6 md:gap-8">
                       
-                      {/* Customer Info */}
+                      {/* Customer & Meta Info */}
                       <div className="md:w-64 shrink-0 flex items-start gap-4 border-b md:border-b-0 md:border-r border-border pb-6 md:pb-0 pr-0 md:pr-6">
-                        <div className="w-12 h-12 rounded-full bg-surface-2 border border-white/5 flex items-center justify-center shrink-0">
+                        <div className="w-12 h-12 rounded-full bg-surface-2 border border-white/5 flex items-center justify-center shrink-0 mt-1">
                            <span className="text-white font-bold">{initials}</span>
                         </div>
                         <div>
                           <p className="text-white font-bold text-lg">{customerName}</p>
+                          <div className="flex items-center gap-1.5 text-muted-2 text-xs mt-2 font-medium">
+                            <MapPin className="w-3.5 h-3.5 text-accent" />
+                            {salonName}
+                          </div>
                           <div className="flex items-center gap-1.5 text-muted-2 text-xs mt-1.5 font-medium">
                             <Calendar className="w-3.5 h-3.5" />
                             {f.appointment_id?.appointment_date || "N/A"}

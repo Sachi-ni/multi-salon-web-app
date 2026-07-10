@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { getSalons } from "../../services/salonService";
-import StepSelectService  from "./steps/StepSelectService";
-import StepSelectStaff    from "./steps/StepSelectStaff";
+import StepSelectService from "./steps/StepSelectService";
+import StepSelectStaff from "./steps/StepSelectStaff";
 import StepSelectTimeSlot from "./steps/StepSelectTimeSlot";
 import StepBookingConfirm from "./steps/StepBookingConfirm";
 
 const STEPS = ["Salon", "Date", "Service", "Staff", "Time Slot", "Confirm"];
 
 export default function BookAppointment() {
-  const [step, setStep]     = useState(0);
+  const [step, setStep] = useState(0);
   const [salons, setSalons] = useState([]);
   const [booking, setBooking] = useState({
     salonId: "", salonName: "",
@@ -23,7 +23,7 @@ export default function BookAppointment() {
 
   useEffect(() => {
     getSalons().then(res => setSalons(res.data));
-    
+
     if (location.state?.staff) {
       const staff = location.state.staff;
       setBooking(prev => ({
@@ -89,9 +89,9 @@ export default function BookAppointment() {
             <div key={i} className="flex items-center flex-1 last:flex-none">
               <div className="flex flex-col items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-200
-                  ${i < step  ? "bg-accent text-primary" : ""}
+                  ${i < step ? "bg-accent text-primary" : ""}
                   ${i === step ? "bg-accent text-primary shadow-glow" : ""}
-                  ${i > step  ? "bg-surface-2 text-muted-2 border border-border" : ""}
+                  ${i > step ? "bg-surface-2 text-muted-2 border border-border" : ""}
                 `}>
                   {i < step ? (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -188,10 +188,10 @@ export default function BookAppointment() {
           )}
 
           {/* Step 2 — Service */}
-          {step === 2 && <StepSelectService  booking={booking} onNext={next} onBack={back} />}
+          {step === 2 && <StepSelectService booking={booking} onNext={next} onBack={back} />}
 
           {/* Step 3 — Staff */}
-          {step === 3 && <StepSelectStaff    booking={booking} onNext={next} onBack={back} />}
+          {step === 3 && <StepSelectStaff booking={booking} onNext={next} onBack={back} />}
 
           {/* Step 4 — Time Slot */}
           {step === 4 && <StepSelectTimeSlot booking={booking} onNext={next} onBack={back} />}

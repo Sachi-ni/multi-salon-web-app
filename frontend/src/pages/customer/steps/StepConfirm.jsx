@@ -22,7 +22,7 @@ export default function StepConfirm({ booking, onBack }) {
         })),
         notes: "",
       });
-      navigate("/my-appointments");
+      navigate("/customer/dashboard");
     } catch {
       setError("Booking failed. Please try again.");
       setLoading(false);
