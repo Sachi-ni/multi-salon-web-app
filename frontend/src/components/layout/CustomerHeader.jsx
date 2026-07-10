@@ -5,7 +5,7 @@ import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
 
-const CustomerHeader = ({ onToggleSidebar }) => {
+const CustomerHeader = () => {
   const { user, logout } = useAuth();
   const navigate          = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -73,9 +73,7 @@ const CustomerHeader = ({ onToggleSidebar }) => {
 
   return (
     <header className="h-header bg-surface/90 backdrop-blur-glass border-b border-border flex items-center px-5 gap-3 fixed top-0 left-0 right-0 z-[200]">
-      <button onClick={onToggleSidebar} className="lg:hidden flex p-1.5 cursor-pointer">
-        <Menu className="w-5 h-5 text-white" />
-      </button>
+
 
       {/* Logo */}
       <div className="flex items-center gap-2 text-lg font-black text-accent whitespace-nowrap tracking-tight">

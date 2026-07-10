@@ -57,7 +57,7 @@ const Login = () => {
       } else if (data.role === "staff-admin" || data.role === "manager") {
         navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
       } else if (data.role === "customer") {
-        navigate("/customer/dashboard");
+        navigate("/");
       } else {
         navigate("/");
       }
