@@ -5,6 +5,7 @@ import StepSelectService from "./steps/StepSelectService";
 import StepSelectStaff from "./steps/StepSelectStaff";
 import StepSelectTimeSlot from "./steps/StepSelectTimeSlot";
 import StepBookingConfirm from "./steps/StepBookingConfirm";
+import CustomerDashboardBackground from "../../components/ui/CustomerDashboardBackground";
 
 const STEPS = ["Salon", "Date", "Service", "Staff", "Time Slot", "Confirm"];
 
@@ -74,8 +75,11 @@ export default function BookAppointment() {
   };
 
   return (
-    <div>
-      <div className="max-w-2xl mx-auto">
+    <div className="relative overflow-hidden min-h-[80vh]">
+      {/* Premium Salon-Themed Background */}
+      <CustomerDashboardBackground />
+
+      <div className="max-w-2xl mx-auto relative z-10">
 
         {/* Header */}
         <div className="mb-8">

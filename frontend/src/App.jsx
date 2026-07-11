@@ -277,7 +277,7 @@ function App() {
           </ProtectedRoute>
         } />
 
-        <Route path="/services" element={
+        <Route path="/our-services" element={
           <CustomerServices />
         } />
 
