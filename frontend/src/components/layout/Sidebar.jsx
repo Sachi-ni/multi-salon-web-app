@@ -20,7 +20,6 @@ const navItems = [
     group: "Overview",
     items: [
       { label: "Dashboard", path: "/superAdminDashboard", icon: LayoutDashboard },
-      { label: "Analytics", path: "/Analytics", icon: BarChart3 },
     ],
   },
   {
