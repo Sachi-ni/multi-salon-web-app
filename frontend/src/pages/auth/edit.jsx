@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { X } from "lucide-react";
 import axios from "axios";
 
 const Edit = () => {
@@ -47,7 +48,13 @@ const Edit = () => {
       }
 
       alert("Profile updated successfully!");
-      navigate("/Profile");
+      if (user?.role === "customer" || user?.role === "user") {
+        navigate("/customer/dashboard");
+      } else if (user?.role === "super-admin") {
+        navigate("/Profile");
+      } else {
+        navigate(-1);
+      }
     } catch (error) {
       console.error("Update error:", error);
       alert(error.response?.data?.message || "Failed to update profile");
@@ -55,9 +62,16 @@ const Edit = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg">
-      <div className="relative z-10 w-[460px] max-w-[96vw] bg-surface border border-border rounded-2xl p-10 shadow-modal">
+    <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg py-4">
+      <div className="relative z-10 w-[460px] max-w-[96vw] max-h-[90vh] overflow-y-auto overflow-x-hidden bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-modal">
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />
+
+        <button 
+          onClick={() => navigate(-1)}
+          className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
         <div className="flex items-center gap-2.5 mb-1.5">
           <div className="w-9 h-9 bg-accent rounded-lg flex items-center justify-center text-base font-black text-primary flex-shrink-0">
@@ -81,17 +95,19 @@ const Edit = () => {
             />
           </div>
 
-          <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-              Username
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
-            />
-          </div>
+          {user?.role !== "customer" && user?.role !== "user" && (
+            <div className="mb-3.5">
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+              />
+            </div>
+          )}
 
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">

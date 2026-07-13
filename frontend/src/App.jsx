@@ -259,6 +259,12 @@ function App() {
           </ProtectedRoute>
         } />
 
+        <Route path="/customer/profile" element={
+          <ProtectedRoute allowedRoles={["customer", "user"]}>
+            <Edit />
+          </ProtectedRoute>
+        } />
+
         <Route path="/customer/branches" element={
           <ProtectedRoute allowedRoles={["customer", "user"]}>
             <CustomerLayout><Branches /></CustomerLayout>
