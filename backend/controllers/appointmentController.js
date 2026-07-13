@@ -1,4 +1,5 @@
 import Appointment from "../models/Appointment.js";
+import AppointmentService from "../models/AppointmentService.js";
 import StaffAvailability from "../models/StaffAvailability.js";
 import Staff from "../models/Staff.js";
 import Salon from "../models/Salon.js";
@@ -39,20 +40,29 @@ const timesOverlap = (s1, e1, s2, e2) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // GET /api/appointments/available-staff
-// Returns staff who can perform the service AND have free slots on that date
-// Query: ?date=2026-07-01&serviceId=xxx&salonId=xxx
+// Returns staff who can perform at least one of the selected services AND have free slots on that date
+// Query: ?date=2026-07-01&serviceIds=id1,id2,id3&salonId=xxx
+//        (also supports legacy ?serviceId=xxx)
 export const getAvailableStaff = async (req, res) => {
   try {
-    const { date, serviceId, salonId } = req.query;
+    const { date, serviceId, serviceIds, salonId } = req.query;
 
-    if (!date || !serviceId || !salonId) {
-      return res.status(400).json({ message: "date, serviceId and salonId are required" });
+    // Support both legacy single serviceId and new comma-separated serviceIds
+    let serviceIdList = [];
+    if (serviceIds) {
+      serviceIdList = serviceIds.split(",").map(s => s.trim()).filter(Boolean);
+    } else if (serviceId) {
+      serviceIdList = [serviceId];
     }
 
-    // Find active staff in this salon who can perform this service
+    if (!date || serviceIdList.length === 0 || !salonId) {
+      return res.status(400).json({ message: "date, serviceId(s) and salonId are required" });
+    }
+
+    // Find active staff in this salon who can perform at least one of the selected services
     const staffList = await Staff.find({
       salon_id: salonId,
-      services: serviceId,
+      services: { $in: serviceIdList },
       status: "Active"
     })
       .populate("salon_id", "name")
@@ -76,23 +86,33 @@ export const getAvailableStaff = async (req, res) => {
 
 // GET /api/appointments/available-slots
 // Returns available start-time slots for a specific staff member on a date,
-// considering the service duration and existing confirmed bookings.
-// Query: ?staffId=xxx&date=2026-07-01&serviceId=xxx&salonId=xxx
+// considering the total service duration and existing confirmed bookings.
+// Query: ?staffId=xxx&date=2026-07-01&serviceIds=id1,id2&salonId=xxx
+//        (also supports legacy ?serviceId=xxx)
 export const getAvailableSlots = async (req, res) => {
   try {
-    const { staffId, date, serviceId, salonId } = req.query;
+    const { staffId, date, serviceId, serviceIds, salonId } = req.query;
     console.log("getAvailableSlots query:", req.query);
 
-    if (!staffId || !date || !serviceId) {
-      return res.status(400).json({ message: "staffId, date, and serviceId are required" });
+    // Support both legacy single serviceId and new comma-separated serviceIds
+    let serviceIdList = [];
+    if (serviceIds) {
+      serviceIdList = serviceIds.split(",").map(s => s.trim()).filter(Boolean);
+    } else if (serviceId) {
+      serviceIdList = [serviceId];
     }
 
-    // 1. Get service duration
-    const service = await Service.findById(serviceId);
-    if (!service) {
-      return res.status(404).json({ message: "Service not found" });
+    if (!staffId || !date || serviceIdList.length === 0) {
+      return res.status(400).json({ message: "staffId, date, and serviceId(s) are required" });
     }
-    const requiredSlots = Math.ceil(service.duration / 60); // e.g. 120min = 2 slots
+
+    // 1. Get total duration from all selected services
+    const services = await Service.find({ _id: { $in: serviceIdList } });
+    if (services.length === 0) {
+      return res.status(404).json({ message: "No services found" });
+    }
+    const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
+    const requiredSlots = Math.ceil(totalDuration / 60); // e.g. 120min = 2 slots
 
     // 2. Get staff availability for this date
     const queryDate = new Date(date);
@@ -216,84 +236,160 @@ export const getAvailableSlots = async (req, res) => {
 
 // POST /api/appointments
 // Customer creates a pending booking — does NOT mark slots
-// Body: { salon_id, service_id, staff_id, appointment_date, start_time, notes }
+// Body (new format): { salon_id, appointment_date, notes, services: [{ service_id, staff_id, start_time }] }
+// Body (legacy format): { salon_id, service_id, staff_id, appointment_date, start_time, notes }
 export const createAppointment = async (req, res) => {
   try {
-    const { salon_id, service_id, staff_id, appointment_date, start_time, notes, guest_name, guest_phone } = req.body;
+    const { salon_id, appointment_date, notes, guest_name, guest_phone } = req.body;
 
     let customer_id = req.user?.id;
 
     if (req.user) {
-      // If admin is creating the appointment
       if (req.user.role !== "customer" && req.user.role !== "user") {
         if (req.body.customer_id) {
           customer_id = req.body.customer_id;
         } else if (guest_name) {
-          customer_id = undefined; // Guest appointment
+          customer_id = undefined;
         }
       }
     } else {
-      // Unauthenticated guest booking
       if (!guest_name || !guest_phone) {
         return res.status(400).json({ message: "Guest name and phone are required for unauthenticated bookings" });
       }
       customer_id = undefined;
     }
 
-    if (!salon_id || !service_id || !staff_id || !appointment_date || !start_time) {
+    // Build the per-service list from either new or legacy format
+    let serviceEntries = []; // [{ service_id, staff_id, start_time }]
+
+    if (req.body.services && Array.isArray(req.body.services) && req.body.services.length > 0) {
+      // New per-service format
+      serviceEntries = req.body.services;
+    } else if (req.body.service_id && req.body.staff_id && req.body.start_time) {
+      // Legacy single-service format
+      const legacyServiceIds = req.body.service_ids && Array.isArray(req.body.service_ids)
+        ? req.body.service_ids
+        : [req.body.service_id];
+      serviceEntries = legacyServiceIds.map(sid => ({
+        service_id: sid,
+        staff_id: req.body.staff_id,
+        start_time: req.body.start_time,
+      }));
+    }
+
+    if (!salon_id || !appointment_date || serviceEntries.length === 0) {
       return res.status(400).json({
-        message: "salon_id, service_id, staff_id, appointment_date, and start_time are required"
+        message: "salon_id, appointment_date, and at least one service with staff_id and start_time are required"
       });
     }
 
-    // Get service to calculate end_time and price
-    const service = await Service.findById(service_id);
-    if (!service) {
-      return res.status(404).json({ message: "Service not found" });
+    // Resolve each service: get duration, compute end_time, check conflicts
+    const resolvedServices = [];
+    let totalPrice = 0;
+    let totalDuration = 0;
+    let overallStart = null;
+    let overallEnd = null;
+
+    for (const entry of serviceEntries) {
+      const service = await Service.findById(entry.service_id);
+      if (!service) {
+        return res.status(404).json({ message: `Service not found: ${entry.service_id}` });
+      }
+
+      const durationHours = Math.ceil(service.duration / 60);
+      const end_time = addHours(entry.start_time, durationHours);
+
+      // Conflict check for this staff on this date
+      const existingAppointments = await Appointment.find({
+        staff_id: entry.staff_id,
+        appointment_date,
+        status: { $in: ["confirmed", "pending"] }
+      });
+
+      const isConflict = existingAppointments.some(appt =>
+        timesOverlap(entry.start_time, end_time, appt.start_time, appt.end_time)
+      );
+
+      if (isConflict) {
+        return res.status(409).json({
+          message: `Time slot ${entry.start_time}-${end_time} is no longer available for the selected staff.`
+        });
+      }
+
+      // Also check conflicts between services within this same booking
+      for (const prev of resolvedServices) {
+        if (prev.staff_id === entry.staff_id) {
+          if (timesOverlap(entry.start_time, end_time, prev.start_time, prev.end_time)) {
+            return res.status(409).json({
+              message: `Time conflict: the same staff member is assigned overlapping times for "${prev.service_name}" and "${service.service_name}".`
+            });
+          }
+        }
+      }
+
+      totalPrice += service.base_price;
+      totalDuration += service.duration;
+
+      if (!overallStart || entry.start_time < overallStart) overallStart = entry.start_time;
+      if (!overallEnd || end_time > overallEnd) overallEnd = end_time;
+
+      resolvedServices.push({
+        service_id: entry.service_id,
+        service_name: service.service_name,
+        staff_id: entry.staff_id,
+        start_time: entry.start_time,
+        end_time,
+        sub_price: service.base_price,
+        duration: service.duration,
+      });
     }
 
-    const durationHours = Math.ceil(service.duration / 60);
-    const end_time = addHours(start_time, durationHours);
-
-    // Final availability check
-    const existingAppointments = await Appointment.find({
-      staff_id,
-      appointment_date,
-      status: { $in: ["confirmed", "pending"] }
-    });
-
-    const isConflict = existingAppointments.some(appt =>
-      timesOverlap(start_time, end_time, appt.start_time, appt.end_time)
-    );
-
-    if (isConflict) {
-      return res.status(409).json({ message: "The selected time slot is no longer available." });
-    }
-
+    // Create parent Appointment
     const appointment = await Appointment.create({
       customer_id,
       guest_name: guest_name || "",
       guest_phone: guest_phone || "",
       salon_id,
-      service_id,
-      staff_id,
+      service_id: resolvedServices[0].service_id,
+      service_ids: resolvedServices.map(s => s.service_id),
+      staff_id: resolvedServices[0].staff_id,
       appointment_date,
-      start_time,
-      end_time,
-      duration: service.duration,
-      total_price: service.base_price,
+      start_time: overallStart,
+      end_time: overallEnd,
+      duration: totalDuration,
+      total_price: totalPrice,
       notes: notes || "",
       status: "pending"
     });
+
+    // Create AppointmentService records for each service
+    const appointmentServiceRecords = resolvedServices.map(s => ({
+      appointment_id: appointment._id,
+      service_id: s.service_id,
+      staff_id: s.staff_id,
+      sub_price: s.sub_price,
+      service_start_time: s.start_time,
+      service_end_time: s.end_time,
+    }));
+    await AppointmentService.insertMany(appointmentServiceRecords);
 
     // Populate for response
     const populated = await Appointment.findById(appointment._id)
       .populate("salon_id", "name location")
       .populate("service_id", "service_name base_price duration")
+      .populate("service_ids", "service_name base_price duration")
       .populate("staff_id", "full_name specification image")
       .populate("customer_id", "name email phone");
 
-    // NOTIFICATION: Notify super-admins and staff-admins of this salon
+    // Fetch AppointmentService details
+    const apptServices = await AppointmentService.find({ appointment_id: appointment._id })
+      .populate("service_id", "service_name base_price duration")
+      .populate("staff_id", "full_name specification image");
+
+    const result = populated.toObject();
+    result.appointment_services = apptServices;
+
+    // NOTIFICATION: Notify super-admins and staff-admins of this salon, AND managers in Staff
     try {
       const adminsToNotify = await Admin.find({
         $or: [
@@ -301,21 +397,40 @@ export const createAppointment = async (req, res) => {
           { role: { $in: ["staff-admin", "manager"] }, salon_id: salon_id }
         ]
       });
-      const notifications = adminsToNotify.map(admin => ({
+
+      const managersToNotify = await Staff.find({
+        role: "manager",
+        salon_id: salon_id
+      });
+
+      const serviceNames = resolvedServices.map(s => s.service_name).join(', ');
+      
+      const adminNotifications = adminsToNotify.map(admin => ({
         recipient_id: admin._id,
         recipient_model: "Admin",
         title: "New Booking Received",
-        message: `A new booking was made by ${populated.customer_id?.name || appointment.guest_name || 'Guest'} for ${populated.service_id?.service_name}.`,
+        message: `A new booking was made by ${populated.customer_id?.name || appointment.guest_name || 'Guest'} for ${serviceNames}.`,
         appointment_id: appointment._id
       }));
-      if (notifications.length > 0) {
-        await Notification.insertMany(notifications);
+
+      const staffNotifications = managersToNotify.map(staff => ({
+        recipient_id: staff._id,
+        recipient_model: "Staff", // or whatever model Staff uses if different
+        title: "New Booking Received",
+        message: `A new booking was made by ${populated.customer_id?.name || appointment.guest_name || 'Guest'} for ${serviceNames}.`,
+        appointment_id: appointment._id
+      }));
+
+      const allNotifications = [...adminNotifications, ...staffNotifications];
+
+      if (allNotifications.length > 0) {
+        await Notification.insertMany(allNotifications);
       }
     } catch (notifErr) {
       console.error("Failed to send admin notifications:", notifErr);
     }
 
-    res.status(201).json(populated);
+    res.status(201).json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -328,8 +443,23 @@ export const getMyAppointments = async (req, res) => {
     const appointments = await Appointment.find({ customer_id: req.user.id })
       .populate("salon_id", "name location")
       .populate("service_id", "service_name base_price duration description")
+      .populate("service_ids", "service_name base_price duration description")
       .populate("staff_id", "full_name specification image")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Attach appointment_services for each appointment
+    const appointmentIds = appointments.map(a => a._id);
+    const allApptServices = await AppointmentService.find({ appointment_id: { $in: appointmentIds } })
+      .populate("service_id", "service_name base_price duration")
+      .populate("staff_id", "full_name specification image")
+      .lean();
+
+    for (const appt of appointments) {
+      appt.appointment_services = allApptServices.filter(
+        as => as.appointment_id.toString() === appt._id.toString()
+      );
+    }
 
     res.status(200).json(appointments);
   } catch (err) {
@@ -344,6 +474,7 @@ export const getAppointment = async (req, res) => {
     const appointment = await Appointment.findById(req.params.id)
       .populate("salon_id", "name location")
       .populate("service_id", "service_name base_price duration description")
+      .populate("service_ids", "service_name base_price duration description")
       .populate("staff_id", "full_name specification image");
 
     if (!appointment) {
@@ -427,6 +558,7 @@ export const getSalonAppointments = async (req, res) => {
 
     const rawAppointments = await Appointment.find(filter)
       .populate("service_id", "service_name base_price duration description")
+      .populate("service_ids", "service_name base_price duration description")
       .populate("staff_id", "full_name specification image role")
       .populate("salon_id", "name location")
       .sort({ createdAt: -1 })
@@ -451,6 +583,19 @@ export const getSalonAppointments = async (req, res) => {
         }
         appt.customer_id = customer || null;
       }
+    }
+
+    // Attach appointment_services for each appointment
+    const appointmentIds = rawAppointments.map(a => a._id);
+    const allApptServices = await AppointmentService.find({ appointment_id: { $in: appointmentIds } })
+      .populate("service_id", "service_name base_price duration")
+      .populate("staff_id", "full_name specification image")
+      .lean();
+
+    for (const appt of rawAppointments) {
+      appt.appointment_services = allApptServices.filter(
+        as => as.appointment_id.toString() === appt._id.toString()
+      );
     }
 
     res.status(200).json(rawAppointments);
@@ -561,13 +706,28 @@ export const confirmAppointment = async (req, res) => {
         role: { $in: ["staff-admin", "manager"] },
         salon_id: appointment.salon_id
       });
-      const notifications = adminsToNotify.map(admin => ({
+      const managersToNotify = await Staff.find({
+        role: "manager",
+        salon_id: appointment.salon_id
+      });
+      
+      const adminNotifs = adminsToNotify.map(admin => ({
         recipient_id: admin._id,
         recipient_model: "Admin",
         title: "Booking Confirmed",
         message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed.`,
         appointment_id: appointment._id
       }));
+      
+      const staffNotifs = managersToNotify.map(staff => ({
+        recipient_id: staff._id,
+        recipient_model: "Staff",
+        title: "Booking Confirmed",
+        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed.`,
+        appointment_id: appointment._id
+      }));
+      
+      const notifications = [...adminNotifs, ...staffNotifs];
       if (notifications.length > 0) {
         await Notification.insertMany(notifications);
       }
@@ -579,6 +739,7 @@ export const confirmAppointment = async (req, res) => {
     const populated = await Appointment.findById(appointment._id)
       .populate("customer_id", "name email phone")
       .populate("service_id", "service_name base_price duration")
+      .populate("service_ids", "service_name base_price duration")
       .populate("staff_id", "full_name specification image")
       .populate("salon_id", "name location");
 
@@ -655,13 +816,28 @@ export const rejectAppointment = async (req, res) => {
         role: { $in: ["staff-admin", "manager"] },
         salon_id: appointment.salon_id
       });
-      const notifications = adminsToNotify.map(admin => ({
+      const managersToNotify = await Staff.find({
+        role: "manager",
+        salon_id: appointment.salon_id
+      });
+      
+      const adminNotifs = adminsToNotify.map(admin => ({
         recipient_id: admin._id,
         recipient_model: "Admin",
         title: "Booking Rejected",
         message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been rejected.`,
         appointment_id: appointment._id
       }));
+      
+      const staffNotifs = managersToNotify.map(staff => ({
+        recipient_id: staff._id,
+        recipient_model: "Staff",
+        title: "Booking Rejected",
+        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been rejected.`,
+        appointment_id: appointment._id
+      }));
+      
+      const notifications = [...adminNotifs, ...staffNotifs];
       if (notifications.length > 0) {
         await Notification.insertMany(notifications);
       }
@@ -709,13 +885,28 @@ export const completeAppointment = async (req, res) => {
         role: { $in: ["staff-admin", "manager"] },
         salon_id: appointment.salon_id
       });
-      const notifications = adminsToNotify.map(admin => ({
+      const managersToNotify = await Staff.find({
+        role: "manager",
+        salon_id: appointment.salon_id
+      });
+      
+      const adminNotifs = adminsToNotify.map(admin => ({
         recipient_id: admin._id,
         recipient_model: "Admin",
         title: "Booking Completed",
         message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been marked as completed.`,
         appointment_id: appointment._id
       }));
+      
+      const staffNotifs = managersToNotify.map(staff => ({
+        recipient_id: staff._id,
+        recipient_model: "Staff",
+        title: "Booking Completed",
+        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been marked as completed.`,
+        appointment_id: appointment._id
+      }));
+      
+      const notifications = [...adminNotifs, ...staffNotifs];
       if (notifications.length > 0) {
         await Notification.insertMany(notifications);
       }
@@ -782,13 +973,28 @@ export const adminCancelAppointment = async (req, res) => {
         role: { $in: ["staff-admin", "manager"] },
         salon_id: appointment.salon_id
       });
-      const notifications = adminsToNotify.map(admin => ({
+      const managersToNotify = await Staff.find({
+        role: "manager",
+        salon_id: appointment.salon_id
+      });
+      
+      const adminNotifs = adminsToNotify.map(admin => ({
         recipient_id: admin._id,
         recipient_model: "Admin",
         title: "Booking Cancelled",
         message: `A confirmed appointment for ${appointment.appointment_date} at ${appointment.start_time} has been cancelled.`,
         appointment_id: appointment._id
       }));
+      
+      const staffNotifs = managersToNotify.map(staff => ({
+        recipient_id: staff._id,
+        recipient_model: "Staff",
+        title: "Booking Cancelled",
+        message: `A confirmed appointment for ${appointment.appointment_date} at ${appointment.start_time} has been cancelled.`,
+        appointment_id: appointment._id
+      }));
+      
+      const notifications = [...adminNotifs, ...staffNotifs];
       if (notifications.length > 0) {
         await Notification.insertMany(notifications);
       }
@@ -816,6 +1022,7 @@ export const getStaffAppointments = async (req, res) => {
     const appointments = await Appointment.find(filter)
       .populate("customer_id", "name email phone")
       .populate("service_id", "service_name base_price duration")
+      .populate("service_ids", "service_name base_price duration")
       .populate("staff_id", "full_name specification image")
       .populate("salon_id", "name location")
       .sort({ appointment_date: 1, start_time: 1 });
@@ -848,6 +1055,7 @@ export const getDailySchedule = async (req, res) => {
     })
       .populate("customer_id", "name email phone")
       .populate("service_id", "service_name base_price duration")
+      .populate("service_ids", "service_name base_price duration")
       .populate("staff_id", "full_name specification image")
       .sort({ start_time: 1 });
 

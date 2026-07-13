@@ -243,44 +243,95 @@ export default function CustomerDashboard() {
                       {/* Right Content Section */}
                       <div className="flex-1 p-6 md:p-8 flex flex-col justify-between relative z-10">
                         <div>
-                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-                            <div>
-                              <div className="flex items-center gap-1.5 text-[#d4af37] text-xs font-bold uppercase tracking-widest mb-2 drop-shadow-sm">
-                                <MapPin className="w-3.5 h-3.5" />
-                                {a.salon_id?.name || "Unknown Salon"}
+                          {/* Services List */}
+                          <div className="mb-6 space-y-4">
+                            {a.appointment_services && a.appointment_services.length > 0 ? (
+                              a.appointment_services.map((svc, idx) => (
+                                <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                                  <div>
+                                    <h3 className="text-xl font-display font-black text-white mb-0.5 drop-shadow-sm">
+                                      {svc.service_id?.service_name || "Unknown Service"}
+                                    </h3>
+                                    <p className="text-sm text-muted-2 font-medium">
+                                      with {svc.staff_id?.full_name || "Any Stylist"} • {formatTime(svc.service_start_time)} - {formatTime(svc.service_end_time)}
+                                    </p>
+                                  </div>
+                                  <div className="text-left sm:text-right shrink-0">
+                                    <p className="text-lg font-black text-[#d4af37] drop-shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+                                      LKR {svc.sub_price || svc.service_id?.base_price}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))
+                            ) : a.service_ids && a.service_ids.length > 0 ? (
+                              a.service_ids.map((svc, idx) => (
+                                <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                                  <div>
+                                    <h3 className="text-xl font-display font-black text-white mb-0.5 drop-shadow-sm">
+                                      {svc.service_name || "Unknown Service"}
+                                    </h3>
+                                    <p className="text-sm text-muted-2 font-medium">
+                                      with {a.staff_id?.full_name || "Any Stylist"}
+                                    </p>
+                                  </div>
+                                  <div className="text-left sm:text-right shrink-0">
+                                    <p className="text-lg font-black text-[#d4af37] drop-shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+                                      LKR {svc.base_price}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div>
+                                  <h3 className="text-xl font-display font-black text-white mb-0.5 drop-shadow-sm">
+                                    {a.service_id?.service_name || "Unknown Service"}
+                                  </h3>
+                                  <p className="text-sm text-muted-2 font-medium">
+                                    with {a.staff_id?.full_name || "Any Stylist"}
+                                  </p>
+                                </div>
+                                <div className="text-left sm:text-right shrink-0">
+                                  <p className="text-lg font-black text-[#d4af37] drop-shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+                                    LKR {a.total_price || a.service_id?.base_price}
+                                  </p>
+                                </div>
                               </div>
-                              <h3 className="text-3xl font-display font-black text-white mb-1 drop-shadow-sm">
-                                {a.service_id?.service_name || "Unknown Service"}
-                              </h3>
-                              <p className="text-base text-muted-2 font-medium">
-                                with {a.staff_id?.full_name || "Any Stylist"}
-                              </p>
-                            </div>
-                            <div className="text-left sm:text-right shrink-0">
-                              <p className="text-2xl font-black text-[#d4af37] drop-shadow-[0_0_10px_rgba(212,175,55,0.2)]">
-                                LKR {a.total_price || a.service_id?.base_price}
-                              </p>
-                            </div>
+                            )}
                           </div>
 
-                          {/* Time & Date Info */}
-                          <div className="flex flex-wrap gap-3 mt-8">
-                            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/5 shadow-inner">
-                              <Calendar className="w-4 h-4 text-[#d4af37]" />
-                              <span className="text-white/90 text-sm font-semibold">
-                                {new Date(a.appointment_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                              </span>
+                          {/* Overall Time & Date Info */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+                            <div className="flex flex-wrap gap-3">
+                              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/5 shadow-inner">
+                                <Calendar className="w-4 h-4 text-[#d4af37]" />
+                                <span className="text-white/90 text-sm font-semibold">
+                                  {new Date(a.appointment_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/5 shadow-inner">
+                                <span className="text-muted-2 text-sm font-medium">Overall Time:</span>
+                                <span className="text-white/90 text-sm font-semibold">
+                                  {formatTime(a.appointment_services?.length > 0 ? a.appointment_services.reduce((min, s) => s.service_start_time < min ? s.service_start_time : min, a.appointment_services[0].service_start_time) : a.start_time)} - {formatTime(a.appointment_services?.length > 0 ? a.appointment_services.reduce((max, s) => s.service_end_time > max ? s.service_end_time : max, a.appointment_services[0].service_end_time) : a.end_time)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/5 shadow-inner">
+                                <span className="text-muted-2 text-sm font-medium">Total Duration:</span>
+                                <span className="text-white/90 text-sm font-semibold">
+                                  {(() => {
+                                    const mins = a.appointment_services?.length > 0 
+                                      ? a.appointment_services.reduce((sum, s) => sum + (s.service_id?.duration || 0), 0)
+                                      : (a.duration || 60);
+                                    const hrs = Math.ceil(mins / 60);
+                                    return `${hrs} ${hrs === 1 ? 'hr' : 'hrs'}`;
+                                  })()}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/5 shadow-inner">
-                              <Clock className="w-4 h-4 text-[#d4af37]" />
-                              <span className="text-white/90 text-sm font-semibold">
-                                {formatTime(a.start_time)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/5 shadow-inner">
-                              <span className="text-muted-2 text-sm font-medium">Duration:</span>
-                              <span className="text-white/90 text-sm font-semibold">
-                                {durationHours} {durationHours === 1 ? "hr" : "hrs"}
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-2 font-bold text-sm">Total Amount:</span>
+                              <span className="text-[#d4af37] font-black text-2xl">
+                                LKR {a.total_price}
                               </span>
                             </div>
                           </div>

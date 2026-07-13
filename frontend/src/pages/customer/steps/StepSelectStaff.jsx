@@ -8,11 +8,16 @@ export default function StepSelectStaff({ booking, onNext, onBack }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getAvailableStaff(booking.date, booking.serviceId, booking.salonId)
+    // Collect all service IDs from the booking
+    const serviceIds = booking.services && booking.services.length > 0
+      ? booking.services.map(s => s.serviceId)
+      : [booking.serviceId];
+
+    getAvailableStaff(booking.date, serviceIds, booking.salonId)
       .then(res => setStaffList(res.data))
       .catch(() => setError("Failed to load available staff."))
       .finally(() => setLoading(false));
-  }, [booking.date, booking.serviceId, booking.salonId]);
+  }, [booking.date, booking.services, booking.serviceId, booking.salonId]);
 
   const handleNext = () => {
     const staff = staffList.find(s => s.staff_id === selected);

@@ -253,8 +253,11 @@ export default function Appointments() {
           const isActionLoading = actionLoading === a._id;
           const appointmentError = getActionError(a._id);
 
-          const requiredSlots = a.duration ? Math.ceil(a.duration / 60) : 1;
-          const durationHours = a.duration ? (a.duration / 60).toFixed(1).replace(/\.0$/, "") : "1";
+          const totalDurationMins = a.appointment_services && a.appointment_services.length > 0
+            ? a.appointment_services.reduce((sum, s) => sum + (s.service_id?.duration || 0), 0)
+            : (a.duration || 60);
+          const durationHours = Math.ceil(totalDurationMins / 60);
+          const requiredSlots = durationHours;
 
           return (
             <div
@@ -296,64 +299,93 @@ export default function Appointments() {
 
               {/* Service + Staff + Time details */}
               <div className="bg-surface-2 rounded-lg p-4 mb-4 space-y-3">
-                {/* Service */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Service</p>
-                    <p className="text-white font-bold text-sm">{a.service_id?.service_name}</p>
-                  </div>
-                  <p className="text-accent font-extrabold text-sm">LKR {a.total_price || a.service_id?.base_price}</p>
-                </div>
-
-                {/* Staff + Time */}
-                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Staff</p>
-                    <p className="text-white text-xs font-bold">{a.staff_id?.full_name}</p>
-                    {a.staff_id?.specification && (
-                      <p className="text-muted-2 text-2xs">{a.staff_id?.specification}</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Time</p>
-                    <p className="text-white text-xs font-bold">
-                      {formatTime(a.start_time)} — {formatTime(a.end_time)}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider">Duration</p>
-                      {a.status === "pending" && editingDuration !== a._id && (
-                        <button 
-                          onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
-                          className="text-accent text-[0.6rem] hover:underline"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </div>
-                    {editingDuration === a._id ? (
-                      <div className="flex items-center gap-2">
-                        <select 
-                          value={newDuration} 
-                          onChange={(e) => setNewDuration(Number(e.target.value))}
-                          className="bg-surface border border-border text-white text-xs rounded px-1 py-0.5"
-                        >
-                          <option value={60}>1 Hour</option>
-                          <option value={120}>2 Hours</option>
-                          <option value={180}>3 Hours</option>
-                          <option value={240}>4 Hours</option>
-                        </select>
-                        <button onClick={() => handleSaveDuration(a._id)} className="text-success text-[0.6rem] hover:underline font-bold">Save</button>
-                        <button onClick={() => setEditingDuration("")} className="text-danger text-[0.6rem] hover:underline font-bold">Cancel</button>
+                {a.appointment_services && a.appointment_services.length > 0 ? (
+                  a.appointment_services.map((svc, idx) => (
+                    <div key={idx} className="pb-3 mb-3 border-b border-border last:pb-0 last:mb-0 last:border-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Service</p>
+                          <p className="text-white font-bold text-sm">{svc.service_id?.service_name || "Unknown Service"}</p>
+                        </div>
+                        <p className="text-accent font-extrabold text-sm">LKR {svc.sub_price || svc.service_id?.base_price}</p>
                       </div>
-                    ) : (
-                      <p className="text-white text-xs font-bold">
-                        {durationHours} {durationHours === 1 ? "Hour" : "Hours"}
-                        <span className="text-muted-2 ml-1">({requiredSlots} {requiredSlots === 1 ? "slot" : "slots"})</span>
-                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Staff</p>
+                          <p className="text-white text-xs font-bold">{svc.staff_id?.full_name || "Any Stylist"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Time</p>
+                          <p className="text-white text-xs font-bold">
+                            {formatTime(svc.service_start_time)} — {formatTime(svc.service_end_time)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="pb-3 mb-3 border-b border-border">
+                    {/* Fallback for single service */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Service</p>
+                        <p className="text-white font-bold text-sm">
+                          {a.service_ids && a.service_ids.length > 0 
+                            ? a.service_ids.map(s => s.service_name).join(", ") 
+                            : a.service_id?.service_name}
+                        </p>
+                      </div>
+                      <p className="text-accent font-extrabold text-sm">LKR {a.total_price || a.service_id?.base_price}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Staff</p>
+                        <p className="text-white text-xs font-bold">{a.staff_id?.full_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Time</p>
+                        <p className="text-white text-xs font-bold">
+                          {formatTime(a.start_time)} — {formatTime(a.end_time)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Total Duration */}
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider">Total Duration</p>
+                    {a.status === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
+                      <button 
+                        onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
+                        className="text-accent text-[0.6rem] hover:underline"
+                      >
+                        Edit
+                      </button>
                     )}
                   </div>
+                  {editingDuration === a._id ? (
+                    <div className="flex items-center gap-2">
+                      <select 
+                        value={newDuration} 
+                        onChange={(e) => setNewDuration(Number(e.target.value))}
+                        className="bg-surface border border-border text-white text-xs rounded px-1 py-0.5"
+                      >
+                        <option value={60}>1 Hour</option>
+                        <option value={120}>2 Hours</option>
+                        <option value={180}>3 Hours</option>
+                        <option value={240}>4 Hours</option>
+                      </select>
+                      <button onClick={() => handleSaveDuration(a._id)} className="text-success text-[0.6rem] hover:underline font-bold">Save</button>
+                      <button onClick={() => setEditingDuration("")} className="text-danger text-[0.6rem] hover:underline font-bold">Cancel</button>
+                    </div>
+                  ) : (
+                    <p className="text-white text-xs font-bold">
+                      {durationHours} {durationHours === 1 ? "Hour" : "Hours"}
+                      <span className="text-muted-2 ml-1">({requiredSlots} {requiredSlots === 1 ? "slot" : "slots"})</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
