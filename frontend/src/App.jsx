@@ -27,7 +27,6 @@ import AddStaff from "./pages/superadmin/AddStaff.jsx";
 import AddService from "./pages/superadmin/Services.jsx";
 import Staff from "./pages/superadmin/Staff.jsx";
 import Appointments from "./pages/superadmin/Appointments.jsx";
-import Analytics from "./pages/superadmin/Analytics.jsx";
 import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 import Services from "./pages/superadmin/Services.jsx";
@@ -229,17 +228,6 @@ function App() {
             <ProtectedRoute allowedRoles={["super-admin"]}>
               <DashboardLayout>
                 <SuperAdminReviews />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/Analytics"
-          element={
-            <ProtectedRoute allowedRoles={["super-admin"]}>
-              <DashboardLayout>
-                <Analytics />
               </DashboardLayout>
             </ProtectedRoute>
           }
