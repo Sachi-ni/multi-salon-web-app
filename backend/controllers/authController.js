@@ -1,5 +1,6 @@
 import Admin from "../models/Admin.js";
 import Staff from "../models/Staff.js";
+import Customer from "../models/Customer.js";
 import bcrypt from "bcryptjs";
 import generateToken from "../utils/generateToken.js";
 
@@ -142,8 +143,59 @@ export const updateProfile = async (req, res) => {
 
     const { full_name, email, phone, username, password } = req.body;
 
-    const user = await Admin.findById(id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    let user;
+    if (req.user.role === "customer" || req.user.role === "user") {
+      user = await Customer.findById(id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      user.name = full_name || user.name;
+      user.email = email || user.email;
+      user.phone = phone || user.phone;
+
+      if (password) {
+        const salt = await bcrypt.genSalt(10);
+        user.password_hash = await bcrypt.hash(password, salt);
+      }
+
+      await user.save();
+
+      return res.json({
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        token: generateToken(user._id) // using user._id instead of whole object based on how customerRegister works
+      });
+    }
+
+    user = await Admin.findById(id);
+    if (!user) {
+      // maybe it's staff?
+      user = await Staff.findById(id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      
+      user.full_name = full_name || user.full_name;
+      user.email = email || user.email;
+      user.phone = phone || user.phone;
+
+      if (password) {
+        const salt = await bcrypt.genSalt(10);
+        user.password_hash = await bcrypt.hash(password, salt);
+      }
+
+      await user.save();
+
+      return res.json({
+        id: user._id,
+        name: user.full_name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        salon_id: user.salon_id,
+        token: generateToken(user._id)
+      });
+    }
 
     user.full_name = full_name || user.full_name;
     user.email = email || user.email;
@@ -166,7 +218,7 @@ export const updateProfile = async (req, res) => {
       username: user.username,
       role: user.role,
       salon_id: user.salon_id,
-      token: generateToken(user)
+      token: generateToken(user._id)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
