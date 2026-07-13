@@ -252,18 +252,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
         {dropdownOpen && (
           <div className="absolute right-0 top-full mt-2 w-48 bg-surface border border-border rounded-xl shadow-modal py-1.5 z-50">
 
-            <button
-              onClick={() => {
-                navigate("/profile");
-                setDropdownOpen(false);
-              }}
-              className="w-full px-4 py-2 text-left text-sm text-muted-2 hover:text-white hover:bg-white/5 flex items-center gap-2"
-            >
-              <User className="w-4 h-4" />
-              Profile
-            </button>
 
-            <div className="my-1 border-t border-border" />
 
             <button
               onClick={handleLogout}
