@@ -2,12 +2,11 @@ import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { getSalons } from "../../services/salonService";
 import StepSelectService from "./steps/StepSelectService";
-import StepSelectStaff from "./steps/StepSelectStaff";
-import StepSelectTimeSlot from "./steps/StepSelectTimeSlot";
+import StepAssignStaffAndTime from "./steps/StepAssignStaffAndTime";
 import StepBookingConfirm from "./steps/StepBookingConfirm";
 import CustomerDashboardBackground from "../../components/ui/CustomerDashboardBackground";
 
-const STEPS = ["Salon", "Date", "Service", "Staff", "Time Slot", "Confirm"];
+const STEPS = ["Salon", "Date", "Services", "Staff & Time", "Confirm"];
 
 export default function BookAppointment() {
   const [step, setStep] = useState(0);
@@ -15,7 +14,9 @@ export default function BookAppointment() {
   const [booking, setBooking] = useState({
     salonId: "", salonName: "",
     date: "",
+    services: [],  // array of { serviceId, serviceName, serviceDuration, servicePrice }
     serviceId: "", serviceName: "", serviceDuration: 0, servicePrice: 0,
+    totalDuration: 0, totalPrice: 0,
     staffId: "", staffName: "", staffSpecification: "",
     startTime: "", endTime: "",
   });
@@ -53,22 +54,20 @@ export default function BookAppointment() {
   const back = () => {
     // Clear downstream selections when going back
     if (step === 3) {
-      // Going back from Staff → clear staff + time
+      // Going back from Staff & Time → clear per-service staff/time
       setBooking(prev => ({
         ...prev,
-        staffId: "", staffName: "", staffSpecification: "",
-        startTime: "", endTime: "",
+        services: prev.services.map(s => ({
+          ...s, staffId: "", staffName: "", staffSpecification: "", startTime: "", endTime: ""
+        }))
       }));
-    } else if (step === 4) {
-      // Going back from Time Slot → clear time
-      setBooking(prev => ({ ...prev, startTime: "", endTime: "" }));
     } else if (step === 2) {
-      // Going back from Service → clear service + staff + time
+      // Going back from Service → clear everything below date
       setBooking(prev => ({
         ...prev,
+        services: [],
         serviceId: "", serviceName: "", serviceDuration: 0, servicePrice: 0,
-        staffId: "", staffName: "", staffSpecification: "",
-        startTime: "", endTime: "",
+        totalDuration: 0, totalPrice: 0,
       }));
     }
     setStep(s => s - 1);
@@ -191,17 +190,14 @@ export default function BookAppointment() {
             </div>
           )}
 
-          {/* Step 2 — Service */}
+          {/* Step 2 — Services */}
           {step === 2 && <StepSelectService booking={booking} onNext={next} onBack={back} />}
 
-          {/* Step 3 — Staff */}
-          {step === 3 && <StepSelectStaff booking={booking} onNext={next} onBack={back} />}
+          {/* Step 3 — Staff & Time */}
+          {step === 3 && <StepAssignStaffAndTime booking={booking} onNext={next} onBack={back} />}
 
-          {/* Step 4 — Time Slot */}
-          {step === 4 && <StepSelectTimeSlot booking={booking} onNext={next} onBack={back} />}
-
-          {/* Step 5 — Confirm */}
-          {step === 5 && <StepBookingConfirm booking={booking} onBack={back} />}
+          {/* Step 4 — Confirm */}
+          {step === 4 && <StepBookingConfirm booking={booking} onBack={back} />}
         </div>
       </div>
     </div>

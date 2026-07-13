@@ -92,7 +92,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
       await handleReadNotification(n._id);
     }
     setNotifOpen(false);
-    
+
     if (n.appointment_id) {
       if (user?.role === "super-admin") {
         navigate(`/Appointments?highlight=${n.appointment_id}`);
@@ -125,16 +125,16 @@ const AdminHeader = ({ onToggleSidebar }) => {
 
   const initials = user?.name
     ? user.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase()
     : "SA";
 
   return (
     <header className="h-header bg-surface/90 backdrop-blur-glass border-b border-border flex items-center px-5 gap-3 fixed top-0 left-0 right-0 z-[200]">
-      
+
       {/* Mobile Menu */}
       <button
         onClick={onToggleSidebar}
@@ -161,7 +161,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
 
       {/* Notification */}
       <div className="relative" ref={notifRef}>
-        <button 
+        <button
           onClick={() => {
             setNotifOpen(!notifOpen);
             if (!notifOpen && user) {
@@ -193,8 +193,8 @@ const AdminHeader = ({ onToggleSidebar }) => {
                 <div className="p-4 text-center text-muted-2 text-xs">No notifications yet</div>
               ) : (
                 notifications.map(n => (
-                  <div 
-                    key={n._id} 
+                  <div
+                    key={n._id}
                     onClick={() => handleNotificationClick(n)}
                     className={clsx(
                       "p-3 border-b border-border/50 hover:bg-surface-2 transition-colors cursor-pointer",
@@ -251,7 +251,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
         {/* Dropdown */}
         {dropdownOpen && (
           <div className="absolute right-0 top-full mt-2 w-48 bg-surface border border-border rounded-xl shadow-modal py-1.5 z-50">
-            
+
             <button
               onClick={() => {
                 navigate("/profile");

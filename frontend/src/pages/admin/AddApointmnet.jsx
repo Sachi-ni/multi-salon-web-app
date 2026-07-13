@@ -7,14 +7,13 @@ import Button from "../../components/ui/Button";
 
 import { getSalon } from "../../services/salonService";
 import StepSelectService from "../customer/steps/StepSelectService";
-import StepSelectStaff from "../customer/steps/StepSelectStaff";
-import StepSelectTimeSlot from "../customer/steps/StepSelectTimeSlot";
+import StepAssignStaffAndTime from "../customer/steps/StepAssignStaffAndTime";
 import api from "../../services/api";
 
 import { createAppointment } from "../../services/appointmentService";
 import { Search, User, Mail, Phone, ArrowLeft, Check } from "lucide-react";
 
-const STEPS = ["Customer", "Date", "Service", "Staff", "Time Slot", "Confirm"];
+const STEPS = ["Customer", "Date", "Services", "Staff & Time", "Confirm"];
 
 export default function AddApointmnet() {
   const navigate = useNavigate();
@@ -42,10 +41,13 @@ export default function AddApointmnet() {
 
     date: "",
 
+    services: [],  // array of { serviceId, serviceName, serviceDuration, servicePrice }
     serviceId: "",
     serviceName: "",
     serviceDuration: 0,
     servicePrice: 0,
+    totalDuration: 0,
+    totalPrice: 0,
 
     staffId: "",
     staffName: "",
@@ -124,25 +126,21 @@ export default function AddApointmnet() {
       // Service -> Date
       setBooking((prev) => ({
         ...prev,
+        services: [],
         serviceId: "",
         serviceName: "",
         serviceDuration: 0,
         servicePrice: 0,
+        totalDuration: 0,
+        totalPrice: 0,
       }));
     } else if (step === 3) {
-      // Staff -> Service
+      // Staff & Time -> Services
       setBooking((prev) => ({
         ...prev,
-        staffId: "",
-        staffName: "",
-        staffSpecification: "",
-      }));
-    } else if (step === 4) {
-      // Time slot -> Staff
-      setBooking((prev) => ({
-        ...prev,
-        startTime: "",
-        endTime: "",
+        services: prev.services.map(s => ({
+          ...s, staffId: "", staffName: "", staffSpecification: "", startTime: "", endTime: ""
+        }))
       }));
     }
 
@@ -150,7 +148,7 @@ export default function AddApointmnet() {
   };
 
   const renderConfirm = () => {
-    const durationHours = Math.ceil(booking.serviceDuration / 60);
+    const totalPrice = booking.services.reduce((sum, s) => sum + s.servicePrice, 0);
 
     const formatTime = (time) => {
       if (!time) return "";
@@ -162,12 +160,16 @@ export default function AddApointmnet() {
 
     const handleConfirmSubmit = async () => {
       try {
+        const servicesPayload = booking.services.map(s => ({
+          service_id: s.serviceId,
+          staff_id: s.staffId,
+          start_time: s.startTime
+        }));
+
         await createAppointment({
           salon_id: booking.salonId,
-          service_id: booking.serviceId,
-          staff_id: booking.staffId,
           appointment_date: booking.date,
-          start_time: booking.startTime,
+          services: servicesPayload,
           customer_id: booking.customerId === "guest" ? undefined : booking.customerId,
           guest_name: booking.customerId === "guest" ? booking.customerName : "",
           guest_phone: booking.customerId === "guest" ? booking.customerPhone : "",
@@ -215,46 +217,38 @@ export default function AddApointmnet() {
           </div>
 
           <div className="bg-surface-3 rounded-lg p-3">
-            <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-2">Service</p>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white font-bold text-sm">{booking.serviceName}</p>
-                <p className="text-muted-2 text-xs mt-0.5">
-                  {durationHours} {durationHours === 1 ? "Hour" : "Hours"}
-                </p>
-              </div>
-              <p className="text-accent font-extrabold text-sm">LKR {booking.servicePrice}</p>
-            </div>
-          </div>
-
-          <div className="bg-surface-3 rounded-lg p-3">
-            <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-2">Staff Member</p>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-accent text-primary flex items-center justify-center flex-shrink-0">
-                <span className="font-black text-xs">
-                  {booking.staffName?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm">{booking.staffName}</p>
-                {booking.staffSpecification && (
-                  <p className="text-muted-2 text-xs">{booking.staffSpecification}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-surface-3 rounded-lg p-3">
-            <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-2">Time Slot</p>
-            <div className="flex items-center justify-between">
-              <p className="text-white font-bold text-sm">
-                {formatTime(booking.startTime)} — {formatTime(booking.endTime)}
-              </p>
-              {durationHours > 1 && (
-                <span className="px-2 py-0.5 bg-accent-dim text-accent text-xs font-bold rounded border border-accent/20">
-                  {durationHours} Slots
-                </span>
-              )}
+            <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-2">
+              Services & Assigned Staff
+            </p>
+            <div className="space-y-3">
+              {booking.services.map((svc, idx) => {
+                const svcHours = Math.ceil(svc.serviceDuration / 60);
+                return (
+                  <div key={idx} className="pb-3 border-b border-border/50 last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-white font-bold text-sm">{svc.serviceName}</p>
+                      <p className="text-accent font-extrabold text-sm">LKR {svc.servicePrice}</p>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-2">
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span className="text-white font-semibold">{svc.staffName}</span>
+                      </span>
+                      <span>·</span>
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {formatTime(svc.startTime)} — {formatTime(svc.endTime)}
+                      </span>
+                      <span>·</span>
+                      <span>{svcHours} {svcHours === 1 ? "hr" : "hrs"}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -509,25 +503,19 @@ export default function AddApointmnet() {
           </div>
         )}
 
-        {/* Step 2 — Select Service */}
+        {/* Step 2 — Service */}
         {step === 2 && (
           <StepSelectService booking={booking} onNext={next} onBack={back} />
         )}
 
-        {/* Step 3 — Select Staff */}
+        {/* Step 3 — Staff & Time */}
         {step === 3 && (
-          <StepSelectStaff booking={booking} onNext={next} onBack={back} />
+          <StepAssignStaffAndTime booking={booking} onNext={next} onBack={back} />
         )}
 
-        {/* Step 4 — Select Time Slot */}
-        {step === 4 && (
-          <StepSelectTimeSlot booking={booking} onNext={next} onBack={back} />
-        )}
-
-        {/* Step 5 — Confirm */}
-        {step === 5 && renderConfirm()}
+        {/* Step 4 — Confirm */}
+        {step === 4 && renderConfirm()}
       </Card>
     </div>
   );
 }
-

@@ -13,8 +13,6 @@ export default function StepBookingConfirm({ booking, onBack }) {
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
 
-  const durationHours = Math.ceil(booking.serviceDuration / 60);
-
   // Convert 24h time to 12h format
   const formatTime = (time) => {
     if (!time) return "";
@@ -33,12 +31,17 @@ export default function StepBookingConfirm({ booking, onBack }) {
     setLoading(true);
     setError("");
     try {
+      // Map to the new per-service format
+      const servicesPayload = booking.services.map(s => ({
+        service_id: s.serviceId,
+        staff_id: s.staffId,
+        start_time: s.startTime
+      }));
+
       await createAppointment({
         salon_id: booking.salonId,
-        service_id: booking.serviceId,
-        staff_id: booking.staffId,
         appointment_date: booking.date,
-        start_time: booking.startTime,
+        services: servicesPayload,
         notes: "",
         guest_name: !user ? guestName : undefined,
         guest_phone: !user ? guestPhone : undefined,
@@ -56,6 +59,8 @@ export default function StepBookingConfirm({ booking, onBack }) {
     }
   };
 
+  const totalPrice = booking.services.reduce((sum, s) => sum + s.servicePrice, 0);
+
   return (
     <div>
       <h2 className="text-lg font-extrabold text-white mb-1">Confirm Your Booking</h2>
@@ -63,7 +68,6 @@ export default function StepBookingConfirm({ booking, onBack }) {
 
       {/* Summary card */}
       <div className="bg-surface-2 border border-border rounded-xl p-4 space-y-4">
-
         {/* Salon + Date */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-surface-3 rounded-lg p-3">
@@ -76,57 +80,47 @@ export default function StepBookingConfirm({ booking, onBack }) {
           </div>
         </div>
 
-        {/* Service */}
+        {/* Services & Staff */}
         <div className="bg-surface-3 rounded-lg p-3">
-          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-2">Service</p>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white font-bold text-sm">{booking.serviceName}</p>
-              <p className="text-muted-2 text-xs mt-0.5">
-                {durationHours} {durationHours === 1 ? "Hour" : "Hours"}
-              </p>
-            </div>
-            <p className="text-accent font-extrabold text-sm">LKR {booking.servicePrice}</p>
-          </div>
-        </div>
-
-        {/* Staff */}
-        <div className="bg-surface-3 rounded-lg p-3">
-          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-2">Staff Member</p>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-accent text-primary flex items-center justify-center flex-shrink-0">
-              <span className="font-black text-xs">
-                {booking.staffName?.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div>
-              <p className="text-white font-bold text-sm">{booking.staffName}</p>
-              {booking.staffSpecification && (
-                <p className="text-muted-2 text-xs">{booking.staffSpecification}</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Time */}
-        <div className="bg-surface-3 rounded-lg p-3">
-          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-2">Time Slot</p>
-          <div className="flex items-center justify-between">
-            <p className="text-white font-bold text-sm">
-              {formatTime(booking.startTime)} — {formatTime(booking.endTime)}
-            </p>
-            {durationHours > 1 && (
-              <span className="px-2 py-0.5 bg-accent-dim text-accent text-xs font-bold rounded border border-accent/20">
-                {durationHours} Slots
-              </span>
-            )}
+          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-2">
+            Services & Assigned Staff
+          </p>
+          <div className="space-y-3">
+            {booking.services.map((svc, idx) => {
+              const svcHours = Math.ceil(svc.serviceDuration / 60);
+              return (
+                <div key={idx} className="pb-3 border-b border-border/50 last:border-0 last:pb-0">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-white font-bold text-sm">{svc.serviceName}</p>
+                    <p className="text-accent font-extrabold text-sm">LKR {svc.servicePrice}</p>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-muted-2">
+                    <span className="flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span className="text-white font-semibold">{svc.staffName}</span>
+                    </span>
+                    <span>·</span>
+                    <span className="flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {formatTime(svc.startTime)} — {formatTime(svc.endTime)}
+                    </span>
+                    <span>·</span>
+                    <span>{svcHours} {svcHours === 1 ? "hr" : "hrs"}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
         {/* Total */}
-        <div className="flex items-center justify-between pt-3 border-t border-border">
+        <div className="flex items-center justify-between pt-1">
           <p className="text-muted-2 text-sm font-bold">Total Amount</p>
-          <p className="text-accent text-xl font-black">LKR {booking.servicePrice}</p>
+          <p className="text-accent text-xl font-black">LKR {totalPrice}</p>
         </div>
       </div>
 
