@@ -22,8 +22,8 @@ const Login = () => {
 
       let data = await res.json();
 
-      // If admin login fails, try staff login
-      if (!res.ok) {
+      // If admin login fails because not found, try staff login
+      if (res.status === 404) {
         res = await fetch("http://localhost:5000/api/staff/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -32,8 +32,8 @@ const Login = () => {
         data = await res.json();
       }
 
-      // If staff login fails, try customer login
-      if (!res.ok) {
+      // If staff login fails because not found, try customer login
+      if (res.status === 404) {
         res = await fetch("http://localhost:5000/api/customers/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -52,14 +52,18 @@ const Login = () => {
       login(userData, token);
 
       // Redirect based on role
-      if (data.role === "super-admin") {
+      const roleStr = (data.role || "").toLowerCase();
+      if (roleStr === "super-admin") {
         navigate("/superAdminDashboard");
-      } else if (data.role === "staff-admin" || data.role === "manager") {
+      } else if (roleStr === "staff-admin" || roleStr === "manager") {
         navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
-      } else if (data.role === "customer") {
+      } else if (roleStr === "staff") {
+        navigate("/staff/dashboard");
+      } else if (roleStr === "customer" || roleStr === "user") {
         navigate("/");
       } else {
-        navigate("/");
+        // Any other role implies a staff member with a custom role title
+        navigate("/staff/dashboard");
       }
     } catch (error) {
       console.error("Login error:", error);
