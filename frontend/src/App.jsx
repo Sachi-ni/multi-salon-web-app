@@ -43,6 +43,7 @@ import GiveFeedback    from "./pages/customer/GiveFeedback.jsx";
 
 // Admin pages
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
+
 import AdminDailySchedule from "./pages/admin/AdminDailySchedule.jsx";
 import AdminStaffSchedule from "./pages/admin/AdminStaffSchedule.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -50,6 +51,7 @@ import Billing from "./pages/admin/Billing.jsx";
 import SalonAdminShell from "./pages/admin/SalonAdminShell";
 import AdminSalonLayout from "./components/layout/AdminSalonLayout";
 import AdminAddStaff from "./pages/admin/AddStaff.jsx";
+
 
 import { useAuth } from "./context/AuthContext";
 import CustomerRegister from "./pages/auth/CustomerRegister.jsx";
@@ -187,14 +189,23 @@ function App() {
           }
         />
 
-        // This route is for adding service to a specific salon, so it includes a salonId param
-
         <Route
           path="/AddStaff/:salonId"
           element={
             <ProtectedRoute allowedRoles={["super-admin"]}>
               <DashboardLayout>
                 <AddStaff />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/AddService"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <AddService />
               </DashboardLayout>
             </ProtectedRoute>
           }

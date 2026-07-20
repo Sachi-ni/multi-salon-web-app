@@ -8,12 +8,13 @@ import Modal from "../../components/ui/Modal";
 import Input from "../../components/ui/Input";
 import EmptyState from "../../components/ui/EmptyState";
 import Skeleton from "../../components/ui/Skeleton";
-import { MoreVertical, MapPin, User, DollarSign, Pencil, Trash2, Eye } from "lucide-react";
+import { MoreVertical, User, DollarSign, Pencil, Trash2, Eye, Power } from "lucide-react";
 
-const SalonCard = ({ salon, onView, onEdit, onDelete }) => {
+const SalonCard = ({ salon, onView, onEdit, onToggleStatus, onDelete }) => {
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState(false);
   const menuRef = useRef(null);
+  const isActive = salon.status === "Active";
 
   // Close menu on outside click
   useEffect(() => {
@@ -30,8 +31,10 @@ const SalonCard = ({ salon, onView, onEdit, onDelete }) => {
 
   return (
     <div className="group relative bg-surface border border-border rounded-xl p-5 hover:shadow-lg transition-all">
+      <div className={isActive ? "absolute inset-x-0 top-0 h-[2px] bg-accent" : "absolute inset-x-0 top-0 h-[2px] bg-muted"} />
+
       {/* Salon Name */}
-      <h3 className="text-lg font-bold text-white mb-1">{salon.name}</h3>
+      <h3 className="text-lg font-bold text-white mb-1 pr-10">{salon.name}</h3>
     
       <p className="text-sm text-muted-2 mb-3">{salon.location || "No address"}</p>
 
@@ -48,8 +51,14 @@ const SalonCard = ({ salon, onView, onEdit, onDelete }) => {
       </div>
 
       {/* Staff Count + Created Date */}
-      <div className="flex items-center justify-between text-xs text-muted-2 mb-4">
-        <span>Staff: {salon.staffCount || 0}</span>
+      <div className="flex items-center justify-between gap-3 text-xs text-muted-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-success">{salon.activeStaffCount ?? 0} Active</span>
+          <span className="text-muted">/</span>
+          <span className="font-semibold text-muted-2">{salon.inactiveStaffCount ?? 0} Inactive</span>
+          <span className="text-muted">/</span>
+          <span>{salon.staffCount ?? 0} Total</span>
+        </div>
         <span>Created: {new Date(salon.createdAt).toLocaleDateString()}</span>
       </div>
 
@@ -65,11 +74,21 @@ const SalonCard = ({ salon, onView, onEdit, onDelete }) => {
         </Button>
       </div>
       
-      {/* View Button */}
-      <div className="absolute bottom-6 right-6">
-        <div onClick={() => onView(salon._id)} title="View">
+      {/* Status + View */}
+      <div className="absolute bottom-6 right-6 flex items-center gap-4">
+        <span
+          className={
+            isActive
+              ? "inline-flex items-center gap-1.5 rounded-lg border border-success-border bg-success-dim px-3 py-1 text-xs font-black text-success"
+              : "inline-flex items-center gap-1.5 rounded-lg border border-accent-muted bg-accent-dim px-3 py-1 text-xs font-black text-accent"
+          }
+        >
+          <span className="text-[0.55rem] leading-none">●</span>
+          {isActive ? "Active" : "Inactive"}
+        </span>
+        <button onClick={() => onView(salon._id)} title="View" className="flex items-center justify-center">
           <Eye className="w-4 h-4 text-blue-500" />
-        </div>
+        </button>
       </div>
       
 
@@ -82,18 +101,35 @@ const SalonCard = ({ salon, onView, onEdit, onDelete }) => {
 
         {/* Dropdown menu */}
         {openMenu && (
-          <div className="absolute right-0 mt-2 w-32 bg-surface-2 border border-border rounded-md shadow-lg">
+          <div className="absolute right-0 mt-2 w-44 bg-surface border border-border rounded-xl shadow-modal py-1.5 z-50">
             <button
-              onClick={() => onEdit(salon._id)}
-              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface"
+              onClick={() => {
+                onToggleStatus(salon);
+                setOpenMenu(false);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-muted-2 hover:bg-white/[0.04] hover:text-white"
             >
-              <Pencil className="w-4 h-4 text-yellow-500" /> Edit
+              <Power className="w-3.5 h-3.5" />
+              {isActive ? "Deactivate" : "Activate"}
             </button>
             <button
-              onClick={() => onDelete(salon._id)}
-              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface"
+              onClick={() => {
+                onEdit(salon._id);
+                setOpenMenu(false);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-muted-2 hover:bg-white/[0.04] hover:text-white"
             >
-              <Trash2 className="w-4 h-4 text-red-500" /> Delete
+              <Pencil className="w-3.5 h-3.5" /> Edit Salon
+            </button>
+            <div className="my-1 border-t border-border" />
+            <button
+              onClick={() => {
+                onDelete(salon._id);
+                setOpenMenu(false);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-danger hover:bg-danger-dim"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Remove Salon
             </button>
           </div>
         )}
@@ -142,13 +178,6 @@ const Salons = () => {
     }
   }, [location]);
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "-";
-    const d = new Date(dateStr);
-    if (isNaN(d)) return dateStr;
-    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-  };
-
   const handleView = (id) => navigate(`/salon-admin/${id}/adminDashboard`);
 
 
@@ -196,6 +225,17 @@ const Salons = () => {
     }
   };
 
+  const handleToggleStatus = async (salon) => {
+    try {
+      const newStatus = salon.status === "Active" ? "Inactive" : "Active";
+      await updateSalon(salon._id, { status: newStatus });
+      await fetchSalons();
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || "Failed to update salon status");
+    }
+  };
+
   const handleSortByName = () => {
     const sorted = [...salonList].sort((a, b) => {
       const nameA = a.name?.toLowerCase() || "";
@@ -205,6 +245,8 @@ const Salons = () => {
     setSalonList(sorted);
     setSortAsc(!sortAsc);
   };
+
+  const activeCount = salonList.filter((salon) => salon.status === "Active").length;
 
   return (
     <div>
@@ -219,6 +261,27 @@ const Salons = () => {
         <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-accent-dim border border-accent-muted text-sm text-white mb-4">
           <span className="flex-1">{error}</span>
           <button onClick={() => setError("")} className="text-muted-2 hover:text-white text-lg leading-none">&times;</button>
+        </div>
+      )}
+
+      {/* Stats Bar */}
+      {!loading && salonList.length > 0 && (
+        <div className="flex flex-wrap gap-3 mb-5">
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+            <Store className="w-4 h-4 text-accent" />
+            <span className="text-xs text-muted-2">Total</span>
+            <span className="text-sm font-black text-white">{salonList.length}</span>
+          </div>
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-success" />
+            <span className="text-xs text-muted-2">Active</span>
+            <span className="text-sm font-black text-success">{activeCount}</span>
+          </div>
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-muted" />
+            <span className="text-xs text-muted-2">Inactive</span>
+            <span className="text-sm font-black text-muted-2">{salonList.length - activeCount}</span>
+          </div>
         </div>
       )}
 
@@ -252,6 +315,7 @@ const Salons = () => {
                   salon={salon}
                   onView={handleView}
                   onEdit={handleEditOpen}
+                  onToggleStatus={handleToggleStatus}
                   onDelete={setDeleteId}
                 />
               ))}

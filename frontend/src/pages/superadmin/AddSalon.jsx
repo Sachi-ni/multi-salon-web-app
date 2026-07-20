@@ -11,9 +11,11 @@ const AddSalon = () => {
 
   const [formData, setFormData] = useState({
     name: "",
+    email: "",
     phone: "",
     location: "",
     about: "",
+    status: "Active",
     managerName: "",
     managerEmail: "",
     managerPhone: "",
@@ -56,12 +58,26 @@ const AddSalon = () => {
           <Card.Subtitle>Fill all required fields</Card.Subtitle>
         </Card.Header>
 
-        <form onSubmit={handleSubmit} autoComplete="off">
+        <form onSubmit={handleSubmit}>
           <Input label="Salon Name" name="name" placeholder="Enter salon name" required value={formData.name} onChange={handleChange} />
+          <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={handleChange} />
           <Input label="Phone" name="phone" placeholder="Enter phone number" required value={formData.phone} onChange={handleChange} />
           <Input label="Address" name="location" placeholder="Enter address" required value={formData.location} onChange={handleChange} />
-          <Input label="About" name="about" placeholder="Enter about the salon" value={formData.about} onChange={handleChange} />
+          <Input label="About" name="about" placeholder="Enter about the salon" required value={formData.about} onChange={handleChange} />
 
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Status</label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
+            >
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          
           <div className="mt-8 mb-3.5 border-t border-border pt-6">
             <h2 className="text-lg font-bold text-white mb-3">Salon Manager Details</h2>
             <Input label="Manager Name" name="managerName" placeholder="Enter manager full name" required value={formData.managerName} onChange={handleChange} />

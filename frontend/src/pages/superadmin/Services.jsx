@@ -24,7 +24,6 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
-import clsx from "clsx";
 import { useParams } from "react-router-dom";
 
 /* ─────────── Skeleton Card ─────────── */
@@ -299,6 +298,14 @@ const ServiceForm = ({
   );
 };
 
+const EMPTY_SERVICE_FORM = {
+  service_name: "",
+  base_price: "",
+  duration: "",
+  description: "",
+  salon_id: "",
+};
+
 /* ═══════════════════════════════════════════
    ══  MAIN SERVICES PAGE  ═══════════════════
    ═══════════════════════════════════════════ */
@@ -315,14 +322,7 @@ const Services = () => {
   const [editingService, setEditingService] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const emptyForm = {
-    service_name: "",
-    base_price: "",
-    duration: "",
-    description: "",
-    salon_id: "",
-  };
-  const [formData, setFormData] = useState(emptyForm);
+  const [formData, setFormData] = useState(EMPTY_SERVICE_FORM);
 
   // Get salonId from URL if present (for direct navigation to Add Service for a specific salon)
   const { salonId } = useParams();
@@ -331,7 +331,7 @@ const Services = () => {
     if (salonId) {
       // If we navigated to /AddService/:salonId, open modal for adding
       setEditingService(null);
-      setFormData({ ...emptyForm, salon_id: salonId });
+      setFormData({ ...EMPTY_SERVICE_FORM, salon_id: salonId });
       setModalOpen(true);
     }
   }, [salonId]);
@@ -364,7 +364,7 @@ const Services = () => {
   /* ── Handlers ── */
   const openAddModal = () => {
     setEditingService(null);
-    setFormData(emptyForm);
+    setFormData(EMPTY_SERVICE_FORM);
     setModalOpen(true);
   };
 
@@ -383,11 +383,21 @@ const Services = () => {
     setModalOpen(true);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (e) => {
+    e?.preventDefault();
+    setError("");
+
+    const serviceName = formData.service_name.trim();
+    const description = formData.description.trim();
+    const price = Number(formData.base_price);
+    const duration = Number(formData.duration);
+
     if (
-      !formData.service_name ||
-      !formData.base_price ||
-      !formData.duration ||
+      !serviceName ||
+      Number.isNaN(price) ||
+      price < 0 ||
+      Number.isNaN(duration) ||
+      duration < 1 ||
       !formData.salon_id
     ) {
       setError("Please fill all required fields (Name, Price, Duration, Salon)");
@@ -397,10 +407,10 @@ const Services = () => {
     try {
       setSaving(true);
       const payload = {
-        service_name: formData.service_name,
-        base_price: Number(formData.base_price),
-        duration: Number(formData.duration),
-        description: formData.description,
+        service_name: serviceName,
+        base_price: price,
+        duration,
+        description,
         salon_id: formData.salon_id,
       };
 
@@ -411,9 +421,9 @@ const Services = () => {
       }
 
       setModalOpen(false);
-      setFormData(emptyForm);
+      setFormData(EMPTY_SERVICE_FORM);
       setEditingService(null);
-      fetchData();
+      await fetchData();
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -568,38 +578,41 @@ const Services = () => {
         onClose={() => {
           setModalOpen(false);
           setEditingService(null);
-          setFormData(emptyForm);
+          setFormData(EMPTY_SERVICE_FORM);
         }}
         title={editingService ? "✏️ Edit Service" : "✨ Add New Service"}
         maxWidth="max-w-xl"
       >
-        <ServiceForm
-          formData={formData}
-          setFormData={setFormData}
-          salons={salons}
-        />
-        <Modal.Actions>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setModalOpen(false);
-              setEditingService(null);
-              setFormData(emptyForm);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleSave}
-            loading={saving}
-            disabled={saving}
-          >
-            {editingService ? "Update Service" : "Create Service"}
-          </Button>
-        </Modal.Actions>
+        <form onSubmit={handleSave} autoComplete="off">
+          <ServiceForm
+            formData={formData}
+            setFormData={setFormData}
+            salons={salons}
+          />
+          <Modal.Actions>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={() => {
+                setModalOpen(false);
+                setEditingService(null);
+                setFormData(EMPTY_SERVICE_FORM);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              type="submit"
+              loading={saving}
+              disabled={saving}
+            >
+              {editingService ? "Update Service" : "Create Service"}
+            </Button>
+          </Modal.Actions>
+        </form>
       </Modal>
     </div>
   );
