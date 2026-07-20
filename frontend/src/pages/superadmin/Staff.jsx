@@ -605,28 +605,48 @@ const Staff = () => {
               />
             </div>
 
-            {/* Salary Payment */}
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Salary Payment</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <select
-                  value={editingStaff.salaryPaymentFrequency}
-                  onChange={(e) => setEditingStaff({ ...editingStaff, salaryPaymentFrequency: e.target.value })}
-                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
+            <div className="mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Salary Frequency */}
+                <div>
+                  <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
+                    Payment Frequency
+                  </label>
+                  <select
+                    value={editingStaff.salaryPaymentFrequency}
+                    onChange={(e) =>
+                      setEditingStaff({
+                        ...editingStaff,
+                        salaryPaymentFrequency: e.target.value,
+                      })
+                    }
+                    className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
 
-                <input
-                  type="number"
-                  min="1"
-                  value={editingStaff.salaryPaymentCountPerDay}
-                  onChange={(e) => setEditingStaff({ ...editingStaff, salaryPaymentCountPerDay: e.target.value })}
-                  placeholder="Amount of salary per day"
-                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
-                />
+                {/* Salary Amount */}
+                <div>
+                  <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
+                    Salary Amount Per Day (LKR)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editingStaff.salaryPaymentCountPerDay}
+                    onChange={(e) =>
+                      setEditingStaff({
+                        ...editingStaff,
+                        salaryPaymentCountPerDay: e.target.value,
+                      })
+                    }
+                    placeholder="Enter daily salary"
+                    className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
+                  />
+                </div>
               </div>
             </div>
 

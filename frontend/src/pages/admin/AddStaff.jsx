@@ -132,28 +132,43 @@ const AddStaff = () => {
           <Input label="Password" name="password" type="password" placeholder="Enter password" required value={formData.password} onChange={handleChange} autoComplete="new-password" />
 
           <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Salary Payment <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <select
-                name="salaryPaymentFrequency"
-                value={formData.salaryPaymentFrequency}
-                onChange={handleChange}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent cursor-pointer"
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                  Payment Frequency
+                  <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">
+                    (required)
+                  </span>
+                </label>
+                <select
+                  name="salaryPaymentFrequency"
+                  value={formData.salaryPaymentFrequency}
+                  onChange={handleChange}
+                  className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent cursor-pointer"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
 
-              <input
-                type="number"
-                name="salaryPaymentCountPerDay"
-                min="1"
-                value={formData.salaryPaymentCountPerDay}
-                onChange={handleChange}
-                placeholder="Amount of salary per day"
-                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
-              />
+              <div>
+                <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                  Salary Amount Per Day (LKR)
+                  <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">
+                    (required)
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  name="salaryPaymentCountPerDay"
+                  min="1"
+                  value={formData.salaryPaymentCountPerDay}
+                  onChange={handleChange}
+                  placeholder="Enter daily salary amount"
+                  className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
+                />
+              </div>
             </div>
           </div>
 

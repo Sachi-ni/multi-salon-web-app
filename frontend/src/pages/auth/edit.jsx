@@ -37,6 +37,10 @@ const Edit = () => {
         email: res.data.email,
         phone: res.data.phone,
         username: res.data.username,
+        salonName: res.data.salonName,
+        role: res.data.role || user.role,
+        id: res.data.id || user.id,
+        salon_id: res.data.salon_id || user.salon_id,
       };
 
       // If backend returned a new token, use login to sync both user + token
@@ -51,9 +55,11 @@ const Edit = () => {
       if (user?.role === "customer" || user?.role === "user") {
         navigate("/customer/dashboard");
       } else if (user?.role === "super-admin") {
-        navigate("/Profile");
-      } else {
+        navigate("/super-profile");
+      } else if (user?.role === "manager" || user?.role === "staff-admin") {
         navigate(-1);
+      } else {
+        navigate("/profile");
       }
     } catch (error) {
       console.error("Update error:", error);
@@ -170,3 +176,4 @@ const Edit = () => {
 };
 
 export default Edit;
+
