@@ -1,10 +1,13 @@
-# TODO — Salon-scoped Staff for Admin
+# Fix: Super Admin "Access Denied" after profile update
 
-- [ ] Backend: enforce salon ownership in staffController (staff-admin only affects req.user.salon_id)
-- [ ] Backend: make staff-admin getStaff always scoped to their salon
-- [ ] Frontend: update staffService.getStaff to accept salonId param
-- [ ] Frontend: update admin/Staff.jsx to show only staff for logged-in admin salon; hide “other salons” selector
-- [ ] Frontend: add “Add Staff” header button and ensure it routes with salonId
-- [ ] Frontend: fix Admin quick action routing to pass salonId and render correct AddStaff component
-- [ ] Run backend + frontend to verify
+## Root Cause
+Redirect path `/Profile` in `edit.jsx` doesn't match any defined route. Super-admin profile is at `/super-profile`.
+
+## Steps
+
+- [x] Step 1: Analyze codebase and identify root cause
+- [x] Step 2: Present plan to user
+- [x] Step 3: Fix `edit.jsx` - Change redirect path from `/Profile` to `/super-profile` + explicitly include role, id, salon_id in updatedUser
+- [x] Step 4: Fix `managerprofile.jsx` - explicitly include role, id, salon_id in updatedUser
+- [x] Step 5: Verified profile page navigation buttons navigate to /editProfile correctly
 
