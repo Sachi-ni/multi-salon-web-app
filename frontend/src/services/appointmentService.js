@@ -2,17 +2,33 @@ import api from "./api";
 
 // ── Customer endpoints ──────────────────────────────────────────────────────
 
-export const getAvailableStaff = (date, serviceId, salonId) =>
-  api.get("/appointments/available-staff", { params: { date, serviceId, salonId } });
+export const getAvailableStaff = (date, serviceIds, salonId) =>
+  api.get("/appointments/available-staff", {
+    params: {
+      date,
+      serviceIds: Array.isArray(serviceIds) ? serviceIds.join(",") : serviceIds,
+      salonId
+    }
+  });
 
-export const getAvailableSlots = (staffId, date, serviceId, salonId) =>
-  api.get("/appointments/available-slots", { params: { staffId, date, serviceId, salonId } });
+export const getAvailableSlots = (staffId, date, serviceIds, salonId) =>
+  api.get("/appointments/available-slots", {
+    params: {
+      staffId,
+      date,
+      serviceIds: Array.isArray(serviceIds) ? serviceIds.join(",") : serviceIds,
+      salonId
+    }
+  });
 
 export const createAppointment = (data) =>
   api.post("/appointments", data);
 
 export const getMyAppointments = () =>
   api.get("/appointments/my");
+
+export const getAppointment = (id) =>
+  api.get(`/appointments/${id}`);
 
 export const cancelAppointment = (id) =>
   api.patch(`/appointments/${id}/cancel`);

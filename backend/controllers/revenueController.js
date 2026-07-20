@@ -5,33 +5,50 @@ import Salary from '../models/Salary.js';
 
 export const getRevenueStats = async (req, res) => {
   try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const sixtyDaysAgo = new Date();
-    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+    const { period = "30days" } = req.query;
+    const now = new Date();
 
-    // Gross revenue last 30 days
+    let start, prevStart, prevEnd;
+    if (period === "year") {
+      start = new Date(now.getFullYear(), 0, 1); // Jan 1 this year
+      prevStart = new Date(now.getFullYear() - 1, 0, 1); // Jan 1 last year
+      prevEnd = start;
+    } else {
+      start = new Date();
+      start.setDate(start.getDate() - 30);
+      prevStart = new Date();
+      prevStart.setDate(prevStart.getDate() - 60);
+      prevEnd = start;
+    }
+
+    // Gross revenue for the selected period
     const recentBills = await Bill.aggregate([
-      { $match: { bill_date: { $gte: thirtyDaysAgo } } },
+      { $match: { bill_date: { $gte: start } } },
       { $group: { _id: null, total: { $sum: '$total_amount' } } }
     ]);
     const grossRevenue = recentBills[0]?.total || 0;
 
-    // Previous 30 days for growth
+    // Same-length previous period, for growth comparison
     const prevBills = await Bill.aggregate([
-      { $match: { bill_date: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } } },
+      { $match: { bill_date: { $gte: prevStart, $lt: prevEnd } } },
       { $group: { _id: null, total: { $sum: '$total_amount' } } }
     ]);
     const prevRevenue = prevBills[0]?.total || 0;
     const grossGrowth = prevRevenue > 0 ? ((grossRevenue - prevRevenue) / prevRevenue * 100).toFixed(1) : 0;
 
-    // Pending payouts & overdue
-    const salaries = await Salary.aggregate([
-      { $match: { status: 'pending' } }
+    // Pending payouts & overdue (not period-dependent — these are always "current outstanding")
+    const pendingBills = await Bill.aggregate([
+      { $match: { payout_status: 'pending' } },
+      { $group: { _id: null, total: { $sum: '$total_amount' }, count: { $sum: 1 } } }
     ]);
-    const pendingPayouts = salaries.reduce((sum, s) => sum + s.amount, 0);
-    const now = new Date();
-    const pendingOverdue = salaries.filter(s => new Date(s.due_date) < now).length;
+    const pendingPayouts = pendingBills[0]?.total || 0;
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const pendingOverdue = await Bill.countDocuments({
+      payout_status: 'pending',
+      bill_date: { $lte: sevenDaysAgo }
+    });
 
     res.json({
       grossRevenue,
@@ -46,11 +63,18 @@ export const getRevenueStats = async (req, res) => {
 
 export const getSalonRevenue = async (req, res) => {
   try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const { period = "30days" } = req.query;
+    const now = new Date();
+    let start;
+    if (period === "year") {
+      start = new Date(now.getFullYear(), 0, 1);
+    } else {
+      start = new Date();
+      start.setDate(start.getDate() - 30);
+    }
 
     const salonsData = await Bill.aggregate([
-      { $match: { bill_date: { $gte: thirtyDaysAgo } } },
+      { $match: { bill_date: { $gte: start } } },
       {
         $lookup: {
           from: 'appointments',
@@ -78,30 +102,7 @@ export const getSalonRevenue = async (req, res) => {
           transactions: { $sum: 1 }
         }
       },
-      {
-        $lookup: {
-          from: 'salons',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'salon'
-        }
-      },
-      { $unwind: { path: '$salon', preserveNullAndEmptyArrays: true } },
-      {
-        $project: {
-          name: { $ifNull: ['$name', '$salon.name'] },
-          status: { $ifNull: ['$status', 'Inactive'] },
-          revenue: { $ifNull: ['$revenue', 0] },
-          transactions: { $ifNull: ['$transactions', 0] },
-          avg: {
-            $cond: {
-              if: { $gt: ['$transactions', 0] },
-              then: { $divide: ['$revenue', '$transactions'] },
-              else: 0
-            }
-          }
-        }
-      }
+      { $sort: { revenue: -1 } }
     ]);
 
     res.json(salonsData);

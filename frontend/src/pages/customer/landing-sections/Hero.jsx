@@ -45,7 +45,7 @@ const Hero = () => {
 
           <div className="flex flex-wrap gap-4 mt-4">
             <button
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/book")}
               className="px-8 py-4 bg-accent text-primary rounded-xl text-base font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-glow transition-all duration-300 hover:-translate-y-1 flex items-center gap-2 group"
             >
               Book Appointment
