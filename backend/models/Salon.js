@@ -10,6 +10,7 @@ const salonSchema = new mongoose.Schema({
   close_time: String,
   capacity: Number,
   about: String,
+  status: { type: String, enum: ["Active", "Inactive"], default: "Active" },
   revenue: { type: Number, default: 0 },
   staffCount: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now }
