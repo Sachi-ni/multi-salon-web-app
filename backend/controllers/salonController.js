@@ -10,7 +10,6 @@ export const createSalon = async(req,res)=>{
         phone,
         location,
         about,
-        status,
         managerName,
         managerEmail,
         managerPhone,
@@ -26,7 +25,6 @@ export const createSalon = async(req,res)=>{
             location,
             phone,
             about,
-            status: status || "Active",
          });
 
       const salt = await bcrypt.genSalt(10);
@@ -69,6 +67,8 @@ export const getSalons = async(req,res)=>{
         
         const obj = s.toObject();
         obj.managerName = manager ? manager.full_name : null;
+        obj.staffCount = actualStaffCount; // Use actual count from database
+        
         return obj;
       }));
 
@@ -82,7 +82,20 @@ export const getSalonById = async(req,res)=>{
    try {
       const salon = await Salon.findById(req.params.id);
       if(!salon) return res.status(404).json({ message: "Salon not found" });
-      res.json(salon);
+      
+      // Count actual staff members for this salon
+      const actualStaffCount = await Staff.countDocuments({ salon_id: salon._id });
+      
+      // Get manager info
+      const manager = await Staff.findOne({ salon_id: salon._id, role: "manager" });
+
+      const salonObj = salon.toObject();
+      salonObj.staffCount = actualStaffCount;
+      if (manager) {
+        salonObj.managerEmail = manager.email;
+      }
+      
+      res.json(salonObj);
    } catch (error) {
       res.status(500).json({ message: error.message });
    }

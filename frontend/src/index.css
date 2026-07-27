@@ -87,21 +87,9 @@
   /* Grid background pattern for auth pages */
   .grid-bg::before {
     content: '';
-    @apply absolute inset-0 pointer-events-none;
+    @apply absolute inset-0;
     background:
       repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(245,200,0,0.03) 40px),
       repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(245,200,0,0.03) 40px);
   }
-
-}
-
-/* Dynamic Moving Background */
-@keyframes gradientFlow {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-.animate-bg-flow {
-  background-size: 300% 300%;
-  animation: gradientFlow 20s ease infinite;
 }

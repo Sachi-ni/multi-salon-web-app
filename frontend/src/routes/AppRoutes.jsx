@@ -8,11 +8,10 @@ import TeamPage from "../pages/customer/TeamPage";
 
 import AdminBookings from "../pages/admin/AdminBookings";
 import Dashboard from "../pages/superadmin/Dashboard";
-import Login from "../pages/auth/Login";
+import Login from "../pages/Login";
 
 import NotFound from "../pages/NotFound";
 import Unauthorized from "../pages/Unauthorized";
-import StaffDashboard from "../pages/staff/StaffDashboard";
 
 export default function AppRoutes() {
   return (
@@ -69,16 +68,6 @@ export default function AppRoutes() {
             <RoleBasedRoute roles={["super-admin"]}>
               <Dashboard />
             </RoleBasedRoute>
-          }
-        />
-
-        {/* Staff */}
-        <Route
-          path="/staff/dashboard"
-          element={
-            <ProtectedRoute>
-              <StaffDashboard />
-            </ProtectedRoute>
           }
         />
 

@@ -2,8 +2,6 @@ import Staff from "../models/Staff.js";
 import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 import Salary from "../models/Salary.js";
-import Admin from "../models/Admin.js";
-import Appointment from "../models/Appointment.js";
 
 export const createStaff = async (req, res) => {
   try {
@@ -345,66 +343,5 @@ export const deleteStaff = async (req, res) => {
     res.status(500).json({
       message: error.message,
     });
-  }
-};
-
-export const getStaffDashboard = async (req, res) => {
-  try {
-    const staffId = req.user.id;
-    
-    // 1. Fetch Staff Profile with Salon info
-    const staff = await Staff.findById(staffId)
-      .select("-password_hash")
-      .populate("salon_id", "name location contact_info");
-      
-    if (!staff) {
-      return res.status(404).json({ message: "Staff profile not found" });
-    }
-
-    // 2. Fetch Manager for the Salon
-    let managerName = "N/A";
-    let managerPhone = "N/A";
-    
-    if (staff.salon_id) {
-      // Check Admin collection first for staff-admin
-      let manager = await Admin.findOne({
-        salon_id: staff.salon_id._id,
-        role: "staff-admin"
-      });
-      
-      // If not in Admin, check Staff collection for manager
-      if (!manager) {
-        manager = await Staff.findOne({
-          salon_id: staff.salon_id._id,
-          role: "manager"
-        });
-      }
-
-      if (manager) {
-        managerName = manager.full_name || manager.username || "N/A";
-        managerPhone = manager.phone || "N/A";
-      }
-    }
-
-    // 3. Fetch Appointments for this staff
-    const appointments = await Appointment.find({ staff_id: staffId })
-      .populate("customer_id", "name email phone")
-      .populate("service_id", "service_name price")
-      .populate("service_ids", "service_name price")
-      .sort({ appointment_date: 1, start_time: 1 });
-
-    res.json({
-      profile: {
-        staffName: staff.full_name,
-        role: staff.role,
-        salonName: staff.salon_id ? staff.salon_id.name : "N/A",
-        managerName,
-        managerPhone,
-      },
-      appointments
-    });
-  } catch (error) {
-    console.error("Error fetching staff dashboard:", error);
-    res.status(500).json({ message: error.message });
   }
 };
