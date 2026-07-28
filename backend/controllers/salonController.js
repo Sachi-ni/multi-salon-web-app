@@ -92,7 +92,9 @@ export const getSalonById = async(req,res)=>{
       const salonObj = salon.toObject();
       salonObj.staffCount = actualStaffCount;
       if (manager) {
+        salonObj.managerName = manager.full_name;
         salonObj.managerEmail = manager.email;
+        salonObj.managerPhone = manager.phone;
       }
       
       res.json(salonObj);
@@ -103,13 +105,46 @@ export const getSalonById = async(req,res)=>{
 
 export const updateSalon = async(req,res)=>{
    try {
-      const { managerEmail, managerPassword, ...salonData } = req.body;
-      const salon = await Salon.findByIdAndUpdate(req.params.id, salonData, { new: true });
+      const salon = await Salon.findById(req.params.id);
       if(!salon) return res.status(404).json({ message: "Salon not found" });
 
-      // Update or Create manager if email or password is provided
-      if (managerEmail || managerPassword) {
+      const userRole = req.user?.role?.toLowerCase();
+      const isManager = userRole === "manager";
+      const isSuperAdmin = userRole === "super-admin";
+
+      if (isManager) {
+         if (req.user.salon_id?.toString() !== salon._id.toString()) {
+            return res.status(403).json({ message: "Forbidden: cannot update another salon" });
+         }
+
+         if (req.body.about === undefined) {
+            return res.status(400).json({ message: "Only salon vision may be updated." });
+         }
+
+         salon.about = req.body.about;
+         await salon.save();
+
          const manager = await Staff.findOne({ salon_id: salon._id, role: "manager" });
+         const salonObj = salon.toObject();
+         if (manager) {
+            salonObj.managerName = manager.full_name;
+            salonObj.managerEmail = manager.email;
+            salonObj.managerPhone = manager.phone;
+         }
+
+         return res.json(salonObj);
+      }
+
+      if (!isSuperAdmin) {
+         return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+      }
+
+      const { managerEmail, managerPassword, ...salonData } = req.body;
+      const updatedSalon = await Salon.findByIdAndUpdate(req.params.id, salonData, { new: true });
+      if(!updatedSalon) return res.status(404).json({ message: "Salon not found" });
+
+      if (managerEmail || managerPassword) {
+         const manager = await Staff.findOne({ salon_id: updatedSalon._id, role: "manager" });
          if (manager) {
             if (managerEmail) manager.email = managerEmail;
             if (managerPassword) {
@@ -118,23 +153,21 @@ export const updateSalon = async(req,res)=>{
             }
             await manager.save();
          } else if (managerEmail && managerPassword) {
-            // Create a new manager if one doesn't exist
             const salt = await bcrypt.genSalt(10);
             const password_hash = await bcrypt.hash(managerPassword, salt);
-            
             await Staff.create({
-               full_name: salon.name + " Manager",
+               full_name: updatedSalon.name + " Manager",
                email: managerEmail,
-               phone: salon.phone || "",
+               phone: updatedSalon.phone || "",
                password_hash,
                role: "manager",
                status: "Active",
-               salon_id: salon._id,
+               salon_id: updatedSalon._id,
             });
          }
       }
 
-      res.json(salon);
+      res.json(updatedSalon);
    } catch (error) {
       res.status(500).json({ message: error.message });
    }

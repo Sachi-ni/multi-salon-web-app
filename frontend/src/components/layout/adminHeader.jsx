@@ -1,17 +1,20 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Bell, Menu, LogOut, User, ChevronDown, Check } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
+import { getSalon } from "../../services/salonService";
 
 const AdminHeader = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { salonId } = useParams();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [brandSalon, setBrandSalon] = useState(null);
 
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
@@ -26,6 +29,15 @@ const AdminHeader = ({ onToggleSidebar }) => {
         .catch(console.error);
     }
   }, [user]);
+
+  useEffect(() => {
+    const effectiveSalonId = salonId || user?.salon_id;
+    if (!effectiveSalonId) return;
+
+    getSalon(effectiveSalonId)
+      .then((res) => setBrandSalon(res.data?.name || res.data?.salonName || null))
+      .catch(() => setBrandSalon(null));
+  }, [salonId, user?.salon_id]);
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -106,6 +118,15 @@ const AdminHeader = ({ onToggleSidebar }) => {
     (n) => !n.is_read
   ).length;
 
+  const handleBrandClick = () => {
+    const targetSalonId = salonId || user?.salon_id;
+    if (targetSalonId) {
+      navigate(`/salon-admin/${targetSalonId}/adminDashboard`);
+    } else {
+      navigate("/");
+    }
+  };
+
   const roleBadgeColor = {
     "super-admin":
       "bg-accent-muted border-accent/35 text-accent",
@@ -143,13 +164,19 @@ const AdminHeader = ({ onToggleSidebar }) => {
         <Menu className="w-5 h-5 text-white" />
       </button>
 
-      {/* Logo */}
-      <div className="flex items-center gap-2 text-lg font-black text-accent whitespace-nowrap tracking-tight">
+      {/* Logo / Salon brand */}
+      <button
+        type="button"
+        onClick={handleBrandClick}
+        className="flex items-center gap-2 text-lg font-black text-accent whitespace-nowrap tracking-tight cursor-pointer"
+      >
         <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-sm font-black text-primary flex-shrink-0">
-          S
+          {brandSalon && brandSalon[0]?.toUpperCase() ? brandSalon[0].toUpperCase() : "S"}
         </div>
-        <span className="text-white">Salon</span>Hub
-      </div>
+        <span className="text-white truncate max-w-[180px]">
+          {brandSalon || "SalonHub"}
+        </span>
+      </button>
 
       {/* Role Badge */}
       <div className={clsx("px-2.5 py-0.5 rounded-full text-[0.6rem] font-extrabold tracking-widest uppercase whitespace-nowrap border", badgeClass)}>
@@ -251,7 +278,22 @@ const AdminHeader = ({ onToggleSidebar }) => {
         {/* Dropdown */}
         {dropdownOpen && (
           <div className="absolute right-0 top-full mt-2 w-48 bg-surface border border-border rounded-xl shadow-modal py-1.5 z-50">
+             <button
+              onClick={() => {
+                if (user?.role === "manager") {
+                  navigate(`/salon-admin/${user.salon_id}/profile`);
+                } else {
+                  navigate(`/salon-admin/${salonId || user?.salon_id}/adminDashboard`);
+                }
+                setDropdownOpen(false);
+              }}
+              className="w-full px-4 py-2 text-left text-sm text-muted-2 hover:text-white hover:bg-white/5 flex items-center gap-2"
+            >
+              <User className="w-4 h-4" />
+              {user?.role === "manager" ? "Profile" : "Salon Dashboard"}
+            </button>
 
+            <div className="my-1 border-t border-border" />
 
 
             <button

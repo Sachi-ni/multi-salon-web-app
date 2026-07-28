@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { getSalon } from "../../services/salonService";
 
 import {
@@ -23,6 +24,7 @@ import Button from "../../components/ui/Button";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { salonId } = useParams();
 
   const [salon, setSalon] = useState(null);
@@ -105,9 +107,38 @@ const AdminDashboard = () => {
     );
   }
 
+  const sliderItems = [
+    {
+      label: "Appointments",
+      section: "contact",
+      value: salon?.appointmentsCount || 0,
+    },
+    {
+      label: "Revenue",
+      section: "vision",
+      value: `Rs. ${salon?.revenue || 0}`,
+    },
+    {
+      label: "Staff",
+      section: "overview",
+      value: salon?.staffCount || 0,
+    },
+    {
+      label: "Rating",
+      section: "details",
+      value: salon?.rating || "0.0",
+    },
+  ];
+
+  const handleSliderClick = (section) => {
+    navigate(`/salon-admin/${salonId}/salonprofile?section=${section}`);
+  };
+
+  const isManager = user?.role === "manager";
+
   return (
     <div>
-      <PageHeader title="Salon Dashboard" subtitle={`Welcome back, ${salon?.name || "Salon Owner"}!`} >
+      <PageHeader title={salon?.name || "Salon Dashboard"} subtitle={`Welcome back, ${salon?.name || "Salon Owner"}!`} >
         <Button
           variant="primary"
           icon={CalendarPlus}
@@ -117,8 +148,32 @@ const AdminDashboard = () => {
         </Button>
       </PageHeader>
 
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3 gap-3">
+          <div>
+            <h3 className="text-lg font-bold text-white">Quick glance</h3>
+          </div>
+        </div>
+
+        <div className="flex gap-3 overflow-x-auto pb-1">
+          {sliderItems.map((item, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => handleSliderClick(item.section)}
+              className="min-w-[180px] p-4 rounded-3xl bg-surface-2 border border-border text-left text-white transition hover:bg-surface-3"
+            >
+              <div className="text-2xl font-extrabold">{item.value}</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-2 mt-2">
+                {item.label}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Salon Information */}
-      <Card className="mb-6">
+      <Card className="mb-6 cursor-pointer" onClick={() => navigate(`/salon-admin/${salonId}/profile`)}>
         <div className="flex items-center gap-4">
           <Building2 className="w-10 h-10 text-accent" />
 

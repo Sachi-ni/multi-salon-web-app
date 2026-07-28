@@ -10,6 +10,7 @@ import {
   Receipt,
   Star,
   Wallet,
+  Building2,
   LogOut,
 } from "lucide-react";
 import clsx from "clsx";
@@ -62,6 +63,16 @@ const navItems = [
         label: "Salary",
         path: "/adminSalary",
         icon: Wallet,
+      },
+    ],
+  },
+  {
+    group: "Manage",
+    items: [
+      {
+        label: "Salon Profile",
+        path: "/salonprofile",
+        icon: Building2,
       },
     ],
   },

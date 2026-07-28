@@ -52,14 +52,15 @@ const Edit = () => {
       }
 
       alert("Profile updated successfully!");
-      if (user?.role === "customer" || user?.role === "user") {
-        navigate("/customer/dashboard");
-      } else if (user?.role === "super-admin") {
-        navigate("/super-profile");
+      if (user?.role === "super-admin") {
+        navigate("/superAdminDashboard");
       } else if (user?.role === "manager" || user?.role === "staff-admin") {
-        navigate(-1);
+        navigate(`/salon-admin/${user.salon_id}/adminDashboard`);
+      } else if (user?.role === "customer" || user?.role === "user") {
+        navigate("/customer/dashboard");
       } else {
-        navigate("/profile");
+        // Fallback for any other roles, or go to a safe default page
+        navigate("/");
       }
     } catch (error) {
       console.error("Update error:", error);
@@ -176,4 +177,3 @@ const Edit = () => {
 };
 
 export default Edit;
-

@@ -48,8 +48,10 @@ import AdminDailySchedule from "./pages/admin/AdminDailySchedule.jsx";
 import AdminStaffSchedule from "./pages/admin/AdminStaffSchedule.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Billing from "./pages/admin/Billing.jsx";
+import SalonProfile from "./pages/admin/SalonProfile.jsx";
 import SalonAdminShell from "./pages/admin/SalonAdminShell";
 import AdminSalonLayout from "./components/layout/AdminSalonLayout";
+import ManagerProfile from "./pages/admin/ManagerProfile.jsx";
 import AdminAddStaff from "./pages/admin/AddStaff.jsx";
 
 import { useAuth } from "./context/AuthContext";
@@ -110,9 +112,31 @@ function App() {
           <Route
             path="/salon-admin/:salonId/*"
             element={
-              <ProtectedRoute allowedRoles={["super-admin", "manager"]}>
+              <ProtectedRoute allowedRoles={["super-admin", "manager", "staff-admin"]}>
                 <AdminSalonLayout>
                   <SalonAdminShell />
+                </AdminSalonLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/salon-admin/:salonId/profile"
+            element={
+              <ProtectedRoute allowedRoles={["manager"]}>
+                <AdminSalonLayout>
+                  <ManagerProfile />
+                </AdminSalonLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/salon-admin/:salonId/salonprofile"
+            element={
+              <ProtectedRoute allowedRoles={["super-admin", "manager", "staff-admin"]}>
+                <AdminSalonLayout>
+                  <SalonProfile />
                 </AdminSalonLayout>
               </ProtectedRoute>
             }

@@ -6,9 +6,9 @@ import {createSalon,getSalons,getSalonById,updateSalon,deleteSalon} from "../con
 const router = express.Router();
 
 router.post("/", protect, authorizeRoles("super-admin"), createSalon);
-router.get("/",getSalons);
-router.get("/:id",getSalonById);
-router.put("/:id",updateSalon);
-router.delete("/:id",deleteSalon);
+router.get("/", getSalons);
+router.get("/:id", getSalonById);
+router.put("/:id", protect, authorizeRoles("super-admin", "manager"), updateSalon);
+router.delete("/:id", protect, authorizeRoles("super-admin"), deleteSalon);
 
 export default router;
