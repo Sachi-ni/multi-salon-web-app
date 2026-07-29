@@ -41,6 +41,9 @@ import BookAppointment  from "./pages/customer/BookAppointment.jsx";
 import MyAppointments   from "./pages/customer/MyAppointments.jsx";
 import GiveFeedback    from "./pages/customer/GiveFeedback.jsx";
 
+// Staff pages
+import StaffDashboard from "./pages/staff/StaffDashboard.jsx";
+
 // Admin pages
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
 
@@ -52,15 +55,19 @@ import AdminAddStaff from "./pages/admin/AddStaff.jsx";
 import { useAuth } from "./context/AuthContext";
 import CustomerRegister from "./pages/auth/CustomerRegister.jsx";
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
+const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
   const { user } = useAuth();
 
   if (!user) {
     return <Navigate to="/" />;
   }
 
-  if (!allowedRoles.includes(user.role)) {
-    return <Navigate to="/unauthorized" />; // you can make a simple Unauthorized page
+  if (requireSalonAccess && user.role !== "super-admin" && !user.salon_id) {
+    return <Navigate to="/unauthorized" />;
+  }
+
+  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/unauthorized" />; 
   }
 
   return children;
@@ -100,7 +107,7 @@ function App() {
         <Route
           path="/salon-admin/:salonId/*"
           element={
-            <ProtectedRoute allowedRoles={["super-admin", "manager"]}>
+            <ProtectedRoute requireSalonAccess={true}>
               <AdminSalonLayout>
                 <SalonAdminShell />
               </AdminSalonLayout>
@@ -295,6 +302,13 @@ function App() {
           </ProtectedRoute>
         } />
 
+        {/* Staff Dashboard */}
+        <Route path="/staff/dashboard" element={
+          <ProtectedRoute requireSalonAccess={true}>
+            <StaffDashboard />
+          </ProtectedRoute>
+        } />
+
         {/* Admin Bookings */}
         <Route
           path="/admin/bookings"
@@ -310,7 +324,7 @@ function App() {
         <Route
           path="/salon-admin/:salonId/AddStaff"
           element={
-            <ProtectedRoute allowedRoles={["super-admin", "manager"]}>
+            <ProtectedRoute requireSalonAccess={true}>
               <AdminSalonLayout>
                 <AdminAddStaff />
               </AdminSalonLayout>
