@@ -11,6 +11,7 @@ import {
   Star,
   Wallet,
   LogOut,
+  BarChart2,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -44,9 +45,9 @@ const navItems = [
     group: "Business",
     items: [
       {
-        label: "Revenue",
-        path: "/adminRevenue",
-        icon: DollarSign,
+        label: "Analytics",
+        path: "/adminAnalytics",
+        icon: BarChart2,
       },
       {
         label: "Billing",

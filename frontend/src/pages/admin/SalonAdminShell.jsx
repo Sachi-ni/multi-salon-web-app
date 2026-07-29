@@ -10,6 +10,7 @@ import AdminSalary from "./AdminSalary";
 import AddApointmnet from "./AddApointmnet";
 import Billing from "./Billing";
 import AdminReviews from "./AdminReviews";
+import AdminAnalytics from "./AdminAnalytics";
 
 
 export default function SalonAdminShell() {
@@ -34,6 +35,7 @@ export default function SalonAdminShell() {
       <Route path="adminBilling" element={<Billing />} />
       <Route path="adminReviews" element={<AdminReviews />} />
       <Route path="adminSalary" element={<AdminSalary />} />
+      <Route path="adminAnalytics" element={<AdminAnalytics />} />
 
       <Route path="*" element={<Navigate to="adminDashboard" replace />} />
     </Routes>
