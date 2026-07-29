@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import PageHeader from "../../components/ui/PageHeader";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
-import Badge from "../../components/ui/Badge";
+
 import EmptyState from "../../components/ui/EmptyState";
 import Input from "../../components/ui/Input";
 
@@ -29,13 +29,7 @@ const formatMoney = (value) => {
   }
 };
 
-const statusVariant = (status) => {
-  const s = (status || "").toLowerCase();
-  if (s.includes("paid") || s === "complete" || s === "processed") return "success";
-  if (s.includes("pending") || s.includes("not")) return "warning";
-  if (s.includes("overdue")) return "danger";
-  return "info";
-};
+
 
 const toMonthKey = (date) => {
   const d = new Date(date);

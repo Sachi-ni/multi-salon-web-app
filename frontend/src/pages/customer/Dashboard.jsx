@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+
 import { getMyAppointments, cancelAppointment, deleteAppointment } from "../../services/appointmentService";
-import { 
+import {
   Calendar, Plus, Clock, CheckCircle2, XCircle, 
-  MapPin, Search, Star, Scissors
+  Search, Star, Scissors
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import CustomerDashboardBackground from "../../components/ui/CustomerDashboardBackground";
@@ -28,7 +28,6 @@ const STATUS_ICONS = {
 const TABS = ["All", "Pending", "Confirmed", "Completed", "Cancelled"];
 
 export default function CustomerDashboard() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -202,7 +201,7 @@ export default function CustomerDashboard() {
           <div className="space-y-6">
             <AnimatePresence>
               {filteredAppointments.map((a) => {
-                const durationHours = Math.ceil((a.duration || 60) / 60);
+
                 return (
                   <motion.div 
                     layout

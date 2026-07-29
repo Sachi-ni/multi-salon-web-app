@@ -80,7 +80,7 @@ export default function MyAppointments() {
         ) : (
           <div className="space-y-4">
             {appointments.map(a => {
-              const durationHours = Math.ceil((a.duration || 60) / 60);
+
               return (
                 <div key={a._id} className="bg-surface border border-border rounded-2xl p-5 shadow-card">
 

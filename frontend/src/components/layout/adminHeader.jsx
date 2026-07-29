@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Bell, Menu, LogOut, User, ChevronDown, Check } from "lucide-react";
+import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
 

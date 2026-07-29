@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import PageHeader from "../../components/ui/PageHeader";
 import Card from "../../components/ui/Card";
-import Button from "../../components/ui/Button";
+
 
 import { getSalon } from "../../services/salonService";
 import StepSelectService from "../customer/steps/StepSelectService";
@@ -20,7 +20,7 @@ export default function AddApointmnet() {
   const { salonId } = useParams();
 
   const [salon, setSalon] = useState(null);
-  const [loadingSalon, setLoadingSalon] = useState(true);
+
 
   const [step, setStep] = useState(0);
 
@@ -62,7 +62,7 @@ export default function AddApointmnet() {
 
     async function loadSalon() {
       try {
-        setLoadingSalon(true);
+
         if (!salonId) return;
         const res = await getSalon(salonId);
         if (!mounted) return;
@@ -76,7 +76,7 @@ export default function AddApointmnet() {
       } catch (err) {
         console.error("Failed to load salon:", err);
       } finally {
-        if (mounted) setLoadingSalon(false);
+
       }
     }
 
@@ -148,7 +148,7 @@ export default function AddApointmnet() {
   };
 
   const renderConfirm = () => {
-    const totalPrice = booking.services.reduce((sum, s) => sum + s.servicePrice, 0);
+
 
     const formatTime = (time) => {
       if (!time) return "";

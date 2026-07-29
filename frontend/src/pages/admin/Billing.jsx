@@ -8,7 +8,7 @@ import {
   Clock,
   Search,
   FileText,
-  Download,
+
   FileSpreadsheet,
   Receipt,
   Loader2,
@@ -187,7 +187,7 @@ const Billing = () => {
 
   useEffect(() => {
     fetchReport(preset, customStart, customEnd);
-  }, [preset, fetchReport]);
+  }, [preset, fetchReport, customStart, customEnd]);
 
   const handlePresetChange = (newPreset) => {
     setPreset(newPreset);
