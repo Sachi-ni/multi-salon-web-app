@@ -11,6 +11,7 @@ import {
   updateAppointmentDuration,
   deleteAppointment
 } from "../../services/appointmentService";
+import { getSalons } from "../../services/salonService";
 
 const STATUS_FILTERS = ["all", "pending", "confirmed", "completed", "rejected", "cancelled"];
 
@@ -33,6 +34,9 @@ export default function Appointments() {
   const [error, setError]               = useState("");
   const [actionLoading, setActionLoading] = useState("");
   const [actionError, setActionError]     = useState("");
+
+  const [salons, setSalons] = useState([]);
+  const [salonFilter, setSalonFilter] = useState("all");
   
   // Duration edit state
   const [editingDuration, setEditingDuration] = useState("");
@@ -44,15 +48,24 @@ export default function Appointments() {
   const fetchAppointments = useCallback(() => {
     setLoading(true);
     setError("");
-    // Superadmin doesn't need to pass a specific salonId to get all appointments now
-    getSalonAppointments("all", filter === "all" ? "" : filter, dateFilter)
+    getSalonAppointments(salonFilter, filter === "all" ? "" : filter, dateFilter)
       .then(res => setAppointments(res.data))
       .catch((err) => {
         console.error("API Error in fetchAppointments:", err, err.response);
         setError("Failed to load appointments.");
       })
       .finally(() => setLoading(false));
-  }, [filter, dateFilter]);
+  }, [salonFilter, filter, dateFilter]);
+
+  const fetchSalons = useCallback(() => {
+    getSalons()
+      .then(res => setSalons(res.data || []))
+      .catch(err => console.error("Failed to load salons for filter:", err));
+  }, []);
+
+  useEffect(() => { 
+    fetchSalons();
+  }, [fetchSalons]);
 
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
@@ -201,32 +214,53 @@ export default function Appointments() {
           ))}
         </div>
         
-        {/* Date Filter */}
-        <div className="flex items-center gap-3 bg-surface-2 p-1.5 pl-4 rounded-xl border border-surface group focus-within:border-accent transition-all duration-300">
-          <label className="text-sm font-bold text-muted-2 whitespace-nowrap flex items-center gap-2">
-            <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Date:
-          </label>
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            style={{ colorScheme: 'dark' }}
-            className="bg-transparent text-white text-sm font-bold focus:outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-          />
-          {dateFilter && (
-            <button
-              onClick={() => setDateFilter("")}
-              title="Clear date filter"
-              className="w-7 h-7 rounded-lg bg-danger-dim text-danger hover:bg-danger hover:text-white flex items-center justify-center transition-all duration-200"
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Salon Filter */}
+          <div className="flex items-center gap-2 bg-surface-2 p-1.5 pl-4 rounded-xl border border-surface group focus-within:border-accent transition-all duration-300">
+            <label className="text-sm font-bold text-muted-2 whitespace-nowrap">
+              Salon:
+            </label>
+            <select
+              value={salonFilter}
+              onChange={(e) => setSalonFilter(e.target.value)}
+              className="bg-transparent text-white text-sm font-bold focus:outline-none cursor-pointer outline-none"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              <option value="all" className="bg-surface">All Salons</option>
+              {salons.map(salon => (
+                <option key={salon._id} value={salon._id} className="bg-surface">
+                  {salon.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Filter */}
+          <div className="flex items-center gap-3 bg-surface-2 p-1.5 pl-4 rounded-xl border border-surface group focus-within:border-accent transition-all duration-300">
+            <label className="text-sm font-bold text-muted-2 whitespace-nowrap flex items-center gap-2">
+              <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-            </button>
-          )}
+              Date:
+            </label>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              style={{ colorScheme: 'dark' }}
+              className="bg-transparent text-white text-sm font-bold focus:outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+            />
+            {dateFilter && (
+              <button
+                onClick={() => setDateFilter("")}
+                title="Clear date filter"
+                className="w-7 h-7 rounded-lg bg-danger-dim text-danger hover:bg-danger hover:text-white flex items-center justify-center transition-all duration-200"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
