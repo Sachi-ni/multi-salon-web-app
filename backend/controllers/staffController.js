@@ -2,6 +2,7 @@ import Staff from "../models/Staff.js";
 import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 import Salary from "../models/Salary.js";
+import Appointment from "../models/Appointment.js";
 
 export const createStaff = async (req, res) => {
   try {
@@ -343,5 +344,43 @@ export const deleteStaff = async (req, res) => {
     res.status(500).json({
       message: error.message,
     });
+  }
+};
+
+export const getStaffDashboard = async (req, res) => {
+  try {
+    const staffId = req.user.id;
+
+    const staff = await Staff.findById(staffId).populate("salon_id", "name");
+    if (!staff) {
+      return res.status(404).json({ message: "Staff not found" });
+    }
+
+    // Find the manager of this salon
+    const manager = await Staff.findOne({
+      salon_id: staff.salon_id?._id,
+      role: { $in: ["manager", "staff-admin"] },
+    });
+
+    const profile = {
+      staffName: staff.full_name,
+      salonName: staff.salon_id?.name || "N/A",
+      managerName: manager ? manager.full_name : "N/A",
+      managerPhone: manager ? manager.phone : "N/A",
+    };
+
+    // Find all appointments for this staff
+    const appointments = await Appointment.find({ staff_id: staffId })
+      .populate("customer_id", "name")
+      .populate("service_ids", "service_name")
+      .sort({ appointment_date: -1 });
+
+    res.json({
+      profile,
+      appointments,
+    });
+  } catch (error) {
+    console.error("Error in getStaffDashboard:", error);
+    res.status(500).json({ message: "Server error getting dashboard data" });
   }
 };
