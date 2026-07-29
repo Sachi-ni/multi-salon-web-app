@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+
 import PageHeader from "../../components/ui/PageHeader";
 import {
   getSalonAppointments,
@@ -23,7 +23,7 @@ const STATUS_COLORS = {
 };
 
 export default function Appointments() {
-  const { user } = useAuth();
+
   const navigate = useNavigate();
   
   const [appointments, setAppointments] = useState([]);
@@ -41,7 +41,7 @@ export default function Appointments() {
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
 
-  const fetchAppointments = () => {
+  const fetchAppointments = useCallback(() => {
     setLoading(true);
     setError("");
     // Superadmin doesn't need to pass a specific salonId to get all appointments now
@@ -52,9 +52,9 @@ export default function Appointments() {
         setError("Failed to load appointments.");
       })
       .finally(() => setLoading(false));
-  };
+  }, [filter, dateFilter]);
 
-  useEffect(() => { fetchAppointments(); }, [filter, dateFilter]);
+  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
   useEffect(() => {
     if (highlightId && !loading && appointments.length > 0) {

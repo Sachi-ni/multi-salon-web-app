@@ -40,7 +40,7 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
     } finally {
       setLoading(false);
     }
-  }, [booking.date, booking.salonId, current?.serviceId]);
+  }, [booking.date, booking.salonId, current]);
 
   // Fetch time slots for current service + selected staff
   const fetchSlots = useCallback(async () => {
@@ -55,7 +55,7 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
     } finally {
       setLoading(false);
     }
-  }, [booking.date, booking.salonId, current?.serviceId, current?.staffId]);
+  }, [booking.date, booking.salonId, current]);
 
   useEffect(() => {
     if (phase === "staff") {

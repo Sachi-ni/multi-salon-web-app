@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   getServices,
   createService,
@@ -24,7 +24,7 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
-import clsx from "clsx";
+
 import { useParams } from "react-router-dom";
 
 /* ─────────── Skeleton Card ─────────── */
@@ -315,13 +315,13 @@ const Services = () => {
   const [editingService, setEditingService] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const emptyForm = {
+  const emptyForm = useMemo(() => ({
     service_name: "",
     base_price: "",
     duration: "",
     description: "",
     salon_id: "",
-  };
+  }), []);
   const [formData, setFormData] = useState(emptyForm);
 
   // Get salonId from URL if present (for direct navigation to Add Service for a specific salon)
@@ -334,7 +334,7 @@ const Services = () => {
       setFormData({ ...emptyForm, salon_id: salonId });
       setModalOpen(true);
     }
-  }, [salonId]);
+  }, [salonId, emptyForm]);
 
   /* ── Data Fetching ── */
   const fetchData = useCallback(async () => {

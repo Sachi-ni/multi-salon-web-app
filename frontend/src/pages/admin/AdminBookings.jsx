@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -37,16 +37,16 @@ export default function AdminBookings() {
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
 
-  const fetchAppointments = () => {
+  const fetchAppointments = useCallback(() => {
     setLoading(true);
     setError("");
     getSalonAppointments(salonId, filter === "all" ? "" : filter)
       .then(res => setAppointments(res.data))
       .catch(() => setError("Failed to load appointments."))
       .finally(() => setLoading(false));
-  };
+  }, [salonId, filter]);
 
-  useEffect(() => { fetchAppointments(); }, [filter]);
+  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
   // Convert 24h time to 12h format
   const formatTime = (time) => {

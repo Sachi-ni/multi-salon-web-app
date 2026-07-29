@@ -6,7 +6,7 @@ import AdminBookings from "./AdminBookings";
 import Services from "./Services";
 import Staff from "./Staff";
 import AdminSalary from "./AdminSalary";
-import AdminStaffScheduleFallback from "./AdminStaffSchedule";
+
 import AddApointmnet from "./AddApointmnet";
 import Billing from "./Billing";
 import AdminReviews from "./AdminReviews";

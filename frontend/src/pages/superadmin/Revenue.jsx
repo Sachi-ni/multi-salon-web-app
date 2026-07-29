@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { getRevenueStats, getSalonRevenue } from "../../services/revenueService";
 import { Download, ArrowUpDown, DollarSign, Clock3 } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader";
@@ -23,27 +23,27 @@ const Revenue = () => {
 
   const formatCurrency = (value) => `Rs. ${Number(value).toLocaleString()}`;
 
-  const fetchData = async () => {
-  try {
-    setLoading(true);
-    setError("");
-    const statsRes = await getRevenueStats(period);
-    const salonsRes = await getSalonRevenue(period);
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const statsRes = await getRevenueStats(period);
+      const salonsRes = await getSalonRevenue(period);
 
-    setGrossRevenue(statsRes?.data?.grossRevenue || 0);
-    setPendingPayouts(statsRes?.data?.pendingPayouts || 0);
-    setGrossGrowth(statsRes?.data?.grossGrowth || 0);
-    setPendingOverdue(statsRes?.data?.pendingOverdue || 0);
-    setSalons(salonsRes?.data || []);
-  } catch (err) {
-    console.error(err);
-    setError("Failed to load revenue data");
-  } finally {
-    setLoading(false);
-  }
-};
+      setGrossRevenue(statsRes?.data?.grossRevenue || 0);
+      setPendingPayouts(statsRes?.data?.pendingPayouts || 0);
+      setGrossGrowth(statsRes?.data?.grossGrowth || 0);
+      setPendingOverdue(statsRes?.data?.pendingOverdue || 0);
+      setSalons(salonsRes?.data || []);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load revenue data");
+    } finally {
+      setLoading(false);
+    }
+  }, [period]);
 
-useEffect(() => { fetchData(); }, [period]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const doExport = () => {
     let csv = "Salon,Revenue,Transactions\n";
