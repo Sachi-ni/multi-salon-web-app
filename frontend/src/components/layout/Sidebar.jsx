@@ -12,6 +12,7 @@ import {
   LogOut,
   Receipt,
   Star,
+  BarChart2,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -35,7 +36,7 @@ const navItems = [
   {
     group: "Finance",
     items: [
-      { label: "Revenue", path: "/Revenue", icon: DollarSign },
+      { label: "Analytics", path: "/Analytics", icon: BarChart2 },
       { label: "Billing", path: "/superAdminBilling", icon: Receipt },
     ],
   },

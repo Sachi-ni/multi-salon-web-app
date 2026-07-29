@@ -21,7 +21,7 @@ import SalonDetailsPage from "./pages/customer/SalonDetailsPage.jsx";
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import Profile from "./pages/superadmin/profile.jsx";
 import SuperAdminDashboard from "./pages/superadmin/Dashboard.jsx";
-import Revenue from "./pages/superadmin/Revenue.jsx";
+import Analytics from "./pages/superadmin/Analytics.jsx";
 import AddSalon from "./pages/superadmin/AddSalon.jsx";
 import AddStaff from "./pages/superadmin/AddStaff.jsx";
 import AddService from "./pages/superadmin/Services.jsx";
@@ -120,11 +120,11 @@ function App() {
         />
 
         <Route
-          path="/Revenue"
+          path="/Analytics"
           element={
             <ProtectedRoute allowedRoles={["super-admin"]}>
               <DashboardLayout>
-                <Revenue />
+                <Analytics />
               </DashboardLayout>
             </ProtectedRoute>
           }
