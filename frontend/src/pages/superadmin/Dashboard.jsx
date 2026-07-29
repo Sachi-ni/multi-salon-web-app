@@ -18,13 +18,13 @@ const Dashboard = () => {
     { icon: Wallet, label: "Platform Revenue", value: "", trend: "", subtitle: "this month" },
   ];
 
-  const statPages = ["salons", "Staff", "Appointments", "Revenue"];
+  const statPages = ["salons", "Staff", "Appointments", "Analytics"];
 
   const quickActions = [
     { label: "Register New Salon", icon: Store, path: "AddSalon" },
     { label: "Add Staff Member", icon: UserPlus, path: "AddStaff" },
     { label: "Create Appointment", icon: CalendarPlus, path: "AddAppointment" },
-    { label: "Manage Revenue", icon: DollarSign, path: "Revenue" },
+    { label: "View Analytics", icon: DollarSign, path: "Analytics" },
   ];
 
   return (
@@ -64,42 +64,25 @@ const Dashboard = () => {
       </div>
 
       {/* Charts Section */}
+      {/* Simplified Revenue Section + Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <Card>
+        <Card className="flex flex-col justify-between">
           <Card.Header>
-            <Card.Title>Revenue — Last 7 Days</Card.Title>
+            <Card.Title>Platform Revenue Summary</Card.Title>
+            <Card.Subtitle>Overview of total earnings across all salons</Card.Subtitle>
           </Card.Header>
-          <EmptyState
-            title="No revenue data"
-            description="Revenue chart will appear here once data is available."
-            icon={Wallet}
-          />
-        </Card>
-
-        <Card>
-          <Card.Header>
-            <Card.Title>Top Salons by Revenue</Card.Title>
-            <Card.Subtitle>This month</Card.Subtitle>
-          </Card.Header>
-          <EmptyState
-            title="No salon data"
-            description="Top performing salons will be shown here."
-            icon={Building2}
-          />
-        </Card>
-      </div>
-
-      {/* Activity + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <Card>
-          <Card.Header>
-            <Card.Title>Live Activity</Card.Title>
-          </Card.Header>
-          <EmptyState
-            title="No recent activity"
-            description="Activity feed will populate as events occur."
-            icon={Calendar}
-          />
+          <div className="flex-1 flex flex-col items-center justify-center py-10">
+            <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mb-4">
+              <DollarSign className="w-8 h-8 text-accent" />
+            </div>
+            <h3 className="text-sm font-bold text-muted-2 mb-2">Want to dive deeper?</h3>
+            <p className="text-xs text-muted-2 text-center max-w-[250px] mb-6">
+              View comprehensive charts, top performing salons, and detailed metrics on the Analytics page.
+            </p>
+            <Button variant="primary" size="sm" onClick={() => navigate("/Analytics")}>
+              Go to Analytics
+            </Button>
+          </div>
         </Card>
 
         <Card>
