@@ -203,10 +203,10 @@ export default function AdminBookings() {
               {/* Header — Customer + Status */}
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <p className="text-white font-extrabold">{a.customer_id?.name || "Unknown Customer"}</p>
+                  <p className="text-white font-extrabold">{a.customer_id?.name || a.guest_name || "Unknown Customer"}</p>
                   <p className="text-muted-2 text-xs mt-0.5">
                     {a.customer_id?.email || "No email provided"}
-                    {a.customer_id?.phone ? ` · ${a.customer_id.phone}` : ""}
+                    {(a.customer_id?.phone || a.guest_phone) ? ` · ${a.customer_id?.phone || a.guest_phone}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

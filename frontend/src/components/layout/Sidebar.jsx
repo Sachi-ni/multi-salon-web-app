@@ -37,7 +37,7 @@ const navItems = [
     group: "Finance",
     items: [
       { label: "Analytics", path: "/Analytics", icon: BarChart2 },
-      { label: "Billing", path: "/superAdminBilling", icon: Receipt },
+      { label: "Report", path: "/superAdminBilling", icon: Receipt },
     ],
   },
 ];

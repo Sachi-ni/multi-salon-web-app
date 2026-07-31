@@ -51,7 +51,7 @@ const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
         group: "Business",
         items: [
           { label: "Analytics", path: "/adminAnalytics", icon: BarChart2 },
-          { label: "Billing", path: "/adminBilling", icon: Receipt },
+          { label: "Report", path: "/adminBilling", icon: Receipt },
           { label: "Reviews", path: "/adminReviews", icon: Star },
           { label: "Salary", path: "/adminSalary", icon: Wallet },
         ],
