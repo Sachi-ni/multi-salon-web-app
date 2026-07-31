@@ -83,7 +83,7 @@ const AdminDashboard = () => {
       path: "/AddStaff",
     },
     {
-      label: "Manage Billing",
+      label: "Manage Report",
       icon: DollarSign,
       path: "/Billing",
     },

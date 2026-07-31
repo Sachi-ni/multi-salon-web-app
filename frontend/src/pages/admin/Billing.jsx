@@ -412,9 +412,9 @@ const Billing = () => {
   return (
     <div className="min-h-[60vh]">
       <PageHeader
-        title="Billing & Revenue"
+        title="Report & Revenue"
         subtitle="Daily revenue report for your salon branch"
-        backTo={`/salon-admin/${salonId}/adminDashboard`}
+        backTo={user?.role === "super-admin" ? "/superAdminDashboard" : `/salon-admin/${salonId}/adminDashboard`}
       >
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" icon={FileText} onClick={exportPDF}>
