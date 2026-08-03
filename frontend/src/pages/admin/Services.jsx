@@ -78,7 +78,12 @@ const ServiceCard = ({ service, index }) => {
 };
 
 export default function AdminServicesPage() {
-  const { salonId } = useParams();
+  const params = useParams();
+  let salonId = params.salonId;
+  if (!salonId) {
+    const match = window.location.pathname.match(/^\/salon-admin\/([^/]+)/);
+    if (match) salonId = match[1];
+  }
   const [servicesList, setServicesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

@@ -26,7 +26,12 @@ function StarDisplay({ rating, max = 5, size = "w-4 h-4" }) {
 }
 
 export default function AdminReviews() {
-  const { salonId } = useParams();
+  const params = useParams();
+  let salonId = params.salonId;
+  if (!salonId) {
+    const match = window.location.pathname.match(/^\/salon-admin\/([^/]+)/);
+    if (match) salonId = match[1];
+  }
   const [feedbacks, setFeedbacks] = useState([]);
   const [ratingFilter, setRatingFilter] = useState("all"); // "all" | "5" | "4" | "3" | "low"
   const [searchTerm, setSearchTerm] = useState("");

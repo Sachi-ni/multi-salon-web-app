@@ -28,7 +28,7 @@ const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
         {
           group: "Main",
           items: [
-            { label: "Dashboard", path: "/staffDashboard", icon: LayoutDashboard },
+            { label: "Dashboard", path: "/staff/dashboard", icon: LayoutDashboard },
             // Optional: Staff can view their own schedule, which is handled in staffDashboard
             // We can leave Appointments out or point it to a specific view if needed,
             // but staffDashboard covers their schedule.
@@ -125,6 +125,16 @@ const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
 
         {/* Bottom Section */}
         <div className="p-3 mt-auto">
+          {user?.role === "super-admin" && (
+            <button
+              onClick={() => navigate("/superAdminDashboard")}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-[0.82rem] font-bold text-black bg-amber-400 hover:bg-amber-500 transition-all duration-150 mb-2 shadow-sm"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              Back to Hub
+            </button>
+          )}
+
           {/* System Status */}
           <div className="bg-surface-2 border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-xs mb-2">
             <span className="w-2 h-2 rounded-full bg-success flex-shrink-0 animate-pulse-dot" />
