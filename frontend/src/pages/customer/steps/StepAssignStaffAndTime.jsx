@@ -49,13 +49,27 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
     setError("");
     try {
       const res = await getAvailableSlots(current.staffId, booking.date, [current.serviceId], booking.salonId);
-      setSlots(res.data);
+      
+      // Filter out slots that overlap with previously assigned services
+      const previousAssignments = assignments.slice(0, currentIndex).filter(a => a.startTime && a.endTime);
+      
+      const validSlots = res.data.filter(slot => {
+        for (const prev of previousAssignments) {
+          // Check if times overlap (start1 < end2 && start2 < end1)
+          if (slot.start_time < prev.endTime && prev.startTime < slot.end_time) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      setSlots(validSlots);
     } catch {
       setError("Failed to load available time slots.");
     } finally {
       setLoading(false);
     }
-  }, [booking.date, booking.salonId, current]);
+  }, [booking.date, booking.salonId, current, assignments, currentIndex]);
 
   useEffect(() => {
     if (phase === "staff") {

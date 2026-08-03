@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getServices } from "../../services/serviceService";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
+import Table from "../../components/ui/Table";
+import Modal from "../../components/ui/Modal";
+import Input from "../../components/ui/Input";
 import EmptyState from "../../components/ui/EmptyState";
 import clsx from "clsx";
 import { useAuth } from "../../context/AuthContext";
@@ -22,29 +25,21 @@ import {
   Pencil,
   Trash2,
   ChevronDown,
+  LayoutGrid,
+  List,
+  UserCheck,
+  Coins,
+  Scissors,
+  Check,
+  Phone,
+  Mail,
+  User
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = "http://localhost:5000";
 
-/* ── Skeleton Card ── */
-const SkeletonStaffCard = () => (
-  <div className="bg-surface border border-border rounded-xl p-5 animate-pulse">
-    <div className="flex items-center gap-4 mb-4">
-      <div className="w-20 h-20 rounded-2xl bg-surface-2" />
-      <div className="flex-1 space-y-2">
-        <div className="h-4 w-28 rounded bg-surface-2" />
-        <div className="h-3 w-20 rounded bg-surface-2" />
-      </div>
-    </div>
-    <div className="space-y-2">
-      <div className="h-3 w-full rounded bg-surface-2" />
-      <div className="h-3 w-3/4 rounded bg-surface-2" />
-    </div>
-  </div>
-);
-
-/* ── Staff Card Actions Menu ── */
+/* ── Actions Menu ── */
 const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
   const [open, setOpen] = useState(false);
 
@@ -62,7 +57,7 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
           e.stopPropagation();
           setOpen(!open);
         }}
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-2 hover:bg-surface-2 hover:text-white transition-all duration-150"
+        className="w-8 h-8 rounded-xl flex items-center justify-center text-neutral-400 hover:bg-surface-2 hover:text-white transition-all duration-150"
       >
         <MoreVertical className="w-4 h-4" />
       </button>
@@ -74,7 +69,7 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-full mt-1 w-44 bg-surface border border-border rounded-xl shadow-modal py-1.5 z-50"
+            className="absolute right-0 top-full mt-1.5 w-44 bg-surface-2 border border-border rounded-xl shadow-modal py-1.5 z-50"
           >
             <button
               onClick={(e) => {
@@ -82,10 +77,10 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
                 onToggleStatus(staff);
                 setOpen(false);
               }}
-              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-muted-2 hover:text-white"
+              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-neutral-300 hover:text-white"
             >
               <Power className="w-3.5 h-3.5" />
-              {staff.status === "Active" ? "Deactivate" : "Activate"}
+              {staff.status === "Active" ? "Deactivate Staff" : "Activate Staff"}
             </button>
 
             <button
@@ -94,10 +89,10 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
                 onEdit();
                 setOpen(false);
               }}
-              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-muted-2 hover:text-white"
+              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-neutral-300 hover:text-white"
             >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit Staff
+              <Pencil className="w-3.5 h-3.5 text-info" />
+              Edit Details
             </button>
 
             <div className="my-1 border-t border-border" />
@@ -111,7 +106,7 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
               className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-danger-dim text-danger"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Remove Staff
+              Delete Staff
             </button>
           </motion.div>
         )}
@@ -122,638 +117,392 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
 
 /* ── Staff Card Component ── */
 const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
-  const initials = staff.name
-    ? staff.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "S";
+  const isInactive = staff.status === "Inactive";
 
-  const salonName = staff.salon_id?.name || staff.salonName || "Unassigned";
-  const isActive = staff.status === "Active";
-  const staffServices = staff.services || [];
-
-  const imageUrl = staff.image
-    ? `${API_BASE}/${staff.image.replace(/\\/g, "/")}`
-    : null;
+  // Capped service tags
+  const maxVisible = 3;
+  const visibleServices = staff.services?.slice(0, maxVisible) || [];
+  const hiddenServices = staff.services?.slice(maxVisible) || [];
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.3 }}
-      className="group bg-surface border border-border rounded-xl overflow-hidden transition-all duration-250 hover:border-accent/40 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(245,200,0,0.06)]"
+      transition={{ delay: index * 0.04, duration: 0.3 }}
+      className={clsx(
+        "group relative bg-surface border border-border rounded-2xl overflow-hidden transition-all duration-300 hover:border-amber-400/40 hover:-translate-y-1 hover:shadow-card-hover flex flex-col justify-between",
+        isInactive && "opacity-70"
+      )}
     >
-      <div
-        className={clsx(
-          "h-[2px] transition-all duration-300",
-          isActive
-            ? "bg-gradient-to-r from-accent via-accent-hover to-accent"
-            : "bg-gradient-to-r from-muted via-muted-2 to-muted"
-        )}
-      />
+      <div>
+        <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400" />
 
-      <div className="p-5">
-        <div className="flex items-start gap-3.5 mb-4">
-          <div className="relative flex-shrink-0">
-            {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt={staff.name}
-                className="w-20 h-20 rounded-2xl object-cover border-2 border-border group-hover:border-accent/40 transition-colors duration-200"
-                onError={(e) => {
-                  e.target.style.display = "none";
-                  if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
-                }}
-              />
-            ) : null}
+        <div className="p-5">
+          {/* Header Row */}
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="relative flex-shrink-0">
+                {staff.image ? (
+                  <img
+                    src={staff.image.startsWith("http") ? staff.image : `${API_BASE}${staff.image}`}
+                    alt={staff.full_name}
+                    className="w-13 h-13 rounded-2xl object-cover border-2 border-amber-400/30 group-hover:border-amber-400 transition-colors"
+                  />
+                ) : (
+                  <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-600 text-black font-black flex items-center justify-center text-lg shadow-sm">
+                    {staff.full_name?.charAt(0).toUpperCase()}
+                  </div>
+                )}
 
-            <div
-              className={clsx(
-                "w-20 h-20 rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 border-2 border-border group-hover:border-accent/40 items-center justify-center text-accent font-black text-2xl transition-colors duration-200",
-                imageUrl ? "hidden" : "flex"
-              )}
-            >
-              {initials}
+                <span
+                  className={clsx(
+                    "absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-surface",
+                    isInactive ? "bg-neutral-500" : "bg-emerald-500"
+                  )}
+                  title={staff.status}
+                />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-extrabold text-white truncate leading-tight group-hover:text-amber-400 transition-colors">
+                  {staff.full_name}
+                </h3>
+                <p className="text-xs font-semibold text-amber-400 mt-0.5 truncate">
+                  {staff.specification || staff.role || "Stylist"}
+                </p>
+                <p className="text-2xs text-neutral-400 mt-0.5 truncate flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-neutral-500 flex-shrink-0" />
+                  {staff.salon_id?.name || "Salon Branch"}
+                </p>
+              </div>
             </div>
 
-            <span
-              className={clsx(
-                "absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-surface",
-                isActive ? "bg-success animate-pulse-dot" : "bg-muted"
-              )}
-            />
+            <ActionsMenu staff={staff} onEdit={onEdit} onToggleStatus={onToggleStatus} onDelete={onDelete} />
           </div>
 
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[0.9rem] font-bold text-white leading-tight truncate">
-              {staff.full_name}
-            </h3>
-            <div className="mt-1">
-              <Badge variant="info" dot={false}>
-                {staff.role}
-              </Badge>
-            </div>
-          </div>
-
-          <ActionsMenu
-            staff={staff}
-            onEdit={onEdit}
-            onToggleStatus={onToggleStatus}
-            onDelete={onDelete}
-          />
-        </div>
-
-        <div className="space-y-2.5 mb-4">
-          <div className="flex items-center gap-2 text-xs">
-            <MapPin className="w-3.5 h-3.5 text-muted flex-shrink-0" />
-            <span className="text-muted-2 truncate">{salonName}</span>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs">
-            <Calendar className="w-3.5 h-3.5 text-muted flex-shrink-0" />
-            <span className="text-muted-2">
-              <span className="text-white font-semibold">{staff.bookings || 0}</span> bookings
+          {/* Salary Rate */}
+          <div className="bg-surface-2/60 border border-border/70 rounded-xl p-3 mb-4 flex items-center justify-between text-xs">
+            <span className="text-neutral-400 font-medium flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5 text-amber-400" />
+              Daily Rate:
+            </span>
+            <span className="text-white font-extrabold">
+              LKR {(staff.salaryPaymentCountPerDay || 0).toLocaleString()} / day
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <Briefcase className="w-3.5 h-3.5 text-muted flex-shrink-0" />
-            <Badge variant={isActive ? "success" : "warning"} dot>
-              {staff.status}
-            </Badge>
-          </div>
-
-          <div className="flex items-start gap-2 text-xs">
-            <Briefcase className="w-3.5 h-3.5 text-muted flex-shrink-0 mt-0.5" />
-            {staffServices.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {staffServices.map((service) => (
+          {/* Capped Assigned Services Badges */}
+          <div className="space-y-1.5">
+            <span className="text-[0.65rem] font-bold text-neutral-400 uppercase tracking-wider block">Assigned Services</span>
+            <div className="flex flex-wrap gap-1.5 items-center">
+              {visibleServices.length > 0 ? (
+                visibleServices.map((svc) => (
                   <span
-                    key={service._id || service}
-                    className="px-2 py-1 rounded-md bg-accent-dim border border-accent-muted text-[0.65rem] font-bold text-accent"
+                    key={svc._id}
+                    className="px-2.5 py-1 rounded-lg bg-surface-2 border border-border text-2xs font-bold text-neutral-200"
                   >
-                    {service.service_name || service}
-                    {service.base_price !== undefined ? (
-                      <span className="ml-1 text-muted-2">({service.base_price})</span>
-                    ) : null}
-
-                    {/* Staff-specific editable fields (working hours / rate%) are stored in Salary rows,
-                        not on Staff. We show them as editable placeholders in Salary UI instead. */}
+                    {svc.service_name}
                   </span>
-                ))}
-              </div>
-            ) : (
-              <span className="text-muted-2">No services assigned</span>
-            )}
-          </div>
-        </div>
+                ))
+              ) : (
+                <span className="text-2xs text-neutral-500 italic">No services assigned</span>
+              )}
 
-        <div className="flex items-center justify-between pt-3.5 border-t border-border">
-          <div className="flex items-center gap-1.5">
-            <div className="flex items-center gap-0.5">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className={clsx(
-                    "w-3 h-3",
-                    star <= Math.round(parseFloat(staff.rating) || 0)
-                      ? "fill-accent text-accent"
-                      : "text-border"
-                  )}
-                />
-              ))}
+              {hiddenServices.length > 0 && (
+                <div className="relative group/tooltip">
+                  <span className="px-2 py-1 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 text-2xs font-extrabold cursor-pointer">
+                    +{hiddenServices.length} more
+                  </span>
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-48 p-2 bg-surface-2 border border-border rounded-xl shadow-modal z-50 text-2xs space-y-1">
+                    <p className="font-extrabold text-white border-b border-border pb-1 mb-1">Additional Services:</p>
+                    {hiddenServices.map((s) => (
+                      <p key={s._id} className="text-neutral-300 truncate">• {s.service_name}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-            <span className="text-[0.7rem] font-bold text-muted-2">{staff.rating || "0.0"}</span>
           </div>
-
-          <button
-            onClick={() => onToggleStatus(staff)}
-            className={clsx(
-              "px-3 py-1 rounded-md text-[0.65rem] font-bold uppercase tracking-wider transition-all duration-200",
-              isActive
-                ? "bg-success-dim text-success border border-success-border hover:bg-success/20"
-                : "bg-accent-dim text-accent border border-accent-muted hover:bg-accent-muted"
-            )}
-          >
-            {isActive ? "Active" : "Inactive"}
-          </button>
         </div>
       </div>
     </motion.div>
   );
 };
 
-const Staff = () => {
+/* ── Main Admin Staff Page ── */
+export default function AdminStaffPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const userRole = user?.role;
-  const isSalonScopedAdmin = userRole === "staff-admin" || userRole === "manager";
-
-  // Super-admin/salon-admin pages live under /salon-admin/:salonId.
-  // Always derive the salonId from the URL so we don't rely on token/user payload.
-  const [salonId] = useState(() => {
-    const match = window.location.pathname.match(/^\/salon-admin\/([^/]+)/);
-    return match ? match[1] : user?.salon_id;
-  });
-
+  const salonId = user?.salon_id || "";
 
   const [staffList, setStaffList] = useState([]);
-  const [services, setServices] = useState([]);
-  const [servicesLoading, setServicesLoading] = useState(false);
+  const [servicesList, setServicesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRole, setSelectedRole] = useState("All Roles");
+  const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
 
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingStaff, setEditingStaff] = useState(null);
+  const [editStaff, setEditStaff] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
 
-  const fetchData = async () => {
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const fetchStaffData = async () => {
     try {
       setLoading(true);
       setError("");
-
-      const res = await getStaff(salonId);
-      setStaffList(res.data || []);
+      const [staffRes, svcRes] = await Promise.all([
+        getStaff(salonId),
+        getServices(salonId)
+      ]);
+      setStaffList(staffRes.data || []);
+      setServicesList(svcRes.data || []);
     } catch (err) {
-      console.error("fetchData(getStaff) failed:", err);
-      setError(err?.response?.data?.message || "Failed to load staff data");
-      setStaffList([]);
+      console.error(err);
+      setError("Failed to load staff list");
     } finally {
       setLoading(false);
     }
   };
 
-
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchStaffData();
   }, [salonId]);
-
-
-  const handleEdit = (staff) => {
-    const names = (staff.name || "").split(" ");
-
-    const assignedServices = (staff.services || [])
-      .map((service) => {
-        if (!service) return null;
-        if (typeof service === "string") return service;
-        if (service._id) return service._id;
-        return service;
-      })
-      .filter(Boolean);
-
-    setEditingStaff({
-      id: staff._id,
-      firstName: names[0] || "",
-      lastName: names.slice(1).join(" "),
-      email: staff.email || "",
-      salon: staff.salon_id?._id || staff.salon || salonId || "",
-      salonName: staff.salon_id?.name || staff.salonName || "Unknown Salon",
-      services: assignedServices,
-      status: staff.status || "Active",
-      salaryPaymentFrequency: staff.salary_payment_frequency || "monthly",
-      salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 1,
-      picture: null,
-      currentImage: staff.image || "",
-    });
-
-    setEditModalOpen(true);
-  };
-
-  useEffect(() => {
-    if (!editModalOpen || !editingStaff?.salon) {
-      setServices([]);
-      return;
-    }
-
-    const fetchSalonServices = async () => {
-      try {
-        setServicesLoading(true);
-        const res = await getServices(editingStaff.salon);
-        setServices(res.data || []);
-      } catch (err) {
-        setServices([]);
-      } finally {
-        setServicesLoading(false);
-      }
-    };
-
-    fetchSalonServices();
-  }, [editModalOpen, editingStaff?.salon]);
-
-  const handleEditServiceToggle = (serviceId) => {
-    setEditingStaff((current) => {
-      const isSelected = current.services.includes(serviceId);
-      return {
-        ...current,
-        services: isSelected
-          ? current.services.filter((id) => id !== serviceId)
-          : [...current.services, serviceId],
-      };
-    });
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to remove this staff member?")) return;
-    try {
-      await deleteStaff(id);
-      fetchData();
-    } catch (err) {
-      alert(err.response?.data?.message || "Delete failed");
-    }
-  };
 
   const handleToggleStatus = async (staff) => {
     try {
       const newStatus = staff.status === "Active" ? "Inactive" : "Active";
       await updateStaff(staff._id, { status: newStatus });
-      fetchData();
+      fetchStaffData();
     } catch (err) {
-      alert(err.response?.data?.message || "Update failed");
+      console.error(err);
+      setError("Failed to update staff status");
     }
   };
 
-  const handleUpdateStaff = async () => {
-    try {
-      const data = new FormData();
-      data.append("name", `${editingStaff.firstName} ${editingStaff.lastName}`);
-      data.append("email", editingStaff.email);
-
-      // manager cannot change salon_id; backend will enforce
-      data.append("salonId", editingStaff.salon);
-      data.append("status", editingStaff.status);
-      data.append("salaryPaymentFrequency", editingStaff.salaryPaymentFrequency);
-      data.append("salaryPaymentCountPerDay", editingStaff.salaryPaymentCountPerDay);
-
-      if (editingStaff.services.length > 0) {
-        editingStaff.services.forEach((serviceId) => data.append("services", serviceId));
-      }
-
-      if (editingStaff.picture) data.append("image", editingStaff.picture);
-
-      await updateStaff(editingStaff.id, data);
-      setEditModalOpen(false);
-      setEditingStaff(null);
-      fetchData();
-      alert("Staff updated successfully");
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to update staff");
-    }
-  };
-
-  // Only allow managers to view staff in a salon.
-  // Backend also enforces this, but this prevents accidental cross-salon UI.
-  const filteredStaff = staffList
-    .filter((s) => {
-      const staffName = s.name || "";
-      const matchesSearch = staffName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesRole = selectedRole === "All Roles" || s.role === selectedRole;
-
-      const staffSalonId = s.salon_id?._id || s.salon_id || s.salon;
-      const salonMatches = staffSalonId?.toString?.() === salonId?.toString?.();
-
-      //  hide managers from staff list
-      const isManager = s.role === "manager";
-
-      // Salon managers + staff-ad mins must be restricted to their salon.
-      if (isSalonScopedAdmin) {
-        return matchesSearch && matchesRole && salonMatches && !isManager;
-      }
-
-      // Super-admin on a specific salon page should behave the same as a salon manager.
-      return matchesSearch && matchesRole && salonMatches && !isManager;
+  const handleEditOpen = (staff) => {
+    setEditStaff(staff);
+    setEditForm({
+      name: staff.full_name,
+      email: staff.email,
+      specification: staff.specification,
+      salaryPaymentCountPerDay: staff.salaryPaymentCountPerDay || 0,
+      status: staff.status,
+      services: staff.services?.map(s => s._id) || []
     });
+  };
 
-  const activeCount = filteredStaff.filter((s) => s.status === "Active").length;
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setEditLoading(true);
+    try {
+      await updateStaff(editStaff._id, editForm);
+      setEditStaff(null);
+      fetchStaffData();
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || "Failed to update staff");
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
-  const addStaffPath = `/salon-admin/${salonId}/AddStaff`;
+  const handleDelete = async () => {
+    setDeleteLoading(true);
+    try {
+      await deleteStaff(deleteId);
+      setDeleteId(null);
+      fetchStaffData();
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || "Failed to delete staff member");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
-  const canAddStaff = userRole === "super-admin" || userRole === "manager";
+  const filteredStaff = useMemo(() => {
+    if (!searchTerm) return staffList;
+    const term = searchTerm.toLowerCase();
+    return staffList.filter((s) => {
+      const name = (s.full_name || "").toLowerCase();
+      const spec = (s.specification || "").toLowerCase();
+      const email = (s.email || "").toLowerCase();
+      return name.includes(term) || spec.includes(term) || email.includes(term);
+    });
+  }, [staffList, searchTerm]);
 
   return (
-    <div>
-      <PageHeader
-        title="Staff"
-        subtitle="Staff management for your salon"
-
-        backTo={`/salon-admin/${salonId}/adminDashboard`}
-      >
-        <Button
-          variant="primary"
-          icon={Plus}
-          onClick={() => navigate(addStaffPath)}
-          disabled={!canAddStaff}
-        >
-          Add Staff
+    <div className="space-y-6">
+      <PageHeader title="Staff Team Directory" subtitle="Manage stylists, staff schedules, and assigned services" backTo={`/salon-admin/${salonId}/adminDashboard`}>
+        <Button variant="primary" icon={Plus} onClick={() => navigate(`/salon-admin/${salonId}/AddStaff`)}>
+          Add Staff Member
         </Button>
       </PageHeader>
 
+      {/* Error Alert */}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-accent-dim border border-accent-muted text-sm text-white mb-4">
-          <span className="flex-1">{error}</span>
-          <button onClick={() => setError("")} className="text-muted-2 hover:text-white text-lg leading-none">
-            &times;
-          </button>
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-danger-dim border border-danger-border text-sm text-danger">
+          <span className="flex-1 font-semibold">{error}</span>
+          <button onClick={() => setError("")} className="text-danger hover:text-white text-lg leading-none">&times;</button>
         </div>
       )}
 
-      {!loading && staffList.length > 0 && (
-        <div className="flex flex-wrap gap-3 mb-5">
-          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
-            <Users className="w-4 h-4 text-accent" />
-            <span className="text-xs text-muted-2">Total</span>
-            <span className="text-sm font-black text-white">{filteredStaff.length}</span>
-          </div>
-
-        <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
-          <span className="w-2 h-2 rounded-full bg-success" />
-
-            <span className="text-xs text-muted-2">Active</span>
-            <span className="text-sm font-black text-success">{activeCount}</span>
-          </div>
-
-          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-muted" />
-            <span className="text-xs text-muted-2">Inactive</span>
-            <span className="text-sm font-black text-muted-2">{filteredStaff.length - activeCount}</span>
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2 mb-5">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-2" />
+      {/* Filter & View Switcher Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <input
-            placeholder="Search by name..."
+            placeholder="Search staff by name, specification, or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-surface border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
+            className="w-full bg-surface border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 placeholder:text-neutral-500 font-medium"
           />
         </div>
 
-        <div className="relative">
-          <select
-            className="appearance-none bg-surface border border-border rounded-xl px-4 pr-9 py-2.5 text-xs font-bold text-white outline-none cursor-pointer transition-all duration-200 focus:border-accent uppercase tracking-wider"
-            value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value)}
+        {/* View Switcher Toggle */}
+        <div className="flex items-center bg-surface border border-border rounded-xl p-1 gap-1">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={clsx(
+              "p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+              viewMode === "grid"
+                ? "bg-amber-400 text-black shadow-sm"
+                : "text-neutral-400 hover:text-white"
+            )}
+            title="Grid View"
           >
-            <option>All Roles</option>
-            {Array.from(new Set(staffList.map((s) => s.role))).map((role) => (
-              <option key={role} value={role}>
-                {role}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-2 pointer-events-none" />
+            <LayoutGrid className="w-4 h-4" />
+            <span className="hidden sm:inline">Grid</span>
+          </button>
+          <button
+            onClick={() => setViewMode("table")}
+            className={clsx(
+              "p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+              viewMode === "table"
+                ? "bg-amber-400 text-black shadow-sm"
+                : "text-neutral-400 hover:text-white"
+            )}
+            title="Table View"
+          >
+            <List className="w-4 h-4" />
+            <span className="hidden sm:inline">Table</span>
+          </button>
         </div>
       </div>
 
+      {/* Content */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <SkeletonStaffCard key={i} />
+            <div key={i} className="p-5 bg-surface border border-border rounded-2xl animate-pulse space-y-4">
+              <div className="w-12 h-12 bg-surface-2 rounded-2xl" />
+              <div className="h-4 w-32 bg-surface-2 rounded" />
+            </div>
           ))}
         </div>
       ) : filteredStaff.length === 0 ? (
         <EmptyState
-          title="No staff found"
-          description="No staff members match your current filters."
+          title="No staff members found"
+          description="No team members match your search criteria."
           icon={Users}
-          actionLabel="Add Staff"
-          onAction={() => navigate(addStaffPath)}
+          actionLabel="Add Staff Member"
+          onAction={() => navigate(`/salon-admin/${salonId}/AddStaff`)}
         />
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredStaff.map((s, i) => (
+      ) : viewMode === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredStaff.map((staff, index) => (
             <StaffCard
-              key={s._id}
-              staff={s}
-              index={i}
-              onEdit={() => handleEdit(s)}
+              key={staff._id}
+              staff={staff}
+              index={index}
+              onEdit={() => handleEditOpen(staff)}
               onToggleStatus={handleToggleStatus}
-              onDelete={handleDelete}
+              onDelete={setDeleteId}
             />
           ))}
         </div>
-      )}
-
-      {/* Edit Staff Modal */}
-      {editModalOpen && editingStaff && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-xl p-6 w-[600px] max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold text-white mb-4">Edit Staff</h2>
-
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">First Name</label>
-              <input
-                type="text"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
-                value={editingStaff.firstName}
-                onChange={(e) => setEditingStaff({ ...editingStaff, firstName: e.target.value })}
-              />
-            </div>
-
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Last Name</label>
-              <input
-                type="text"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
-                value={editingStaff.lastName}
-                onChange={(e) => setEditingStaff({ ...editingStaff, lastName: e.target.value })}
-              />
-            </div>
-
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Email</label>
-              <input
-                type="email"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
-                value={editingStaff.email}
-                onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
-              />
-            </div>
-
-            <div className="mb-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Salary Frequency */}
-                <div>
-                  <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-                    Payment Frequency
-                  </label>
-                  <select
-                    value={editingStaff.salaryPaymentFrequency}
-                    onChange={(e) =>
-                      setEditingStaff({
-                        ...editingStaff,
-                        salaryPaymentFrequency: e.target.value,
-                      })
-                    }
-                    className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-
-                {/* Salary Amount */}
-                <div>
-                  <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-                    Salary Amount Per Day (LKR)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={editingStaff.salaryPaymentCountPerDay}
-                    onChange={(e) =>
-                      setEditingStaff({
-                        ...editingStaff,
-                        salaryPaymentCountPerDay: e.target.value,
-                      })
-                    }
-                    placeholder="Enter daily salary"
-                    className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-                Salon
-              </label>
-              <div className="w-full p-2 rounded bg-surface-2 text-white text-sm">
-                {editingStaff.salonName}
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Services</label>
-              <div className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3">
-                {!editingStaff.salon ? (
-                  <p className="text-xs text-muted-2">Select a salon to choose services.</p>
-                ) : servicesLoading ? (
-                  <p className="text-xs text-muted-2">Loading services...</p>
-                ) : services.length === 0 ? (
-                  <p className="text-xs text-muted-2">No services found for this salon.</p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {services.map((service) => (
-                      <label
-                        key={service._id}
-                        className="flex items-center gap-2.5 rounded-md border border-border bg-surface px-3 py-2 text-sm text-white cursor-pointer hover:border-accent/50 transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={editingStaff.services.includes(service._id)}
-                          onChange={() => handleEditServiceToggle(service._id)}
-                          className="h-4 w-4 accent-yellow-400"
-                        />
-                        <span className="truncate">{service.service_name}</span>
-                      </label>
-                    ))}
+      ) : (
+        /* Table View */
+        <Table>
+          <Table.Head>
+            <Table.Th>Staff Member</Table.Th>
+            <Table.Th>Specification</Table.Th>
+            <Table.Th>Status</Table.Th>
+            <Table.Th align="right">Daily Rate</Table.Th>
+            <Table.Th align="right">Actions</Table.Th>
+          </Table.Head>
+          <Table.Body>
+            {filteredStaff.map((staff) => (
+              <tr key={staff._id} className="hover:bg-surface-2/60 transition-colors">
+                <Table.Td bold className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs">
+                    {staff.full_name?.charAt(0).toUpperCase()}
                   </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Status</label>
-              <select
-                value={editingStaff.status}
-                onChange={(e) => setEditingStaff({ ...editingStaff, status: e.target.value })}
-                className="w-full p-2 rounded bg-surface-2 text-white"
-              >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-
-            {editingStaff.currentImage && (
-              <div className="mb-3">
-                <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Current Image</label>
-                <img
-                  src={`${API_BASE}/${editingStaff.currentImage}`}
-                  alt="staff"
-                  className="w-24 h-24 rounded-lg object-cover border"
-                />
-              </div>
-            )}
-
-            <div className="mb-4">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Change Profile Picture</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setEditingStaff({ ...editingStaff, picture: e.target.files[0] })}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
-              />
-            </div>
-
-            <div className="flex gap-2.5 justify-end mt-5 pt-4 border-t border-border">
-              <button
-                onClick={() => setEditModalOpen(false)}
-                className="px-4 py-2 rounded bg-gray-600 text-white"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={handleUpdateStaff}
-                className="px-4 py-2 rounded bg-accent text-black font-semibold"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
+                  <div>
+                    <span className="text-white font-extrabold text-sm">{staff.full_name}</span>
+                    <span className="text-2xs text-neutral-400 block">{staff.email}</span>
+                  </div>
+                </Table.Td>
+                <Table.Td className="text-neutral-300 text-xs font-semibold">{staff.specification || staff.role || "Stylist"}</Table.Td>
+                <Table.Td>
+                  <Badge variant={staff.status === "Active" ? "success" : "neutral"} dot={true}>
+                    {staff.status}
+                  </Badge>
+                </Table.Td>
+                <Table.Td align="right" className="text-amber-400 font-black text-xs">
+                  LKR {(staff.salaryPaymentCountPerDay || 0).toLocaleString()} / day
+                </Table.Td>
+                <Table.Td align="right">
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => handleEditOpen(staff)}
+                      className="p-1.5 rounded-lg bg-surface-2 text-info hover:bg-info/20 transition-colors"
+                      title="Edit Staff"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteId(staff._id)}
+                      className="p-1.5 rounded-lg bg-surface-2 text-danger hover:bg-danger/20 transition-colors"
+                      title="Delete Staff"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </Table.Td>
+              </tr>
+            ))}
+          </Table.Body>
+        </Table>
       )}
+
+      {/* Edit Modal */}
+      <Modal isOpen={!!editStaff} onClose={() => setEditStaff(null)} title="✏️ Edit Staff Details" maxWidth="max-w-md">
+        <form onSubmit={handleEditSubmit} className="space-y-4 pt-1">
+          <Input label="Full Name" value={editForm.name || ""} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
+          <Input label="Specification / Title" value={editForm.specification || ""} onChange={(e) => setEditForm({ ...editForm, specification: e.target.value })} />
+          <Input label="Daily Rate (LKR)" type="number" value={editForm.salaryPaymentCountPerDay || 0} onChange={(e) => setEditForm({ ...editForm, salaryPaymentCountPerDay: Number(e.target.value) })} />
+
+          <Modal.Actions>
+            <Button variant="ghost" type="button" onClick={() => setEditStaff(null)} disabled={editLoading}>Cancel</Button>
+            <Button variant="primary" type="submit" loading={editLoading}>Save Changes</Button>
+          </Modal.Actions>
+        </form>
+      </Modal>
+
+      {/* Delete Modal */}
+      <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="🗑️ Delete Staff Member?" maxWidth="max-w-sm">
+        <p className="text-xs text-neutral-300 py-3 text-center leading-relaxed">
+          Are you sure you want to delete this staff member? This action cannot be undone.
+        </p>
+        <Modal.Actions className="justify-center">
+          <Button variant="ghost" size="sm" onClick={() => setDeleteId(null)} disabled={deleteLoading}>Cancel</Button>
+          <Button variant="danger" size="sm" onClick={handleDelete} loading={deleteLoading}>Delete Staff</Button>
+        </Modal.Actions>
+      </Modal>
     </div>
   );
-};
-
-export default Staff;
+}
