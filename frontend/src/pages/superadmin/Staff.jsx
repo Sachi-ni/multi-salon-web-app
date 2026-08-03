@@ -3,29 +3,35 @@ import { useNavigate } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getSalons } from "../../services/salonService";
 import { getServices } from "../../services/serviceService";
-import { Plus, Search, Users, Star, MapPin, Briefcase, Calendar, MoreVertical, Power, Pencil, Trash2, ChevronDown } from "lucide-react";
+import { 
+  Plus, Search, Users, Star, MapPin, Briefcase, 
+  Calendar, MoreVertical, Power, Pencil, Trash2, 
+  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Sparkles, Coins
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
+import Table from "../../components/ui/Table";
+import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
 
 const API_BASE = "http://localhost:5000";
 
 /* ── Skeleton Card ── */
 const SkeletonStaffCard = () => (
-  <div className="bg-surface border border-border rounded-xl p-5 animate-pulse">
-    <div className="flex items-center gap-4 mb-4">
-      <div className="w-20 h-20 rounded-2xl bg-surface-2" />
+  <div className="bg-surface border border-border rounded-2xl p-5 animate-pulse space-y-4 shadow-card">
+    <div className="flex items-center gap-4">
+      <div className="w-14 h-14 rounded-2xl bg-surface-2" />
       <div className="flex-1 space-y-2">
-        <div className="h-4 w-28 rounded bg-surface-2" />
+        <div className="h-4 w-32 rounded bg-surface-2" />
         <div className="h-3 w-20 rounded bg-surface-2" />
       </div>
     </div>
     <div className="space-y-2">
       <div className="h-3 w-full rounded bg-surface-2" />
-      <div className="h-3 w-3/4 rounded bg-surface-2" />
+      <div className="h-3 w-2/3 rounded bg-surface-2" />
     </div>
   </div>
 );
@@ -45,7 +51,7 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
     <div className="relative">
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-2 hover:bg-surface-2 hover:text-white transition-all duration-150"
+        className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-2 hover:bg-surface-2 hover:text-white transition-all duration-150"
       >
         <MoreVertical className="w-4 h-4" />
       </button>
@@ -56,14 +62,14 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-full mt-1 w-44 bg-surface border border-border rounded-xl shadow-modal py-1.5 z-50"
+            className="absolute right-0 top-full mt-1.5 w-44 bg-surface-2 border border-border rounded-xl shadow-modal py-1.5 z-50"
           >
             <button
               onClick={(e) => { e.stopPropagation(); onToggleStatus(staff); setOpen(false); }}
-              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-muted-2 hover:text-white"
+              className="w-full px-3.5 py-2 text-left text-xs font-bold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-muted-2 hover:text-white"
             >
-              <Power className="w-3.5 h-3.5" />
-              {staff.status === "Active" ? "Deactivate" : "Activate"}
+              <Power className="w-3.5 h-3.5 text-accent" />
+              {staff.status === "Active" ? "Deactivate Staff" : "Activate Staff"}
             </button>
             <button
               onClick={(e) => {
@@ -71,15 +77,15 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
                 onEdit();
                 setOpen(false);
               }}
-              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-muted-2 hover:text-white"
+              className="w-full px-3.5 py-2 text-left text-xs font-bold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-muted-2 hover:text-white"
             >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit Staff
+              <Pencil className="w-3.5 h-3.5 text-info" />
+              Edit Details
             </button>
             <div className="my-1 border-t border-border" />
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(staff._id); setOpen(false); }}
-              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-danger-dim text-danger"
+              className="w-full px-3.5 py-2 text-left text-xs font-bold flex items-center gap-2.5 transition-colors duration-150 hover:bg-danger-dim text-danger"
             >
               <Trash2 className="w-3.5 h-3.5" />
               Remove Staff
@@ -92,160 +98,162 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
 };
 
 /* ── Staff Card Component ── */
-const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete, }) => {
+const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
   const initials = staff.name
     ? staff.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
     : "S";
-  const salonName = staff.salon_id?.name || staff.salonName || "Unassigned";
+  const salonName = staff.salon_id?.name || staff.salonName || "Unassigned Salon";
   const isActive = staff.status === "Active";
   const staffServices = staff.services || [];
 
-  // Build image URL from the uploaded path
   const imageUrl = staff.image
     ? `${API_BASE}/${staff.image.replace(/\\/g, "/")}`
     : null;
+
+  const maxVisibleServices = 3;
+  const visibleServices = staffServices.slice(0, maxVisibleServices);
+  const hiddenCount = staffServices.length - maxVisibleServices;
+  const hiddenServiceNames = staffServices.slice(maxVisibleServices).map(s => s.service_name || s).join(", ");
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.3 }}
-      className="group bg-surface border border-border rounded-xl overflow-hidden transition-all duration-250 hover:border-accent/40 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(245,200,0,0.06)]"
+      transition={{ delay: index * 0.04, duration: 0.3 }}
+      className="group bg-surface border border-border rounded-2xl overflow-hidden transition-all duration-300 hover:border-accent/40 hover:-translate-y-1 hover:shadow-card-hover flex flex-col justify-between"
     >
-      {/* Top Accent Line */}
-      <div className={clsx(
-        "h-[2px] transition-all duration-300",
-        isActive
-          ? "bg-gradient-to-r from-accent via-accent-hover to-accent"
-          : "bg-gradient-to-r from-muted via-muted-2 to-muted"
-      )} />
+      <div>
+        {/* Top Accent Bar */}
+        <div className={clsx(
+          "h-1 transition-all duration-300",
+          isActive
+            ? "bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400"
+            : "bg-neutral-700"
+        )} />
 
-      <div className="p-5">
-        {/* Header Row: Avatar + Name + Actions */}
-        <div className="flex items-start gap-3.5 mb-4">
-          {/* Avatar / Photo */}
-          <div className="relative flex-shrink-0">
-            {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt={staff.name}
-                className="w-20 h-20 rounded-2xl object-cover border-2 border-border group-hover:border-accent/40 transition-colors duration-200"
-                onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
+        <div className="p-5">
+          {/* Header Row: Avatar + Name + Role + Actions */}
+          <div className="flex items-start gap-3.5 mb-4">
+            <div className="relative flex-shrink-0">
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt={staff.name}
+                  className="w-14 h-14 rounded-2xl object-cover border border-border/80 group-hover:border-accent/50 transition-colors duration-200"
+                  onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
+                />
+              ) : null}
+              <div
+                className={clsx(
+                  "w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/20 via-amber-400/10 to-yellow-600/10 border border-amber-400/30 items-center justify-center text-amber-400 font-black text-lg shadow-sm transition-colors duration-200",
+                  imageUrl ? "hidden" : "flex"
+                )}
+              >
+                {initials}
+              </div>
+              <span
+                className={clsx(
+                  "absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-surface",
+                  isActive ? "bg-success animate-pulse" : "bg-neutral-600"
+                )}
               />
-            ) : null}
-            <div
-              className={clsx(
-                "w-20 h-20 rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 border-2 border-border group-hover:border-accent/40 items-center justify-center text-accent font-black text-2xl transition-colors duration-200",
-                imageUrl ? "hidden" : "flex"
-              )}
-            >
-              {initials}
             </div>
-            {/* Status Dot */}
-            <span
-              className={clsx(
-                "absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-surface",
-                isActive ? "bg-success animate-pulse-dot" : "bg-muted"
-              )}
+
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-extrabold text-white leading-tight truncate group-hover:text-amber-400 transition-colors">
+                {staff.name || staff.full_name}
+              </h3>
+              <p className="text-xs text-amber-400/90 font-semibold mt-0.5">
+                {staff.role || "Stylist"}
+              </p>
+            </div>
+
+            <ActionsMenu
+              staff={staff}
+              onEdit={onEdit}
+              onToggleStatus={onToggleStatus}
+              onDelete={onDelete}
             />
           </div>
 
-          {/* Name + Role */}
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[0.9rem] font-bold text-white leading-tight truncate">
-              {staff.full_name}
-            </h3>
-            <div className="mt-1">
-              <Badge variant="info" dot={false}>
-                {staff.role}
-              </Badge>
+          {/* Details Section */}
+          <div className="space-y-2 mb-4 text-xs">
+            {/* Salon Branch */}
+            <div className="flex items-center gap-2">
+              <MapPin className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+              <span className="text-neutral-300 font-medium truncate">{salonName}</span>
             </div>
+
+            {/* Total Bookings */}
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+              <span className="text-neutral-300 font-medium">
+                <strong className="text-white font-extrabold">{staff.bookings || 0}</strong> Bookings Completed
+              </span>
+            </div>
+
+            {/* Daily Salary Rate */}
+            {staff.salary_payment_count_per_day && (
+              <div className="flex items-center gap-2">
+                <Coins className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                <span className="text-neutral-300 font-medium">
+                  <strong className="text-emerald-400 font-extrabold">LKR {Number(staff.salary_payment_count_per_day).toLocaleString()}</strong> / {staff.salary_payment_frequency || "day"}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Actions Menu */}
-          <ActionsMenu
-            staff={staff}
-            onEdit={onEdit}
-            onToggleStatus={onToggleStatus}
-            onDelete={onDelete}
-          />
-        </div>
-
-        {/* Details Grid */}
-        <div className="space-y-2.5 mb-4">
-          {/* Salon */}
-          <div className="flex items-center gap-2 text-xs">
-            <MapPin className="w-3.5 h-3.5 text-muted flex-shrink-0" />
-            <span className="text-muted-2 truncate">{salonName}</span>
-          </div>
-          {/* Bookings */}
-          <div className="flex items-center gap-2 text-xs">
-            <Calendar className="w-3.5 h-3.5 text-muted flex-shrink-0" />
-            <span className="text-muted-2">
-              <span className="text-white font-semibold">{staff.bookings || 0}</span> bookings
-            </span>
-          </div>
-          {/* Status */}
-          <div className="flex items-center gap-2 text-xs">
-            <Briefcase className="w-3.5 h-3.5 text-muted flex-shrink-0" />
-            <Badge variant={isActive ? "success" : "warning"} dot>
-              {staff.status}
-            </Badge>
-          </div>
-          <div className="flex items-start gap-2 text-xs">
-            <Briefcase className="w-3.5 h-3.5 text-muted flex-shrink-0 mt-0.5" />
+          {/* Assigned Services Pills */}
+          <div className="pt-2 border-t border-border/50">
+            <p className="text-[0.65rem] font-bold text-neutral-400 uppercase tracking-wider mb-2">
+              Assigned Services ({staffServices.length})
+            </p>
             {staffServices.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {staffServices.map((service) => (
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {visibleServices.map((service, sIdx) => (
                   <span
-                    key={service._id || service}
-                    className="px-2 py-1 rounded-md bg-accent-dim border border-accent-muted text-[0.65rem] font-bold text-accent"
+                    key={service._id || sIdx}
+                    className="px-2.5 py-1 rounded-lg bg-surface-2 border border-border text-[0.7rem] font-semibold text-neutral-200 hover:border-amber-400/40 transition-colors"
                   >
                     {service.service_name || service}
                   </span>
                 ))}
+                {hiddenCount > 0 && (
+                  <span
+                    title={hiddenServiceNames}
+                    className="px-2 py-1 rounded-lg bg-amber-400/10 border border-amber-400/30 text-[0.7rem] font-extrabold text-amber-400 cursor-help"
+                  >
+                    +{hiddenCount} more
+                  </span>
+                )}
               </div>
             ) : (
-              <span className="text-muted-2">No services assigned</span>
+              <span className="text-neutral-500 text-xs italic">No services assigned</span>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Footer: Rating + Quick Actions */}
-        <div className="flex items-center justify-between pt-3.5 border-t border-border">
-          {/* Rating */}
-          <div className="flex items-center gap-1.5">
-            <div className="flex items-center gap-0.5">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className={clsx(
-                    "w-3 h-3",
-                    star <= Math.round(parseFloat(staff.rating) || 0)
-                      ? "fill-accent text-accent"
-                      : "text-border"
-                  )}
-                />
-              ))}
-            </div>
-            <span className="text-[0.7rem] font-bold text-muted-2">
-              {staff.rating || "0.0"}
-            </span>
-          </div>
-
-          {/* Quick Toggle */}
-          <button
-            onClick={() => onToggleStatus(staff)}
-            className={clsx(
-              "px-3 py-1 rounded-md text-[0.65rem] font-bold uppercase tracking-wider transition-all duration-200",
-              isActive
-                ? "bg-success-dim text-success border border-success-border hover:bg-success/20"
-                : "bg-accent-dim text-accent border border-accent-muted hover:bg-accent-muted"
-            )}
-          >
-            {isActive ? "Active" : "Inactive"}
-          </button>
+      {/* Footer Bar */}
+      <div className="px-5 py-3 bg-surface-2/30 border-t border-border flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+          <span className="text-xs font-extrabold text-white">
+            {staff.rating || "5.0"}
+          </span>
         </div>
+
+        <button
+          onClick={() => onToggleStatus(staff)}
+          className={clsx(
+            "px-3 py-1 rounded-lg text-[0.65rem] font-extrabold uppercase tracking-wider transition-all duration-200",
+            isActive
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20"
+              : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-700"
+          )}
+        >
+          {isActive ? "Active" : "Inactive"}
+        </button>
       </div>
     </motion.div>
   );
@@ -263,20 +271,20 @@ const Staff = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState("All Roles");
   const [selectedSalon, setSelectedSalon] = useState("All Salons");
+  const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
+
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
 
   const handleEdit = (staff) => {
     const names = (staff.name || "").split(" ");
 
-    // staff.services may be populated objects ({_id, service_name}) or raw ids
     const assignedServices = (staff.services || []).map((service) => {
       if (!service) return null;
       if (typeof service === "string") return service;
       if (service._id) return service._id;
       return service;
     }).filter(Boolean);
-
 
     setEditingStaff({
       id: staff._id,
@@ -372,15 +380,11 @@ const Staff = () => {
       alert("Update failed");
     }
   };
+
   const handleUpdateStaff = async () => {
     try {
       const data = new FormData();
-
-      data.append(
-        "name",
-        `${editingStaff.firstName} ${editingStaff.lastName}`
-      );
-
+      data.append("name", `${editingStaff.firstName} ${editingStaff.lastName}`);
       data.append("email", editingStaff.email);
       data.append("salonId", editingStaff.salon);
       data.append("status", editingStaff.status);
@@ -392,50 +396,26 @@ const Staff = () => {
         });
       }
 
-
       if (editingStaff.picture) {
         data.append("image", editingStaff.picture);
       }
 
-      // DEBUG: Check what is being sent
-      for (let pair of data.entries()) {
-        console.log(pair[0], pair[1]);
-      }
-
-      const res = await updateStaff(editingStaff.id, data);
-
-      // DEBUG: Check response from backend
-      console.log("UPDATE RESPONSE:", res.data);
-
+      await updateStaff(editingStaff.id, data);
       setEditModalOpen(false);
       setEditingStaff(null);
-
       fetchData();
-
-      alert("Staff updated successfully");
     } catch (err) {
       console.error("UPDATE ERROR:", err);
-      alert(
-        err.response?.data?.message || "Failed to update staff"
-      );
+      alert(err.response?.data?.message || "Failed to update staff");
     }
   };
 
   const filteredStaff = staffList.filter((s) => {
     const staffName = s.name || "";
-
-    const matchesSearch =
-      staffName.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesRole =
-      selectedRole === "All Roles" ||
-      s.role === selectedRole;
-
+    const matchesSearch = staffName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = selectedRole === "All Roles" || s.role === selectedRole;
     const salonName = s.salon_id?.name || "";
-
-    const matchesSalon =
-      selectedSalon === "All Salons" ||
-      salonName === selectedSalon;
+    const matchesSalon = selectedSalon === "All Salons" || salonName === selectedSalon;
 
     return matchesSearch && matchesRole && matchesSalon;
   });
@@ -443,82 +423,119 @@ const Staff = () => {
   const activeCount = filteredStaff.filter((s) => s.status === "Active").length;
 
   return (
-    <div>
-      <PageHeader title="Staff" subtitle="All staff across all salons" backTo="/superAdminDashboard">
+    <div className="space-y-6">
+      <PageHeader title="Staff Management" subtitle="Overview and management of all salon personnel" backTo="/superAdminDashboard">
         <Button variant="primary" icon={Plus} onClick={() => navigate("/AddStaff")}>
-          Add Staff
+          Add Staff Member
         </Button>
       </PageHeader>
 
       {/* Error Alert */}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-accent-dim border border-accent-muted text-sm text-white mb-4">
-          <span className="flex-1">{error}</span>
-          <button onClick={() => setError("")} className="text-muted-2 hover:text-white text-lg leading-none">&times;</button>
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-danger-dim border border-danger-border text-sm text-danger">
+          <span className="flex-1 font-semibold">{error}</span>
+          <button onClick={() => setError("")} className="text-danger hover:text-white text-lg leading-none">&times;</button>
         </div>
       )}
 
       {/* Stats Bar */}
       {!loading && staffList.length > 0 && (
-        <div className="flex flex-wrap gap-3 mb-5">
-          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
-            <Users className="w-4 h-4 text-accent" />
-            <span className="text-xs text-muted-2">Total</span>
+        <div className="flex flex-wrap gap-3">
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
+            <Users className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-semibold text-neutral-400">Total Staff:</span>
             <span className="text-sm font-black text-white">{filteredStaff.length}</span>
           </div>
-          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-success" />
-            <span className="text-xs text-muted-2">Active</span>
-            <span className="text-sm font-black text-success">{activeCount}</span>
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-semibold text-neutral-400">Active Staff:</span>
+            <span className="text-sm font-black text-emerald-400">{activeCount}</span>
           </div>
-          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-muted" />
-            <span className="text-xs text-muted-2">Inactive</span>
-            <span className="text-sm font-black text-muted-2">{filteredStaff.length - activeCount}</span>
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
+            <XCircle className="w-4 h-4 text-neutral-500" />
+            <span className="text-xs font-semibold text-neutral-400">Inactive Staff:</span>
+            <span className="text-sm font-black text-neutral-400">{filteredStaff.length - activeCount}</span>
           </div>
         </div>
       )}
 
-      {/* Filter Bar */}
-      <div className="flex flex-wrap gap-2 mb-5">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-2" />
-          <input
-            placeholder="Search by name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-surface border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
-          />
+      {/* Filter & View Switcher Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            <input
+              placeholder="Search staff by name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium"
+            />
+          </div>
+
+          {/* Role Select */}
+          <div className="relative">
+            <select
+              className="appearance-none bg-surface border border-border rounded-xl px-4 pr-9 py-2.5 text-xs font-bold text-white outline-none cursor-pointer transition-all duration-200 focus:border-amber-400 uppercase tracking-wider"
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+            >
+              <option>All Roles</option>
+              {Array.from(new Set(staffList.map((s) => s.role).filter(Boolean))).map((role) => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
+          </div>
+
+          {/* Salon Select */}
+          <div className="relative">
+            <select
+              className="appearance-none bg-surface border border-border rounded-xl px-4 pr-9 py-2.5 text-xs font-bold text-white outline-none cursor-pointer transition-all duration-200 focus:border-amber-400 uppercase tracking-wider"
+              value={selectedSalon}
+              onChange={(e) => setSelectedSalon(e.target.value)}
+            >
+              <option>All Salons</option>
+              {salons.map((s) => (
+                <option key={s._id} value={s.name}>{s.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
+          </div>
         </div>
-        <div className="relative">
-          <select
-            className="appearance-none bg-surface border border-border rounded-xl px-4 pr-9 py-2.5 text-xs font-bold text-white outline-none cursor-pointer transition-all duration-200 focus:border-accent uppercase tracking-wider"
-            value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value)}
+
+        {/* Layout View Mode Switcher */}
+        <div className="flex items-center bg-surface border border-border rounded-xl p-1 gap-1">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={clsx(
+              "p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+              viewMode === "grid"
+                ? "bg-amber-400 text-black shadow-sm"
+                : "text-neutral-400 hover:text-white"
+            )}
+            title="Grid View"
           >
-            <option>All Roles</option>
-            {Array.from(new Set(staffList.map((s) => s.role))).map((role) => (
-              <option key={role} value={role}>{role}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-2 pointer-events-none" />
-        </div>
-        <div className="relative">
-          <select
-            className="appearance-none bg-surface border border-border rounded-xl px-4 pr-9 py-2.5 text-xs font-bold text-white outline-none cursor-pointer transition-all duration-200 focus:border-accent uppercase tracking-wider"
-            value={selectedSalon}
-            onChange={(e) => setSelectedSalon(e.target.value)}
+            <LayoutGrid className="w-4 h-4" />
+            <span className="hidden sm:inline">Grid</span>
+          </button>
+          <button
+            onClick={() => setViewMode("table")}
+            className={clsx(
+              "p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+              viewMode === "table"
+                ? "bg-amber-400 text-black shadow-sm"
+                : "text-neutral-400 hover:text-white"
+            )}
+            title="Table View"
           >
-            <option>All Salons</option>
-            {salons.map((s) => (
-              <option key={s._id} value={s.name}>{s.name}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-2 pointer-events-none" />
+            <List className="w-4 h-4" />
+            <span className="hidden sm:inline">Table</span>
+          </button>
         </div>
       </div>
 
-      {/* Staff Grid */}
+      {/* Staff Display Content */}
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -527,13 +544,13 @@ const Staff = () => {
         </div>
       ) : filteredStaff.length === 0 ? (
         <EmptyState
-          title="No staff found"
-          description="No staff members match your current filters."
+          title="No staff members found"
+          description="No staff members match your search filters."
           icon={Users}
-          actionLabel="Add Staff"
+          actionLabel="Add Staff Member"
           onAction={() => navigate("/AddStaff")}
         />
-      ) : (
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredStaff.map((s, i) => (
             <StaffCard
@@ -546,150 +563,167 @@ const Staff = () => {
             />
           ))}
         </div>
+      ) : (
+        /* Table View */
+        <Table>
+          <Table.Head>
+            <Table.Th>Staff Member</Table.Th>
+            <Table.Th>Role</Table.Th>
+            <Table.Th>Salon Location</Table.Th>
+            <Table.Th>Assigned Services</Table.Th>
+            <Table.Th>Status</Table.Th>
+            <Table.Th align="right">Actions</Table.Th>
+          </Table.Head>
+          <Table.Body>
+            {filteredStaff.map((s) => {
+              const salonName = s.salon_id?.name || s.salonName || "Unassigned";
+              const isActive = s.status === "Active";
+              const servicesCount = s.services?.length || 0;
+
+              return (
+                <tr key={s._id} className="hover:bg-surface-2/60 transition-colors">
+                  <Table.Td bold className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs">
+                      {(s.name || s.full_name || "S").charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-white font-extrabold text-sm">{s.name || s.full_name}</p>
+                      <p className="text-2xs text-neutral-400">{s.email || "No email"}</p>
+                    </div>
+                  </Table.Td>
+                  <Table.Td className="text-amber-400 font-semibold text-xs">{s.role || "Stylist"}</Table.Td>
+                  <Table.Td className="text-neutral-300 text-xs">{salonName}</Table.Td>
+                  <Table.Td className="text-xs text-neutral-400">{servicesCount} Services Assigned</Table.Td>
+                  <Table.Td>
+                    <Badge variant={isActive ? "success" : "neutral"} dot>
+                      {s.status}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td align="right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleEdit(s)}
+                        className="p-1.5 rounded-lg bg-surface-2 text-info hover:bg-info/20 transition-colors"
+                        title="Edit Staff"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(s._id)}
+                        className="p-1.5 rounded-lg bg-surface-2 text-danger hover:bg-danger/20 transition-colors"
+                        title="Delete Staff"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </Table.Td>
+                </tr>
+              );
+            })}
+          </Table.Body>
+        </Table>
       )}
 
       {/* Edit Staff Modal */}
-      {editModalOpen && editingStaff && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-xl p-6 w-[600px] max-h-[90vh] overflow-y-auto">
-
-            <h2 className="text-xl font-bold text-white mb-4">
-              Edit Staff
-            </h2>
-
-            {/* First Name */}
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">First Name</label>
-              <input
-                type="text"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
-                value={editingStaff.firstName}
-                onChange={(e) =>
-                  setEditingStaff({
-                    ...editingStaff,
-                    firstName: e.target.value,
-                  })
-                }
-              />
-            </div>
-
-            {/* Last Name */}
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Last Name</label>
-              <input
-                type="text"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
-                value={editingStaff.lastName}
-                onChange={(e) =>
-                  setEditingStaff({
-                    ...editingStaff,
-                    lastName: e.target.value,
-                  })
-                }
-              />
-            </div>
-
-            {/* Email */}
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Email</label>
-              <input
-                type="email"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent focus:shadow-glow-sm placeholder:text-muted-2"
-                value={editingStaff.email}
-                onChange={(e) =>
-                  setEditingStaff({
-                    ...editingStaff,
-                    email: e.target.value,
-                  })
-                }
-              />
-            </div>
-
-            <div className="mb-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Salary Frequency */}
-                <div>
-                  <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-                    Payment Frequency
-                  </label>
-                  <select
-                    value={editingStaff.salaryPaymentFrequency}
-                    onChange={(e) =>
-                      setEditingStaff({
-                        ...editingStaff,
-                        salaryPaymentFrequency: e.target.value,
-                      })
-                    }
-                    className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-
-                {/* Salary Amount */}
-                <div>
-                  <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-                    Salary Amount Per Day (LKR)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={editingStaff.salaryPaymentCountPerDay}
-                    onChange={(e) =>
-                      setEditingStaff({
-                        ...editingStaff,
-                        salaryPaymentCountPerDay: e.target.value,
-                      })
-                    }
-                    placeholder="Enter daily salary"
-                    className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
-                  />
-                </div>
+      <Modal
+        isOpen={editModalOpen && !!editingStaff}
+        onClose={() => setEditModalOpen(false)}
+        title="✏️ Edit Staff Member"
+        maxWidth="max-w-xl"
+      >
+        {editingStaff && (
+          <div className="space-y-4 pt-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">First Name</label>
+                <input
+                  type="text"
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
+                  value={editingStaff.firstName}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, firstName: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Last Name</label>
+                <input
+                  type="text"
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
+                  value={editingStaff.lastName}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, lastName: e.target.value })}
+                />
               </div>
             </div>
 
-            {/* Salon */}
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Salon</label>
+            <div>
+              <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Email Address</label>
+              <input
+                type="email"
+                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
+                value={editingStaff.email}
+                onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Payment Frequency</label>
+                <select
+                  value={editingStaff.salaryPaymentFrequency}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, salaryPaymentFrequency: e.target.value })}
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Daily Salary (LKR)</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editingStaff.salaryPaymentCountPerDay}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, salaryPaymentCountPerDay: e.target.value })}
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Assigned Salon</label>
               <select
                 value={editingStaff.salon}
                 onChange={(e) => handleEditSalonChange(e.target.value)}
-                className="w-full p-2 rounded bg-surface-2 text-white"
+                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
               >
                 <option value="">Select Salon</option>
-
                 {salons.map((salon) => (
-                  <option key={salon._id} value={salon._id}>
-                    {salon.name}
-                  </option>
+                  <option key={salon._id} value={salon._id}>{salon.name}</option>
                 ))}
               </select>
             </div>
 
-            {/* Services */}
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Services</label>
-              <div className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3">
+            <div>
+              <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Assigned Services</label>
+              <div className="bg-surface-2 border border-border rounded-xl p-3">
                 {!editingStaff.salon ? (
-                  <p className="text-xs text-muted-2">Select a salon to choose services.</p>
+                  <p className="text-xs text-neutral-400">Select a salon first to view services.</p>
                 ) : servicesLoading ? (
-                  <p className="text-xs text-muted-2">Loading services...</p>
+                  <p className="text-xs text-neutral-400">Loading salon services...</p>
                 ) : services.length === 0 ? (
-                  <p className="text-xs text-muted-2">No services found for this salon.</p>
+                  <p className="text-xs text-neutral-400">No services available for this salon.</p>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
                     {services.map((service) => (
                       <label
                         key={service._id}
-                        className="flex items-center gap-2.5 rounded-md border border-border bg-surface px-3 py-2 text-sm text-white cursor-pointer hover:border-accent/50 transition-colors"
+                        className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-white cursor-pointer hover:border-amber-400/40"
                       >
                         <input
                           type="checkbox"
                           checked={editingStaff.services.includes(service._id)}
                           onChange={() => handleEditServiceToggle(service._id)}
-                          className="h-4 w-4 accent-yellow-400"
+                          className="h-3.5 w-3.5 accent-amber-400"
                         />
                         <span className="truncate">{service.service_name}</span>
                       </label>
@@ -699,79 +733,27 @@ const Staff = () => {
               </div>
             </div>
 
-            {/* Status */}
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">Status</label>
-              <select
-                value={editingStaff.status}
-                onChange={(e) =>
-                  setEditingStaff({
-                    ...editingStaff,
-                    status: e.target.value,
-                  })
-                }
-                className="w-full p-2 rounded bg-surface-2 text-white"
-              >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-
-            {/* Current Image */}
-            {editingStaff.currentImage && (
-              <div className="mb-3">
-                <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-                  Current Image
-                </label>
-
-                <img
-                  src={`${API_BASE}/${editingStaff.currentImage}`}
-                  alt="staff"
-                  className="w-24 h-24 rounded-lg object-cover border"
-                />
-              </div>
-            )}
-
-            {/* Upload New Image */}
-            <div className="mb-4">
-              <label className="block text-xs font-bold text-muted-2 uppercase tracking-wider mb-1.5">
-                Change Profile Picture
-              </label>
-
+            <div>
+              <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Profile Picture</label>
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) =>
-                  setEditingStaff({
-                    ...editingStaff,
-                    picture: e.target.files[0],
-                  })
-                }
-                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
+                onChange={(e) => setEditingStaff({ ...editingStaff, picture: e.target.files[0] })}
+                className="w-full bg-surface-2 border border-border rounded-xl px-3.5 py-2.5 text-xs text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-400 file:text-black file:cursor-pointer"
               />
             </div>
-
-            {/* Buttons */}
-            <div className="flex gap-2.5 justify-end mt-5 pt-4 border-t border-border">
-              <button
-                onClick={() => setEditModalOpen(false)}
-                className="px-4 py-2 rounded bg-gray-600 text-white"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={handleUpdateStaff}
-                className="px-4 py-2 rounded bg-accent text-black font-semibold"
-              >
-                Save Changes
-              </button>
-            </div>
-
           </div>
-        </div>
-      )}
+        )}
 
+        <Modal.Actions>
+          <Button variant="ghost" size="sm" onClick={() => setEditModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" onClick={handleUpdateStaff}>
+            Save Changes
+          </Button>
+        </Modal.Actions>
+      </Modal>
     </div>
   );
 };
