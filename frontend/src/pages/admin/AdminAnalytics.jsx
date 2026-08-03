@@ -17,6 +17,7 @@ import { getStaff } from "../../services/staffService";
 import { getServices } from "../../services/serviceService";
 
 import Card from "../../components/ui/Card";
+import PageHeader from "../../components/ui/PageHeader";
 import Spinner from "../../components/ui/Spinner";
 
 const COLORS = ["#8b5cf6", "#10b981", "#ef4444", "#f59e0b", "#3b82f6", "#ec4899", "#14b8a6", "#6366f1"];
@@ -232,29 +233,31 @@ export default function AdminAnalytics() {
   );
 
   return (
-    <div className="p-6 max-w-7xl mx-auto pb-20">
-      
-      {/* Header & Filters */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-black text-white">Business Analytics</h1>
-          <p className="text-sm text-muted-2 mt-1">Monitor your salon's performance and growth</p>
-        </div>
-        
-        <select 
-          value={dateRange} 
-          onChange={(e) => setDateRange(e.target.value)}
-          className="bg-surface-2 border border-border text-white text-sm rounded-lg focus:ring-accent focus:border-accent block p-2.5 outline-none min-w-[160px]"
-        >
-          <option value="today">Today</option>
-          <option value="yesterday">Yesterday</option>
-          <option value="7days">Last 7 Days</option>
-          <option value="30days">Last 30 Days</option>
-          <option value="90days">Last 90 Days</option>
-          <option value="year">This Year</option>
-          <option value="all">All Time</option>
-        </select>
-      </div>
+  <div className="p-6 max-w-7xl mx-auto pb-20 min-h-[60vh]">
+
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+
+      <PageHeader
+        title="Business Analytics"
+        subtitle="Monitor your salon's performance and growth"
+        backTo={`/salon-admin/${salonId}/adminDashboard`}
+      />
+
+      <select
+        value={dateRange}
+        onChange={(e) => setDateRange(e.target.value)}
+        className="bg-surface-2 border border-border text-white text-sm rounded-lg focus:ring-accent focus:border-accent block p-2.5 outline-none min-w-[160px]"
+      >
+        <option value="today">Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="7days">Last 7 Days</option>
+        <option value="30days">Last 30 Days</option>
+        <option value="90days">Last 90 Days</option>
+        <option value="year">This Year</option>
+        <option value="all">All Time</option>
+      </select>
+
+    </div>
 
       {error && (
         <div className="px-4 py-3 rounded-lg bg-danger-dim border border-danger/30 text-sm text-danger font-medium mb-6">

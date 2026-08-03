@@ -8,6 +8,7 @@ import Notification from "../models/Notification.js";
 import Admin from "../models/Admin.js";
 import Customer from "../models/Customer.js";
 import mongoose from "mongoose";
+import { processSalaryOnCompletion } from "./salaryController.js";
 
 // ─── Helper: add hours to a "HH:MM" string ──────────────────────────────────
 const addHours = (timeStr, hours) => {
@@ -869,6 +870,14 @@ export const completeAppointment = async (req, res) => {
 
     appointment.status = "completed";
     await appointment.save();
+
+    // SALARY: Process salary calculation for completed appointment
+    try {
+      await processSalaryOnCompletion(appointment);
+      console.log(`Salary processed for appointment ${appointment._id}`);
+    } catch (salaryErr) {
+      console.error("Failed to process salary:", salaryErr);
+    }
 
     // NOTIFICATION: Notify the customer
     try {

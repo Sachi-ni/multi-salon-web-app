@@ -55,10 +55,10 @@ export default function SuperAdminReviews() {
   return (
     <div className="max-w-6xl mx-auto pb-12">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-8">
-        <PageHeader 
-          title="All Reviews" 
-          subtitle="Monitor customer feedback across your entire network" 
-          hideBack 
+        <PageHeader
+          title="All Reviews"
+          subtitle="Monitor customer feedback across your entire network"
+          backTo="/superAdminDashboard"
         />
         
         {/* Salon Filter Dropdown */}
