@@ -385,7 +385,9 @@ const Salary = () => {
       const doc = new jsPDF("p", "mm", "a4");
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 15;
+      const margin = 12;
+      const contentWidth = pageWidth - margin * 2;
+      const rowHeight = 7;
       let yPos = margin;
 
       const salon = salary.salon_id || {};
@@ -395,7 +397,6 @@ const Salary = () => {
       const frequencyLabel = frequency.charAt(0).toUpperCase() + frequency.slice(1);
       const isWeekly = frequency === "weekly";
       const isMonthly = frequency === "monthly";
-      const rowHeight = 7;
       const rows = Array.isArray(salary.dailyRecords) && salary.dailyRecords.length > 0
         ? salary.dailyRecords
         : [{
@@ -424,23 +425,27 @@ const Salary = () => {
         return `LKR ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       };
 
-      const drawBanner = (text, top) => {
+      const drawBanner = () => {
         doc.setFillColor(255, 215, 0);
-        doc.rect(0, top, pageWidth, 45, "F");
+        doc.rect(0, 0, pageWidth, 42, "F");
         doc.setTextColor(0, 0, 0);
-        doc.setFont(undefined, "bold");
-        doc.setFontSize(18);
-        doc.text(text, pageWidth / 2, top + 12, { align: "center" });
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(20);
+        doc.text("SALARY PAYMENT SLIP", pageWidth / 2, 14, { align: "center" });
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${frequencyLabel} Salary Report`, pageWidth / 2, 28, { align: "center" });
       };
 
       const drawSection = (title) => {
-        doc.setFillColor(245, 245, 245);
-        doc.rect(margin, yPos - 5, pageWidth - margin * 2, 8, "F");
-        doc.setTextColor(0, 0, 0);
+        yPos += 2;
+        doc.setFillColor(70, 130, 180);
+        doc.rect(margin, yPos - 4, contentWidth, 8, "F");
+        doc.setTextColor(255, 255, 255);
         doc.setFontSize(9);
-        doc.setFont(undefined, "bold");
-        doc.text(title, margin + 2, yPos);
-        yPos += 8;
+        doc.setFont("helvetica", "bold");
+        doc.text(title, margin + 3, yPos + 1);
+        yPos += 10;
       };
 
       const ensureSpace = (needed) => {
@@ -449,158 +454,210 @@ const Salary = () => {
         yPos = margin;
       };
 
+      const labelWidth = 50;
+      const drawInfoRow = (label, value) => {
+        ensureSpace(6);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(60, 60, 60);
+        doc.text(label, margin + 3, yPos);
+        
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+        const valueText = String(value ?? "N/A");
+        const wrappedValue = doc.splitTextToSize(valueText, contentWidth - labelWidth - 5);
+        doc.text(wrappedValue, margin + labelWidth + 2, yPos);
+        yPos += Math.max(5.5, wrappedValue.length * 3.5);
+      };
+
       const periodLabel = isWeekly
         ? `${formatDate(salary.dateRange?.start || salary.period)} to ${formatDate(salary.dateRange?.end || salary.period)}`
         : isMonthly
           ? (salary.period || formatDate(salary.dateRange?.start))
           : formatDate(salary.period);
 
-      drawBanner("SALARY PAYMENT SLIP", 0);
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(10);
-      doc.setFont(undefined, "bold");
-      doc.text(`${frequencyLabel} SALARY REPORT`, pageWidth / 2, 20, { align: "center" });
+      drawBanner();
+      yPos = 48;
 
-      doc.setFontSize(9);
-      doc.setFont(undefined, "normal");
-      doc.text(`Payment Type    : ${frequencyLabel}`, margin, 27);
-      doc.text(`Salary Period   : ${periodLabel}`, margin, 34);
-      doc.text(`Salon Name      : ${salon.name || "N/A"}`, pageWidth - margin, 27, { align: "right" });
-      doc.text(`Salon Location  : ${salon.location || "N/A"}`, pageWidth - margin, 34, { align: "right" });
-
-      yPos = 52;
-      drawSection("STAFF INFORMATION");
-      doc.setFont(undefined, "normal");
-      doc.text(`Staff Name      : ${staff.full_name || salary.staff_name || "N/A"}`, margin + 2, yPos);
+      // Header Info Section
+      doc.setTextColor(30, 30, 30);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      
+      // Left column
+      doc.text("Payment Type", margin + 2, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.text(`: ${frequencyLabel}`, margin + 35, yPos);
+      
+      // Right column
+      doc.setFont("helvetica", "bold");
+      doc.text("Salon Name", pageWidth - margin - 50, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.text(`: ${salon.name || "N/A"}`, pageWidth - margin - 15, yPos);
+      
       yPos += 6;
-      doc.text(`Staff email     : ${staff.email || "N/A"}`, margin + 2, yPos);
-      yPos += 10;
+      doc.setFont("helvetica", "bold");
+      doc.text("Salary Period", margin + 2, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.text(`: ${periodLabel}`, margin + 35, yPos);
+      
+      doc.setFont("helvetica", "bold");
+      doc.text("Location", pageWidth - margin - 50, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.text(`: ${salon.location || "N/A"}`, pageWidth - margin - 15, yPos);
+      
+      yPos += 8;
 
-      drawSection("SERVICES");
-      doc.setFontSize(7.8);
-      doc.setFont(undefined, "bold");
-      const serviceHeaders = ["Service", "Amount"];
-      const serviceCols = [120, pageWidth - margin * 2 - 120];
-      doc.setFillColor(50, 50, 50);
-      doc.rect(margin, yPos - 5, pageWidth - margin * 2, rowHeight, "F");
+      // Staff Information Section
+      drawSection("STAFF INFORMATION");
+      drawInfoRow("Full Name", staff.full_name || salary.staff_name || "N/A");
+      drawInfoRow("Email", staff.email || "N/A");
+      yPos += 1;
+
+      // Services Section
+      drawSection("SERVICES ASSIGNED");
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setFillColor(70, 130, 180);
+      doc.rect(margin, yPos - 4, contentWidth, rowHeight, "F");
       doc.setTextColor(255, 255, 255);
-      let serviceCx = margin;
-      serviceHeaders.forEach((header, index) => {
-        doc.text(header, serviceCx + 2, yPos);
-        serviceCx += serviceCols[index];
-      });
-      yPos += rowHeight;
+      doc.text("Service Name", margin + 2, yPos + 1);
+      doc.text("Amount", pageWidth - margin - 22, yPos + 1, { align: "left" });
+      yPos += rowHeight + 1;
 
-      doc.setFont(undefined, "normal");
+      doc.setFont("helvetica", "normal");
       doc.setTextColor(0, 0, 0);
-      let servicesTotal = 0;
       const serviceRows = services.length > 0
         ? services
-        : [{ service_name: "No services available", base_price: 0 }];
+        : [{ service_name: "No services assigned", base_price: 0 }];
 
       serviceRows.forEach((service, index) => {
-        ensureSpace(rowHeight + 4);
-        doc.setFillColor(index % 2 === 0 ? 248 : 255, index % 2 === 0 ? 248 : 255, index % 2 === 0 ? 248 : 255);
-        doc.rect(margin, yPos - 5, pageWidth - margin * 2, rowHeight, "F");
+        ensureSpace(rowHeight + 2);
+        doc.setFillColor(...(index % 2 === 0 ? [250, 250, 250] : [240, 248, 255]));
+        doc.rect(margin, yPos - 3.5, contentWidth, rowHeight, "F");
+        doc.setLineWidth(0.1);
+        doc.setDrawColor(220, 220, 220);
+        doc.line(margin, yPos + 2.5, pageWidth - margin, yPos + 2.5);
+        
         const serviceName = service?.service_name || service?.name || "Service";
         const serviceAmount = Number(service?.base_price ?? service?.price ?? 0);
-        servicesTotal += serviceAmount;
-        doc.text(serviceName, margin + 2, yPos);
-        doc.text(formatMoney(serviceAmount), margin + serviceCols[0] + 2, yPos);
-        yPos += rowHeight;
+        const wrappedName = doc.splitTextToSize(serviceName, contentWidth - 50);
+        doc.setFontSize(8);
+        doc.text(wrappedName, margin + 2, yPos + 1);
+        doc.text(formatMoney(serviceAmount), pageWidth - margin - 2, yPos + 1, { align: "right" });
+        yPos += Math.max(rowHeight, wrappedName.length * 3.5) + 0.5;
       });
 
-      yPos += 6;
+      yPos += 3;
 
+      // Daily Records Section
       drawSection("DAILY RECORDS");
       doc.setFontSize(7.5);
-      doc.setFont(undefined, "bold");
-      doc.setFillColor(50, 50, 50);
-
-      const columns = isWeekly
-        ? [20, 34, 30, 18, 30, 30]
-        : [34, 30, 18, 34, 30];
-      const tableWidth = pageWidth - margin * 2;
-
-      const drawHeaderRow = (headers) => {
-        let cx = margin;
-        doc.setFillColor(50, 50, 50);
-        doc.rect(margin, yPos - 5, tableWidth, rowHeight, "F");
-        doc.setTextColor(255, 255, 255);
-        headers.forEach((header, index) => {
-          doc.text(header, cx + 2, yPos);
-          cx += columns[index];
-        });
-        yPos += rowHeight;
-      };
-
-      const drawDataRow = (cells, evenRow) => {
-        ensureSpace(rowHeight + 4);
-        doc.setFillColor(evenRow ? 248 : 255, evenRow ? 248 : 255, evenRow ? 248 : 255);
-        doc.rect(margin, yPos - 5, tableWidth, rowHeight, "F");
-        doc.setTextColor(0, 0, 0);
-        let cx = margin;
-        cells.forEach((cell, index) => {
-          doc.text(String(cell ?? ""), cx + 2, yPos);
-          cx += columns[index];
-        });
-        yPos += rowHeight;
-      };
+      doc.setFont("helvetica", "bold");
+      doc.setFillColor(70, 130, 180);
+      doc.rect(margin, yPos - 4, contentWidth, rowHeight, "F");
+      doc.setTextColor(255, 255, 255);
 
       if (isWeekly) {
-        drawHeaderRow(["Day", "WorkingAmount", "Rate", "DaySalary"]);
-        rows.forEach((record, index) => {
+        doc.text("Day", margin + 2, yPos + 1);
+        doc.text("Amount", margin + 25, yPos + 1);
+        doc.text("Rate %", margin + 65, yPos + 1);
+        doc.text("Salary", pageWidth - margin - 22, yPos + 1, { align: "left" });
+      } else {
+        doc.text("Date", margin + 2, yPos + 1);
+        doc.text("Amount", margin + 25, yPos + 1);
+        doc.text("Rate %", margin + 65, yPos + 1);
+        doc.text("Work Rate", margin + 95, yPos + 1);
+        doc.text("Day Salary", pageWidth - margin - 22, yPos + 1, { align: "left" });
+      }
+      yPos += rowHeight + 1;
+
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(8);
+      rows.forEach((record, index) => {
+        ensureSpace(rowHeight + 2);
+        doc.setFillColor(...(index % 2 === 0 ? [250, 250, 250] : [240, 248, 255]));
+        doc.rect(margin, yPos - 3.5, contentWidth, rowHeight, "F");
+        doc.setLineWidth(0.1);
+        doc.setDrawColor(220, 220, 220);
+        doc.line(margin, yPos + 2.5, pageWidth - margin, yPos + 2.5);
+        
+        if (isWeekly) {
           const dateValue = record.date || salary.dateRange?.start;
           const dayName = new Date(dateValue).toLocaleDateString("en-US", { weekday: "short" });
-          drawDataRow([
-            dayName,
-            formatMoney(record.workingAmount),
-            `${Number(record.rate || salary.rate || 0)}%`,
-            formatMoney(record.daySalary),
-          ], index % 2 === 0);
-        });
-      } else {
-        drawHeaderRow(["Date", "WorkingAmount", "Rate", "WorkRate", "DaySalary"]);
-        rows.forEach((record, index) => {
-          drawDataRow([
-            formatDate(record.date),
-            formatMoney(record.workingAmount),
-            `${Number(record.rate || salary.rate || 0)}%`,
-            formatMoney(record.workRate),
-            formatMoney(record.daySalary),
-          ], index % 2 === 0);
-        });
-      }
+          doc.text(dayName, margin + 2, yPos + 1);
+          doc.text(formatMoney(record.workingAmount), margin + 25, yPos + 1);
+          doc.text(`${Number(record.rate || salary.rate || 0)}%`, margin + 65, yPos + 1);
+          doc.text(formatMoney(record.daySalary), pageWidth - margin - 2, yPos + 1, { align: "right" });
+        } else {
+          doc.text(formatDate(record.date), margin + 2, yPos + 1);
+          doc.text(formatMoney(record.workingAmount), margin + 25, yPos + 1);
+          doc.text(`${Number(record.rate || salary.rate || 0)}%`, margin + 65, yPos + 1);
+          doc.text(formatMoney(record.workRate), margin + 95, yPos + 1);
+          doc.text(formatMoney(record.daySalary), pageWidth - margin - 2, yPos + 1, { align: "right" });
+        }
+        yPos += rowHeight + 0.5;
+      });
 
-      yPos += 4;
-      doc.setDrawColor(250, 204, 21);
-      doc.setLineWidth(0.8);
-      doc.line(margin, yPos, pageWidth - margin, yPos);
-      yPos += 4;
+      yPos += 3;
 
-      drawSection("SUMMARY");
-      doc.setFont(undefined, "normal");
-      doc.text(`Total Working Amount : ${formatMoney(totalWorkingAmount)}`, margin + 2, yPos);
-      yPos += 7;
-      doc.text(`Total Work Rate      : ${formatMoney(totalWorkRate)}`, margin + 2, yPos);
-      yPos += 7;
-      doc.text(`Total Salary         : ${formatMoney(totalSalary)}`, margin + 2, yPos);
-      yPos += 7;
-      doc.text(`Status               : ${salary.status || "Not Paid"}`, margin + 2, yPos);
-      yPos += 7;
-      if (salary.paidAt) {
-        doc.text(`Paid Date            : ${formatDate(salary.paidAt)}`, margin + 2, yPos);
-        yPos += 7;
-      }
-
-      yPos = pageHeight - 20;
-      doc.setDrawColor(250, 204, 21);
-      doc.setLineWidth(0.3);
+      // Divider
+      doc.setDrawColor(255, 215, 0);
+      doc.setLineWidth(1);
       doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 5;
-      doc.setTextColor(100, 100, 100);
-      doc.setFontSize(8);
-      doc.text("This is a computer-generated salary slip", pageWidth / 2, yPos, { align: "center" });
+
+      // Summary Section with creative styling
+      drawSection("PAYMENT SUMMARY");
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      
+      // Summary with background boxes
+      const summaryItems = [
+        { label: "Total Working Amount", value: formatMoney(totalWorkingAmount), color: [230, 240, 250] },
+        { label: "Total Work Rate", value: formatMoney(totalWorkRate), color: [240, 250, 240] },
+        { label: "TOTAL SALARY", value: formatMoney(totalSalary), color: [255, 250, 240] },
+        { label: "Payment Status", value: salary.status || "Not Paid", color: [255, 240, 245] },
+      ];
+
+      summaryItems.forEach((item, idx) => {
+        ensureSpace(7);
+        doc.setFillColor(...item.color);
+        doc.rect(margin, yPos - 3.5, contentWidth, 7, "F");
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.3);
+        doc.rect(margin, yPos - 3.5, contentWidth, 7);
+        
+        doc.setTextColor(30, 30, 30);
+        doc.text(item.label, margin + 3, yPos + 1);
+        doc.setTextColor(...(idx === 2 ? [180, 40, 40] : [60, 60, 60]));
+        doc.setFont("helvetica", "bold");
+        doc.text(item.value, pageWidth - margin - 2, yPos + 1, { align: "right" });
+        yPos += 8;
+      });
+
+      if (salary.paidAt) {
+        ensureSpace(6);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80, 80, 80);
+        doc.text(`Paid Date: ${formatDate(salary.paidAt)}`, margin + 3, yPos);
+        yPos += 6;
+      }
+
+      // Footer
+      yPos = pageHeight - 18;
+      doc.setDrawColor(255, 215, 0);
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 4;
+      doc.setTextColor(120, 120, 120);
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "italic");
+      doc.text("✓ This is a computer-generated salary slip. No signature required.", pageWidth / 2, yPos, { align: "center" });
+      yPos += 3;
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: "center" });
 
       const fileName = `salary_slip_${staff.full_name || salary.staff_name || "staff"}_${salary.period}_${salary.frequency}.pdf`;
       doc.save(fileName);
