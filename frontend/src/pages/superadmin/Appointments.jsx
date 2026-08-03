@@ -12,6 +12,13 @@ import {
   deleteAppointment
 } from "../../services/appointmentService";
 
+const SALARY_REFRESH_KEY = "salary-refresh-token";
+
+const triggerSalaryRefresh = () => {
+  localStorage.setItem(SALARY_REFRESH_KEY, String(Date.now()));
+  window.dispatchEvent(new Event("salary-refresh"));
+};
+
 const STATUS_FILTERS = ["all", "pending", "confirmed", "completed", "rejected", "cancelled"];
 
 const STATUS_COLORS = {
@@ -111,6 +118,7 @@ export default function Appointments() {
     setActionError("");
     try {
       await completeAppointment(id);
+      triggerSalaryRefresh();
       fetchAppointments();
     } catch {
       setActionError(`${id}:Failed to complete appointment.`);
