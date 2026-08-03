@@ -236,6 +236,12 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
                     className="px-2 py-1 rounded-md bg-accent-dim border border-accent-muted text-[0.65rem] font-bold text-accent"
                   >
                     {service.service_name || service}
+                    {service.base_price !== undefined ? (
+                      <span className="ml-1 text-muted-2">({service.base_price})</span>
+                    ) : null}
+
+                    {/* Staff-specific editable fields (working hours / rate%) are stored in Salary rows,
+                        not on Staff. We show them as editable placeholders in Salary UI instead. */}
                   </span>
                 ))}
               </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getSalon } from "../../services/salonService";
 
@@ -28,24 +28,21 @@ const AdminDashboard = () => {
   const [salon, setSalon] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchSalon();
-  }, [salonId]);
-
-  const fetchSalon = async () => {
+  const fetchSalon = useCallback(async () => {
     try {
       setLoading(true);
-
       const res = await getSalon(salonId);
-
       setSalon(res.data);
-
     } catch (err) {
       console.error("Failed to load salon:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [salonId]);
+
+  useEffect(() => {
+    fetchSalon();
+  }, [fetchSalon]);
 
   const stats = [
     {
@@ -86,7 +83,7 @@ const AdminDashboard = () => {
       path: "/AddStaff",
     },
     {
-      label: "Manage Billing",
+      label: "Manage Report",
       icon: DollarSign,
       path: "/Billing",
     },

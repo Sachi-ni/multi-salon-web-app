@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+
 import PageHeader from "../../components/ui/PageHeader";
 import {
   getSalonAppointments,
@@ -11,6 +11,7 @@ import {
   updateAppointmentDuration,
   deleteAppointment
 } from "../../services/appointmentService";
+import { getSalons } from "../../services/salonService";
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";
 
@@ -30,7 +31,7 @@ const STATUS_COLORS = {
 };
 
 export default function Appointments() {
-  const { user } = useAuth();
+
   const navigate = useNavigate();
   
   const [appointments, setAppointments] = useState([]);
@@ -40,6 +41,9 @@ export default function Appointments() {
   const [error, setError]               = useState("");
   const [actionLoading, setActionLoading] = useState("");
   const [actionError, setActionError]     = useState("");
+
+  const [salons, setSalons] = useState([]);
+  const [salonFilter, setSalonFilter] = useState("all");
   
   // Duration edit state
   const [editingDuration, setEditingDuration] = useState("");
@@ -48,20 +52,29 @@ export default function Appointments() {
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
 
-  const fetchAppointments = () => {
+  const fetchAppointments = useCallback(() => {
     setLoading(true);
     setError("");
-    // Superadmin doesn't need to pass a specific salonId to get all appointments now
-    getSalonAppointments("all", filter === "all" ? "" : filter, dateFilter)
+    getSalonAppointments(salonFilter, filter === "all" ? "" : filter, dateFilter)
       .then(res => setAppointments(res.data))
       .catch((err) => {
         console.error("API Error in fetchAppointments:", err, err.response);
         setError("Failed to load appointments.");
       })
       .finally(() => setLoading(false));
-  };
+  }, [salonFilter, filter, dateFilter]);
 
-  useEffect(() => { fetchAppointments(); }, [filter, dateFilter]);
+  const fetchSalons = useCallback(() => {
+    getSalons()
+      .then(res => setSalons(res.data || []))
+      .catch(err => console.error("Failed to load salons for filter:", err));
+  }, []);
+
+  useEffect(() => { 
+    fetchSalons();
+  }, [fetchSalons]);
+
+  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
   useEffect(() => {
     if (highlightId && !loading && appointments.length > 0) {
@@ -179,18 +192,17 @@ export default function Appointments() {
 
   return (
     <div>
-      <PageHeader title="All Appointments" subtitle="Manage and view all customer bookings across all salons" backTo="/superAdminDashboard"></PageHeader>
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <PageHeader title="All Appointments" subtitle="Manage and view all customer bookings across all salons" backTo="/superAdminDashboard">
         <button
           onClick={() => navigate("/AddAppointment")}
-          className="px-5 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 hover:shadow-glow flex items-center gap-2 w-fit"
+          className="px-5 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 hover:shadow-glow flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
           </svg>
           Create Appointment
         </button>
-      </div>
+      </PageHeader>
 
       {/* FILTERS */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -210,32 +222,53 @@ export default function Appointments() {
           ))}
         </div>
         
-        {/* Date Filter */}
-        <div className="flex items-center gap-3 bg-surface-2 p-1.5 pl-4 rounded-xl border border-surface group focus-within:border-accent transition-all duration-300">
-          <label className="text-sm font-bold text-muted-2 whitespace-nowrap flex items-center gap-2">
-            <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Date:
-          </label>
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            style={{ colorScheme: 'dark' }}
-            className="bg-transparent text-white text-sm font-bold focus:outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-          />
-          {dateFilter && (
-            <button
-              onClick={() => setDateFilter("")}
-              title="Clear date filter"
-              className="w-7 h-7 rounded-lg bg-danger-dim text-danger hover:bg-danger hover:text-white flex items-center justify-center transition-all duration-200"
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Salon Filter */}
+          <div className="flex items-center gap-2 bg-surface-2 p-1.5 pl-4 rounded-xl border border-surface group focus-within:border-accent transition-all duration-300">
+            <label className="text-sm font-bold text-muted-2 whitespace-nowrap">
+              Salon:
+            </label>
+            <select
+              value={salonFilter}
+              onChange={(e) => setSalonFilter(e.target.value)}
+              className="bg-transparent text-white text-sm font-bold focus:outline-none cursor-pointer outline-none"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              <option value="all" className="bg-surface">All Salons</option>
+              {salons.map(salon => (
+                <option key={salon._id} value={salon._id} className="bg-surface">
+                  {salon.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Filter */}
+          <div className="flex items-center gap-3 bg-surface-2 p-1.5 pl-4 rounded-xl border border-surface group focus-within:border-accent transition-all duration-300">
+            <label className="text-sm font-bold text-muted-2 whitespace-nowrap flex items-center gap-2">
+              <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-            </button>
-          )}
+              Date:
+            </label>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              style={{ colorScheme: 'dark' }}
+              className="bg-transparent text-white text-sm font-bold focus:outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+            />
+            {dateFilter && (
+              <button
+                onClick={() => setDateFilter("")}
+                title="Clear date filter"
+                className="w-7 h-7 rounded-lg bg-danger-dim text-danger hover:bg-danger hover:text-white flex items-center justify-center transition-all duration-200"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -262,8 +295,11 @@ export default function Appointments() {
           const isActionLoading = actionLoading === a._id;
           const appointmentError = getActionError(a._id);
 
-          const requiredSlots = a.duration ? Math.ceil(a.duration / 60) : 1;
-          const durationHours = a.duration ? (a.duration / 60).toFixed(1).replace(/\.0$/, "") : "1";
+          const totalDurationMins = a.appointment_services && a.appointment_services.length > 0
+            ? a.appointment_services.reduce((sum, s) => sum + (s.service_id?.duration || 0), 0)
+            : (a.duration || 60);
+          const durationHours = Math.ceil(totalDurationMins / 60);
+          const requiredSlots = durationHours;
 
           return (
             <div
@@ -305,64 +341,93 @@ export default function Appointments() {
 
               {/* Service + Staff + Time details */}
               <div className="bg-surface-2 rounded-lg p-4 mb-4 space-y-3">
-                {/* Service */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Service</p>
-                    <p className="text-white font-bold text-sm">{a.service_id?.service_name}</p>
-                  </div>
-                  <p className="text-accent font-extrabold text-sm">LKR {a.total_price || a.service_id?.base_price}</p>
-                </div>
-
-                {/* Staff + Time */}
-                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Staff</p>
-                    <p className="text-white text-xs font-bold">{a.staff_id?.full_name}</p>
-                    {a.staff_id?.specification && (
-                      <p className="text-muted-2 text-2xs">{a.staff_id?.specification}</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Time</p>
-                    <p className="text-white text-xs font-bold">
-                      {formatTime(a.start_time)} — {formatTime(a.end_time)}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider">Duration</p>
-                      {a.status === "pending" && editingDuration !== a._id && (
-                        <button 
-                          onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
-                          className="text-accent text-[0.6rem] hover:underline"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </div>
-                    {editingDuration === a._id ? (
-                      <div className="flex items-center gap-2">
-                        <select 
-                          value={newDuration} 
-                          onChange={(e) => setNewDuration(Number(e.target.value))}
-                          className="bg-surface border border-border text-white text-xs rounded px-1 py-0.5"
-                        >
-                          <option value={60}>1 Hour</option>
-                          <option value={120}>2 Hours</option>
-                          <option value={180}>3 Hours</option>
-                          <option value={240}>4 Hours</option>
-                        </select>
-                        <button onClick={() => handleSaveDuration(a._id)} className="text-success text-[0.6rem] hover:underline font-bold">Save</button>
-                        <button onClick={() => setEditingDuration("")} className="text-danger text-[0.6rem] hover:underline font-bold">Cancel</button>
+                {a.appointment_services && a.appointment_services.length > 0 ? (
+                  a.appointment_services.map((svc, idx) => (
+                    <div key={idx} className="pb-3 mb-3 border-b border-border last:pb-0 last:mb-0 last:border-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Service</p>
+                          <p className="text-white font-bold text-sm">{svc.service_id?.service_name || "Unknown Service"}</p>
+                        </div>
+                        <p className="text-accent font-extrabold text-sm">LKR {svc.sub_price || svc.service_id?.base_price}</p>
                       </div>
-                    ) : (
-                      <p className="text-white text-xs font-bold">
-                        {durationHours} {durationHours === 1 ? "Hour" : "Hours"}
-                        <span className="text-muted-2 ml-1">({requiredSlots} {requiredSlots === 1 ? "slot" : "slots"})</span>
-                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Staff</p>
+                          <p className="text-white text-xs font-bold">{svc.staff_id?.full_name || "Any Stylist"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Time</p>
+                          <p className="text-white text-xs font-bold">
+                            {formatTime(svc.service_start_time)} — {formatTime(svc.service_end_time)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="pb-3 mb-3 border-b border-border">
+                    {/* Fallback for single service */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Service</p>
+                        <p className="text-white font-bold text-sm">
+                          {a.service_ids && a.service_ids.length > 0 
+                            ? a.service_ids.map(s => s.service_name).join(", ") 
+                            : a.service_id?.service_name}
+                        </p>
+                      </div>
+                      <p className="text-accent font-extrabold text-sm">LKR {a.total_price || a.service_id?.base_price}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Staff</p>
+                        <p className="text-white text-xs font-bold">{a.staff_id?.full_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Time</p>
+                        <p className="text-white text-xs font-bold">
+                          {formatTime(a.start_time)} — {formatTime(a.end_time)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Total Duration */}
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider">Total Duration</p>
+                    {a.status === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
+                      <button 
+                        onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
+                        className="text-accent text-[0.6rem] hover:underline"
+                      >
+                        Edit
+                      </button>
                     )}
                   </div>
+                  {editingDuration === a._id ? (
+                    <div className="flex items-center gap-2">
+                      <select 
+                        value={newDuration} 
+                        onChange={(e) => setNewDuration(Number(e.target.value))}
+                        className="bg-surface border border-border text-white text-xs rounded px-1 py-0.5"
+                      >
+                        <option value={60}>1 Hour</option>
+                        <option value={120}>2 Hours</option>
+                        <option value={180}>3 Hours</option>
+                        <option value={240}>4 Hours</option>
+                      </select>
+                      <button onClick={() => handleSaveDuration(a._id)} className="text-success text-[0.6rem] hover:underline font-bold">Save</button>
+                      <button onClick={() => setEditingDuration("")} className="text-danger text-[0.6rem] hover:underline font-bold">Cancel</button>
+                    </div>
+                  ) : (
+                    <p className="text-white text-xs font-bold">
+                      {durationHours} {durationHours === 1 ? "Hour" : "Hours"}
+                      <span className="text-muted-2 ml-1">({requiredSlots} {requiredSlots === 1 ? "slot" : "slots"})</span>
+                    </p>
+                  )}
                 </div>
               </div>
 

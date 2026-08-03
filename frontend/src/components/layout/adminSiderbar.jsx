@@ -11,66 +11,55 @@ import {
   Star,
   Wallet,
   LogOut,
+  BarChart2,
 } from "lucide-react";
 import clsx from "clsx";
-
-const navItems = [
-  {
-    group: "Main",
-    items: [
-      {
-        label: "Dashboard",
-        path: "/adminDashboard",
-        icon: LayoutDashboard,
-      },
-      {
-        label: "Appointments",
-        path: "/adminAppointments",
-        icon: Calendar,
-      },
-      {
-        label: "Staff",
-        path: "/adminStaff",
-        icon: Users,
-      },
-      {
-        label: "Services",
-        path: "/adminServices",
-        icon: Scissors,
-      },
-    ],
-  },
-  {
-    group: "Business",
-    items: [
-      {
-        label: "Revenue",
-        path: "/adminRevenue",
-        icon: DollarSign,
-      },
-      {
-        label: "Billing",
-        path: "/adminBilling",
-        icon: Receipt,
-      },
-      {
-        label: "Reviews",
-        path: "/adminReviews",
-        icon: Star,
-      },
-      {
-        label: "Salary",
-        path: "/adminSalary",
-        icon: Wallet,
-      },
-    ],
-  },
-];
 
 const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+
+  const isStandardStaff = user?.role && !["super-admin", "manager", "staff-admin"].includes(user.role);
+
+  const getNavItems = () => {
+    if (isStandardStaff) {
+      return [
+        {
+          group: "Main",
+          items: [
+            { label: "Dashboard", path: "/staffDashboard", icon: LayoutDashboard },
+            // Optional: Staff can view their own schedule, which is handled in staffDashboard
+            // We can leave Appointments out or point it to a specific view if needed,
+            // but staffDashboard covers their schedule.
+          ],
+        },
+      ];
+    }
+    
+    return [
+      {
+        group: "Main",
+        items: [
+          { label: "Dashboard", path: "/adminDashboard", icon: LayoutDashboard },
+          { label: "Appointments", path: "/adminAppointments", icon: Calendar },
+          { label: "Staff", path: "/adminStaff", icon: Users },
+          { label: "Services", path: "/adminServices", icon: Scissors },
+        ],
+      },
+      {
+        group: "Business",
+        items: [
+          { label: "Analytics", path: "/adminAnalytics", icon: BarChart2 },
+          { label: "Report", path: "/adminBilling", icon: Receipt },
+          { label: "Reviews", path: "/adminReviews", icon: Star },
+          { label: "Salary", path: "/adminSalary", icon: Wallet },
+        ],
+      },
+    ];
+  };
+
+  const navItems = getNavItems();
 
 
   const isActive = (path) => {

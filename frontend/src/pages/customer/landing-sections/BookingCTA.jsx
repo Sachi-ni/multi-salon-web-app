@@ -29,7 +29,7 @@ const BookingCTA = () => {
           </p>
           
           <button 
-            onClick={() => navigate("/login")}
+            onClick={() => navigate("/book")}
             className="px-10 py-5 bg-accent text-primary rounded-xl text-lg font-extrabold tracking-widest uppercase hover:bg-accent-hover hover:shadow-glow transition-all duration-300 hover:-translate-y-1 inline-flex items-center gap-3 group"
           >
             Book Now 

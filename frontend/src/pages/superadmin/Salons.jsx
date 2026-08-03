@@ -8,7 +8,7 @@ import Modal from "../../components/ui/Modal";
 import Input from "../../components/ui/Input";
 import EmptyState from "../../components/ui/EmptyState";
 import Skeleton from "../../components/ui/Skeleton";
-import { MoreVertical, MapPin, User, DollarSign, Pencil, Trash2, Eye } from "lucide-react";
+import { MoreVertical, User, DollarSign, Pencil, Trash2, Eye } from "lucide-react";
 
 const SalonCard = ({ salon, onView, onEdit, onDelete }) => {
   const navigate = useNavigate();
@@ -142,12 +142,7 @@ const Salons = () => {
     }
   }, [location]);
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "-";
-    const d = new Date(dateStr);
-    if (isNaN(d)) return dateStr;
-    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-  };
+
 
   const handleView = (id) => navigate(`/salon-admin/${id}/adminDashboard`);
 

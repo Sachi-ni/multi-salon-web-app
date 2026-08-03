@@ -1,16 +1,12 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-
-<<<<<<< Updated upstream
 import PageHeader from "../../components/ui/PageHeader";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import Input from "../../components/ui/Input";
-=======
-import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
 
 import {
@@ -20,7 +16,7 @@ import {
   updateRate,
   getStaffWithSalaries,
 } from "../../services/salaryService";
->>>>>>> Stashed changes
+
 
 import {
   Loader2,
@@ -50,7 +46,7 @@ const formatMoney = (value) => {
 
 const statusVariant = (status) => {
   const s = (status || "").toLowerCase();
-<<<<<<< Updated upstream
+
   if (s.includes("paid") || s === "complete" || s === "processed") return "success";
   if (s.includes("pending") || s.includes("not")) return "warning";
   if (s.includes("overdue")) return "danger";
@@ -58,13 +54,15 @@ const statusVariant = (status) => {
 };
 
 const toMonthKey = (date) => {
-=======
-  if (s === "paid") return "success";
-  return "warning";
+  const d = new Date(date);
+
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+
+  return `${y}-${m}`;
 };
 
 const toDateKey = (date) => {
->>>>>>> Stashed changes
   const d = new Date(date);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Bell, Menu, LogOut, User, ChevronDown, Check } from "lucide-react";
+import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
 
@@ -62,7 +62,7 @@ const Header = ({ onToggleSidebar }) => {
       await handleReadNotification(n._id);
     }
     setNotifOpen(false);
-    
+
     if (n.appointment_id) {
       if (user?.role === "super-admin") {
         navigate(`/Appointments?highlight=${n.appointment_id}`);
@@ -114,7 +114,7 @@ const Header = ({ onToggleSidebar }) => {
 
       {/* Notification */}
       <div className="relative" ref={notifRef}>
-        <button 
+        <button
           onClick={() => {
             setNotifOpen(!notifOpen);
             if (!notifOpen && user) {
@@ -146,8 +146,8 @@ const Header = ({ onToggleSidebar }) => {
                 <div className="p-4 text-center text-muted-2 text-xs">No notifications yet</div>
               ) : (
                 notifications.map(n => (
-                  <div 
-                    key={n._id} 
+                  <div
+                    key={n._id}
                     onClick={() => handleNotificationClick(n)}
                     className={clsx(
                       "p-3 border-b border-border/50 hover:bg-surface-2 transition-colors cursor-pointer",

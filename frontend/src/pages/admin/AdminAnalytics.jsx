@@ -233,26 +233,31 @@ export default function AdminAnalytics() {
   );
 
   return (
-    <div className="min-h-[60vh]">
-      
-      {/* Header & Filters */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <PageHeader title="Business Analytics" subtitle="Monitor your salon's performance and growth" backTo={`/salon-admin/${salonId}/adminDashboard`} />
-        
-        <select 
-          value={dateRange} 
-          onChange={(e) => setDateRange(e.target.value)}
-          className="bg-surface-2 border border-border text-white text-sm rounded-lg focus:ring-accent focus:border-accent block p-2.5 outline-none min-w-[160px]"
-        >
-          <option value="today">Today</option>
-          <option value="yesterday">Yesterday</option>
-          <option value="7days">Last 7 Days</option>
-          <option value="30days">Last 30 Days</option>
-          <option value="90days">Last 90 Days</option>
-          <option value="year">This Year</option>
-          <option value="all">All Time</option>
-        </select>
-      </div>
+  <div className="p-6 max-w-7xl mx-auto pb-20 min-h-[60vh]">
+
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+
+      <PageHeader
+        title="Business Analytics"
+        subtitle="Monitor your salon's performance and growth"
+        backTo={`/salon-admin/${salonId}/adminDashboard`}
+      />
+
+      <select
+        value={dateRange}
+        onChange={(e) => setDateRange(e.target.value)}
+        className="bg-surface-2 border border-border text-white text-sm rounded-lg focus:ring-accent focus:border-accent block p-2.5 outline-none min-w-[160px]"
+      >
+        <option value="today">Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="7days">Last 7 Days</option>
+        <option value="30days">Last 30 Days</option>
+        <option value="90days">Last 90 Days</option>
+        <option value="year">This Year</option>
+        <option value="all">All Time</option>
+      </select>
+
+    </div>
 
       {error && (
         <div className="px-4 py-3 rounded-lg bg-danger-dim border border-danger/30 text-sm text-danger font-medium mb-6">

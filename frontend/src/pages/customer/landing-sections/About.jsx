@@ -26,7 +26,7 @@ const About = () => {
             className="absolute top-0 left-0 w-2/3 h-3/4 rounded-2xl overflow-hidden border border-border shadow-2xl"
           >
             <img
-              src="https://images.unsplash.com/photo-1521590832167-7bfc17484d20?q=80&w=2070&auto=format&fit=crop"
+              src="/salon_interior.png"
               alt="Salon Interior"
               className="w-full h-full object-cover"
             />
@@ -41,24 +41,13 @@ const About = () => {
             className="absolute bottom-0 right-0 w-2/3 h-2/3 rounded-2xl overflow-hidden border-4 border-surface-2 shadow-2xl z-10"
           >
             <img
-              src="https://images.unsplash.com/photo-1595476108010-b4d1f10d5e43?q=80&w=1974&auto=format&fit=crop"
+              src="/stylist_at_work.png"
               alt="Stylist at work"
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-primary/20" />
           </motion.div>
 
-          {/* Experience Badge */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-accent w-32 h-32 rounded-full flex flex-col items-center justify-center text-primary shadow-glow z-20 border-4 border-surface-2"
-          >
-            <span className="text-4xl font-black">15+</span>
-            <span className="text-xs font-bold uppercase tracking-wider text-center leading-tight mt-1">Years<br/>Experience</span>
-          </motion.div>
         </div>
 
         {/* Content */}

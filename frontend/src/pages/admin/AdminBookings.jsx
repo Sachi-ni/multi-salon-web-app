@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   getSalonAppointments,
@@ -28,6 +29,7 @@ const STATUS_COLORS = {
 };
 
 export default function AdminBookings() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const salonId  = user?.salon_id || "";
 
@@ -42,16 +44,16 @@ export default function AdminBookings() {
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
 
-  const fetchAppointments = () => {
+  const fetchAppointments = useCallback(() => {
     setLoading(true);
     setError("");
     getSalonAppointments(salonId, filter === "all" ? "" : filter)
       .then(res => setAppointments(res.data))
       .catch(() => setError("Failed to load appointments."))
       .finally(() => setLoading(false));
-  };
+  }, [salonId, filter]);
 
-  useEffect(() => { fetchAppointments(); }, [filter]);
+  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
   // Convert 24h time to 12h format
   const formatTime = (time) => {
@@ -145,9 +147,18 @@ export default function AdminBookings() {
       <PageHeader 
         title="Appointments"
         subtitle="Manage and confirm customer bookings"
-
         backTo={`/salon-admin/${salonId}/adminDashboard`}
-      ></PageHeader>
+      >
+        <button
+          onClick={() => navigate(`/salon-admin/${salonId}/AddAppointment`)}
+          className="px-5 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 hover:shadow-glow flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+          Create Appointment
+        </button>
+      </PageHeader>
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
@@ -186,7 +197,10 @@ export default function AdminBookings() {
 
       <div className="space-y-4">
         {appointments.map(a => {
-          const durationHours = Math.ceil((a.duration || 60) / 60);
+          const totalDurationMins = a.appointment_services && a.appointment_services.length > 0
+            ? a.appointment_services.reduce((sum, s) => sum + (s.service_id?.duration || 0), 0)
+            : (a.duration || 60);
+          const durationHours = Math.ceil(totalDurationMins / 60);
           const requiredSlots = durationHours;
           const appointmentError = getActionError(a._id);
           const isActionLoading = actionLoading === a._id;
@@ -197,10 +211,10 @@ export default function AdminBookings() {
               {/* Header — Customer + Status */}
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <p className="text-white font-extrabold">{a.customer_id?.name || "Unknown Customer"}</p>
+                  <p className="text-white font-extrabold">{a.customer_id?.name || a.guest_name || "Unknown Customer"}</p>
                   <p className="text-muted-2 text-xs mt-0.5">
                     {a.customer_id?.email || "No email provided"}
-                    {a.customer_id?.phone ? ` · ${a.customer_id.phone}` : ""}
+                    {(a.customer_id?.phone || a.guest_phone) ? ` · ${a.customer_id?.phone || a.guest_phone}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -213,42 +227,73 @@ export default function AdminBookings() {
 
               {/* Service + Staff + Time details */}
               <div className="bg-surface-2 rounded-lg p-4 mb-4 space-y-3">
-                {/* Service */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Service</p>
-                    <p className="text-white font-bold text-sm">{a.service_id?.service_name}</p>
+                {a.appointment_services && a.appointment_services.length > 0 ? (
+                  a.appointment_services.map((svc, idx) => (
+                    <div key={idx} className="pb-3 mb-3 border-b border-border last:pb-0 last:mb-0 last:border-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Service</p>
+                          <p className="text-white font-bold text-sm">{svc.service_id?.service_name || "Unknown Service"}</p>
+                        </div>
+                        <p className="text-accent font-extrabold text-sm">LKR {svc.sub_price || svc.service_id?.base_price}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Staff</p>
+                          <p className="text-white text-xs font-bold">{svc.staff_id?.full_name || "Any Stylist"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Time</p>
+                          <p className="text-white text-xs font-bold">
+                            {formatTime(svc.service_start_time)} — {formatTime(svc.service_end_time)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="pb-3 mb-3 border-b border-border">
+                    {/* Fallback for single service */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Service</p>
+                        <p className="text-white font-bold text-sm">
+                          {a.service_ids && a.service_ids.length > 0 
+                            ? a.service_ids.map(s => s.service_name).join(", ") 
+                            : a.service_id?.service_name}
+                        </p>
+                      </div>
+                      <p className="text-accent font-extrabold text-sm">LKR {a.total_price || a.service_id?.base_price}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Staff</p>
+                        <p className="text-white text-xs font-bold">{a.staff_id?.full_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Time</p>
+                        <p className="text-white text-xs font-bold">
+                          {formatTime(a.start_time)} — {formatTime(a.end_time)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-accent font-extrabold text-sm">LKR {a.total_price || a.service_id?.base_price}</p>
-                </div>
+                )}
 
-                {/* Staff + Time */}
-                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Staff</p>
-                    <p className="text-white text-xs font-bold">{a.staff_id?.full_name}</p>
-                    {a.staff_id?.specification && (
-                      <p className="text-muted-2 text-2xs">{a.staff_id?.specification}</p>
+                {/* Total Duration */}
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider">Total Duration</p>
+                    {a.status === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
+                      <button 
+                        onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
+                        className="text-accent text-[0.6rem] hover:underline"
+                      >
+                        Edit
+                      </button>
                     )}
                   </div>
                   <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Time</p>
-                    <p className="text-white text-xs font-bold">
-                      {formatTime(a.start_time)} — {formatTime(a.end_time)}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider">Duration</p>
-                      {a.status === "pending" && editingDuration !== a._id && (
-                        <button 
-                          onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
-                          className="text-accent text-[0.6rem] hover:underline"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </div>
                     {editingDuration === a._id ? (
                       <div className="flex items-center gap-2">
                         <select 
@@ -267,7 +312,7 @@ export default function AdminBookings() {
                     ) : (
                       <p className="text-white text-xs font-bold">
                         {durationHours} {durationHours === 1 ? "Hour" : "Hours"}
-                        <span className="text-muted-2 ml-1">({requiredSlots} {requiredSlots === 1 ? "slot" : "slots"})</span>
+                        <span className="text-muted-2 ml-1 font-normal">({requiredSlots} {requiredSlots === 1 ? "slot" : "slots"})</span>
                       </p>
                     )}
                   </div>

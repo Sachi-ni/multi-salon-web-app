@@ -24,9 +24,9 @@ export const protect = async (req, res, next) => {
       }
 
       req.user = {
-        id: user._id,
+        id: String(user._id),
         role: user.role,
-        salon_id: user.salon_id,
+        salon_id: user.salon_id ? String(user.salon_id) : null,
       };
 
       // DEBUG: log auth user role for permission troubleshooting
@@ -42,4 +42,28 @@ export const protect = async (req, res, next) => {
   } else {
     res.status(401).json({ message: "Not authorized, no token" });
   }
+};
+
+export const optionalProtect = async (req, res, next) => {
+  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+    try {
+      const token = req.headers.authorization.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      let user = await Admin.findById(decoded.id).select("-password");
+      if (!user) user = await Staff.findById(decoded.id).select("-password_hash");
+      if (!user) user = await Customer.findById(decoded.id).select("-password_hash");
+
+      if (user) {
+        req.user = {
+          id: String(user._id),
+          role: user.role,
+          salon_id: user.salon_id ? String(user.salon_id) : null,
+        };
+      }
+    } catch (error) {
+      // Ignored for optional protect
+    }
+  }
+  next();
 };
