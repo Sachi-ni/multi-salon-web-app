@@ -254,7 +254,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
 
             <button
               onClick={() => {
-                navigate("/profile");
+                navigate(user?.role === "super-admin" ? "/Profile" : "/editProfile");
                 setDropdownOpen(false);
               }}
               className="w-full px-4 py-2 text-left text-sm text-muted-2 hover:text-white hover:bg-white/5 flex items-center gap-2"

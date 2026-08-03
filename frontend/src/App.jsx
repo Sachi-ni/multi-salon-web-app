@@ -305,7 +305,9 @@ function App() {
         {/* Staff Dashboard */}
         <Route path="/staff/dashboard" element={
           <ProtectedRoute requireSalonAccess={true}>
-            <StaffDashboard />
+            <AdminSalonLayout>
+              <StaffDashboard />
+            </AdminSalonLayout>
           </ProtectedRoute>
         } />
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   getSalonAppointments,
@@ -35,7 +35,8 @@ const STATUS_FILTERS = ["all", "pending", "confirmed", "completed", "rejected", 
 export default function AdminBookings() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const salonId = user?.salon_id || "";
+  const { salonId: routeSalonId } = useParams();
+  const salonId = routeSalonId || user?.salon_id || "";
 
   const [appointments, setAppointments] = useState([]);
   const [filter, setFilter] = useState("all");

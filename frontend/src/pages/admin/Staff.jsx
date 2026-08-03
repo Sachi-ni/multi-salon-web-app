@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getServices } from "../../services/serviceService";
 import PageHeader from "../../components/ui/PageHeader";
@@ -233,7 +233,8 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
 export default function AdminStaffPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const salonId = user?.salon_id || "";
+  const { salonId: routeSalonId } = useParams();
+  const salonId = routeSalonId || user?.salon_id || "";
 
   const [staffList, setStaffList] = useState([]);
   const [servicesList, setServicesList] = useState([]);

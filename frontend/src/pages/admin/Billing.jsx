@@ -113,7 +113,11 @@ const presetLabel = (p, startDate, endDate) => {
 const Billing = () => {
   const { salonId: routeSalonId } = useParams();
   const { user } = useAuth();
-  const salonId = routeSalonId || user?.salon_id || "";
+  let salonId = routeSalonId || user?.salon_id || "";
+  if (!salonId) {
+    const match = window.location.pathname.match(/^\/salon-admin\/([^/]+)/);
+    if (match) salonId = match[1];
+  }
 
   // ── State ──────────────────────────────────────────────────────────────────
 

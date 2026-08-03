@@ -51,7 +51,12 @@ const API_BASE = "http://localhost:5000";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { salonId } = useParams();
+  const params = useParams();
+  let salonId = params.salonId;
+  if (!salonId) {
+    const match = window.location.pathname.match(/^\/salon-admin\/([^/]+)/);
+    if (match) salonId = match[1];
+  }
 
   const [salon, setSalon] = useState(null);
   const [appointments, setAppointments] = useState([]);
