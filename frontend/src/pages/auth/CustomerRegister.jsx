@@ -60,11 +60,11 @@ const CustomerRegister = () => {
         <h1 className="text-2xl font-extrabold text-white mb-1">Create Account</h1>
         <p className="text-muted-2 text-sm mb-6">Book appointments at your favourite salon</p>
 
-        <form onSubmit={handleRegister}>
+        <form onSubmit={handleRegister} autoComplete="off">
           {/* Name */}
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-              Full Name
+              Full Name <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
             </label>
             <input
               type="text"
@@ -72,6 +72,7 @@ const CustomerRegister = () => {
               value={name}
               onChange={e => setName(e.target.value)}
               className={inputClass}
+              autoComplete="new-name"
               required
             />
           </div>
@@ -79,7 +80,7 @@ const CustomerRegister = () => {
           {/* Email */}
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-              Email
+              Email <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
             </label>
             <input
               type="email"
@@ -87,6 +88,7 @@ const CustomerRegister = () => {
               value={email}
               onChange={e => setEmail(e.target.value)}
               className={inputClass}
+              autoComplete="new-email"
               required
             />
           </div>
@@ -94,7 +96,7 @@ const CustomerRegister = () => {
           {/* Phone */}
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-              Phone
+              Phone <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
             </label>
             <input
               type="tel"
@@ -102,6 +104,8 @@ const CustomerRegister = () => {
               value={phone}
               onChange={e => setPhone(e.target.value)}
               className={inputClass}
+              autoComplete="new-phone"
+              required
             />
           </div>
 
@@ -109,7 +113,7 @@ const CustomerRegister = () => {
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-                Password
+                Password <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
               </label>
               <input
                 type="password"
@@ -117,12 +121,13 @@ const CustomerRegister = () => {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className={inputClass}
+                autoComplete="new-password"
                 required
               />
             </div>
             <div>
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-                Confirm
+                Confirm <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
               </label>
               <input
                 type="password"
@@ -130,6 +135,7 @@ const CustomerRegister = () => {
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 className={inputClass}
+                autoComplete="new-password"
                 required
               />
             </div>

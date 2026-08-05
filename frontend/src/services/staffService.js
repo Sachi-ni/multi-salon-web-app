@@ -13,8 +13,15 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
-export const getStaff = () =>
-  API.get("/staff");
+export const getStaff = (salonId) =>
+  API.get("/staff", { params: salonId ? { salonId } : {} });
+
+export const getTeam = (salonId, serviceId) => {
+  const params = new URLSearchParams();
+  if (salonId) params.append("salonId", salonId);
+  if (serviceId) params.append("serviceId", serviceId);
+  return API.get(`/team?${params.toString()}`);
+};
 
 export const createStaff = (data) =>
   API.post("/staff", data);

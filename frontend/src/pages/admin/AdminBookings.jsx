@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   getSalonAppointments,
@@ -6,46 +7,61 @@ import {
   rejectAppointment,
   completeAppointment,
   adminCancelAppointment,
-  updateAppointmentDuration
+  updateAppointmentDuration,
+  deleteAppointment
 } from "../../services/appointmentService";
+import PageHeader from "../../components/ui/PageHeader";
+import Button from "../../components/ui/Button";
+import Badge from "../../components/ui/Badge";
+import Table from "../../components/ui/Table";
+import EmptyState from "../../components/ui/EmptyState";
+import { 
+  Calendar, Clock, User, Store, Search, LayoutGrid, 
+  List, CheckCircle2, AlertCircle, Trash2, 
+  Check, X, ChevronDown, Plus, Hash
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import clsx from "clsx";
+
+const SALARY_REFRESH_KEY = "salary-refresh-token";
+
+const triggerSalaryRefresh = () => {
+  localStorage.setItem(SALARY_REFRESH_KEY, String(Date.now()));
+  window.dispatchEvent(new Event("salary-refresh"));
+};
 
 const STATUS_FILTERS = ["all", "pending", "confirmed", "completed", "rejected", "cancelled"];
 
-const STATUS_COLORS = {
-  pending:   "bg-warning-dim text-warning border-warning-border",
-  confirmed: "bg-success-dim text-success border-success-border",
-  cancelled: "bg-danger-dim text-danger border-danger-border",
-  rejected:  "bg-danger-dim text-danger border-danger-border",
-  completed: "bg-info-dim text-info border-info-border",
-};
-
 export default function AdminBookings() {
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const salonId  = user?.salon_id || "";
+  const { salonId: routeSalonId } = useParams();
+  const salonId = routeSalonId || user?.salon_id || "";
 
   const [appointments, setAppointments] = useState([]);
-  const [filter, setFilter]             = useState("pending");
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState("");
+  const [filter, setFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState("");
-  const [actionError, setActionError]     = useState("");
-  
-  // Duration edit state
+  const [actionError, setActionError] = useState("");
+
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
 
-  const fetchAppointments = () => {
+  const fetchAppointments = useCallback(() => {
     setLoading(true);
     setError("");
-    getSalonAppointments(salonId, filter === "all" ? "" : filter)
-      .then(res => setAppointments(res.data))
+    getSalonAppointments(salonId, filter === "all" ? "" : filter, dateFilter)
+      .then(res => setAppointments(res.data || []))
       .catch(() => setError("Failed to load appointments."))
       .finally(() => setLoading(false));
-  };
+  }, [salonId, filter, dateFilter]);
 
-  useEffect(() => { fetchAppointments(); }, [filter]);
+  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
-  // Convert 24h time to 12h format
   const formatTime = (time) => {
     if (!time) return "";
     const [h, m] = time.split(":").map(Number);
@@ -87,6 +103,7 @@ export default function AdminBookings() {
     setActionError("");
     try {
       await completeAppointment(id);
+      triggerSalaryRefresh();
       fetchAppointments();
     } catch {
       setActionError(`${id}:Failed to complete appointment.`);
@@ -109,6 +126,20 @@ export default function AdminBookings() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to permanently delete this appointment? This action cannot be undone.")) return;
+    setActionLoading(id);
+    setActionError("");
+    try {
+      await deleteAppointment(id);
+      fetchAppointments();
+    } catch {
+      setActionError(`${id}:Failed to delete appointment.`);
+    } finally {
+      setActionLoading("");
+    }
+  };
+
   const handleSaveDuration = async (id) => {
     setActionLoading(id);
     setActionError("");
@@ -124,204 +155,490 @@ export default function AdminBookings() {
     }
   };
 
-  // Parse action error for a specific appointment
   const getActionError = (id) => {
     if (!actionError) return null;
     const [errId, ...msg] = actionError.split(":");
     return errId === id ? msg.join(":") : null;
   };
 
+  const filteredAppointments = useMemo(() => {
+    if (!searchTerm) return appointments;
+    const term = searchTerm.toLowerCase();
+
+    return appointments.filter(a => {
+      const custName = (a.customer_id?.name || a.guest_name || "").toLowerCase();
+      const phone = (a.customer_id?.phone || a.guest_phone || "").toLowerCase();
+      const email = (a.customer_id?.email || "").toLowerCase();
+      const idStr = (a._id || "").toLowerCase();
+
+      return custName.includes(term) || phone.includes(term) || email.includes(term) || idStr.includes(term);
+    });
+  }, [appointments, searchTerm]);
+
+  const getStatusBadge = (status) => {
+    switch (status?.toLowerCase()) {
+      case "confirmed":
+        return <Badge variant="success">Confirmed</Badge>;
+      case "pending":
+        return <Badge variant="warning">Pending</Badge>;
+      case "completed":
+        return <Badge variant="info">Completed</Badge>;
+      case "cancelled":
+      case "rejected":
+        return <Badge variant="danger">{status}</Badge>;
+      default:
+        return <Badge variant="neutral">{status}</Badge>;
+    }
+  };
+
+  const getCardBorderStyle = (status) => {
+    switch (status?.toLowerCase()) {
+      case "pending":
+        return "border-l-4 border-l-amber-400 bg-gradient-to-r from-amber-500/5 via-surface to-surface";
+      case "confirmed":
+        return "border-l-4 border-l-emerald-500 bg-gradient-to-r from-emerald-500/5 via-surface to-surface";
+      case "completed":
+        return "border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-500/5 via-surface to-surface";
+      case "rejected":
+      case "cancelled":
+        return "border-l-4 border-l-rose-500 bg-gradient-to-r from-rose-500/5 via-surface to-surface";
+      default:
+        return "border-l-4 border-l-neutral-600 bg-surface";
+    }
+  };
+
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-black text-white">Appointments</h1>
-        <p className="text-muted-2 text-sm mt-1">Manage and confirm customer bookings</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Appointments Management" subtitle="Manage and confirm customer bookings for your salon branch" backTo={`/salon-admin/${salonId}/adminDashboard`}>
+        <Button variant="primary" icon={Plus} onClick={() => navigate(`/salon-admin/${salonId}/AddAppointment`)}>
+          Create Booking
+        </Button>
+      </PageHeader>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {STATUS_FILTERS.map(s => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`px-4 py-1.5 rounded-lg text-xs font-extrabold border transition-all duration-200
-              ${filter === s
-                ? "bg-accent text-primary border-accent"
-                : "bg-surface-2 text-muted-2 border-border hover:border-border-hover"
-              }`}
-          >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-
+      {/* Error Alert */}
       {error && (
-        <div className="p-3 bg-danger-dim border border-danger-border rounded-lg mb-4">
-          <p className="text-danger text-xs font-bold">{error}</p>
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-danger-dim border border-danger-border text-sm text-danger">
+          <span className="flex-1 font-semibold">{error}</span>
+          <button onClick={() => setError("")} className="text-danger hover:text-white text-lg leading-none">&times;</button>
         </div>
       )}
 
-      {!loading && appointments.length === 0 && (
-        <div className="bg-surface border border-border rounded-2xl p-10 text-center">
-          <p className="text-muted-2 text-sm">No {filter === "all" ? "" : filter} appointments found.</p>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {appointments.map(a => {
-          const durationHours = Math.ceil((a.duration || 60) / 60);
-          const requiredSlots = durationHours;
-          const appointmentError = getActionError(a._id);
-          const isActionLoading = actionLoading === a._id;
-
+      {/* Status Filter Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {STATUS_FILTERS.map((f) => {
+          const isActive = filter === f;
           return (
-            <div key={a._id} className="bg-surface border border-border rounded-2xl p-5 shadow-card">
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={clsx(
+                "px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap",
+                isActive
+                  ? "bg-amber-400 text-black shadow-sm font-extrabold"
+                  : "bg-surface border border-border text-neutral-400 hover:text-white hover:border-amber-400/30"
+              )}
+            >
+              {f}
+            </button>
+          );
+        })}
+      </div>
 
-              {/* Header — Customer + Status */}
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <p className="text-white font-extrabold">{a.customer_id?.name || "Unknown Customer"}</p>
-                  <p className="text-muted-2 text-xs mt-0.5">
-                    {a.customer_id?.email || "No email provided"}
-                    {a.customer_id?.phone ? ` · ${a.customer_id.phone}` : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border ${STATUS_COLORS[a.status]}`}>
-                    {a.status.toUpperCase()}
-                  </span>
-                  <span className="text-muted-2 text-xs">{a.appointment_date}</span>
-                </div>
-              </div>
+      {/* Search & Filter Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            <input
+              placeholder="Search by customer name, phone, email, or #ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 placeholder:text-neutral-500 font-medium"
+            />
+          </div>
 
-              {/* Service + Staff + Time details */}
-              <div className="bg-surface-2 rounded-lg p-4 mb-4 space-y-3">
-                {/* Service */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Service</p>
-                    <p className="text-white font-bold text-sm">{a.service_id?.service_name}</p>
+          {/* Date Filter */}
+          <div className="relative flex items-center">
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              style={{ colorScheme: "dark" }}
+              className="bg-surface border border-border rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none cursor-pointer transition-all duration-200 focus:border-amber-400"
+            />
+            {dateFilter && (
+              <button
+                onClick={() => setDateFilter("")}
+                className="ml-2 p-2 rounded-lg bg-surface-2 text-neutral-400 hover:text-white transition-colors"
+                title="Clear date"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* View Switcher Toggle */}
+        <div className="flex items-center bg-surface border border-border rounded-xl p-1 gap-1">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={clsx(
+              "p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+              viewMode === "grid"
+                ? "bg-amber-400 text-black shadow-sm"
+                : "text-neutral-400 hover:text-white"
+            )}
+            title="Grid View"
+          >
+            <LayoutGrid className="w-4 h-4" />
+            <span className="hidden sm:inline">Grid</span>
+          </button>
+          <button
+            onClick={() => setViewMode("table")}
+            className={clsx(
+              "p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+              viewMode === "table"
+                ? "bg-amber-400 text-black shadow-sm"
+                : "text-neutral-400 hover:text-white"
+            )}
+            title="Table View"
+          >
+            <List className="w-4 h-4" />
+            <span className="hidden sm:inline">Table</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="p-5 bg-surface border border-border rounded-2xl animate-pulse space-y-3">
+              <div className="h-4 w-40 bg-surface-2 rounded" />
+              <div className="h-3 w-64 bg-surface-2 rounded" />
+              <div className="h-16 w-full bg-surface-2 rounded-xl" />
+            </div>
+          ))}
+        </div>
+      ) : filteredAppointments.length === 0 ? (
+        <EmptyState
+          title="No appointments found"
+          description="No customer bookings match your current filters."
+          icon={Calendar}
+          actionLabel="Create Booking"
+          onAction={() => navigate(`/salon-admin/${salonId}/AddAppointment`)}
+        />
+      ) : viewMode === "grid" ? (
+        /* Card View */
+        <div className="space-y-5">
+          {filteredAppointments.map((a, index) => {
+            const isActionLoading = actionLoading === a._id;
+            const appointmentError = getActionError(a._id);
+
+            const totalDurationMins = a.appointment_services && a.appointment_services.length > 0
+              ? a.appointment_services.reduce((sum, s) => sum + (s.service_id?.duration || 0), 0)
+              : (a.duration || 60);
+            const durationHours = Math.ceil(totalDurationMins / 60);
+
+            const customerName = a.customer_id?.name || a.guest_name || "Guest Customer";
+            const isGuest = !a.customer_id && a.guest_name;
+            const totalPrice = a.total_price || a.service_id?.base_price || 0;
+            const refCode = `#APT-${a._id.slice(-6).toUpperCase()}`;
+
+            return (
+              <motion.div
+                key={a._id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.03, duration: 0.25 }}
+                className={clsx(
+                  "border border-border/80 rounded-2xl p-5 shadow-card hover:border-amber-400/40 transition-all space-y-4",
+                  getCardBorderStyle(a.status)
+                )}
+              >
+                {/* Top Reference Banner */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/60 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-surface-2 border border-border text-amber-400 font-black tracking-wider text-2xs flex items-center gap-1">
+                      <Hash className="w-3 h-3" />
+                      {refCode}
+                    </span>
+                    <span className="text-neutral-400 font-medium">
+                      Date: <strong className="text-white font-extrabold">{a.appointment_date}</strong>
+                    </span>
                   </div>
-                  <p className="text-accent font-extrabold text-sm">LKR {a.total_price || a.service_id?.base_price}</p>
+
+                  <div>{getStatusBadge(a.status)}</div>
                 </div>
 
-                {/* Staff + Time */}
-                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Staff</p>
-                    <p className="text-white text-xs font-bold">{a.staff_id?.full_name}</p>
-                    {a.staff_id?.specification && (
-                      <p className="text-muted-2 text-2xs">{a.staff_id?.specification}</p>
-                    )}
+                {/* Customer Information Row */}
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-600 text-black font-black flex items-center justify-center text-lg shadow-sm flex-shrink-0">
+                    {customerName.charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Time</p>
-                    <p className="text-white text-xs font-bold">
-                      {formatTime(a.start_time)} — {formatTime(a.end_time)}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-extrabold text-white leading-tight truncate">{customerName}</h3>
+                      {isGuest && (
+                        <span className="text-[0.65rem] bg-amber-400/10 text-amber-400 border border-amber-400/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                          Guest
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-neutral-400 mt-0.5 flex flex-wrap items-center gap-2 truncate">
+                      <span>{a.customer_id?.email || (isGuest ? "Guest Booking" : "No Email")}</span>
+                      {(a.customer_id?.phone || a.guest_phone) && (
+                        <>
+                          <span>·</span>
+                          <span className="text-neutral-300 font-semibold">{a.customer_id?.phone || a.guest_phone}</span>
+                        </>
+                      )}
                     </p>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider">Duration</p>
-                      {a.status === "pending" && editingDuration !== a._id && (
+                </div>
+
+                {/* Service Breakdown Box */}
+                <div className="bg-surface-2/40 border border-border/60 rounded-2xl p-4 space-y-2.5">
+                  {a.appointment_services && a.appointment_services.length > 0 ? (
+                    a.appointment_services.map((svc, idx) => (
+                      <div key={idx} className="p-3 bg-surface/90 border border-border/80 rounded-xl hover:border-amber-400/30 transition-colors shadow-sm">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>
+                            {svc.service_id?.service_name || "Service"}
+                          </h4>
+                          <span className="text-sm font-black text-amber-400">
+                            LKR {(svc.sub_price || svc.service_id?.base_price || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between text-xs text-neutral-400 gap-2 pl-3.5">
+                          <span className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-blue-400" />
+                            Staff: <strong className="text-white font-semibold">{svc.staff_id?.full_name || "Any Staff"}</strong>
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                            Time: <strong className="text-white font-semibold">{formatTime(svc.service_start_time)} — {formatTime(svc.service_end_time)}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 bg-surface/90 border border-border/80 rounded-xl flex items-center justify-between text-xs">
+                      <div>
+                        <h4 className="text-white font-extrabold text-sm mb-1">
+                          {a.service_ids && a.service_ids.length > 0 
+                            ? a.service_ids.map(s => s.service_name).join(", ") 
+                            : (a.service_id?.service_name || "Service")}
+                        </h4>
+                        <p className="text-neutral-400 flex items-center gap-2">
+                          <span>Staff: <strong className="text-white">{a.staff_id?.full_name || "Staff"}</strong></span>
+                          <span>·</span>
+                          <span>Time: <strong className="text-white">{formatTime(a.start_time)} — {formatTime(a.end_time)}</strong></span>
+                        </p>
+                      </div>
+                      <span className="text-sm font-black text-amber-400">
+                        LKR {totalPrice.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Summary Footer Line inside Box */}
+                  <div className="pt-2.5 border-t border-border/50 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-neutral-400 font-medium">Duration:</span>
+                      {a.status === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
                         <button 
                           onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
-                          className="text-accent text-[0.6rem] hover:underline"
+                          className="text-amber-400 text-2xs hover:underline font-bold"
                         >
                           Edit
                         </button>
                       )}
+                      {editingDuration === a._id ? (
+                        <div className="flex items-center gap-1.5">
+                          <select 
+                            value={newDuration} 
+                            onChange={(e) => setNewDuration(Number(e.target.value))}
+                            className="bg-surface border border-border text-white text-xs rounded-lg px-2 py-0.5"
+                          >
+                            <option value={60}>1 Hour</option>
+                            <option value={120}>2 Hours</option>
+                            <option value={180}>3 Hours</option>
+                            <option value={240}>4 Hours</option>
+                          </select>
+                          <button onClick={() => handleSaveDuration(a._id)} className="text-emerald-400 text-2xs font-bold hover:underline">Save</button>
+                          <button onClick={() => setEditingDuration("")} className="text-neutral-400 text-2xs font-bold hover:underline">Cancel</button>
+                        </div>
+                      ) : (
+                        <span className="text-white font-extrabold">{durationHours} {durationHours === 1 ? "Hour" : "Hours"}</span>
+                      )}
                     </div>
-                    {editingDuration === a._id ? (
-                      <div className="flex items-center gap-2">
-                        <select 
-                          value={newDuration} 
-                          onChange={(e) => setNewDuration(Number(e.target.value))}
-                          className="bg-surface border border-border text-white text-xs rounded px-1 py-0.5"
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-neutral-400 font-medium font-semibold">Total Amount:</span>
+                      <span className="text-amber-400 font-black text-base">LKR {totalPrice.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Error Notification */}
+                {appointmentError && (
+                  <div className="p-3 bg-danger-dim border border-danger-border rounded-xl flex items-center gap-2 text-xs text-danger">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span className="font-semibold">{appointmentError}</span>
+                  </div>
+                )}
+
+                {/* Footer Bar Actions */}
+                <div className="flex items-center justify-between pt-3 border-t border-border/80 text-xs">
+                  <span className="text-neutral-500 text-2xs">
+                    Booked on {new Date(a.createdAt).toLocaleDateString()}
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    {a.status === "pending" && (
+                      <>
+                        <button
+                          onClick={() => handleConfirm(a._id)}
+                          disabled={isActionLoading}
+                          className="px-5 py-2 rounded-xl bg-emerald-500 text-black text-xs font-black hover:bg-emerald-400 shadow-md shadow-emerald-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
                         >
-                          <option value={60}>1 Hour</option>
-                          <option value={120}>2 Hours</option>
-                          <option value={180}>3 Hours</option>
-                          <option value={240}>4 Hours</option>
-                        </select>
-                        <button onClick={() => handleSaveDuration(a._id)} className="text-success text-[0.6rem] hover:underline font-bold">Save</button>
-                        <button onClick={() => setEditingDuration("")} className="text-danger text-[0.6rem] hover:underline font-bold">Cancel</button>
-                      </div>
-                    ) : (
-                      <p className="text-white text-xs font-bold">
-                        {durationHours} {durationHours === 1 ? "Hour" : "Hours"}
-                        <span className="text-muted-2 ml-1">({requiredSlots} {requiredSlots === 1 ? "slot" : "slots"})</span>
-                      </p>
+                          <Check className="w-4 h-4" />
+                          {isActionLoading ? "..." : "Accept Booking"}
+                        </button>
+                        <button
+                          onClick={() => handleReject(a._id)}
+                          disabled={isActionLoading}
+                          className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition-all disabled:opacity-40 flex items-center gap-1.5"
+                        >
+                          <X className="w-4 h-4" />
+                          Reject
+                        </button>
+                      </>
+                    )}
+
+                    {a.status === "confirmed" && (
+                      <>
+                        <button
+                          onClick={() => handleComplete(a._id)}
+                          disabled={isActionLoading}
+                          className="px-5 py-2 rounded-xl bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          {isActionLoading ? "..." : "Mark Complete"}
+                        </button>
+                        <button
+                          onClick={() => handleAdminCancel(a._id)}
+                          disabled={isActionLoading}
+                          className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition-all disabled:opacity-40"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+
+                    {["completed", "rejected", "cancelled"].includes(a.status) && (
+                      <button
+                        onClick={() => handleDelete(a._id)}
+                        disabled={isActionLoading}
+                        className="px-4 py-2 rounded-xl bg-surface-2 text-rose-400 hover:bg-rose-500 hover:text-white transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Booking
+                      </button>
                     )}
                   </div>
                 </div>
-              </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Table View */
+        <Table>
+          <Table.Head>
+            <Table.Th>Reference & Customer</Table.Th>
+            <Table.Th>Date & Time</Table.Th>
+            <Table.Th>Status</Table.Th>
+            <Table.Th align="right">Amount</Table.Th>
+            <Table.Th align="right">Actions</Table.Th>
+          </Table.Head>
+          <Table.Body>
+            {filteredAppointments.map((a) => {
+              const customerName = a.customer_id?.name || a.guest_name || "Guest Customer";
+              const totalPrice = a.total_price || a.service_id?.base_price || 0;
+              const isActionLoading = actionLoading === a._id;
+              const refCode = `#APT-${a._id.slice(-6).toUpperCase()}`;
 
-              {/* Action error */}
-              {appointmentError && (
-                <div className="mb-3 p-3 bg-danger-dim border border-danger-border rounded-lg flex items-start gap-2">
-                  <svg className="w-4 h-4 text-danger flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                  <p className="text-danger text-xs font-bold">{appointmentError}</p>
-                </div>
-              )}
-
-              {/* Footer — Actions */}
-              <div className="flex items-center justify-between pt-4 border-t border-border">
-                <p className="text-muted-2 text-xs">
-                  Booked {new Date(a.createdAt).toLocaleDateString()}
-                </p>
-
-                <div className="flex gap-2">
-                  {a.status === "pending" && (
-                    <>
-                      <button
-                        onClick={() => handleConfirm(a._id)}
-                        disabled={isActionLoading}
-                        className="px-4 py-1.5 bg-success-dim text-success border border-success-border text-xs font-extrabold rounded-lg hover:bg-success/20 transition-all duration-200 disabled:opacity-40"
-                      >
-                        {isActionLoading ? "..." : "Accept"}
-                      </button>
-                      <button
-                        onClick={() => handleReject(a._id)}
-                        disabled={isActionLoading}
-                        className="px-4 py-1.5 bg-danger-dim text-danger border border-danger-border text-xs font-extrabold rounded-lg hover:bg-danger/20 transition-all duration-200 disabled:opacity-40"
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
-                  {a.status === "confirmed" && (
-                    <>
-                      <button
-                        onClick={() => handleComplete(a._id)}
-                        disabled={isActionLoading}
-                        className="px-4 py-1.5 bg-info-dim text-info border border-info-border text-xs font-extrabold rounded-lg hover:bg-info/20 transition-all duration-200 disabled:opacity-40"
-                      >
-                        {isActionLoading ? "..." : "Complete"}
-                      </button>
-                      <button
-                        onClick={() => handleAdminCancel(a._id)}
-                        disabled={isActionLoading}
-                        className="px-4 py-1.5 bg-danger-dim text-danger border border-danger-border text-xs font-extrabold rounded-lg hover:bg-danger/20 transition-all duration-200 disabled:opacity-40"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              return (
+                <tr key={a._id} className="hover:bg-surface-2/60 transition-colors">
+                  <Table.Td bold className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs">
+                      {customerName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="text-2xs text-amber-400 font-black block">{refCode}</span>
+                      <p className="text-white font-extrabold text-sm">{customerName}</p>
+                      <p className="text-2xs text-neutral-400">{a.customer_id?.phone || a.guest_phone || "No phone"}</p>
+                    </div>
+                  </Table.Td>
+                  <Table.Td className="text-xs text-neutral-300">
+                    <p className="font-bold text-white">{a.appointment_date}</p>
+                    <p className="text-2xs text-neutral-400">{formatTime(a.start_time)}</p>
+                  </Table.Td>
+                  <Table.Td>{getStatusBadge(a.status)}</Table.Td>
+                  <Table.Td align="right" className="text-amber-400 font-extrabold text-xs">
+                    LKR {totalPrice.toLocaleString()}
+                  </Table.Td>
+                  <Table.Td align="right">
+                    <div className="flex items-center justify-end gap-2">
+                      {a.status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => handleConfirm(a._id)}
+                            disabled={isActionLoading}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-extrabold text-2xs hover:bg-emerald-400 transition-colors"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => handleReject(a._id)}
+                            disabled={isActionLoading}
+                            className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white transition-colors text-2xs font-extrabold"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      {a.status === "confirmed" && (
+                        <button
+                          onClick={() => handleComplete(a._id)}
+                          disabled={isActionLoading}
+                          className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-2xs font-extrabold hover:bg-blue-400 transition-colors"
+                        >
+                          Complete
+                        </button>
+                      )}
+                      {["completed", "rejected", "cancelled"].includes(a.status) && (
+                        <button
+                          onClick={() => handleDelete(a._id)}
+                          disabled={isActionLoading}
+                          className="p-1.5 rounded-lg bg-surface-2 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors"
+                          title="Delete Appointment"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </Table.Td>
+                </tr>
+              );
+            })}
+          </Table.Body>
+        </Table>
+      )}
     </div>
   );
 }

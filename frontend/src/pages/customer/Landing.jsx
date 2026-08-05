@@ -1,66 +1,48 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import LoginHeader from "../../components/layout/loginHeader";
-import "./customer.css";
-import { useAuth } from "../../context/AuthContext";
+import React, { useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import LandingNavbar from "./landing-sections/LandingNavbar";
+import Hero from "./landing-sections/Hero";
+import About from "./landing-sections/About";
+import Services from "./landing-sections/Services";
+import WhyChooseUs from "./landing-sections/WhyChooseUs";
+import Testimonials from "./landing-sections/Testimonials";
+import BookingCTA from "./landing-sections/BookingCTA";
+import Contact from "./landing-sections/Contact";
+import Footer from "./landing-sections/Footer";
 
-const Dashboard = () => {
-  const navigate = useNavigate();
-  const { user }  = useAuth();
+const Landing = () => {
+  const location = useLocation();
 
-  const handleBooking = () => {
-    if (user?.role === "customer" || user?.role === "user") {
-      navigate("/book");
+  useEffect(() => {
+    if (location.hash) {
+      const element = document.querySelector(location.hash);
+      if (element) {
+        setTimeout(() => {
+          const offsetTop = element.getBoundingClientRect().top + window.scrollY - 80;
+          window.scrollTo({
+            top: offsetTop,
+            behavior: "smooth",
+          });
+        }, 100);
+      }
     } else {
-      navigate("/customer/register");
+      window.scrollTo(0, 0);
     }
-  };
-
-  const doExport = () => {
-    console.log("Export clicked");
-  };
+  }, [location]);
 
   return (
-    <div className="customer-page">
-      <LoginHeader />
-    <div id="screen-home" className="screen active">
-    <div className="hero">
-        <div className="hero-left">
-        <div className="hero-tag">Premium Grooming Studio</div>
-        <div className="hero-title">LOOK<br /><span>SHARP.</span><br />FEEL<br />GREAT.</div>
-        <p className="hero-sub">Expert cuts, flawless styling, and premium grooming services — crafted for the modern individual. Walk out a new you.</p>
-        <div className="hero-btns">
-            <button className="btn-primary" onClick={handleBooking}>Book Appointment</button>
-            <button className="btn-outline">View Services</button>
-        </div>
-        </div>
-        <div className="hero-right">
-        <div className="hero-art">
-            <div className="hero-circle"></div>
-            <div className="hero-circle"></div>
-            <div className="hero-scissors">✂</div>
-            <div className="hero-stat-grid">
-            <div className="stat"><div className="stat-num">2K+</div><div className="stat-label">Clients</div></div>
-            <div className="stat"><div className="stat-num">12</div><div className="stat-label">Stylists</div></div>
-            <div className="stat"><div className="stat-num">2</div><div className="stat-label">Branches</div></div>
-            </div>
-        </div>
-        </div>
+    <div className="bg-primary min-h-screen font-sans selection:bg-accent selection:text-primary">
+      <LandingNavbar />
+      <Hero />
+      <About />
+      <WhyChooseUs />
+      <Services />
+      <Testimonials />
+      <BookingCTA />
+      <Contact />
+      <Footer />
     </div>
+  );
+};
 
-    <div className="services-strip">
-        <span className="strip-item">HAIR CUT</span><span className="strip-dot">◆</span>
-        <span className="strip-item">BEARD TRIM</span><span className="strip-dot">◆</span>
-        <span className="strip-item">FACIAL</span><span className="strip-dot">◆</span>
-        <span className="strip-item">HAIR COLOUR</span><span className="strip-dot">◆</span>
-        <span className="strip-item">HAIR WASH</span><span className="strip-dot">◆</span>
-        <span className="strip-item">MASSAGE</span><span className="strip-dot">◆</span>
-        <span className="strip-item">DRESSING</span><span className="strip-dot">◆</span>
-        <span className="strip-item">GROOMING</span>
-    </div>
-    </div>
-    </div>
-        );
-    };  
-
-export default Dashboard;
+export default Landing;

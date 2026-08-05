@@ -2,26 +2,31 @@ import { useEffect, useState } from "react";
 import { getAvailableSlots } from "../../../services/appointmentService";
 
 export default function StepSelectTimeSlot({ booking, onNext, onBack }) {
-  const [slots, setSlots]       = useState([]);
+  const [slots, setSlots] = useState([]);
   const [selected, setSelected] = useState(booking.startTime || "");
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const durationHours = Math.ceil(booking.serviceDuration / 60);
+  const durationHours = Math.ceil((booking.totalDuration || booking.serviceDuration) / 60);
 
   useEffect(() => {
-    getAvailableSlots(booking.staffId, booking.date, booking.serviceId, booking.salonId)
+    // Collect all service IDs from the booking
+    const serviceIds = booking.services && booking.services.length > 0
+      ? booking.services.map(s => s.serviceId)
+      : [booking.serviceId];
+
+    getAvailableSlots(booking.staffId, booking.date, serviceIds, booking.salonId)
       .then(res => setSlots(res.data))
       .catch(() => setError("Failed to load available time slots."))
       .finally(() => setLoading(false));
-  }, [booking.staffId, booking.date, booking.serviceId, booking.salonId]);
+  }, [booking.staffId, booking.date, booking.services, booking.serviceId, booking.salonId]);
 
   const handleNext = () => {
     const slot = slots.find(s => s.start_time === selected);
     if (!slot) return;
     onNext({
       startTime: slot.start_time,
-      endTime:   slot.end_time,
+      endTime: slot.end_time,
     });
   };
 

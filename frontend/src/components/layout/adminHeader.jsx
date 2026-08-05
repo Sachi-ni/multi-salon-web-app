@@ -1,25 +1,54 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Menu, LogOut, User, ChevronDown } from "lucide-react";
+import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
 import clsx from "clsx";
+import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
 
 const AdminHeader = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
 
-  // close dropdown on outside click
+  const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
+
+  const displayName = user?.name || "Admin User";
+  const displayEmail = user?.email || "";
+
+  useEffect(() => {
+    if (user) {
+      getNotifications()
+        .then((res) => setNotifications(res.data))
+        .catch(console.error);
+    }
+  }, [user]);
+
   useEffect(() => {
     const handleClick = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target)
+      ) {
         setDropdownOpen(false);
       }
+
+      if (
+        notifRef.current &&
+        !notifRef.current.contains(e.target)
+      ) {
+        setNotifOpen(false);
+      }
     };
+
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -27,34 +56,85 @@ const AdminHeader = ({ onToggleSidebar }) => {
     navigate("/");
   };
 
-  const isSuperAdmin = user?.role === "super-admin";
+  const handleReadNotification = async (id) => {
+    try {
+      await markNotificationAsRead(id);
 
-  // When viewing a per-salon shell (/salon-admin/:salonId/*), show the selected salon in the header.
-  // We still keep Auth user info for email/initials when salon data is not available.
-  const headerSalonName = (() => {
-    if (user?.role !== "super-admin") return user?.salon?.name;
-    return user?.salon?.name;
-  })();
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n._id === id
+            ? { ...n, is_read: true }
+            : n
+        )
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  const displayName = isSuperAdmin
-    ? user?.name || headerSalonName || "Super Admin"
-    : user?.salon?.name || "Salon Manager";
+  const handleReadAll = async () => {
+    try {
+      await markAllNotificationsAsRead();
 
-  const displayEmail = isSuperAdmin
-    ? user?.email || "admin@salonhub.com"
-    : user?.email || "manager@salonhub.com";
+      setNotifications((prev) =>
+        prev.map((n) => ({
+          ...n,
+          is_read: true,
+        }))
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
+  const handleNotificationClick = async (n) => {
+    if (!n.is_read) {
+      await handleReadNotification(n._id);
+    }
+    setNotifOpen(false);
 
-  const initials = displayName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+    if (n.appointment_id) {
+      if (user?.role === "super-admin") {
+        navigate(`/Appointments?highlight=${n.appointment_id}`);
+      } else {
+        navigate(`/salon-admin/${user.salon_id}/adminAppointments?highlight=${n.appointment_id}`);
+      }
+    }
+  };
+
+  const unreadCount = notifications.filter(
+    (n) => !n.is_read
+  ).length;
+
+  const roleBadgeColor = {
+    "super-admin":
+      "bg-accent-muted border-accent/35 text-accent",
+    "staff-admin":
+      "bg-info-dim border-info-border text-info",
+    admin:
+      "bg-purple-dim border-purple-border text-purple",
+  };
+
+  const roleDisplay =
+    user?.role?.replace("-", " ").toUpperCase() ||
+    "ADMIN";
+
+  const badgeClass =
+    roleBadgeColor[user?.role] ||
+    roleBadgeColor["super-admin"];
+
+  const initials = user?.name
+    ? user.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase()
+    : "SA";
 
   return (
     <header className="h-header bg-surface/90 backdrop-blur-glass border-b border-border flex items-center px-5 gap-3 fixed top-0 left-0 right-0 z-[200]">
-      
+
       {/* Mobile Menu */}
       <button
         onClick={onToggleSidebar}
@@ -63,24 +143,81 @@ const AdminHeader = ({ onToggleSidebar }) => {
         <Menu className="w-5 h-5 text-white" />
       </button>
 
-      {/* App / Salon Name */}
-      <div className="flex items-center gap-2 font-black text-accent">
-        <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-primary">
-          {(headerSalonName || user?.salon?.name || "Salon").charAt(0).toUpperCase()}
+      {/* Logo */}
+      <div className="flex items-center gap-2 text-lg font-black text-accent whitespace-nowrap tracking-tight">
+        <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-sm font-black text-primary flex-shrink-0">
+          S
         </div>
-
-        <div className="flex flex-col leading-tight">
-          <span className="text-white text-sm font-bold">
-            {user?.salon?.name}
-          </span>
-
-          <span className="text-white text-xs opacity-80">
-            Admin Panel
-          </span>
-        </div>
+        <span className="text-white">Salon</span>Hub
       </div>
 
+      {/* Role Badge */}
+      <div className={clsx("px-2.5 py-0.5 rounded-full text-[0.6rem] font-extrabold tracking-widest uppercase whitespace-nowrap border", badgeClass)}>
+        {roleDisplay}
+      </div>
+
+      {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Notification */}
+      <div className="relative" ref={notifRef}>
+        <button
+          onClick={() => {
+            setNotifOpen(!notifOpen);
+            if (!notifOpen && user) {
+              getNotifications().then(res => setNotifications(res.data)).catch(console.error);
+            }
+          }}
+          className="w-9 h-9 rounded-lg bg-transparent border border-border flex items-center justify-center text-muted-2 hover:bg-surface-2 hover:text-white hover:border-border-hover transition-all duration-150 relative"
+        >
+          <Bell className="w-4 h-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-accent text-primary text-[0.6rem] font-black rounded-full flex items-center justify-center">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+
+        {notifOpen && (
+          <div className="absolute right-0 top-full mt-2 w-80 bg-surface border border-border rounded-xl shadow-modal py-2 animate-scale-in z-50">
+            <div className="flex items-center justify-between px-4 pb-2 border-b border-border">
+              <h3 className="text-white font-extrabold text-sm">Notifications</h3>
+              {unreadCount > 0 && (
+                <button onClick={handleReadAll} className="text-accent text-xs font-bold hover:underline">
+                  Mark all as read
+                </button>
+              )}
+            </div>
+            <div className="max-h-80 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="p-4 text-center text-muted-2 text-xs">No notifications yet</div>
+              ) : (
+                notifications.map(n => (
+                  <div
+                    key={n._id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={clsx(
+                      "p-3 border-b border-border/50 hover:bg-surface-2 transition-colors cursor-pointer",
+                      !n.is_read ? "bg-accent/5" : ""
+                    )}
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <p className={clsx("text-xs font-bold", !n.is_read ? "text-accent" : "text-white")}>{n.title}</p>
+                      <span className="text-[0.6rem] text-muted-2 whitespace-nowrap ml-2">
+                        {new Date(n.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-2 leading-snug">{n.message}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Separator */}
+      <div className="w-px h-5 bg-border mx-0.5" />
 
       {/* Profile Dropdown */}
       <div className="relative" ref={dropdownRef}>
@@ -114,10 +251,10 @@ const AdminHeader = ({ onToggleSidebar }) => {
         {/* Dropdown */}
         {dropdownOpen && (
           <div className="absolute right-0 top-full mt-2 w-48 bg-surface border border-border rounded-xl shadow-modal py-1.5 z-50">
-            
+
             <button
               onClick={() => {
-                navigate("/profile");
+                navigate(user?.role === "super-admin" ? "/Profile" : "/editProfile");
                 setDropdownOpen(false);
               }}
               className="w-full px-4 py-2 text-left text-sm text-muted-2 hover:text-white hover:bg-white/5 flex items-center gap-2"

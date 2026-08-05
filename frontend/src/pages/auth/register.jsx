@@ -63,40 +63,40 @@ const Signup = () => {
 
         <h1 className="text-2xl font-extrabold text-white mb-6">Create Account</h1>
 
-        <form onSubmit={handleRegister}>
+        <form onSubmit={handleRegister} autoComplete="off">
           {/* Full Name */}
           <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Full Name</label>
-            <input type="text" placeholder="Enter your full name" value={fname} onChange={(e) => setFname(e.target.value)} className={inputClass} required />
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Full Name <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
+            <input type="text" placeholder="Enter your full name" value={fname} onChange={(e) => setFname(e.target.value)} className={inputClass} autoComplete="new-name" required />
           </div>
 
           {/* Username */}
           <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Username</label>
-            <input type="text" placeholder="Username" value={uname} onChange={(e) => setUname(e.target.value)} className={inputClass} required />
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Username <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
+            <input type="text" placeholder="Username" value={uname} onChange={(e) => setUname(e.target.value)} className={inputClass} autoComplete="new-username" required />
           </div>
 
           {/* Email */}
           <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Email</label>
-            <input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} required />
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Email <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
+            <input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} autoComplete="new-email" required />
           </div>
 
           {/* Phone */}
           <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Phone</label>
-            <input type="tel" placeholder="07---XXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Phone <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
+            <input type="tel" placeholder="07---XXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} autoComplete="new-phone" required />
           </div>
 
           {/* Passwords Row */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Password</label>
-              <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} required />
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Password <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
+              <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} autoComplete="new-password" required />
             </div>
             <div>
-              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Confirm</label>
-              <input type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass} required />
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Confirm <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
+              <input type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass} autoComplete="new-password" required />
             </div>
           </div>
 

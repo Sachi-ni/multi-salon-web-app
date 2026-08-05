@@ -20,6 +20,8 @@ const AddStaff = () => {
   const [formData, setFormData] = useState({
     firstName: "", lastName: "", email: "", password: "",
     salon: salonId || "", services: [], picture: null,
+    salaryPaymentFrequency: "monthly",
+    salaryPaymentCountPerDay: 1,
   });
 
   useEffect(() => {
@@ -86,12 +88,15 @@ const AddStaff = () => {
       data.append("email", formData.email);
       data.append("password", formData.password);
       data.append("salonId", formData.salon);
+      data.append("salaryPaymentFrequency", formData.salaryPaymentFrequency);
+      data.append("salaryPaymentCountPerDay", formData.salaryPaymentCountPerDay);
       formData.services.forEach((serviceId) => {
         data.append("services", serviceId);
       });
       if (formData.picture) data.append("image", formData.picture);
       await createStaff(data);
-      navigate("/Staff");
+      // Navigate back to Salons page to show updated staffCount
+      navigate("/Salons", { state: { refreshData: true } });
     } catch (err) {
       alert(err.response?.data?.message || "Failed to add staff");
     } finally {
@@ -109,14 +114,55 @@ const AddStaff = () => {
           <Card.Subtitle>Fill all required fields</Card.Subtitle>
         </Card.Header>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="off">
           <Input label="First Name" name="firstName" placeholder="Enter first name" required value={formData.firstName} onChange={handleChange} />
           <Input label="Last Name" name="lastName" placeholder="Enter last name" required value={formData.lastName} onChange={handleChange} />
           <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={handleChange} />
           <Input label="Password" name="password" type="password" placeholder="Enter password" required value={formData.password} onChange={handleChange} />
 
           <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Salon</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                  Payment Frequency
+                  <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">
+                    (required)
+                  </span>
+                </label>
+                <select
+                  name="salaryPaymentFrequency"
+                  value={formData.salaryPaymentFrequency}
+                  onChange={handleChange}
+                  className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent cursor-pointer"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                  Salary Amount Per Day (LKR)
+                  <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">
+                    (required)
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  name="salaryPaymentCountPerDay"
+                  min="1"
+                  value={formData.salaryPaymentCountPerDay}
+                  onChange={handleChange}
+                  placeholder="Enter daily salary amount"
+                  className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Salon <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
             <select
               name="salon"
               required
@@ -132,7 +178,7 @@ const AddStaff = () => {
           </div>
 
           <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Services</label>
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Services <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
             <div className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3">
               {!formData.salon ? (
                 <p className="text-xs text-muted-2">Select a salon to choose services.</p>
@@ -162,12 +208,13 @@ const AddStaff = () => {
           </div>
 
           <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Profile Picture</label>
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Profile Picture <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
             <input
               type="file"
               accept="image/*"
               onChange={(e) => setFormData({ ...formData, picture: e.target.files[0] })}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
+              required
             />
           </div>
 

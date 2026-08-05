@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Bell, Menu, LogOut, User, ChevronDown, Check } from "lucide-react";
+import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
 
@@ -57,6 +57,21 @@ const Header = ({ onToggleSidebar }) => {
     }
   };
 
+  const handleNotificationClick = async (n) => {
+    if (!n.is_read) {
+      await handleReadNotification(n._id);
+    }
+    setNotifOpen(false);
+
+    if (n.appointment_id) {
+      if (user?.role === "super-admin") {
+        navigate(`/Appointments?highlight=${n.appointment_id}`);
+      } else {
+        navigate(`/salon-admin/${user.salon_id}/adminAppointments?highlight=${n.appointment_id}`);
+      }
+    }
+  };
+
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const roleBadgeColor = {
@@ -99,8 +114,13 @@ const Header = ({ onToggleSidebar }) => {
 
       {/* Notification */}
       <div className="relative" ref={notifRef}>
-        <button 
-          onClick={() => setNotifOpen(!notifOpen)}
+        <button
+          onClick={() => {
+            setNotifOpen(!notifOpen);
+            if (!notifOpen && user) {
+              getNotifications().then(res => setNotifications(res.data)).catch(console.error);
+            }
+          }}
           className="w-9 h-9 rounded-lg bg-transparent border border-border flex items-center justify-center text-muted-2 hover:bg-surface-2 hover:text-white hover:border-border-hover transition-all duration-150 relative"
         >
           <Bell className="w-4 h-4" />
@@ -126,9 +146,9 @@ const Header = ({ onToggleSidebar }) => {
                 <div className="p-4 text-center text-muted-2 text-xs">No notifications yet</div>
               ) : (
                 notifications.map(n => (
-                  <div 
-                    key={n._id} 
-                    onClick={() => !n.is_read && handleReadNotification(n._id)}
+                  <div
+                    key={n._id}
+                    onClick={() => handleNotificationClick(n)}
                     className={clsx(
                       "p-3 border-b border-border/50 hover:bg-surface-2 transition-colors cursor-pointer",
                       !n.is_read ? "bg-accent/5" : ""

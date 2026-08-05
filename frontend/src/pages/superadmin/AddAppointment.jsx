@@ -18,6 +18,7 @@ export default function AddAppointment() {
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerError, setCustomerError] = useState("");
+  const [customerType, setCustomerType] = useState("registered");
   const [booking, setBooking] = useState({
     customerId: "",
     customerName: "",
@@ -134,7 +135,9 @@ export default function AddAppointment() {
           staff_id: booking.staffId,
           appointment_date: booking.date,
           start_time: booking.startTime,
-          customer_id: booking.customerId,
+          customer_id: booking.customerId === "guest" ? undefined : booking.customerId,
+          guest_name: booking.customerId === "guest" ? booking.customerName : "",
+          guest_phone: booking.customerId === "guest" ? booking.customerPhone : "",
           notes: "Booked by Admin",
         });
         navigate("/Appointments");
@@ -289,88 +292,144 @@ export default function AddAppointment() {
         {/* Step 0 — Select Customer */}
         {step === 0 && (
           <div>
-            <h2 className="text-lg font-extrabold text-white mb-1">Select Customer</h2>
-            <p className="text-muted-2 text-sm mb-5">Choose the customer for this appointment</p>
+            <h2 className="text-lg font-extrabold text-white mb-1">Customer Details</h2>
+            <p className="text-muted-2 text-sm mb-5">Choose or enter the customer for this appointment</p>
 
-            {/* Search */}
-            <div className="relative mb-4">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-2" />
-              <input
-                type="text"
-                placeholder="Search customers by name, email, or phone..."
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none focus:border-accent transition-all placeholder:text-muted-2"
-              />
+            {/* Tabs */}
+            <div className="flex gap-2 mb-6 p-1 bg-surface-2 rounded-xl">
+              <button
+                onClick={() => setCustomerType("registered")}
+                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                  customerType === "registered" ? "bg-accent text-primary shadow-glow-sm" : "text-muted-2 hover:text-white"
+                }`}
+              >
+                Registered
+              </button>
+              <button
+                onClick={() => {
+                  setCustomerType("guest");
+                  setBooking(prev => ({
+                    ...prev,
+                    customerId: "guest",
+                    customerName: "",
+                    customerPhone: "",
+                    customerEmail: ""
+                  }));
+                }}
+                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                  customerType === "guest" ? "bg-accent text-primary shadow-glow-sm" : "text-muted-2 hover:text-white"
+                }`}
+              >
+                Guest (Unregistered)
+              </button>
             </div>
 
-            {customerError && <p className="text-danger text-sm mb-4">{customerError}</p>}
+            {customerType === "registered" ? (
+              <>
+                {/* Search */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-2" />
+                  <input
+                    type="text"
+                    placeholder="Search customers by name, email, or phone..."
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="w-full bg-surface-2 border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none focus:border-accent transition-all placeholder:text-muted-2"
+                  />
+                </div>
 
-            {loadingCustomers ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
-                {filteredCustomers.map((c) => {
-                  const isSelected = booking.customerId === c._id;
-                  return (
-                    <div
-                      key={c._id}
-                      onClick={() =>
-                        setBooking((prev) => ({
-                          ...prev,
-                          customerId: c._id,
-                          customerName: c.name,
-                          customerEmail: c.email,
-                          customerPhone: c.phone,
-                        }))
-                      }
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-200 flex items-center justify-between
-                        ${
-                          isSelected
-                            ? "border-accent bg-accent-dim shadow-glow-sm"
-                            : "border-border bg-surface-2 hover:border-border-hover"
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-surface-3 border border-border flex items-center justify-center text-accent">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-white font-bold text-sm">{c.name}</p>
-                          <div className="flex items-center gap-3 text-xs text-muted-2 mt-0.5">
-                            <span className="flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-muted" />
-                              {c.email}
-                            </span>
-                            {c.phone && (
-                              <span className="flex items-center gap-1">
-                                <Phone className="w-3 h-3 text-muted" />
-                                {c.phone}
-                              </span>
-                            )}
+                {customerError && <p className="text-danger text-sm mb-4">{customerError}</p>}
+
+                {loadingCustomers ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+                    {filteredCustomers.map((c) => {
+                      const isSelected = booking.customerId === c._id;
+                      return (
+                        <div
+                          key={c._id}
+                          onClick={() =>
+                            setBooking((prev) => ({
+                              ...prev,
+                              customerId: c._id,
+                              customerName: c.name,
+                              customerEmail: c.email,
+                              customerPhone: c.phone,
+                            }))
+                          }
+                          className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-200 flex items-center justify-between
+                            ${
+                              isSelected
+                                ? "border-accent bg-accent-dim shadow-glow-sm"
+                                : "border-border bg-surface-2 hover:border-border-hover"
+                            }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-lg bg-surface-3 border border-border flex items-center justify-center text-accent">
+                              <User className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="text-white font-bold text-sm">{c.name}</p>
+                              <div className="flex items-center gap-3 text-xs text-muted-2 mt-0.5">
+                                <span className="flex items-center gap-1">
+                                  <Mail className="w-3 h-3 text-muted" />
+                                  {c.email}
+                                </span>
+                                {c.phone && (
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="w-3 h-3 text-muted" />
+                                    {c.phone}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
+                          {isSelected && (
+                            <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
+                              <Check className="w-3 h-3 text-primary" />
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      {isSelected && (
-                        <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3 h-3 text-primary" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
 
-                {filteredCustomers.length === 0 && (
-                  <p className="text-center text-muted-2 text-sm py-4">No customers found.</p>
+                    {filteredCustomers.length === 0 && (
+                      <p className="text-center text-muted-2 text-sm py-4">No customers found.</p>
+                    )}
+                  </div>
                 )}
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-muted-2 mb-1.5 uppercase tracking-wide">Guest Name</label>
+                  <input
+                    type="text"
+                    value={booking.customerName}
+                    onChange={(e) => setBooking(prev => ({ ...prev, customerName: e.target.value }))}
+                    placeholder="Enter guest name"
+                    className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-accent transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-muted-2 mb-1.5 uppercase tracking-wide">Guest Phone</label>
+                  <input
+                    type="text"
+                    value={booking.customerPhone}
+                    onChange={(e) => setBooking(prev => ({ ...prev, customerPhone: e.target.value }))}
+                    placeholder="Enter guest phone (optional)"
+                    className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-accent transition-all"
+                  />
+                </div>
               </div>
             )}
 
             <div className="flex justify-end mt-6">
               <button
-                disabled={!booking.customerId}
+                disabled={customerType === "registered" ? !booking.customerId || booking.customerId === "guest" : !booking.customerName.trim()}
                 onClick={() => setStep(1)}
                 className="px-6 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-glow"
               >
@@ -448,7 +507,8 @@ export default function AddAppointment() {
               value={booking.date}
               min={new Date().toISOString().split("T")[0]}
               onChange={(e) => setBooking((prev) => ({ ...prev, date: e.target.value }))}
-              className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-accent focus:bg-accent-dim/20 transition-all duration-200 cursor-pointer"
+              style={{ colorScheme: "dark" }}
+              className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-accent focus:bg-accent-dim/20 transition-all duration-200 cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:hover:opacity-80"
             />
             <div className="flex justify-between mt-6">
               <button onClick={back} className="px-6 py-2.5 bg-surface-2 text-muted-2 text-sm font-bold rounded-lg border border-border hover:border-border-hover transition-all duration-200">
