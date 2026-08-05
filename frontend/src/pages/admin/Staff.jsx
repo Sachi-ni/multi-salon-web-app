@@ -177,7 +177,9 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
                   {staff.full_name}
                 </h3>
                 <p className="text-xs font-semibold text-amber-400 mt-0.5 truncate">
-                  {staff.specification || staff.role || "Stylist"}
+                  {staff.services?.length > 0
+                    ? staff.services.map((s) => s.service_name).join(", ")
+                    : "No services"}
                 </p>
                 <p className="text-2xs text-neutral-400 mt-0.5 truncate flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-neutral-500 flex-shrink-0" />
@@ -195,8 +197,23 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
               <Coins className="w-3.5 h-3.5 text-amber-400" />
               Daily Rate:
             </span>
-            <span className="text-white font-extrabold">
-              LKR {((staff.salaryPaymentCountPerDay ?? staff.salary_payment_count_per_day ?? 0)).toLocaleString()} / day
+<span className="text-white font-extrabold">
+              LKR {(staff.salary_payment_count_per_day || 0).toLocaleString()} / day
+            </span>
+          </div>
+
+          {/* Staff Rating */}
+          <div className="bg-surface-2/60 border border-border/70 rounded-xl p-3 mb-4 flex items-center justify-between text-xs">
+            <span className="text-neutral-400 font-medium flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5 text-amber-400" />
+              Staff Rating:
+            </span>
+            <span className="text-white font-extrabold flex items-center gap-1.5">
+              <span className="text-amber-400">{staff.rating || "0.0"}</span>
+              <span className="text-neutral-400 font-medium">/ 5.0</span>
+              {staff.ratingCount > 0 && (
+                <span className="text-[0.65rem] text-neutral-500 font-medium">({staff.ratingCount})</span>
+              )}
             </span>
           </div>
 
@@ -298,10 +315,7 @@ export default function AdminStaffPage() {
       name: staff.full_name,
       email: staff.email,
       specification: staff.specification,
-      salaryPaymentFrequency: staff.salaryPaymentFrequency || staff.salary_payment_frequency || "daily",
-      salaryPaymentCountPerDay:
-        staff.salaryPaymentCountPerDay ?? staff.salary_payment_count_per_day ?? 1,
-      salaryBalance: staff.salaryBalance ?? staff.salary_balance ?? 0,
+salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 0,
       status: staff.status,
       services: staff.services?.map((s) => s._id) || [],
       imageFile: null,
@@ -311,19 +325,12 @@ export default function AdminStaffPage() {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setEditLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("name", editForm.name || "");
-      formData.append("email", editForm.email || "");
-      if (editForm.specification !== undefined) formData.append("specification", editForm.specification || "");
-      if (editForm.salaryPaymentFrequency !== undefined) formData.append("salaryPaymentFrequency", editForm.salaryPaymentFrequency);
-      if (editForm.salaryPaymentCountPerDay !== undefined) formData.append("salaryPaymentCountPerDay", editForm.salaryPaymentCountPerDay);
-      if (editForm.salaryBalance !== undefined) formData.append("salaryBalance", editForm.salaryBalance);
-      if (editForm.imageFile) formData.append("image", editForm.imageFile);
 
-      await updateStaff(editStaff._id, formData);
+    try {
+      await updateStaff(editStaff._id, editForm);
       setEditStaff(null);
       fetchStaffData();
+
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.message || "Failed to update staff");
@@ -352,7 +359,7 @@ export default function AdminStaffPage() {
     const term = searchTerm.toLowerCase();
     return visibleStaff.filter((s) => {
       const name = (s.full_name || "").toLowerCase();
-      const spec = (s.specification || "").toLowerCase();
+      const spec = (s.services || "").toLowerCase();
       const email = (s.email || "").toLowerCase();
       return name.includes(term) || spec.includes(term) || email.includes(term);
     });
@@ -379,7 +386,7 @@ export default function AdminStaffPage() {
         <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <input
-            placeholder="Search staff by name, specification, or email..."
+            placeholder="Search staff by name, services, or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-surface border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 placeholder:text-neutral-500 font-medium"
@@ -454,7 +461,7 @@ export default function AdminStaffPage() {
           <Table.Head>
             <Table.Th>Photo</Table.Th>
             <Table.Th>Staff Member</Table.Th>
-            <Table.Th>Specification</Table.Th>
+            <Table.Th>Services</Table.Th>
             <Table.Th>Status</Table.Th>
             <Table.Th align="right">Daily Rate</Table.Th>
             <Table.Th align="right">Actions</Table.Th>
@@ -482,14 +489,29 @@ export default function AdminStaffPage() {
                     <span className="text-2xs text-neutral-400 block">{staff.email}</span>
                   </div>
                 </Table.Td>
-                <Table.Td className="text-neutral-300 text-xs font-semibold">{staff.specification || staff.role || "Stylist"}</Table.Td>
+                <Table.Td>
+                  <div className="flex flex-wrap gap-1">
+                    {staff.services?.length > 0 ? (
+                      staff.services.map((service) => (
+                        <span
+                          key={service._id}
+                          className="px-2 py-1 rounded-lg bg-surface-2 text-xs"
+                        >
+                          {service.service_name}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-neutral-500">No services</span>
+                    )}
+                  </div>
+                </Table.Td>
                 <Table.Td>
                   <Badge variant={staff.status === "Active" ? "success" : "neutral"} dot={true}>
                     {staff.status}
                   </Badge>
                 </Table.Td>
-                <Table.Td align="right" className="text-amber-400 font-black text-xs">
-                  LKR {(staff.salaryPaymentCountPerDay ?? staff.salary_payment_count_per_day ?? 0).toLocaleString()} / day
+<Table.Td align="right" className="text-amber-400 font-black text-xs">
+                  LKR {(staff.salary_payment_count_per_day || 0).toLocaleString()} / day
                 </Table.Td>
                 <Table.Td align="right">
                   <div className="flex items-center justify-end gap-2">

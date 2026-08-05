@@ -7,11 +7,18 @@ import Appointment from "../models/Appointment.js";
 export const createStaff = async (req, res) => {
   try {
     const { password } = req.body;
-    const services = Array.isArray(req.body.services)
-      ? req.body.services
-      : req.body.services
-        ? [req.body.services]
-        : [];
+    let services = [];
+    if (req.body.services) {
+      try {
+        if (typeof req.body.services === "string") {
+          services = JSON.parse(req.body.services);
+        } else {
+          services = req.body.services;
+        }
+      } catch {
+        services = [];
+      }
+    }
 
     if (!password) {
       return res.status(400).json({ message: "Password is required" });
@@ -106,21 +113,42 @@ export const getStaff = async (req, res) => {
     const isSalonScopedAdmin = userRole === "manager";
     const isSuperAdmin = userRole === "super-admin";
 
-    let filter = {};
+    let filter = {
+      role: {
+        $not: {
+          $regex: "^(manager|staff-admin|staff admin)$",
+          $options: "i"
+        }
+      }
+    };
 
-    // If the logged-in user belongs to a salon, always scope by their salon_id.
+    // Manager view
     if (isSalonScopedAdmin) {
       filter = {
         salon_id: req.user.salon_id,
+        role: {
+          $not: {
+            $regex: "^(manager|staff-admin|staff admin)$",
+            $options: "i"
+          }
+        }
       };
-    } else if (isSuperAdmin) {
-      // super-admin can view staff for a requested salon.
-      // Frontend sends { salonId } query param; map it to salon_id filter.
+    }
+
+    // Super admin view
+    else if (isSuperAdmin) {
       if (req.query.salonId) {
-        filter = { salon_id: req.query.salonId };
-      } else if (req.user?.salon_id) {
-        // fallback: if token already contains a salon_id, use it
-        filter = { salon_id: req.user.salon_id };
+        filter = {
+          salon_id: req.user.salon_id,
+          role: {
+            $not: {
+              $regex: "^(manager|staff-admin|staff admin)$",
+              $options: "i"
+            }
+          }
+        };    
+              } else if (req.user?.salon_id) {
+        filter.salon_id = req.user.salon_id;
       }
     }
 
@@ -149,7 +177,15 @@ export const getTeam = async (req, res) => {
   try {
     const { salonId, serviceId } = req.query;
 
-    const filter = { status: "Active" };
+    const filter = {
+      status: "Active",
+      role: {
+        $not: {
+          $regex: "^(manager|staff-admin|staff admin)$",
+          $options: "i"
+        }
+      }
+    };
 
     if (salonId) {
       filter.salon_id = salonId;
@@ -205,13 +241,48 @@ export const updateStaff = async (req, res) => {
 
     const updateData = {};
 
-    const services = (
-      Array.isArray(req.body.services)
-        ? req.body.services
-        : req.body.services
-        ? [req.body.services]
-        : undefined
-    )?.filter(Boolean);
+    let services;
+    if (req.body.services !== undefined) {
+      try {
+
+        let rawServices = req.body.services;
+
+        console.log("RAW SERVICES:", rawServices);
+        console.log("RAW TYPE:", typeof rawServices);
+
+
+        // Multer gives array -> take first value
+        if (Array.isArray(rawServices)) {
+          rawServices = rawServices[0];
+        }
+
+
+        // Convert JSON string to array
+        if (typeof rawServices === "string") {
+          services = JSON.parse(rawServices);
+        } else {
+          services = rawServices;
+        }
+
+
+        // Ensure array
+        if (!Array.isArray(services)) {
+          services = [];
+        }
+
+
+        // Remove empty values
+        services = services.filter(Boolean);
+
+
+      } catch (error) {
+        console.log("SERVICE PARSE ERROR:", error);
+        services = [];
+      }
+    }
+
+    console.log("services:", req.body.services);
+    console.log("type:", typeof req.body.services);
 
     const willUpdateServices = services !== undefined;
 
@@ -223,6 +294,10 @@ export const updateStaff = async (req, res) => {
 
     if (req.body.role !== undefined)
       updateData.role = req.body.role;
+
+    if (req.body.specification !== undefined) {
+      updateData.specification = req.body.specification;
+    }
 
     if (req.body.salaryPaymentFrequency !== undefined)
       updateData.salary_payment_frequency = req.body.salaryPaymentFrequency;
@@ -247,6 +322,8 @@ export const updateStaff = async (req, res) => {
 
     if (req.body.status !== undefined)
       updateData.status = req.body.status;
+
+    console.log("FINAL SERVICES TO SAVE:", services);
 
     if (services !== undefined)
       updateData.services = services;
@@ -277,10 +354,11 @@ export const updateStaff = async (req, res) => {
     const staff = await Staff.findByIdAndUpdate(
       req.params.id,
       updateData,
-      {
-        returnDocument: "after",
-      }
-    ).select("-password_hash");
+      { new: true }
+    )
+      .select("-password_hash")
+      .populate("services", "service_name")
+      .populate("salon_id", "name");
 
     // If staff services changed, ensure salary row basics are refreshed for current month (best-effort)
     if (willUpdateServices) {
@@ -366,7 +444,13 @@ export const getStaffDashboard = async (req, res) => {
     // Find the manager of this salon
     const manager = await Staff.findOne({
       salon_id: staff.salon_id?._id,
-      role: { $in: ["manager", "staff-admin"] },
+      role: {
+        $in: [
+          /^manager$/i,
+          /^staff-admin$/i,
+          /^staff admin$/i
+        ]
+      },
     });
 
     const profile = {

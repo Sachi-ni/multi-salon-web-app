@@ -211,8 +211,12 @@ const Salons = () => {
   const handleEditOpen = async (id) => {
     try {
       const res = await getSalon(id);
+
+      console.log("EDIT SALON DATA:", res.data);
+
       setEditSalon(res.data);
       setEditForm(res.data);
+
     } catch (err) {
       console.error(err);
       setError("Failed to load salon details for editing");
@@ -466,7 +470,9 @@ const Salons = () => {
 
           <div className="pt-3 border-t border-border">
             <h4 className="text-xs font-extrabold text-neutral-400 uppercase tracking-wider mb-2">Manager Credentials</h4>
+            <Input label="Manager Name" name="managerName" value={editForm.managerName || ""} onChange={handleEditChange} />
             <Input label="Manager Email" name="managerEmail" type="email" value={editForm.managerEmail || ""} onChange={handleEditChange} />
+            <Input label="Manager Phone" name="managerPhone" type="tel" value={editForm.managerPhone || ""} onChange={handleEditChange} />
             <Input label="Manager Password" name="managerPassword" type="password" placeholder="Leave blank to keep current password" value={editForm.managerPassword || ""} onChange={handleEditChange} />
           </div>
 
