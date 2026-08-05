@@ -1,15 +1,79 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { getServices } from "../../services/serviceService";
+import { getServices, createService, updateService, deleteService } from "../../services/serviceService";
 import PageHeader from "../../components/ui/PageHeader";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
-import { Scissors, Clock, MapPin, Search, LayoutGrid, List, Plus, Sparkles, Coins } from "lucide-react";
-import { motion } from "framer-motion";
+import Modal from "../../components/ui/Modal";
+import Button from "../../components/ui/Button";
+import { Scissors, Clock, MapPin, Search, LayoutGrid, List, Plus, Coins, Pencil, Trash2, MoreVertical, DollarSign } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 
-const ServiceCard = ({ service, index }) => {
+/* ─────────── Actions Menu ─────────── */
+const ActionsMenu = ({ onEdit, onDelete }) => {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [open]);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(!open);
+        }}
+        className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-2 hover:bg-surface-2 hover:text-white transition-all duration-150"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-1.5 w-44 bg-surface-2 border border-border rounded-xl shadow-modal py-1.5 z-50"
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+                setOpen(false);
+              }}
+              className="w-full px-3.5 py-2 text-left text-xs font-bold flex items-center gap-2.5 transition-colors duration-150 hover:bg-white/[0.04] text-muted-2 hover:text-white"
+            >
+              <Pencil className="w-3.5 h-3.5 text-info" />
+              Edit Service
+            </button>
+            <div className="my-1 border-t border-border" />
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+                setOpen(false);
+              }}
+              className="w-full px-3.5 py-2 text-left text-xs font-bold flex items-center gap-2.5 transition-colors duration-150 hover:bg-danger-dim text-danger"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Service
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+/* ─────────── Service Card ─────────── */
+const ServiceCard = ({ service, index, onEdit, onDelete }) => {
   const salonName = service.salon_id?.name || "Salon Branch";
 
   const formatDuration = (mins) => {
@@ -46,6 +110,11 @@ const ServiceCard = ({ service, index }) => {
                 <span className="truncate">{salonName}</span>
               </p>
             </div>
+
+            <ActionsMenu
+              onEdit={() => onEdit(service)}
+              onDelete={() => onDelete(service._id)}
+            />
           </div>
 
           {service.description && (
@@ -77,6 +146,77 @@ const ServiceCard = ({ service, index }) => {
   );
 };
 
+/* ─────────── Service Form (Add/Edit modal) ─────────── */
+const ServiceForm = ({ formData, setFormData }) => {
+  return (
+    <div className="space-y-4 pt-1">
+      {/* Service Title */}
+      <div>
+        <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
+          Service Title <span className="text-amber-400/80 lowercase font-medium ml-1">(required)</span>
+        </label>
+        <input
+          type="text"
+          className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium"
+          placeholder="e.g. Haircut & Styling, Deluxe Facial"
+          value={formData.service_name}
+          onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+          autoComplete="off"
+          required
+        />
+      </div>
+
+      {/* Price + Duration Row */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
+            Base Price (LKR) <span className="text-amber-400/80 lowercase font-medium ml-1">(required)</span>
+          </label>
+          <input
+            type="number"
+            min="0"
+            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium"
+            placeholder="0.00"
+            value={formData.base_price}
+            onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
+            Duration (Minutes) <span className="text-amber-400/80 lowercase font-medium ml-1">(required)</span>
+          </label>
+          <input
+            type="number"
+            min="1"
+            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium"
+            placeholder="60"
+            value={formData.duration}
+            onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+            required
+          />
+        </div>
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
+          Description <span className="text-neutral-500 lowercase font-medium ml-1">(optional)</span>
+        </label>
+        <textarea
+          rows={3}
+          className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 resize-none font-medium"
+          placeholder="Detailed description of what's included in this service..."
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          autoComplete="off"
+        />
+      </div>
+    </div>
+  );
+};
+
+/* ─────────── Main Services Page ─────────── */
 export default function AdminServicesPage() {
   const params = useParams();
   let salonId = params.salonId;
@@ -84,19 +224,38 @@ export default function AdminServicesPage() {
     const match = window.location.pathname.match(/^\/salon-admin\/([^/]+)/);
     if (match) salonId = match[1];
   }
+
   const [servicesList, setServicesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
 
-  useEffect(() => {
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingService, setEditingService] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const emptyForm = useMemo(() => ({
+    service_name: "",
+    base_price: "",
+    duration: "",
+    description: "",
+  }), []);
+  const [formData, setFormData] = useState(emptyForm);
+
+  const fetchServices = () => {
     setLoading(true);
     setError("");
     getServices(salonId)
       .then((res) => setServicesList(res.data || []))
       .catch((err) => setError(err.response?.data?.message || "Failed to load services"))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchServices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [salonId]);
 
   const filteredServices = useMemo(() => {
@@ -109,9 +268,85 @@ export default function AdminServicesPage() {
     });
   }, [servicesList, searchTerm]);
 
+  /* ── Handlers ── */
+  const openAddModal = () => {
+    setEditingService(null);
+    setFormData(emptyForm);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (service) => {
+    setEditingService(service);
+    setFormData({
+      service_name: service.service_name || "",
+      base_price: service.base_price || "",
+      duration: service.duration || "",
+      description: service.description || "",
+    });
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingService(null);
+    setFormData(emptyForm);
+  };
+
+  const handleSave = async () => {
+    if (!formData.service_name || !formData.base_price || !formData.duration) {
+      setError("Please fill all required fields (Name, Price, Duration)");
+      return;
+    }
+
+    const payload = {
+      service_name: formData.service_name,
+      base_price: Number(formData.base_price),
+      duration: Number(formData.duration),
+      description: formData.description,
+      salon_id: salonId,
+    };
+
+    try {
+      setSaving(true);
+      if (editingService) {
+        await updateService(editingService._id, payload);
+      } else {
+        await createService(payload);
+      }
+      closeModal();
+      fetchServices();
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          `Failed to ${editingService ? "update" : "create"} service`
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this service?")) return;
+    try {
+      await deleteService(id);
+      setServicesList((prev) => prev.filter((s) => s._id !== id));
+    } catch (err) {
+      console.error("Delete error:", err);
+      setError(err.response?.data?.message || "Failed to delete service");
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Services Catalog" subtitle="Catalog of salon services, pricing, and treatment durations" backTo={`/salon-admin/${salonId}/adminDashboard`} />
+      <PageHeader
+        title="Services Catalog"
+        subtitle="Catalog of salon services, pricing, and treatment durations"
+        backTo={`/salon-admin/${salonId}/adminDashboard`}
+      >
+        <Button variant="primary" icon={Plus} onClick={openAddModal}>
+          Add New Service
+        </Button>
+      </PageHeader>
 
       {/* Error Alert */}
       {error && (
@@ -179,11 +414,19 @@ export default function AdminServicesPage() {
           title="No services found"
           description="No salon services match your search criteria."
           icon={Scissors}
+          actionLabel="Add New Service"
+          onAction={openAddModal}
         />
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredServices.map((service, index) => (
-            <ServiceCard key={service._id} service={service} index={index} />
+            <ServiceCard
+              key={service._id}
+              service={service}
+              index={index}
+              onEdit={openEditModal}
+              onDelete={handleDelete}
+            />
           ))}
         </div>
       ) : (
@@ -195,6 +438,7 @@ export default function AdminServicesPage() {
             <Table.Th>Duration</Table.Th>
             <Table.Th align="right">Base Price</Table.Th>
             <Table.Th align="right">Status</Table.Th>
+            <Table.Th align="right">Actions</Table.Th>
           </Table.Head>
           <Table.Body>
             {filteredServices.map((service) => (
@@ -213,11 +457,53 @@ export default function AdminServicesPage() {
                 <Table.Td align="right">
                   <Badge variant="success" dot={true}>Active</Badge>
                 </Table.Td>
+                <Table.Td align="right">
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => openEditModal(service)}
+                      className="p-1.5 rounded-lg bg-surface-2 text-info hover:bg-info/20 transition-colors"
+                      title="Edit Service"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(service._id)}
+                      className="p-1.5 rounded-lg bg-surface-2 text-danger hover:bg-danger/20 transition-colors"
+                      title="Delete Service"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </Table.Td>
               </tr>
             ))}
           </Table.Body>
         </Table>
       )}
+
+      {/* ── Add / Edit Modal ── */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={closeModal}
+        title={editingService ? "✏️ Edit Service Details" : "✨ Add New Service"}
+        maxWidth="max-w-xl"
+      >
+        <ServiceForm formData={formData} setFormData={setFormData} />
+        <Modal.Actions>
+          <Button variant="ghost" size="sm" onClick={closeModal}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSave}
+            loading={saving}
+            disabled={saving}
+          >
+            {editingService ? "Update Service" : "Create Service"}
+          </Button>
+        </Modal.Actions>
+      </Modal>
     </div>
   );
 }

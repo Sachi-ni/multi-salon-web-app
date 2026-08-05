@@ -225,9 +225,18 @@ const AdminHeader = ({ onToggleSidebar }) => {
           onClick={() => setDropdownOpen(!dropdownOpen)}
           className="flex items-center gap-2 cursor-pointer"
         >
-          {/* Avatar */}
-          <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-primary font-black text-xs">
-            {initials}
+{/* Avatar */}
+          <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-primary font-black text-xs overflow-hidden">
+            {user?.image ? (
+              <img
+                src={user.image.startsWith("http") ? user.image : `http://localhost:5000/${user.image.replace(/\\/g, "/")}`}
+                alt={displayName}
+                className="w-full h-full object-cover"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+            ) : (
+              initials
+            )}
           </div>
 
           {/* Name + Email */}

@@ -141,18 +141,24 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
           {/* Header Row */}
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-3.5 min-w-0">
-              <div className="relative flex-shrink-0">
+<div className="relative flex-shrink-0">
                 {staff.image ? (
                   <img
-                    src={staff.image.startsWith("http") ? staff.image : `${API_BASE}${staff.image}`}
+                    src={staff.image.startsWith("http") ? staff.image : `${API_BASE}/${staff.image.replace(/\\/g, "/")}`}
                     alt={staff.full_name}
-                    className="w-13 h-13 rounded-2xl object-cover border-2 border-amber-400/30 group-hover:border-amber-400 transition-colors"
+className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400/30 group-hover:border-amber-400 transition-colors"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      e.target.nextSibling.style.display = "flex";
+                    }}
                   />
-                ) : (
-                  <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-600 text-black font-black flex items-center justify-center text-lg shadow-sm">
-                    {staff.full_name?.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                ) : null}
+                <div
+className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-600 text-black font-black flex items-center justify-center text-lg shadow-sm"
+                  style={staff.image ? { display: "none" } : undefined}
+                >
+                  {staff.full_name?.charAt(0).toUpperCase()}
+                </div>
 
                 <span
                   className={clsx(
@@ -180,14 +186,29 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
             <ActionsMenu staff={staff} onEdit={onEdit} onToggleStatus={onToggleStatus} onDelete={onDelete} />
           </div>
 
-          {/* Salary Rate */}
+{/* Salary Rate */}
           <div className="bg-surface-2/60 border border-border/70 rounded-xl p-3 mb-4 flex items-center justify-between text-xs">
             <span className="text-neutral-400 font-medium flex items-center gap-1.5">
               <Coins className="w-3.5 h-3.5 text-amber-400" />
               Daily Rate:
             </span>
-            <span className="text-white font-extrabold">
-              LKR {(staff.salaryPaymentCountPerDay || 0).toLocaleString()} / day
+<span className="text-white font-extrabold">
+              LKR {(staff.salary_payment_count_per_day || 0).toLocaleString()} / day
+            </span>
+          </div>
+
+          {/* Staff Rating */}
+          <div className="bg-surface-2/60 border border-border/70 rounded-xl p-3 mb-4 flex items-center justify-between text-xs">
+            <span className="text-neutral-400 font-medium flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5 text-amber-400" />
+              Staff Rating:
+            </span>
+            <span className="text-white font-extrabold flex items-center gap-1.5">
+              <span className="text-amber-400">{staff.rating || "0.0"}</span>
+              <span className="text-neutral-400 font-medium">/ 5.0</span>
+              {staff.ratingCount > 0 && (
+                <span className="text-[0.65rem] text-neutral-500 font-medium">({staff.ratingCount})</span>
+              )}
             </span>
           </div>
 
@@ -289,7 +310,7 @@ export default function AdminStaffPage() {
       name: staff.full_name,
       email: staff.email,
       specification: staff.specification,
-      salaryPaymentCountPerDay: staff.salaryPaymentCountPerDay || 0,
+salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 0,
       status: staff.status,
       services: staff.services?.map(s => s._id) || []
     });
@@ -453,8 +474,8 @@ export default function AdminStaffPage() {
                     {staff.status}
                   </Badge>
                 </Table.Td>
-                <Table.Td align="right" className="text-amber-400 font-black text-xs">
-                  LKR {(staff.salaryPaymentCountPerDay || 0).toLocaleString()} / day
+<Table.Td align="right" className="text-amber-400 font-black text-xs">
+                  LKR {(staff.salary_payment_count_per_day || 0).toLocaleString()} / day
                 </Table.Td>
                 <Table.Td align="right">
                   <div className="flex items-center justify-end gap-2">
