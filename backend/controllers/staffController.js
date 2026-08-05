@@ -30,6 +30,7 @@ export const createStaff = async (req, res) => {
       : req.body.salonId;
 
     const salaryPaymentCountPerDay = Number(req.body.salaryPaymentCountPerDay || 1);
+    const salaryBalance = Number(req.body.salaryBalance || 0);
 
     const staffData = {
       full_name: req.body.name,
@@ -41,6 +42,7 @@ export const createStaff = async (req, res) => {
       commission_rate: req.body.commission_rate,
       salary_payment_frequency: req.body.salaryPaymentFrequency || "monthly",
       salary_payment_count_per_day: Number.isFinite(salaryPaymentCountPerDay) && salaryPaymentCountPerDay > 0 ? salaryPaymentCountPerDay : 1,
+      salary_balance: Number.isFinite(salaryBalance) && salaryBalance >= 0 ? salaryBalance : 0,
       salon_id: salonId,
       services,
       image: req.file ? req.file.path : null,
@@ -228,6 +230,11 @@ export const updateStaff = async (req, res) => {
     if (req.body.salaryPaymentCountPerDay !== undefined) {
       const parsedCount = Number(req.body.salaryPaymentCountPerDay);
       updateData.salary_payment_count_per_day = Number.isFinite(parsedCount) && parsedCount > 0 ? parsedCount : 1;
+    }
+
+    if (req.body.salaryBalance !== undefined) {
+      const parsedBalance = Number(req.body.salaryBalance);
+      updateData.salary_balance = Number.isFinite(parsedBalance) && parsedBalance >= 0 ? parsedBalance : 0;
     }
 
     // Only super-admin can change salon assignment

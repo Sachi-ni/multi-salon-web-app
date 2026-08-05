@@ -39,6 +39,14 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = "http://localhost:5000";
 
+const buildImageUrl = (image) => {
+  if (!image) return null;
+  const normalized = image.replace(/\\/g, "/");
+  if (normalized.startsWith("http")) return normalized;
+  if (normalized.startsWith("/")) return `${API_BASE}${normalized}`;
+  return `${API_BASE}/${normalized}`;
+};
+
 /* ── Actions Menu ── */
 const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
   const [open, setOpen] = useState(false);
@@ -142,14 +150,15 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-3.5 min-w-0">
               <div className="relative flex-shrink-0">
-                {staff.image ? (
+                {buildImageUrl(staff.image) ? (
                   <img
-                    src={staff.image.startsWith("http") ? staff.image : `${API_BASE}${staff.image}`}
+                    src={buildImageUrl(staff.image)}
                     alt={staff.full_name}
-                    className="w-13 h-13 rounded-2xl object-cover border-2 border-amber-400/30 group-hover:border-amber-400 transition-colors"
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400/30 group-hover:border-amber-400 transition-colors"
+                    onError={(e) => { e.target.style.display = "none"; }}
                   />
                 ) : (
-                  <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-600 text-black font-black flex items-center justify-center text-lg shadow-sm">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-600 text-black font-black flex items-center justify-center text-lg shadow-sm">
                     {staff.full_name?.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -187,7 +196,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
               Daily Rate:
             </span>
             <span className="text-white font-extrabold">
-              LKR {(staff.salaryPaymentCountPerDay || 0).toLocaleString()} / day
+              LKR {((staff.salaryPaymentCountPerDay ?? staff.salary_payment_count_per_day ?? 0)).toLocaleString()} / day
             </span>
           </div>
 
@@ -289,9 +298,13 @@ export default function AdminStaffPage() {
       name: staff.full_name,
       email: staff.email,
       specification: staff.specification,
-      salaryPaymentCountPerDay: staff.salaryPaymentCountPerDay || 0,
+      salaryPaymentFrequency: staff.salaryPaymentFrequency || staff.salary_payment_frequency || "daily",
+      salaryPaymentCountPerDay:
+        staff.salaryPaymentCountPerDay ?? staff.salary_payment_count_per_day ?? 1,
+      salaryBalance: staff.salaryBalance ?? staff.salary_balance ?? 0,
       status: staff.status,
-      services: staff.services?.map(s => s._id) || []
+      services: staff.services?.map((s) => s._id) || [],
+      imageFile: null,
     });
   };
 
@@ -299,7 +312,16 @@ export default function AdminStaffPage() {
     e.preventDefault();
     setEditLoading(true);
     try {
-      await updateStaff(editStaff._id, editForm);
+      const formData = new FormData();
+      formData.append("name", editForm.name || "");
+      formData.append("email", editForm.email || "");
+      if (editForm.specification !== undefined) formData.append("specification", editForm.specification || "");
+      if (editForm.salaryPaymentFrequency !== undefined) formData.append("salaryPaymentFrequency", editForm.salaryPaymentFrequency);
+      if (editForm.salaryPaymentCountPerDay !== undefined) formData.append("salaryPaymentCountPerDay", editForm.salaryPaymentCountPerDay);
+      if (editForm.salaryBalance !== undefined) formData.append("salaryBalance", editForm.salaryBalance);
+      if (editForm.imageFile) formData.append("image", editForm.imageFile);
+
+      await updateStaff(editStaff._id, formData);
       setEditStaff(null);
       fetchStaffData();
     } catch (err) {
@@ -325,9 +347,10 @@ export default function AdminStaffPage() {
   };
 
   const filteredStaff = useMemo(() => {
-    if (!searchTerm) return staffList;
+    const visibleStaff = staffList.filter((s) => (s.role || "").toLowerCase() !== "manager");
+    if (!searchTerm) return visibleStaff;
     const term = searchTerm.toLowerCase();
-    return staffList.filter((s) => {
+    return visibleStaff.filter((s) => {
       const name = (s.full_name || "").toLowerCase();
       const spec = (s.specification || "").toLowerCase();
       const email = (s.email || "").toLowerCase();
@@ -429,6 +452,7 @@ export default function AdminStaffPage() {
         /* Table View */
         <Table>
           <Table.Head>
+            <Table.Th>Photo</Table.Th>
             <Table.Th>Staff Member</Table.Th>
             <Table.Th>Specification</Table.Th>
             <Table.Th>Status</Table.Th>
@@ -438,10 +462,21 @@ export default function AdminStaffPage() {
           <Table.Body>
             {filteredStaff.map((staff) => (
               <tr key={staff._id} className="hover:bg-surface-2/60 transition-colors">
+                <Table.Td>
+                  {buildImageUrl(staff.image) ? (
+                    <img
+                      src={buildImageUrl(staff.image)}
+                      alt={staff.full_name}
+                      className="w-8 h-8 rounded-xl object-cover"
+                      onError={(e) => { e.target.style.display = "none"; }}
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs">
+                      {staff.full_name?.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </Table.Td>
                 <Table.Td bold className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs">
-                    {staff.full_name?.charAt(0).toUpperCase()}
-                  </div>
                   <div>
                     <span className="text-white font-extrabold text-sm">{staff.full_name}</span>
                     <span className="text-2xs text-neutral-400 block">{staff.email}</span>
@@ -454,7 +489,7 @@ export default function AdminStaffPage() {
                   </Badge>
                 </Table.Td>
                 <Table.Td align="right" className="text-amber-400 font-black text-xs">
-                  LKR {(staff.salaryPaymentCountPerDay || 0).toLocaleString()} / day
+                  LKR {(staff.salaryPaymentCountPerDay ?? staff.salary_payment_count_per_day ?? 0).toLocaleString()} / day
                 </Table.Td>
                 <Table.Td align="right">
                   <div className="flex items-center justify-end gap-2">
@@ -481,11 +516,70 @@ export default function AdminStaffPage() {
       )}
 
       {/* Edit Modal */}
-      <Modal isOpen={!!editStaff} onClose={() => setEditStaff(null)} title="✏️ Edit Staff Details" maxWidth="max-w-md">
+      <Modal isOpen={!!editStaff} onClose={() => setEditStaff(null)} title="✏️ Edit Staff Details" maxWidth="max-w-2xl">
         <form onSubmit={handleEditSubmit} className="space-y-4 pt-1">
           <Input label="Full Name" value={editForm.name || ""} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
-          <Input label="Specification / Title" value={editForm.specification || ""} onChange={(e) => setEditForm({ ...editForm, specification: e.target.value })} />
-          <Input label="Daily Rate (LKR)" type="number" value={editForm.salaryPaymentCountPerDay || 0} onChange={(e) => setEditForm({ ...editForm, salaryPaymentCountPerDay: Number(e.target.value) })} />
+          <Input label="Email Address" type="email" value={editForm.email || ""} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Payment Frequency"
+              type="select"
+              value={editForm.salaryPaymentFrequency || "daily"}
+              onChange={(e) => setEditForm({ ...editForm, salaryPaymentFrequency: e.target.value })}
+              className="bg-surface border-border"
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </Input>
+            <Input
+              label="Salary Amount Per Day (LKR)"
+              type="number"
+              min="1"
+              value={editForm.salaryPaymentCountPerDay || 0}
+              onChange={(e) => setEditForm({ ...editForm, salaryPaymentCountPerDay: Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Assigned Services</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-surface border border-border rounded-xl p-3">
+              {servicesList.length === 0 ? (
+                <p className="text-xs text-neutral-400">No services available.</p>
+              ) : (
+                servicesList.map((service) => {
+                  const checked = editForm.services?.includes(service._id);
+                  return (
+                    <label key={service._id} className="flex items-center gap-2 rounded-xl border border-border p-3 text-sm text-white cursor-pointer hover:border-amber-400/50">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          const currentServices = editForm.services || [];
+                          const nextServices = checked
+                            ? currentServices.filter((id) => id !== service._id)
+                            : [...currentServices, service._id];
+                          setEditForm({ ...editForm, services: nextServices });
+                        }}
+                        className="h-4 w-4 accent-amber-400"
+                      />
+                      <span>{service.service_name}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+ 
+          <div>
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Profile Picture</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setEditForm({ ...editForm, imageFile: e.target.files?.[0] || null })}
+              className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-400 file:text-black file:cursor-pointer"
+            />
+          </div>
 
           <Modal.Actions>
             <Button variant="ghost" type="button" onClick={() => setEditStaff(null)} disabled={editLoading}>Cancel</Button>

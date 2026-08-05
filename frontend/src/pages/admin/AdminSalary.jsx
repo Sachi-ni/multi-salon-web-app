@@ -327,6 +327,8 @@ const Salary = () => {
   };
 
   const handleSaveRate = async (salaryId) => {
+    if (!salaryId || String(salaryId).startsWith("fallback-")) return;
+
     const rate = editingRates[salaryId];
     if (rate === undefined || rate === null) return;
     try {
@@ -345,6 +347,7 @@ const Salary = () => {
   // ─── Pay ────────────────────────────────────────────────────────────────
 
   const handlePay = async (salaryId) => {
+    if (!salaryId || String(salaryId).startsWith("fallback-")) return;
     setLoading(true);
     setError("");
     setSuccessMsg("");
@@ -360,6 +363,7 @@ const Salary = () => {
   };
 
   const handleDownloadPdf = async (salaryId) => {
+    if (!salaryId || String(salaryId).startsWith("fallback-")) return;
     setPdfLoading(true);
     setError("");
     try {
@@ -510,7 +514,7 @@ const Salary = () => {
 
       // Staff Information Section
       drawSection("STAFF INFORMATION");
-      drawInfoRow("Full Name", staff.full_name || salary.staff_name || "N/A");
+      drawInfoRow("Full Name", staff.name || staff.full_name || salary.staff_name || "N/A");
       drawInfoRow("Email", staff.email || "N/A");
       yPos += 1;
 
@@ -659,7 +663,7 @@ const Salary = () => {
       yPos += 3;
       doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: "center" });
 
-      const fileName = `salary_slip_${staff.full_name || salary.staff_name || "staff"}_${salary.period}_${salary.frequency}.pdf`;
+      const fileName = `salary_slip_${staff.name || staff.full_name || salary.staff_name || "staff"}_${salary.period}_${salary.frequency}.pdf`;
       doc.save(fileName);
       setShowPdfModal(false);
       setPdfData(null);
@@ -674,12 +678,21 @@ const Salary = () => {
 
   let displayRows = [...salaries];
 
-  // If no salary records exist but we have staff, create fallback rows
-  if (salaries.length === 0 && fallbackStaff.length > 0) {
-    displayRows = fallbackStaff.map((staff) => ({
-      _id: staff._id,
+  // Always include active staff for the selected frequency/period,
+  // even when some salary rows already exist.
+  const existingStaffIds = new Set(
+    salaries
+      .map((row) => row.staff_id?._id || row.staff_id || row.staffId)
+      .filter(Boolean)
+      .map(String)
+  );
+
+  const missingStaffRows = fallbackStaff
+    .filter((staff) => !existingStaffIds.has(String(staff._id)))
+    .map((staff) => ({
+      _id: `fallback-${staff._id}`,
       staff_id: staff,
-      staff_name: staff.full_name || "",
+      staff_name: staff.name || staff.full_name || "",
       workingAmount: 0,
       rate: staff.commission_rate || 0,
       commission_rate: staff.commission_rate || 0,
@@ -687,14 +700,16 @@ const Salary = () => {
       daySalary: 0,
       totalSalary: 0,
       status: "Not Paid",
+      period: null,
     }));
-  }
+
+  displayRows = [...displayRows, ...missingStaffRows];
 
   // ─── Filter by search ──────────────────────────────────────────────────
 
   const filteredDisplayRows = searchQuery
     ? displayRows.filter((row) => {
-        const name = (row.staff_id?.full_name || row.staff_name || "").toLowerCase();
+        const name = (row.staff_id?.name || row.staff_id?.full_name || row.staff_name || "").toLowerCase();
         return name.includes(searchQuery.toLowerCase());
       })
     : displayRows;
@@ -870,24 +885,36 @@ const Salary = () => {
               <tbody>
                 {filteredDisplayRows.map((row) => {
                   const staff = row.staff_id || {};
-                  const staffName = staff.full_name || row.staff_name || "Unknown";
-                  const isFallback = !row.period; // no period means it's a fallback staff row
+                  const staffName = staff.name || staff.full_name || row.staff_name || "Unknown";
+                  const isFallback = !row.period || String(row._id).startsWith("fallback-");
                   const monthlyDayRecord =
                     frequency === "monthly" && Array.isArray(row.dailyRecords)
                       ? row.dailyRecords.find((dr) => toDateKey(dr.date) === selectedMonthlyDateKey)
                       : null;
+                  const selectedWeeklyRecord =
+                    frequency === "weekly" && Array.isArray(row.dailyRecords)
+                      ? row.dailyRecords.find((dr) => toDateKey(dr.date) === weeklyDate)
+                      : null;
                   const selectedDailyRecord = monthlyDayRecord || null;
                   const workingAmt = frequency === "monthly"
                     ? (selectedDailyRecord?.workingAmount || 0)
-                    : (row.workingAmount || 0);
-                  const currentRate = editingRates[row._id] !== undefined ? editingRates[row._id] : (row.rate ?? row.commission_rate ?? 0);
+                    : frequency === "weekly"
+                      ? (selectedWeeklyRecord?.workingAmount || 0)
+                      : (row.workingAmount || 0);
+                  const currentRate = editingRates[row._id] !== undefined
+                    ? editingRates[row._id]
+                    : (selectedWeeklyRecord?.rate ?? row.rate ?? row.commission_rate ?? 0);
                   const isDirty = dirtyRates[row._id] || false;
                   const workRate = frequency === "monthly"
                     ? (selectedDailyRecord?.workRate || 0)
-                    : (row.workRate || 0);
+                    : frequency === "weekly"
+                      ? (selectedWeeklyRecord?.workRate || 0)
+                      : (row.workRate || 0);
                   const daySalary = frequency === "monthly"
                     ? (selectedDailyRecord?.daySalary || 0)
-                    : (row.daySalary || 0);
+                    : frequency === "weekly"
+                      ? (selectedWeeklyRecord?.daySalary || 0)
+                      : (row.daySalary || 0);
                   const totalSal = frequency === "monthly"
                     ? (Array.isArray(row.dailyRecords)
                         ? row.dailyRecords.reduce((sum, dr) => {
@@ -920,10 +947,10 @@ const Salary = () => {
                             onChange={(e) => handleRateChange(row._id, e.target.value)}
                             className="w-16 bg-[#1d1d1d] border border-gray-700 rounded px-2 py-1 text-xs text-white text-center outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/20"
                             min="0" max="100" step="0.1"
-                            disabled={isPaid}
+                            disabled={isPaid || isFallback}
                           />
                           <span className="text-xs text-gray-400">%</span>
-                          {isDirty && (
+                          {!isFallback && isDirty && (
                             <button
                               onClick={() => handleSaveRate(row._id)}
                               className="p-1 rounded hover:bg-yellow-400/20 text-yellow-400 transition-colors"
