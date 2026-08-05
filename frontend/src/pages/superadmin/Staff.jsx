@@ -238,8 +238,8 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
       <div className="px-5 py-3 bg-surface-2/30 border-t border-border flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-          <span className="text-xs font-extrabold text-white">
-            {staff.rating || "5.0"}
+<span className="text-xs font-extrabold text-white">
+            {staff.rating || "0.0"}
           </span>
         </div>
 

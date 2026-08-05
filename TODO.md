@@ -1,10 +1,15 @@
-# TODO — Salon-scoped Staff for Admin
+# Task: Show staff ratings (from Feedback) across Superadmin, Manager, and Customer views
 
-- [ ] Backend: enforce salon ownership in staffController (staff-admin only affects req.user.salon_id)
-- [ ] Backend: make staff-admin getStaff always scoped to their salon
-- [ ] Frontend: update staffService.getStaff to accept salonId param
-- [ ] Frontend: update admin/Staff.jsx to show only staff for logged-in admin salon; hide “other salons” selector
-- [ ] Frontend: add “Add Staff” header button and ensure it routes with salonId
-- [ ] Frontend: fix Admin quick action routing to pass salonId and render correct AddStaff component
-- [ ] Run backend + frontend to verify
+## Problem
+- The superadmin reviews page computes average staff ratings from the Feedback collection.
+- The `/api/staff` endpoint (used by superadmin & manager) and `/api/team` endpoint (used by customer team page) do NOT attach the rating, so staff cards show default/0 values.
 
+## Plan
+- [x] Backend: In `backend/controllers/staffController.js`, compute average `staffRating` per staff from `Feedback` collection.
+- [x] Backend: Attach computed `rating` to each staff member in `getStaff` (superadmin & manager).
+- [x] Backend: Attach computed `rating` to each staff member in `getTeam` (customer team page).
+- [x] Frontend: Customer team StaffCard already reads `member.rating` — displays correctly.
+- [x] Frontend: Superadmin StaffCard already reads `staff.rating` — displays correctly.
+- [x] Frontend: Superadmin StaffCard rating now defaults to `0.0` (instead of `5.0`) when no feedback rating exists, matching the manager dashboard (`frontend/src/pages/superadmin/Staff.jsx`).
+- [x] Frontend: Added Staff Rating display to manager's admin StaffCard (`frontend/src/pages/admin/Staff.jsx`).
+- [x] Verify by restarting backend and loading the pages.
