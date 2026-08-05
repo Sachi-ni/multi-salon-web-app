@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
 import clsx from "clsx";
@@ -11,11 +11,13 @@ const API_BASE = "http://localhost:5000";
 const AdminHeader = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { salonId } = useParams();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [salon, setSalon] = useState(null);
+  const [brandSalon, setBrandSalon] = useState(null);
 
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
@@ -39,6 +41,15 @@ const AdminHeader = ({ onToggleSidebar }) => {
         .catch(console.error);
     }
   }, [user]);
+
+  useEffect(() => {
+    const effectiveSalonId = salonId || user?.salon_id;
+    if (!effectiveSalonId) return;
+
+    getSalon(effectiveSalonId)
+      .then((res) => setBrandSalon(res.data?.name || res.data?.salonName || null))
+      .catch(() => setBrandSalon(null));
+  }, [salonId, user?.salon_id]);
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -182,6 +193,11 @@ const AdminHeader = ({ onToggleSidebar }) => {
             <span className="text-white">Salon</span>Hub
           </>
         )}
+        <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-sm font-black text-primary flex-shrink-0">
+          {brandSalon && brandSalon[0]?.toUpperCase() ? brandSalon[0].toUpperCase() : "S"}
+        </div>
+         <span className="text-white truncate max-w-[180px]">
+          {brandSalon || "SalonHub"}</span>
       </div>
 
       {/* Role Badge */}
