@@ -14,9 +14,13 @@ export default function SalonCard({ branch, index }) {
     navigate(`/our-salons/${branch._id}`);
   };
 
-  const imageUrl = branch.image 
-    ? `http://localhost:5000/${branch.image.replace(/\\/g, '/')}`
-    : "https://images.unsplash.com/photo-1600948836101-f9ffda59d250?q=80&w=2036&auto=format&fit=crop";
+const primaryImage = (branch.images && branch.images.length > 0)
+    ? branch.images[0]
+    : (branch.logo || null);
+
+  const imageUrl = primaryImage 
+    ? `http://localhost:5000/${primaryImage.replace(/\\/g, '/')}`
+    : "/salon_interior.png";
 
   return (
     <motion.div
@@ -33,8 +37,8 @@ export default function SalonCard({ branch, index }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-primary/80 to-transparent" />
         <div className="absolute top-4 left-4 bg-primary/80 backdrop-blur-md px-3 py-1 rounded-lg flex items-center gap-1 border border-border">
-          <Star className="w-4 h-4 fill-accent text-accent" />
-          <span className="text-white font-bold text-sm">4.9</span>
+<Star className="w-4 h-4 fill-accent text-accent" />
+          <span className="text-white font-bold text-sm">{branch.rating || 0}</span>
         </div>
       </div>
 

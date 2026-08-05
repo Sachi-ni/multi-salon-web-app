@@ -6,6 +6,8 @@ import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 
+const API_BASE = "http://localhost:5000";
+
 const AddSalon = () => {
   const navigate = useNavigate();
 
@@ -19,6 +21,8 @@ const AddSalon = () => {
     managerPhone: "",
     managerPassword: ""
   });
+  const [logo, setLogo] = useState(null);
+  const [logoPreview, setLogoPreview] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -26,13 +30,25 @@ const AddSalon = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogo(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
-      await createSalon(formData);
-      navigate("/Salons");
+      const data = new FormData();
+      Object.entries(formData).forEach(([key, value]) => {
+        data.append(key, value);
+      });
+      if (logo) data.append("logo", logo);
+      await createSalon(data);
+      navigate("/Salons", { state: { refreshData: true } });
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.message || "Failed to create salon");
@@ -60,7 +76,32 @@ const AddSalon = () => {
           <Input label="Salon Name" name="name" placeholder="Enter salon name" required value={formData.name} onChange={handleChange} />
           <Input label="Phone" name="phone" placeholder="Enter phone number" required value={formData.phone} onChange={handleChange} />
           <Input label="Address" name="location" placeholder="Enter address" required value={formData.location} onChange={handleChange} />
-          <Input label="About" name="about" placeholder="Enter about the salon" value={formData.about} onChange={handleChange} />
+<Input label="About" name="about" placeholder="Enter about the salon" value={formData.about} onChange={handleChange} />
+
+          {/* Salon Logo Upload */}
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              Salon Logo <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(optional)</span>
+            </label>
+            <div className="flex items-center gap-3">
+              {logoPreview ? (
+                <div className="w-16 h-16 rounded-xl bg-surface-2 border border-border overflow-hidden flex-shrink-0">
+                  <img src={logoPreview} alt="Salon logo preview" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-surface-2 border border-border flex items-center justify-center text-muted-2 flex-shrink-0">
+                  <span className="text-2xl font-black">S</span>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLogoChange}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
+              />
+            </div>
+            <p className="text-[0.6rem] text-muted-2 mt-1">Upload a logo for this salon. It will appear in the manager header and salon directory.</p>
+          </div>
 
           <div className="mt-8 mb-3.5 border-t border-border pt-6">
             <h2 className="text-lg font-bold text-white mb-3">Salon Manager Details</h2>
