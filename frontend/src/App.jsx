@@ -21,16 +21,16 @@ import SalonDetailsPage from "./pages/customer/SalonDetailsPage.jsx";
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import Profile from "./pages/superadmin/profile.jsx";
 import SuperAdminDashboard from "./pages/superadmin/Dashboard.jsx";
-import Revenue from "./pages/superadmin/Revenue.jsx";
+import Analytics from "./pages/superadmin/Analytics.jsx";
 import AddSalon from "./pages/superadmin/AddSalon.jsx";
 import AddStaff from "./pages/superadmin/AddStaff.jsx";
 import AddService from "./pages/superadmin/Services.jsx";
 import Staff from "./pages/superadmin/Staff.jsx";
 import Appointments from "./pages/superadmin/Appointments.jsx";
-import Analytics from "./pages/superadmin/Analytics.jsx";
 import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 import Services from "./pages/superadmin/Services.jsx";
+import SuperAdminReviews from "./pages/superadmin/SuperAdminReviews.jsx";
 
 import CustomerLayout   from "./components/layout/CustomerLayout.jsx";
 import CustomerDashboard from "./pages/customer/Dashboard.jsx";
@@ -41,11 +41,12 @@ import BookAppointment  from "./pages/customer/BookAppointment.jsx";
 import MyAppointments   from "./pages/customer/MyAppointments.jsx";
 import GiveFeedback    from "./pages/customer/GiveFeedback.jsx";
 
+// Staff pages
+import StaffDashboard from "./pages/staff/StaffDashboard.jsx";
+
 // Admin pages
 import AdminBookings from "./pages/admin/AdminBookings.jsx";
-import AdminDailySchedule from "./pages/admin/AdminDailySchedule.jsx";
-import AdminStaffSchedule from "./pages/admin/AdminStaffSchedule.jsx";
-import AdminDashboard from "./pages/admin/AdminDashboard";
+
 import Billing from "./pages/admin/Billing.jsx";
 import SalonAdminShell from "./pages/admin/SalonAdminShell";
 import AdminSalonLayout from "./components/layout/AdminSalonLayout";
@@ -54,15 +55,19 @@ import AdminAddStaff from "./pages/admin/AddStaff.jsx";
 import { useAuth } from "./context/AuthContext";
 import CustomerRegister from "./pages/auth/CustomerRegister.jsx";
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
+const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
   const { user } = useAuth();
 
   if (!user) {
     return <Navigate to="/" />;
   }
 
-  if (!allowedRoles.includes(user.role)) {
-    return <Navigate to="/unauthorized" />; // you can make a simple Unauthorized page
+  if (requireSalonAccess && user.role !== "super-admin" && !user.salon_id) {
+    return <Navigate to="/unauthorized" />;
+  }
+
+  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/unauthorized" />; 
   }
 
   return children;
@@ -102,7 +107,7 @@ function App() {
         <Route
           path="/salon-admin/:salonId/*"
           element={
-            <ProtectedRoute allowedRoles={["super-admin", "manager"]}>
+            <ProtectedRoute requireSalonAccess={true}>
               <AdminSalonLayout>
                 <SalonAdminShell />
               </AdminSalonLayout>
@@ -122,11 +127,11 @@ function App() {
         />
 
         <Route
-          path="/Revenue"
+          path="/Analytics"
           element={
             <ProtectedRoute allowedRoles={["super-admin"]}>
               <DashboardLayout>
-                <Revenue />
+                <Analytics />
               </DashboardLayout>
             </ProtectedRoute>
           }
@@ -187,7 +192,7 @@ function App() {
           }
         />
 
-        // This route is for adding service to a specific salon, so it includes a salonId param
+        {/* This route is for adding service to a specific salon, so it includes a salonId param */}
 
         <Route
           path="/AddStaff/:salonId"
@@ -223,11 +228,11 @@ function App() {
         />
 
         <Route
-          path="/Analytics"
+          path="/superAdminReviews"
           element={
             <ProtectedRoute allowedRoles={["super-admin"]}>
               <DashboardLayout>
-                <Analytics />
+                <SuperAdminReviews />
               </DashboardLayout>
             </ProtectedRoute>
           }
@@ -259,16 +264,20 @@ function App() {
           </ProtectedRoute>
         } />
 
+        <Route path="/customer/profile" element={
+          <ProtectedRoute allowedRoles={["customer", "user"]}>
+            <Edit />
+          </ProtectedRoute>
+        } />
+
         <Route path="/customer/branches" element={
           <ProtectedRoute allowedRoles={["customer", "user"]}>
             <CustomerLayout><Branches /></CustomerLayout>
           </ProtectedRoute>
         } />
 
-        <Route path="/customer/services" element={
-          <ProtectedRoute allowedRoles={["customer", "user"]}>
-            <CustomerLayout><CustomerServices /></CustomerLayout>
-          </ProtectedRoute>
+        <Route path="/our-services" element={
+          <CustomerServices />
         } />
 
         <Route path="/customer/staff" element={
@@ -278,9 +287,7 @@ function App() {
         } />
 
         <Route path="/book" element={
-          <ProtectedRoute allowedRoles={["customer", "user"]}>
-            <CustomerLayout><BookAppointment /></CustomerLayout>
-          </ProtectedRoute>
+          <CustomerLayout><BookAppointment /></CustomerLayout>
         } />
 
         <Route path="/my-appointments" element={
@@ -292,6 +299,15 @@ function App() {
         <Route path="/customer/give-feedback/:appointmentId" element={
           <ProtectedRoute allowedRoles={["customer", "user"]}>
             <CustomerLayout><GiveFeedback /></CustomerLayout>
+          </ProtectedRoute>
+        } />
+
+        {/* Staff Dashboard */}
+        <Route path="/staff/dashboard" element={
+          <ProtectedRoute requireSalonAccess={true}>
+            <AdminSalonLayout>
+              <StaffDashboard />
+            </AdminSalonLayout>
           </ProtectedRoute>
         } />
 
@@ -310,7 +326,7 @@ function App() {
         <Route
           path="/salon-admin/:salonId/AddStaff"
           element={
-            <ProtectedRoute allowedRoles={["super-admin", "manager"]}>
+            <ProtectedRoute requireSalonAccess={true}>
               <AdminSalonLayout>
                 <AdminAddStaff />
               </AdminSalonLayout>

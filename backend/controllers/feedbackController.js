@@ -4,6 +4,7 @@ import Salon from "../models/Salon.js";
 import Customer from "../models/Customer.js";
 import Service from "../models/Service.js";
 import Staff from "../models/Staff.js";
+import Admin from "../models/Admin.js";
 
 export const submitFeedback = async (req, res) => {
   try {
@@ -83,18 +84,39 @@ export const getSalonFeedback = async (req, res) => {
       return res.status(400).json({ message: "salonId is required." });
     }
 
-    const filter = { salon_id };
+    const filter = {};
+    if (salon_id !== "all") {
+      filter.salon_id = salon_id;
+    }
     if (req.query.staffId) filter.staff_id = req.query.staffId;
     if (req.query.serviceId) filter.service_id = req.query.serviceId;
 
-    const feedbacks = await Feedback.find(filter)
+    const rawFeedbacks = await Feedback.find(filter)
       .populate("appointment_id", "appointment_date start_time status")
-      .populate("customer_id", "name email")
       .populate("service_id", "service_name")
       .populate("staff_id", "full_name")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.status(200).json(feedbacks);
+    for (const f of rawFeedbacks) {
+      if (f.customer_id) {
+        let customer = await Customer.findById(f.customer_id, "name email phone").lean();
+        if (!customer) {
+          const admin = await Admin.findById(f.customer_id, "full_name email phone").lean();
+          if (admin) {
+            customer = {
+              _id: admin._id,
+              name: admin.full_name,
+              email: admin.email,
+              phone: admin.phone
+            };
+          }
+        }
+        f.customer_id = customer || null;
+      }
+    }
+
+    res.status(200).json(rawFeedbacks);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

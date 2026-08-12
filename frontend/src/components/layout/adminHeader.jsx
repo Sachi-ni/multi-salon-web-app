@@ -1,17 +1,20 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Bell, Menu, LogOut, User, ChevronDown, Check } from "lucide-react";
+import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
+import { getSalon } from "../../services/salonService";
 
 const AdminHeader = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { salonId } = useParams();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [brandSalon, setBrandSalon] = useState(null);
 
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
@@ -26,6 +29,15 @@ const AdminHeader = ({ onToggleSidebar }) => {
         .catch(console.error);
     }
   }, [user]);
+
+  useEffect(() => {
+    const effectiveSalonId = salonId || user?.salon_id;
+    if (!effectiveSalonId) return;
+
+    getSalon(effectiveSalonId)
+      .then((res) => setBrandSalon(res.data?.name || res.data?.salonName || null))
+      .catch(() => setBrandSalon(null));
+  }, [salonId, user?.salon_id]);
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -92,7 +104,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
       await handleReadNotification(n._id);
     }
     setNotifOpen(false);
-    
+
     if (n.appointment_id) {
       if (user?.role === "super-admin") {
         navigate(`/Appointments?highlight=${n.appointment_id}`);
@@ -125,16 +137,16 @@ const AdminHeader = ({ onToggleSidebar }) => {
 
   const initials = user?.name
     ? user.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase()
     : "SA";
 
   return (
     <header className="h-header bg-surface/90 backdrop-blur-glass border-b border-border flex items-center px-5 gap-3 fixed top-0 left-0 right-0 z-[200]">
-      
+
       {/* Mobile Menu */}
       <button
         onClick={onToggleSidebar}
@@ -146,9 +158,10 @@ const AdminHeader = ({ onToggleSidebar }) => {
       {/* Logo */}
       <div className="flex items-center gap-2 text-lg font-black text-accent whitespace-nowrap tracking-tight">
         <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-sm font-black text-primary flex-shrink-0">
-          S
+          {brandSalon && brandSalon[0]?.toUpperCase() ? brandSalon[0].toUpperCase() : "S"}
         </div>
-        <span className="text-white">Salon</span>Hub
+         <span className="text-white truncate max-w-[180px]">
+          {brandSalon || "SalonHub"}</span>
       </div>
 
       {/* Role Badge */}
@@ -161,7 +174,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
 
       {/* Notification */}
       <div className="relative" ref={notifRef}>
-        <button 
+        <button
           onClick={() => {
             setNotifOpen(!notifOpen);
             if (!notifOpen && user) {
@@ -193,8 +206,8 @@ const AdminHeader = ({ onToggleSidebar }) => {
                 <div className="p-4 text-center text-muted-2 text-xs">No notifications yet</div>
               ) : (
                 notifications.map(n => (
-                  <div 
-                    key={n._id} 
+                  <div
+                    key={n._id}
                     onClick={() => handleNotificationClick(n)}
                     className={clsx(
                       "p-3 border-b border-border/50 hover:bg-surface-2 transition-colors cursor-pointer",
@@ -225,9 +238,18 @@ const AdminHeader = ({ onToggleSidebar }) => {
           onClick={() => setDropdownOpen(!dropdownOpen)}
           className="flex items-center gap-2 cursor-pointer"
         >
-          {/* Avatar */}
-          <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-primary font-black text-xs">
-            {initials}
+{/* Avatar */}
+          <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-primary font-black text-xs overflow-hidden">
+            {user?.image ? (
+              <img
+                src={user.image.startsWith("http") ? user.image : `http://localhost:5000/${user.image.replace(/\\/g, "/")}`}
+                alt={displayName}
+                className="w-full h-full object-cover"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+            ) : (
+              initials
+            )}
           </div>
 
           {/* Name + Email */}
@@ -251,10 +273,10 @@ const AdminHeader = ({ onToggleSidebar }) => {
         {/* Dropdown */}
         {dropdownOpen && (
           <div className="absolute right-0 top-full mt-2 w-48 bg-surface border border-border rounded-xl shadow-modal py-1.5 z-50">
-            
+
             <button
               onClick={() => {
-                navigate("/profile");
+                navigate(user?.role === "super-admin" ? "/Profile" : "/editProfile");
                 setDropdownOpen(false);
               }}
               className="w-full px-4 py-2 text-left text-sm text-muted-2 hover:text-white hover:bg-white/5 flex items-center gap-2"

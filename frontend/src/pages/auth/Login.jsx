@@ -54,10 +54,16 @@ const Login = () => {
       // Redirect based on role
       if (data.role === "super-admin") {
         navigate("/superAdminDashboard");
-      } else if (data.role === "staff-admin" || data.role === "manager") {
-        navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
       } else if (data.role === "customer") {
-        navigate("/customer/dashboard");
+        navigate("/");
+      } else if (userData.salon_id) {
+        // If they have a salon_id, they are some kind of staff/manager
+        if (data.role === "manager" || data.role === "staff-admin") {
+          navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
+        } else {
+          // Normal staff go to staffDashboard
+          navigate(`/staff/dashboard`);
+        }
       } else {
         navigate("/");
       }

@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { X, Camera } from "lucide-react";
 import axios from "axios";
+
+const API_BASE = "http://localhost:5000";
 
 const Edit = () => {
   const { user, setUser, token, login } = useAuth();
@@ -13,6 +16,22 @@ const Edit = () => {
   const [username, setUsername] = useState(user?.username || "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState(
+    user?.image
+      ? user.image.startsWith("http")
+        ? user.image
+        : `${API_BASE}/${user.image.replace(/\\/g, "/")}`
+      : ""
+  );
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImage(file);
+    setPreview(URL.createObjectURL(file));
+  };
 
   const handleUpdate = async (e) => {
     e.preventDefault();
@@ -23,9 +42,19 @@ const Edit = () => {
     }
 
     try {
+      setUploading(true);
+
+      const formData = new FormData();
+      formData.append("full_name", fname);
+      formData.append("email", email);
+      formData.append("phone", phone);
+      formData.append("username", username);
+      if (password) formData.append("password", password);
+      if (image) formData.append("image", image);
+
       const res = await axios.put(
         `http://localhost:5000/api/auth/user/${user.id}`,
-        { full_name: fname, email, phone, username, password },
+        formData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -36,6 +65,7 @@ const Edit = () => {
         email: res.data.email,
         phone: res.data.phone,
         username: res.data.username,
+        image: res.data.image || user.image,
       };
 
       // If backend returned a new token, use login to sync both user + token
@@ -47,17 +77,32 @@ const Edit = () => {
       }
 
       alert("Profile updated successfully!");
-      navigate("/Profile");
+      if (user?.role === "customer" || user?.role === "user") {
+        navigate("/customer/dashboard");
+      } else if (user?.role === "super-admin") {
+        navigate("/Profile");
+      } else {
+        navigate(-1);
+      }
     } catch (error) {
       console.error("Update error:", error);
       alert(error.response?.data?.message || "Failed to update profile");
+    } finally {
+      setUploading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg">
-      <div className="relative z-10 w-[460px] max-w-[96vw] bg-surface border border-border rounded-2xl p-10 shadow-modal">
+    <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg py-4">
+      <div className="relative z-10 w-[460px] max-w-[96vw] max-h-[90vh] overflow-y-auto overflow-x-hidden bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-modal">
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />
+
+        <button 
+          onClick={() => navigate(-1)}
+          className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
         <div className="flex items-center gap-2.5 mb-1.5">
           <div className="w-9 h-9 bg-accent rounded-lg flex items-center justify-center text-base font-black text-primary flex-shrink-0">
@@ -68,7 +113,44 @@ const Edit = () => {
 
         <h1 className="text-2xl font-extrabold text-white mb-6">Edit Profile</h1>
 
-        <form onSubmit={handleUpdate}>
+<form onSubmit={handleUpdate}>
+          {/* Profile Picture */}
+          <div className="mb-5 flex items-center gap-4">
+            <div className="relative">
+              {preview ? (
+                <img
+                  src={preview}
+                  alt="Profile"
+                  className="w-16 h-16 rounded-2xl object-cover border-2 border-accent/40"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-accent-dim border-2 border-accent/40 flex items-center justify-center text-accent font-black text-xl">
+                  {(user?.name || "S").charAt(0).toUpperCase()}
+                </div>
+              )}
+              <label
+                htmlFor="profile-image"
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-lg bg-accent text-primary flex items-center justify-center cursor-pointer hover:bg-accent-hover transition-colors shadow-sm"
+                title="Change photo"
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </label>
+            </div>
+            <div className="flex-1">
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                Profile Picture
+              </label>
+              <input
+                id="profile-image"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="w-full text-xs text-muted-2 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer cursor-pointer"
+              />
+              <p className="text-[0.6rem] text-muted mt-1">Upload a new photo to update your profile picture.</p>
+            </div>
+          </div>
+
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
               Full Name
@@ -81,17 +163,19 @@ const Edit = () => {
             />
           </div>
 
-          <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-              Username
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
-            />
-          </div>
+          {user?.role !== "customer" && user?.role !== "user" && (
+            <div className="mb-3.5">
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+              />
+            </div>
+          )}
 
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
@@ -141,11 +225,12 @@ const Edit = () => {
             />
           </div>
 
-          <button
+<button
             className="w-full mt-1.5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase cursor-pointer transition-all duration-200 hover:bg-accent-hover hover:shadow-glow hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
             type="submit"
+            disabled={uploading}
           >
-            Save Changes
+            {uploading ? "Saving..." : "Save Changes"}
           </button>
         </form>
       </div>

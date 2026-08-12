@@ -8,13 +8,17 @@ import {
   Clock,
   Search,
   FileText,
-  Download,
   FileSpreadsheet,
   Receipt,
   Loader2,
   ChevronLeft,
   ChevronRight,
   Store,
+  Coins,
+  TrendingUp,
+  Filter,
+  Download,
+  Printer
 } from "lucide-react";
 
 import jsPDF from "jspdf";
@@ -26,11 +30,13 @@ import StatCard from "../../components/ui/StatCard";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
+import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 
 import { useAuth } from "../../context/AuthContext";
 import { getDailyReport } from "../../services/billingService";
 import { getSalons } from "../../services/salonService";
+import clsx from "clsx";
 
 import "./admin.css";
 
@@ -58,17 +64,6 @@ const fmtTime12 = (t) => {
 };
 
 const invoiceNo = (id) => (id ? `INV-${id.slice(-6).toUpperCase()}` : "—");
-
-const statusBadge = (status) => {
-  const map = {
-    completed: "success",
-    pending:   "warning",
-    confirmed: "info",
-    cancelled: "danger",
-    rejected:  "danger",
-  };
-  return map[status] || "neutral";
-};
 
 const ITEMS_PER_PAGE = 10;
 
@@ -115,14 +110,14 @@ const presetLabel = (p, startDate, endDate) => {
   return labels[p] || p;
 };
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  Component
-// ═════════════════════════════════════════════════════════════════════════════
-
 const Billing = () => {
   const { salonId: routeSalonId } = useParams();
   const { user } = useAuth();
-  const salonId = routeSalonId || user?.salon_id || "";
+  let salonId = routeSalonId || user?.salon_id || "";
+  if (!salonId) {
+    const match = window.location.pathname.match(/^\/salon-admin\/([^/]+)/);
+    if (match) salonId = match[1];
+  }
 
   // ── State ──────────────────────────────────────────────────────────────────
 
@@ -142,7 +137,11 @@ const Billing = () => {
   const [data, setData] = useState({
     totalAppointments: 0,
     paidAppointments:  0,
+    confirmedAppointments: 0,
     pendingAppointments: 0,
+    completedRevenue: 0,
+    confirmedRevenue: 0,
+    totalProjectedRevenue: 0,
     totalRevenue: 0,
     averageBill: 0,
     appointments: [],
@@ -176,7 +175,6 @@ const Billing = () => {
     }
   }, [selectedSalonId]);
 
-  // Load salons list for super admins
   useEffect(() => {
     if (user?.role === "super-admin") {
       getSalons().then((res) => {
@@ -187,7 +185,7 @@ const Billing = () => {
 
   useEffect(() => {
     fetchReport(preset, customStart, customEnd);
-  }, [preset, fetchReport]);
+  }, [preset, fetchReport, customStart, customEnd]);
 
   const handlePresetChange = (newPreset) => {
     setPreset(newPreset);
@@ -210,21 +208,20 @@ const Billing = () => {
   // ── Filtering + Pagination ─────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
-    let list = data.appointments;
+    let list = data.appointments || [];
 
-    // Status filter
     if (statusFilter !== "all") {
       list = list.filter((a) => a.status === statusFilter);
     }
 
-    // Search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter((a) => {
         const customer = (a.customer_id?.name || a.guest_name || "").toLowerCase();
         const staff    = (a.staff_id?.full_name || "").toLowerCase();
         const inv      = invoiceNo(a._id).toLowerCase();
-        return customer.includes(q) || staff.includes(q) || inv.includes(q);
+        const service  = (a.service_id?.service_name || "").toLowerCase();
+        return customer.includes(q) || staff.includes(q) || inv.includes(q) || service.includes(q);
       });
     }
 
@@ -237,17 +234,25 @@ const Billing = () => {
     page * ITEMS_PER_PAGE
   );
 
-  // ── Totals for the bottom section (based on currently filtered data) ───────
+  // Fallback Revenue computations from appointment array
+  const displayCompletedRevenue = useMemo(() => {
+    if (data.completedRevenue !== undefined && data.completedRevenue > 0) return data.completedRevenue;
+    const completedList = (data.appointments || []).filter(a => a.status === "completed");
+    return completedList.reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
+  }, [data]);
 
-  const filteredTotals = useMemo(() => {
-    const completed = filtered.filter((a) => a.status === "completed");
-    const revenue   = completed.reduce((s, a) => s + (a.total_price || 0), 0);
-    return {
-      count: filtered.length,
-      revenue,
-      avg: completed.length > 0 ? revenue / completed.length : 0,
-    };
-  }, [filtered]);
+  const displayProjectedRevenue = useMemo(() => {
+    if (data.totalProjectedRevenue !== undefined && data.totalProjectedRevenue > 0) return data.totalProjectedRevenue;
+    const validList = (data.appointments || []).filter(a => ["completed", "confirmed"].includes(a.status));
+    return validList.reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
+  }, [data]);
+
+  const displayAvgBill = useMemo(() => {
+    if (data.averageBill && data.averageBill > 0) return data.averageBill;
+    const validList = (data.appointments || []).filter(a => ["completed", "confirmed"].includes(a.status));
+    const total = validList.reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
+    return validList.length > 0 ? total / validList.length : 0;
+  }, [data]);
 
   // ── PDF Export ─────────────────────────────────────────────────────────────
 
@@ -255,19 +260,16 @@ const Billing = () => {
     const doc = new jsPDF("p", "mm", "a4");
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // ── Header ───────────────────────────────────────────────────────────────
-    // White background
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, pageWidth, 44, "F");
 
-    // Yellow Accent line
     doc.setFillColor(250, 204, 21); 
     doc.rect(0, 38, pageWidth, 2, "F");
 
     doc.setTextColor(30, 30, 30);
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text(data.salonName || "Salon", 14, 20);
+    doc.text(data.salonName || "Salon Network", 14, 20);
 
     doc.setTextColor(100, 100, 100);
     doc.setFontSize(10);
@@ -275,52 +277,42 @@ const Billing = () => {
     if (data.branchLocation) doc.text(data.branchLocation, 14, 27);
     if (data.managerName)    doc.text(`Branch Manager: ${data.managerName}`, 14, 33);
 
-    // Report title on right
     doc.setTextColor(30, 30, 30);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("Daily Revenue Report", pageWidth - 14, 20, { align: "right" });
+    doc.text("Revenue & Financial Report", pageWidth - 14, 20, { align: "right" });
 
     doc.setTextColor(100, 100, 100);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(
-      presetLabel(preset, customStart, customEnd),
-      pageWidth - 14,
-      27,
-      { align: "right" }
-    );
+    doc.text(presetLabel(preset, customStart, customEnd), pageWidth - 14, 27, { align: "right" });
 
-    // ── Summary boxes ────────────────────────────────────────────────────────
     const boxY = 46;
     const boxW = (pageWidth - 28 - 15) / 4;
     const summaryItems = [
-      { label: "Total Revenue",      value: fmtMoney(data.totalRevenue) },
-      { label: "Total Appointments",  value: String(data.totalAppointments) },
-      { label: "Paid Appointments",   value: String(data.paidAppointments) },
-      { label: "Pending Appointments", value: String(data.pendingAppointments) },
+      { label: "Completed Rev",     value: fmtMoney(displayCompletedRevenue) },
+      { label: "Projected Rev",     value: fmtMoney(displayProjectedRevenue) },
+      { label: "Total Bookings",     value: String(data.totalAppointments || 0) },
+      { label: "Avg Bill Value",    value: fmtMoney(displayAvgBill) },
     ];
 
     summaryItems.forEach((item, i) => {
       const x = 14 + i * (boxW + 5);
-      
-      // Light grey box with border
       doc.setFillColor(248, 248, 248);
       doc.setDrawColor(220, 220, 220);
       doc.roundedRect(x, boxY, boxW, 20, 2, 2, "FD");
       
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.setTextColor(100, 100, 100);
       doc.text(item.label.toUpperCase(), x + 4, boxY + 7);
       
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setTextColor(30, 30, 30);
       doc.setFont("helvetica", "bold");
       doc.text(item.value, x + 4, boxY + 15);
       doc.setFont("helvetica", "normal");
     });
 
-    // ── Table ────────────────────────────────────────────────────────────────
     const tableData = filtered.map((a) => [
       invoiceNo(a._id),
       a.customer_id?.name || a.guest_name || "N/A",
@@ -328,7 +320,7 @@ const Billing = () => {
       a.service_id?.service_name || "N/A",
       a.appointment_date,
       fmtTime12(a.start_time),
-      fmtMoney(a.total_price || 0),
+      fmtMoney(a.total_price || a.service_id?.base_price || 0),
       (a.status || "").charAt(0).toUpperCase() + (a.status || "").slice(1),
     ]);
 
@@ -337,56 +329,13 @@ const Billing = () => {
       head: [["Invoice #", "Customer", "Staff", "Service", "Date", "Time", "Amount", "Status"]],
       body: tableData,
       theme: "striped",
-      styles: {
-        fontSize: 9,
-        cellPadding: 4,
-        textColor: [40, 40, 40],
-      },
-      headStyles: {
-        fillColor: [250, 204, 21],
-        textColor: [30, 30, 30],
-        fontStyle: "bold",
-      },
-      alternateRowStyles: {
-        fillColor: [248, 248, 248],
-      },
+      styles: { fontSize: 8, cellPadding: 3, textColor: [40, 40, 40] },
+      headStyles: { fillColor: [250, 204, 21], textColor: [30, 30, 30], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 248, 248] },
     });
 
-    // ── Footer summary ───────────────────────────────────────────────────────
-    // Safely get the Y position where the table ended to draw the footer below it
-    const finalY = (doc.lastAutoTable?.finalY || doc.previousAutoTable?.finalY || (boxY + 30 + tableData.length * 10)) + 10;
-
-    doc.setFillColor(248, 248, 248);
-    doc.setDrawColor(220, 220, 220);
-    doc.roundedRect(14, finalY, pageWidth - 28, 22, 2, 2, "FD");
-
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text("Total Appointments", 20, finalY + 8);
-    doc.text("Total Revenue", 20 + 55, finalY + 8);
-    doc.text("Average Bill", 20 + 110, finalY + 8);
-
-    doc.setFontSize(12);
-    doc.setTextColor(30, 30, 30);
-    doc.setFont("helvetica", "bold");
-    doc.text(String(data.totalAppointments), 20, finalY + 16);
-    doc.text(fmtMoney(data.totalRevenue), 20 + 55, finalY + 16);
-    doc.text(fmtMoney(data.averageBill), 20 + 110, finalY + 16);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text(
-      `Generated: ${new Date().toLocaleString()}`,
-      pageWidth - 14,
-      finalY + 16,
-      { align: "right" }
-    );
-
-    doc.save("Daily_Revenue_Report.pdf");
+    doc.save("Revenue_Report.pdf");
   };
-
-  // ── Excel Export ───────────────────────────────────────────────────────────
 
   const exportExcel = () => {
     const rows = filtered.map((a) => ({
@@ -397,313 +346,294 @@ const Billing = () => {
       "Staff Name":        a.staff_id?.full_name || "N/A",
       "Service Name":      a.service_id?.service_name || "N/A",
       "Duration (min)":    a.duration || 0,
-      "Amount":            a.total_price || 0,
+      "Amount":            a.total_price || a.service_id?.base_price || 0,
       "Status":            a.status,
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Revenue Report");
-    XLSX.writeFile(wb, "Daily_Revenue_Report.xlsx");
+    XLSX.writeFile(wb, "Revenue_Report.xlsx");
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const getStatusBadge = (status) => {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return <Badge variant="success">Completed</Badge>;
+      case "confirmed":
+        return <Badge variant="info">Confirmed</Badge>;
+      case "pending":
+        return <Badge variant="warning">Pending</Badge>;
+      case "cancelled":
+      case "rejected":
+        return <Badge variant="danger">{status}</Badge>;
+      default:
+        return <Badge variant="neutral">{status}</Badge>;
+    }
+  };
 
   return (
-    <div className="min-h-[60vh]">
+    <div className="space-y-6">
       <PageHeader
-        title="Billing & Revenue"
-        subtitle="Daily revenue report for your salon branch"
-        backTo={`/salon-admin/${salonId}/adminDashboard`}
+        title="Report & Financial Revenue"
+        subtitle="Financial overview, revenue statements, and downloadable reports across salon locations"
+        backTo={user?.role === "super-admin" ? "/superAdminDashboard" : `/salon-admin/${salonId}/adminDashboard`}
       >
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" icon={FileText} onClick={exportPDF}>
+          <button
+            onClick={exportPDF}
+            className="px-4 py-2 rounded-xl bg-amber-400 text-black text-xs font-black hover:bg-amber-300 transition-all flex items-center gap-1.5 shadow-sm"
+          >
+            <Printer className="w-4 h-4" />
             Print PDF
-          </Button>
-          <Button variant="ghost" size="sm" icon={FileSpreadsheet} onClick={exportExcel}>
+          </button>
+          <button
+            onClick={exportExcel}
+            className="px-4 py-2 rounded-xl bg-surface border border-border text-neutral-300 text-xs font-bold hover:border-amber-400/40 hover:text-white transition-all flex items-center gap-1.5"
+          >
+            <Download className="w-4 h-4 text-amber-400" />
             Export Excel
-          </Button>
+          </button>
         </div>
       </PageHeader>
 
-      {/* ── Summary Cards ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        {[
-          { icon: Wallet,       label: "Total Revenue",      value: fmtMoney(data.totalRevenue),     sub: "Completed amounts" },
-          { icon: Calendar,     label: "Total Appointments",  value: data.totalAppointments,          sub: "Selected period" },
-          { icon: CheckCircle2, label: "Paid Appointments",   value: data.paidAppointments,           sub: "Completed" },
-          { icon: Clock,        label: "Pending Appointments", value: data.pendingAppointments,        sub: "Awaiting action" },
-        ].map((s, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06 }}
-          >
-            <StatCard icon={s.icon} label={s.label} value={s.value} subtitle={s.sub} />
-          </motion.div>
-        ))}
+      {/* Summary Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+          <div className="bg-surface border border-border rounded-2xl p-5 shadow-card relative overflow-hidden group hover:border-amber-400/40 transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Completed Revenue</span>
+              <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400">
+                <Coins className="w-5 h-5" />
+              </div>
+            </div>
+            <h3 className="text-xl font-black text-amber-400 leading-none">{fmtMoney(displayCompletedRevenue)}</h3>
+            <p className="text-2xs text-neutral-400 mt-2 font-medium">Earned from completed bookings</p>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <div className="bg-surface border border-border rounded-2xl p-5 shadow-card relative overflow-hidden group hover:border-amber-400/40 transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Projected Revenue</span>
+              <div className="w-10 h-10 rounded-xl bg-blue-400/10 border border-blue-400/30 flex items-center justify-center text-blue-400">
+                <Wallet className="w-5 h-5" />
+              </div>
+            </div>
+            <h3 className="text-xl font-black text-white leading-none">{fmtMoney(displayProjectedRevenue)}</h3>
+            <p className="text-2xs text-neutral-400 mt-2 font-medium">Includes confirmed appointments</p>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+          <div className="bg-surface border border-border rounded-2xl p-5 shadow-card relative overflow-hidden group hover:border-amber-400/40 transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Total Bookings</span>
+              <div className="w-10 h-10 rounded-xl bg-emerald-400/10 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
+                <Calendar className="w-5 h-5" />
+              </div>
+            </div>
+            <h3 className="text-xl font-black text-white leading-none">{data.totalAppointments || 0}</h3>
+            <p className="text-2xs text-neutral-400 mt-2 font-medium">{data.paidAppointments || 0} Paid · {data.confirmedAppointments || 0} Confirmed · {data.pendingAppointments || 0} Pending</p>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <div className="bg-surface border border-border rounded-2xl p-5 shadow-card relative overflow-hidden group hover:border-amber-400/40 transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Avg Bill Value</span>
+              <div className="w-10 h-10 rounded-xl bg-purple-400/10 border border-purple-400/30 flex items-center justify-center text-purple-400">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+            </div>
+            <h3 className="text-xl font-black text-white leading-none">{fmtMoney(displayAvgBill)}</h3>
+            <p className="text-2xs text-neutral-400 mt-2 font-medium">Average ticket size per active booking</p>
+          </div>
+        </motion.div>
       </div>
 
-      {/* ── Filters ───────────────────────────────────────────────────────── */}
-      <Card className="mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
-          
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Super Admin Salon Selector */}
-            {user?.role === "super-admin" && !routeSalonId && (
-              <div className="flex items-center gap-2 bg-surface-2 px-3 py-1.5 rounded-lg border border-border">
-                <Store className="w-4 h-4 text-accent" />
-                <select
-                  className="bg-transparent text-xs font-semibold text-white focus:outline-none w-full cursor-pointer"
-                  value={selectedSalonId}
-                  onChange={handleSalonChange}
-                >
-                  <option value="all" className="bg-surface text-white">All Salons</option>
-                  {salonsList.map(s => (
-                    <option key={s._id} value={s._id} className="bg-surface text-white">
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Date presets */}
-            <div className="flex flex-wrap gap-2">
-              {["today", "yesterday", "thisWeek", "thisMonth", "custom"].map((p) => (
-                <button
-                  key={p}
-                  onClick={() => handlePresetChange(p)}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-extrabold border transition-all duration-200 ${
-                    preset === p
-                      ? "bg-accent text-primary border-accent"
-                      : "bg-surface-2 text-muted-2 border-border hover:border-border-hover"
-                  }`}
-                >
-                  {p === "today" && "Today"}
-                  {p === "yesterday" && "Yesterday"}
-                  {p === "thisWeek" && "This Week"}
-                  {p === "thisMonth" && "This Month"}
-                  {p === "custom" && "Custom Range"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom date inputs */}
-          {preset === "custom" && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <input
-                type="date"
-                value={customStart}
-                onChange={(e) => setCustomStart(e.target.value)}
-                className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-white text-xs focus:border-accent focus:outline-none transition-colors"
-              />
-              <span className="text-muted-2 text-xs">to</span>
-              <input
-                type="date"
-                value={customEnd}
-                onChange={(e) => setCustomEnd(e.target.value)}
-                className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-white text-xs focus:border-accent focus:outline-none transition-colors"
-              />
-              <Button variant="primary" size="xs" onClick={applyCustomDate}>
-                Apply
-              </Button>
+      {/* Preset Time Range & Branch Filters */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-surface border border-border rounded-2xl p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {user?.role === "super-admin" && !routeSalonId && (
+            <div className="relative mr-2">
+              <select
+                className="appearance-none bg-surface-2 border border-border rounded-xl px-4 pr-8 py-2 text-xs font-bold text-white outline-none cursor-pointer uppercase tracking-wider"
+                value={selectedSalonId}
+                onChange={handleSalonChange}
+              >
+                <option value="all">All Salons</option>
+                {salonsList.map(s => (
+                  <option key={s._id} value={s._id}>{s.name}</option>
+                ))}
+              </select>
             </div>
           )}
-        </div>
-      </Card>
 
-      {/* ── Search + Status filter ────────────────────────────────────────── */}
-      <Card className="mb-6" padding="p-0">
-        <Card.Header className="px-5 pt-5">
-          <Card.Title>Appointments</Card.Title>
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Status toggle */}
+          {["today", "yesterday", "thisWeek", "thisMonth", "custom"].map((p) => (
+            <button
+              key={p}
+              onClick={() => handlePresetChange(p)}
+              className={clsx(
+                "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all",
+                preset === p
+                  ? "bg-amber-400 text-black font-extrabold shadow-sm"
+                  : "bg-surface-2 text-neutral-400 hover:text-white hover:border-amber-400/30"
+              )}
+            >
+              {p === "today" && "Today"}
+              {p === "yesterday" && "Yesterday"}
+              {p === "thisWeek" && "This Week"}
+              {p === "thisMonth" && "This Month"}
+              {p === "custom" && "Custom Range"}
+            </button>
+          ))}
+        </div>
+
+        {preset === "custom" && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              style={{ colorScheme: "dark" }}
+              className="bg-surface-2 border border-border rounded-xl px-3 py-1.5 text-white text-xs outline-none"
+            />
+            <span className="text-neutral-400 text-xs">to</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              style={{ colorScheme: "dark" }}
+              className="bg-surface-2 border border-border rounded-xl px-3 py-1.5 text-white text-xs outline-none"
+            />
+            <button
+              onClick={applyCustomDate}
+              className="px-3 py-1.5 rounded-xl bg-amber-400 text-black text-xs font-extrabold"
+            >
+              Apply Range
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Filter Bar & Data Table */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            <input
+              type="text"
+              placeholder="Search by customer name, invoice #, staff, or service..."
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+              className="w-full bg-surface border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 placeholder:text-neutral-500 font-medium"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
             <select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-white text-xs focus:border-accent focus:outline-none transition-colors"
+              className="bg-surface border border-border rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none cursor-pointer uppercase tracking-wider"
             >
-              <option value="completed">Completed Only</option>
               <option value="all">All Statuses</option>
-              <option value="pending">Pending Only</option>
+              <option value="completed">Completed Only</option>
               <option value="confirmed">Confirmed Only</option>
+              <option value="pending">Pending Only</option>
             </select>
-
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-2" />
-              <input
-                type="text"
-                placeholder="Search name, invoice, staff…"
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                className="w-56 bg-surface-2 border border-border rounded-lg pl-8 pr-3 py-1.5 text-white text-xs focus:border-accent focus:outline-none transition-colors placeholder:text-muted"
-              />
-            </div>
           </div>
-        </Card.Header>
+        </div>
 
-        {/* ── Error banner ─────────────────────────────────────────────────── */}
+        {/* Error Notification */}
         {error && (
-          <div className="mx-5 mt-2 px-4 py-3 rounded-xl border border-danger-border bg-danger-dim text-danger text-xs font-bold">
+          <div className="px-4 py-3 rounded-xl bg-danger-dim border border-danger-border text-xs text-danger font-semibold">
             {error}
           </div>
         )}
 
-        {/* ── Table ────────────────────────────────────────────────────────── */}
+        {/* Financial Transactions Table */}
         {loading ? (
-          <div className="flex items-center justify-center py-16 gap-3 text-muted-2">
-            <Loader2 className="w-5 h-5 animate-spin text-accent" />
-            <span className="text-sm">Loading billing data…</span>
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-neutral-400">
+            <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+            <span className="text-xs font-semibold">Loading billing reports...</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="px-5 pb-5">
-            <EmptyState
-              icon={Receipt}
-              title="No billing records found"
-              description="There are no appointments matching your filters for the selected period."
-            />
-          </div>
+          <EmptyState
+            icon={Receipt}
+            title="No revenue records found"
+            description="There are no appointments matching your filters for the selected period."
+          />
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Invoice No.</th>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Customer</th>
-                    <th>Staff</th>
-                    <th>Service</th>
-                    <th>Duration</th>
-                    <th className="text-right">Amount</th>
-                    <th>Status</th>
+          <div className="space-y-4">
+            <Table>
+              <Table.Head>
+                <Table.Th>Invoice No.</Table.Th>
+                <Table.Th>Date & Time</Table.Th>
+                <Table.Th>Customer</Table.Th>
+                <Table.Th>Staff</Table.Th>
+                <Table.Th>Service</Table.Th>
+                <Table.Th align="right">Amount</Table.Th>
+                <Table.Th align="right">Status</Table.Th>
+              </Table.Head>
+              <Table.Body>
+                {paginated.map((a) => (
+                  <tr key={a._id} className="hover:bg-surface-2/60 transition-colors">
+                    <Table.Td bold className="text-amber-400 font-black text-xs">
+                      {invoiceNo(a._id)}
+                    </Table.Td>
+                    <Table.Td className="text-xs text-neutral-300">
+                      <p className="font-bold text-white">{a.appointment_date}</p>
+                      <p className="text-2xs text-neutral-400">{fmtTime12(a.start_time)}</p>
+                    </Table.Td>
+                    <Table.Td className="text-xs">
+                      <p className="font-extrabold text-white">{a.customer_id?.name || a.guest_name || "N/A"}</p>
+                      <p className="text-2xs text-neutral-400">{a.customer_id?.phone || a.guest_phone || ""}</p>
+                    </Table.Td>
+                    <Table.Td className="text-xs text-neutral-300 font-medium">
+                      {a.staff_id?.full_name || "Unassigned"}
+                    </Table.Td>
+                    <Table.Td className="text-xs text-neutral-300 font-semibold">
+                      {a.service_id?.service_name || (a.appointment_services && a.appointment_services.length > 0 ? a.appointment_services.map(s => s.service_id?.service_name).join(", ") : "Service")}
+                    </Table.Td>
+                    <Table.Td align="right" className="text-amber-400 font-black text-xs">
+                      LKR {(a.total_price || a.service_id?.base_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </Table.Td>
+                    <Table.Td align="right">
+                      {getStatusBadge(a.status)}
+                    </Table.Td>
                   </tr>
-                </thead>
-                <tbody>
-                  {paginated.map((a) => (
-                    <tr key={a._id}>
-                      <td className="whitespace-nowrap font-bold text-accent text-sm">
-                        {invoiceNo(a._id)}
-                      </td>
-                      <td className="whitespace-nowrap text-sm">{a.appointment_date}</td>
-                      <td className="whitespace-nowrap text-sm">{fmtTime12(a.start_time)}</td>
-                      <td className="text-sm min-w-[140px]">
-                        <div className="font-bold text-white">
-                          {a.customer_id?.name || a.guest_name || "N/A"}
-                        </div>
-                        {a.customer_id?.phone && (
-                          <div className="text-muted-2 text-[0.7rem]">{a.customer_id.phone}</div>
-                        )}
-                      </td>
-                      <td className="text-sm">{a.staff_id?.full_name || "N/A"}</td>
-                      <td className="text-sm">{a.service_id?.service_name || "N/A"}</td>
-                      <td className="whitespace-nowrap text-sm text-muted-2">
-                        {a.duration ? `${a.duration} min` : "—"}
-                      </td>
-                      <td className="whitespace-nowrap text-sm font-bold text-right text-accent">
-                        {fmtMoney(a.total_price || 0)}
-                      </td>
-                      <td>
-                        <Badge variant={statusBadge(a.status)}>
-                          {(a.status || "").toUpperCase()}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </Table.Body>
+            </Table>
 
-            {/* ── Pagination ──────────────────────────────────────────────── */}
+            {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-5 py-4 border-t border-border">
-                <span className="text-xs text-muted-2">
-                  Showing {(page - 1) * ITEMS_PER_PAGE + 1}–
-                  {Math.min(page * ITEMS_PER_PAGE, filtered.length)} of{" "}
-                  {filtered.length}
+              <div className="flex items-center justify-between pt-2 text-xs">
+                <span className="text-neutral-400">
+                  Showing Page <strong className="text-white">{page}</strong> of <strong className="text-white">{totalPages}</strong>
                 </span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-border text-muted-2 hover:border-accent hover:text-accent disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                    className="p-2 rounded-xl bg-surface border border-border text-neutral-300 hover:text-white disabled:opacity-40"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(
-                      (n) =>
-                        n === 1 ||
-                        n === totalPages ||
-                        Math.abs(n - page) <= 1
-                    )
-                    .reduce((acc, n, idx, arr) => {
-                      if (idx > 0 && n - arr[idx - 1] > 1) acc.push("...");
-                      acc.push(n);
-                      return acc;
-                    }, [])
-                    .map((item, idx) =>
-                      item === "..." ? (
-                        <span key={`dot-${idx}`} className="px-1 text-muted-2 text-xs">…</span>
-                      ) : (
-                        <button
-                          key={item}
-                          onClick={() => setPage(item)}
-                          className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-colors ${
-                            page === item
-                              ? "bg-accent text-primary border border-accent"
-                              : "border border-border text-muted-2 hover:border-accent hover:text-accent"
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      )
-                    )}
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-border text-muted-2 hover:border-accent hover:text-accent disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                    className="p-2 rounded-xl bg-surface border border-border text-neutral-300 hover:text-white disabled:opacity-40"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
-      </Card>
-
-      {/* ── Bottom Totals ─────────────────────────────────────────────────── */}
-      {!loading && filtered.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { label: "Total Appointments", value: String(filteredTotals.count), accent: false },
-            { label: "Total Revenue",      value: fmtMoney(filteredTotals.revenue), accent: true },
-            { label: "Average Bill Value",  value: fmtMoney(filteredTotals.avg), accent: false },
-          ].map((item, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + i * 0.05 }}
-            >
-              <Card className="text-center admin-card">
-                <p className="text-[0.65rem] font-bold text-muted-2 uppercase tracking-widest mb-2">
-                  {item.label}
-                </p>
-                <p className={`text-2xl font-black ${item.accent ? "text-accent" : "text-white"}`}>
-                  {item.value}
-                </p>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 };

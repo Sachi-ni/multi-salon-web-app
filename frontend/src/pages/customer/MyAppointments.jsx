@@ -80,7 +80,7 @@ export default function MyAppointments() {
         ) : (
           <div className="space-y-4">
             {appointments.map(a => {
-              const durationHours = Math.ceil((a.duration || 60) / 60);
+
               return (
                 <div key={a._id} className="bg-surface border border-border rounded-2xl p-5 shadow-card">
 
@@ -97,27 +97,68 @@ export default function MyAppointments() {
 
                   {/* Service details */}
                   <div className="bg-surface-2 rounded-lg p-3 mb-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-white font-bold text-sm">{a.service_id?.service_name}</p>
-                      <p className="text-accent font-extrabold text-sm">LKR {a.total_price || a.service_id?.base_price}</p>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-2">
-                      <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        {a.staff_id?.full_name}
-                      </span>
-                      <span>·</span>
-                      <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {formatTime(a.start_time)} — {formatTime(a.end_time)}
-                      </span>
-                      <span>·</span>
-                      <span>{durationHours} {durationHours === 1 ? "hr" : "hrs"}</span>
-                    </div>
+                    {a.appointment_services && a.appointment_services.length > 0 ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-muted-2 text-xs font-bold uppercase tracking-wider">
+                            {a.appointment_services.length} Service{a.appointment_services.length !== 1 ? "s" : ""}
+                          </p>
+                          <p className="text-accent font-extrabold text-sm">
+                            LKR {a.total_price || a.appointment_services.reduce((sum, svc) => sum + (svc.sub_price || svc.service_id?.base_price || 0), 0)}
+                          </p>
+                        </div>
+                        {a.appointment_services.map((svc, idx) => (
+                          <div key={idx} className="pb-2 border-b border-border/50 last:border-0 last:pb-0">
+                            <div className="flex items-center justify-between text-sm mb-1">
+                              <p className="text-white font-semibold">{svc.service_id?.service_name}</p>
+                              <p className="text-muted-2 text-xs">LKR {svc.sub_price || svc.service_id?.base_price}</p>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-2">
+                              <span className="flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                                {svc.staff_id?.full_name}
+                              </span>
+                              <span>·</span>
+                              <span className="flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {formatTime(svc.service_start_time)} — {formatTime(svc.service_end_time)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      // Fallback for older appointments without appointment_services
+                      <>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-white font-bold text-sm">
+                            {a.service_ids && a.service_ids.length > 0
+                              ? `${a.service_ids.length} Services`
+                              : a.service_id?.service_name}
+                          </p>
+                          <p className="text-accent font-extrabold text-sm">LKR {a.total_price || a.service_id?.base_price}</p>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-2">
+                          <span className="flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            {a.staff_id?.full_name}
+                          </span>
+                          <span>·</span>
+                          <span className="flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {formatTime(a.start_time)} — {formatTime(a.end_time)}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Footer — Actions */}

@@ -52,11 +52,11 @@ export default function AppRoutes() {
           }
         />
 
-        {/* Admin — only super-admin and staff-admin can view bookings */}
+        {/* Admin — super-admin, staff-admin, and manager can view bookings */}
         <Route
           path="/admin/bookings"
           element={
-            <RoleBasedRoute roles={["super-admin", "staff-admin"]}>
+            <RoleBasedRoute roles={["super-admin", "staff-admin", "manager"]}>
               <AdminBookings />
             </RoleBasedRoute>
           }
