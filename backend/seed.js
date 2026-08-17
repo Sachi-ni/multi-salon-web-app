@@ -13,6 +13,8 @@ import Appointment from "./models/Appointment.js";
 import Admin from "./models/Admin.js";
 import Bill from "./models/Bill.js";
 import Review from "./models/Review.js";
+import Feedback from "./models/Feedback.js";
+import Notification from "./models/Notification.js";
 import AppointmentService from "./models/AppointmentService.js";
 
 dotenv.config();
@@ -29,24 +31,26 @@ const addHours = (timeStr, hours) => {
 const seed = async () => {
   try {
     console.log("Connecting to database...");
-    if (!process.env.MONGO_URI) {
-      throw new Error("MONGO_URI environment variable is not defined in .env file");
-    }
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("Connected successfully!");
+    const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/multi_salon_db";
+    await mongoose.connect(mongoUri);
+    console.log("Connected successfully to MongoDB!");
 
     console.log("Clearing existing data...");
-    await Salon.deleteMany({});
-    await ServiceCategory.deleteMany({});
-    await Service.deleteMany({});
-    await Staff.deleteMany({});
-    await StaffAvailability.deleteMany({});
-    await Customer.deleteMany({});
-    await Appointment.deleteMany({});
-    await Admin.deleteMany({});
-    await Bill.deleteMany({});
-    await Review.deleteMany({});
-    await AppointmentService.deleteMany({});
+    await Promise.all([
+      Salon.deleteMany({}),
+      ServiceCategory.deleteMany({}),
+      Service.deleteMany({}),
+      Staff.deleteMany({}),
+      StaffAvailability.deleteMany({}),
+      Customer.deleteMany({}),
+      Appointment.deleteMany({}),
+      Admin.deleteMany({}),
+      Bill.deleteMany({}),
+      Review.deleteMany({}),
+      Feedback.deleteMany({}),
+      Notification.deleteMany({}),
+      AppointmentService.deleteMany({})
+    ]);
     console.log("Database cleared.");
 
     // Generate password hash
@@ -55,187 +59,280 @@ const seed = async () => {
     const passwordHash = await bcrypt.hash("123456", salt);
     console.log("Password hash generated.");
 
-    // 1. Service Categories
-    console.log("Creating service categories...");
-    const categories = await ServiceCategory.insertMany([
-      { category_name: "Hair" },
-      { category_name: "Beauty" },
-      { category_name: "Spa" },
-      { category_name: "Makeup" }
-    ]);
-    console.log(`Created ${categories.length} categories.`);
+    // 1. 10 Service Categories
+    console.log("Creating 10 service categories...");
+    const categoryNames = [
+      "Hair Care & Styling",
+      "Skin Care & Facials",
+      "Spa & Body Massage",
+      "Bridal & Makeup",
+      "Nail Art & Pedicure",
+      "Men's Grooming & Beard",
+      "Waxing & Threading",
+      "Hair Coloring & Balayage",
+      "Ayurvedic Treatments",
+      "Kids & Teen Styling"
+    ];
+
+    const categories = await ServiceCategory.insertMany(
+      categoryNames.map(category_name => ({ category_name }))
+    );
+    console.log(`Created ${categories.length} service categories.`);
 
     const categoryMap = {};
     categories.forEach(cat => {
       categoryMap[cat.category_name] = cat._id;
     });
 
-    // 2. Salons
-    console.log("Creating salons...");
-    const salons = await Salon.insertMany([
+    // 2. 10 Salons
+    console.log("Creating 10 salon branches...");
+    const salonsData = [
       {
-        name: "Colombo Branch",
+        name: "Colombo Elite Branch",
         location: "Colombo, Sri Lanka",
         contact_info: "No. 12, Galle Road, Colombo 03",
         phone: "0112345678",
         email: "colombo@salon.com",
         open_time: "09:00",
-        close_time: "17:00",
-        capacity: 5,
-        about: "Our flagship salon in Colombo offers premium hair, beauty, and spa services with state-of-the-art facilities."
+        close_time: "18:00",
+        capacity: 10,
+        revenue: 450000,
+        about: "Our flagship luxury salon in Colombo offers premium hair, beauty, and wellness services with state-of-the-art facilities."
       },
       {
-        name: "Negombo Branch",
+        name: "Kandy Heritage Branch",
+        location: "Kandy, Sri Lanka",
+        contact_info: "No. 78, Peradeniya Road, Kandy",
+        phone: "0812345678",
+        email: "kandy@salon.com",
+        open_time: "09:00",
+        close_time: "17:30",
+        capacity: 8,
+        revenue: 320000,
+        about: "Located in the heart of the hill capital, featuring traditional Ayurvedic therapies alongside modern styling."
+      },
+      {
+        name: "Galle Fort Branch",
+        location: "Galle, Sri Lanka",
+        contact_info: "No. 34, Church Street, Galle Fort",
+        phone: "0912345678",
+        email: "galle@salon.com",
+        open_time: "09:30",
+        close_time: "18:30",
+        capacity: 7,
+        revenue: 280000,
+        about: "Boutique aesthetic salon nestled inside historical Galle Fort, specialized in rejuvenating seaside spa sessions."
+      },
+      {
+        name: "Negombo Coastal Branch",
         location: "Negombo, Sri Lanka",
         contact_info: "No. 45, Lewis Place, Negombo",
         phone: "0312345678",
         email: "negombo@salon.com",
         open_time: "09:00",
-        close_time: "17:00",
-        capacity: 5,
-        about: "Conveniently located near the beach, our Negombo branch offers top-tier hair styling and facial treatments."
+        close_time: "18:00",
+        capacity: 8,
+        revenue: 310000,
+        about: "Conveniently located near the coastline, offering top-tier hair coloring, tan treatments, and bridal suites."
       },
       {
-        name: "Jaffna Branch",
+        name: "Jaffna Royal Branch",
         location: "Jaffna, Sri Lanka",
         contact_info: "No. 88, Hospital Road, Jaffna",
         phone: "0212345678",
         email: "jaffna@salon.com",
+        open_time: "08:30",
+        close_time: "17:30",
+        capacity: 6,
+        revenue: 240000,
+        about: "Our Jaffna branch provides exquisite traditional Hindu bridal makeovers, hair therapies, and relaxing spa sessions."
+      },
+      {
+        name: "Gampaha City Branch",
+        location: "Gampaha, Sri Lanka",
+        contact_info: "No. 19, Yakkala Road, Gampaha",
+        phone: "0332345678",
+        email: "gampaha@salon.com",
         open_time: "09:00",
-        close_time: "17:00",
+        close_time: "18:00",
+        capacity: 6,
+        revenue: 190000,
+        about: "Modern family salon providing comprehensive grooming, facial treatments, and express haircuts."
+      },
+      {
+        name: "Kurunegala Central Branch",
+        location: "Kurunegala, Sri Lanka",
+        contact_info: "No. 52, Colombo Road, Kurunegala",
+        phone: "0372345678",
+        email: "kurunegala@salon.com",
+        open_time: "09:00",
+        close_time: "17:30",
+        capacity: 6,
+        revenue: 210000,
+        about: "Premier beauty and hair studio in North Western Province with certified stylists and beauticians."
+      },
+      {
+        name: "Matara Oceanview Branch",
+        location: "Matara, Sri Lanka",
+        contact_info: "No. 67, Anagarika Dharmapala Mawatha, Matara",
+        phone: "0412345678",
+        email: "matara@salon.com",
+        open_time: "09:00",
+        close_time: "18:00",
         capacity: 5,
-        about: "Our Jaffna branch provides specialized bridal makeup, traditional styling, and relaxing spa sessions."
+        revenue: 175000,
+        about: "Southern coastal salon offering relaxing scalp treatments, pedicures, and modern hair trends."
+      },
+      {
+        name: "Batticaloa Lagoon Branch",
+        location: "Batticaloa, Sri Lanka",
+        contact_info: "No. 23, Trinco Road, Batticaloa",
+        phone: "0652345678",
+        email: "batticaloa@salon.com",
+        open_time: "08:30",
+        close_time: "17:30",
+        capacity: 5,
+        revenue: 150000,
+        about: "Eastern haven for bridal preparation, soothing massages, and expert skincare consultations."
+      },
+      {
+        name: "Anuradhapura Oasis Branch",
+        location: "Anuradhapura, Sri Lanka",
+        contact_info: "No. 14, Main Street, Anuradhapura",
+        phone: "0252345678",
+        email: "anuradhapura@salon.com",
+        open_time: "08:30",
+        close_time: "17:30",
+        capacity: 5,
+        revenue: 165000,
+        about: "Holistic wellness and beauty salon specializing in herbal remedies, haircuts, and bridal elegance."
       }
-    ]);
+    ];
+
+    const salons = await Salon.insertMany(salonsData);
     console.log(`Created ${salons.length} salons.`);
 
-    // 3. Admins (Super admin + Branch admins)
-    console.log("Creating Admins for system testing...");
-    await Admin.insertMany([
+    // 3. 11 Admins (1 Super Admin + 10 Branch Admins)
+    console.log("Creating Admins (1 Super Admin + 10 Branch Admins)...");
+    const adminsData = [
       {
-        full_name: "Super Admin",
+        full_name: "Super Admin Officer",
         username: "superadmin",
-        email: "pawanmadushanka15@gmail.com",
-        phone: "0771112222",
+        email: "superadmin@salon.com",
+        phone: "0771110000",
         password: passwordHash,
         role: "super-admin",
         salon_id: null
       },
-      {
-        full_name: "Colombo Admin",
-        username: "colomboadmin",
-        email: "colomboadmin@salon.com",
-        phone: "0773334444",
-        password: passwordHash,
-        role: "staff-admin",
-        salon_id: salons[0]._id
-      },
-      {
-        full_name: "Negombo Admin",
-        username: "negomboadmin",
-        email: "negomboadmin@salon.com",
-        phone: "0775556666",
-        password: passwordHash,
-        role: "staff-admin",
-        salon_id: salons[1]._id
-      },
-      {
-        full_name: "Jaffna Admin",
-        username: "jaffnaadmin",
-        email: "jaffnaadmin@salon.com",
-        phone: "0777778888",
-        password: passwordHash,
-        role: "staff-admin",
-        salon_id: salons[2]._id
-      }
-    ]);
-    console.log("Admins seeded.");
+      ...salons.map((salon, idx) => {
+        const slug = salon.name.split(" ")[0].toLowerCase();
+        return {
+          full_name: `${salon.name.split(" ")[0]} Branch Admin`,
+          username: `${slug}admin`,
+          email: `${slug}admin@salon.com`,
+          phone: `077111${String(idx + 1).padStart(4, "0")}`,
+          password: passwordHash,
+          role: "staff-admin",
+          salon_id: salon._id
+        };
+      })
+    ];
 
-    // 4. Services (Templates mapped to all 3 salons, creating distinct service records per salon)
-    console.log("Creating services for each salon...");
+    await Admin.insertMany(adminsData);
+    console.log(`Created ${adminsData.length} Admin accounts.`);
+
+    // 4. Service Templates across Categories
+    console.log("Creating services for all salons...");
     const serviceTemplates = [
-      { service_name: "Hair Cut", description: "Classic trim, wash, and style.", duration: 60, base_price: 1500, categoryName: "Hair" },
-      { service_name: "Hair Coloring", description: "Full head color using premium organic dyes.", duration: 120, base_price: 5000, categoryName: "Hair" },
-      { service_name: "Hair Wash", description: "Deep cleanse wash and blow dry.", duration: 60, base_price: 1000, categoryName: "Hair" },
-      { service_name: "Beard Trim", description: "Precision beard shaping and conditioning.", duration: 60, base_price: 800, categoryName: "Hair" },
-      { service_name: "Facial", description: "Revitalizing skin treatment and scrub.", duration: 120, base_price: 3000, categoryName: "Beauty" },
-      { service_name: "Bridal Makeup", description: "Exquisite bridal makeovers including hairstyling.", duration: 180, base_price: 15000, categoryName: "Makeup" },
-      { service_name: "Threading", description: "Precise eyebrow and facial threading.", duration: 60, base_price: 500, categoryName: "Beauty" },
-      { service_name: "Spa Treatment", description: "Full body Swedish massage and aromatherapy.", duration: 120, base_price: 6000, categoryName: "Spa" },
-      { service_name: "Hair Straightening", description: "Keratin-infused straightening treatment.", duration: 180, base_price: 8000, categoryName: "Hair" },
-      { service_name: "Hair Treatment", description: "Deep conditioning spa treatment to repair damaged hair.", duration: 120, base_price: 4000, categoryName: "Hair" }
+      { service_name: "Signature Haircut & Blowdry", description: "Precision trim, scalp massage, wash, and style.", duration: 60, base_price: 2500, cat: "Hair Care & Styling" },
+      { service_name: "Deep Hydration Facial", description: "Revitalizing botanical skin treatment and gentle scrub.", duration: 90, base_price: 4500, cat: "Skin Care & Facials" },
+      { service_name: "Swedish Aromatherapy Massage", description: "Full body Swedish massage with essential herbal oils.", duration: 120, base_price: 7500, cat: "Spa & Body Massage" },
+      { service_name: "Royal Bridal Makeover", description: "Exquisite bridal makeup, jewellery setting, and hair styling.", duration: 180, base_price: 25000, cat: "Bridal & Makeup" },
+      { service_name: "Luxury Gel Pedicure & Manicure", description: "Full nail care, cuticle treatment, polish, and massage.", duration: 60, base_price: 3500, cat: "Nail Art & Pedicure" },
+      { service_name: "Executive Beard Grooming", description: "Precision beard shaping, hot towel treatment, and beard oil.", duration: 45, base_price: 1800, cat: "Men's Grooming & Beard" },
+      { service_name: "Eyebrow & Upper Lip Threading", description: "Precise eyebrow contouring and facial threading.", duration: 30, base_price: 800, cat: "Waxing & Threading" },
+      { service_name: "Balayage & Hair Coloring", description: "Full head hand-painted highlights with gloss finish.", duration: 150, base_price: 12000, cat: "Hair Coloring & Balayage" },
+      { service_name: "Ayurvedic Head & Scalp Therapy", description: "Traditional herbal oil therapy to relieve stress and nourish hair.", duration: 60, base_price: 3000, cat: "Ayurvedic Treatments" },
+      { service_name: "Kids Trendy Haircut", description: "Fun and gentle haircut designed for kids and teens.", duration: 30, base_price: 1200, cat: "Kids & Teen Styling" },
+      { service_name: "Keratin Smooth Treatment", description: "Keratin-infused straightening treatment lasting up to 4 months.", duration: 180, base_price: 15000, cat: "Hair Care & Styling" },
+      { service_name: "Anti-Aging Gold Facial", description: "Luxury 24k gold leaf infusion with collagen boosting mask.", duration: 90, base_price: 6500, cat: "Skin Care & Facials" }
     ];
 
     const allServices = [];
     for (const salon of salons) {
       for (const t of serviceTemplates) {
+        const catId = categoryMap[t.cat] || categories[0]._id;
         const s = await Service.create({
           service_name: t.service_name,
           description: t.description,
           duration: t.duration,
           base_price: t.base_price,
-          category_id: categoryMap[t.categoryName],
+          category_id: catId,
           salon_id: salon._id
         });
         allServices.push(s);
       }
     }
-    console.log(`Created ${allServices.length} total services.`);
+    console.log(`Created ${allServices.length} total services across ${salons.length} salons.`);
 
-    // 5. Staff Members (5 per salon = 15 total)
-    console.log("Creating staff members and assigning services based on specialization...");
-    const staffTemplates = [
-      // Colombo Staff (Index 0)
-      { full_name: "Kasun Perera", role: "Stylist", specification: "Hair Stylist", salonIndex: 0 },
-      { full_name: "Dilshan Fernando", role: "Senior Stylist", specification: "Master Hair Specialist", salonIndex: 0 },
-      { full_name: "Priyanthi Silva", role: "Beautician", specification: "Skin Care Expert", salonIndex: 0 },
-      { full_name: "Sanduni Jayasinghe", role: "Spa Specialist", specification: "Massage Therapist", salonIndex: 0 },
-      { full_name: "Amara Wijesinghe", role: "Makeup Artist", specification: "Bridal Makeup Artist", salonIndex: 0 },
-
-      // Negombo Staff (Index 1)
-      { full_name: "Sheron Cooray", role: "Stylist", specification: "Hair Stylist", salonIndex: 1 },
-      { full_name: "Nisal Mendis", role: "Senior Stylist", specification: "Hair Coloring Expert", salonIndex: 1 },
-      { full_name: "Fathima Rizan", role: "Beautician", specification: "Esthetician", salonIndex: 1 },
-      { full_name: "Nadeesha Perera", role: "Spa Specialist", specification: "Spa Therapist", salonIndex: 1 },
-      { full_name: "Kavindi Jayawardena", role: "Makeup Artist", specification: "Fashion Makeup Artist", salonIndex: 1 },
-
-      // Jaffna Staff (Index 2)
-      { full_name: "Sinthujan Selvarajah", role: "Stylist", specification: "Hair Stylist", salonIndex: 2 },
-      { full_name: "Tharshini Koneswaran", role: "Senior Stylist", specification: "Hair Care Specialist", salonIndex: 2 },
-      { full_name: "Abirami Visvanathan", role: "Beautician", specification: "Beauty Therapist", salonIndex: 2 },
-      { full_name: "Luxman Balakrishnan", role: "Spa Specialist", specification: "Body Therapy Specialist", salonIndex: 2 },
-      { full_name: "Janaki Ramachandran", role: "Makeup Artist", specification: "Traditional Bridal Artist", salonIndex: 2 }
+    // 5. 20+ Staff Members (at least 2 per salon)
+    console.log("Creating staff members for all salons...");
+    const staffDefinitions = [
+      // Colombo
+      { full_name: "Kasun Perera", role: "Master Stylist", spec: "Hair Design & Balayage", salonIdx: 0, catName: "Hair Care & Styling" },
+      { full_name: "Priyanthi Silva", role: "Skin Specialist", spec: "Dermal Aesthetics & Facials", salonIdx: 0, catName: "Skin Care & Facials" },
+      { full_name: "Sanduni Jayasinghe", role: "Spa Therapist", spec: "Swedish & Herbal Body Spa", salonIdx: 0, catName: "Spa & Body Massage" },
+      // Kandy
+      { full_name: "Dilshan Bandara", role: "Ayurvedic Specialist", spec: "Head Spa & Herbal Care", salonIdx: 1, catName: "Ayurvedic Treatments" },
+      { full_name: "Anusha Ratnayake", role: "Bridal Stylist", spec: "Traditional Kandyan Makeup", salonIdx: 1, catName: "Bridal & Makeup" },
+      // Galle
+      { full_name: "Chamara Fernando", role: "Senior Stylist", spec: "Hair Coloring & Styling", salonIdx: 2, catName: "Hair Coloring & Balayage" },
+      { full_name: "Niluka Wickramasinghe", role: "Beautician", spec: "Pedicure & Nail Art", salonIdx: 2, catName: "Nail Art & Pedicure" },
+      // Negombo
+      { full_name: "Sheron Cooray", role: "Master Barber", spec: "Men's Beard & Hair Grooming", salonIdx: 3, catName: "Men's Grooming & Beard" },
+      { full_name: "Fathima Rizan", role: "Aesthetician", spec: "Anti-Aging & Gold Facials", salonIdx: 3, catName: "Skin Care & Facials" },
+      // Jaffna
+      { full_name: "Janaki Ramachandran", role: "Lead Makeup Artist", spec: "Hindu Bridal & Hair Ornaments", salonIdx: 4, catName: "Bridal & Makeup" },
+      { full_name: "Sinthujan Selvarajah", role: "Hair Specialist", spec: "Keratin & Straightening", salonIdx: 4, catName: "Hair Care & Styling" },
+      // Gampaha
+      { full_name: "Kavisha Ranasinghe", role: "Stylist", spec: "Modern Cuts & Kids Styling", salonIdx: 5, catName: "Kids & Teen Styling" },
+      { full_name: "Nadeesha Perera", role: "Beautician", spec: "Skin Care & Threading", salonIdx: 5, catName: "Waxing & Threading" },
+      // Kurunegala
+      { full_name: "Roshan Gunawardena", role: "Senior Stylist", spec: "Hair Coloring & Balayage", salonIdx: 6, catName: "Hair Coloring & Balayage" },
+      { full_name: "Madhusha Jayawardena", role: "Nail Artist", spec: "Gel Nails & Manicure", salonIdx: 6, catName: "Nail Art & Pedicure" },
+      // Matara
+      { full_name: "Thisara Silva", role: "Stylist", spec: "Beard Grooming & Hair Cuts", salonIdx: 7, catName: "Men's Grooming & Beard" },
+      { full_name: "Minoli Peiris", role: "Spa Therapist", spec: "Aromatherapy & Body Scrub", salonIdx: 7, catName: "Spa & Body Massage" },
+      // Batticaloa
+      { full_name: "Luxman Balakrishnan", role: "Ayurvedic Expert", spec: "Herbal Scalp & Body Spa", salonIdx: 8, catName: "Ayurvedic Treatments" },
+      { full_name: "Tharshini Koneswaran", role: "Bridal Beautician", spec: "Bridal Dressing & Threading", salonIdx: 8, catName: "Bridal & Makeup" },
+      // Anuradhapura
+      { full_name: "Devinda Senanayake", role: "Master Stylist", spec: "Precision Cuts & Hair Care", salonIdx: 9, catName: "Hair Care & Styling" },
+      { full_name: "Oshadi Ranasinghe", role: "Skin Consultant", spec: "Organic Facials & Skin Glow", salonIdx: 9, catName: "Skin Care & Facials" }
     ];
 
     const allStaff = [];
-    for (const t of staffTemplates) {
-      const salon = salons[t.salonIndex];
-      // Get services of this salon
+    for (const def of staffDefinitions) {
+      const salon = salons[def.salonIdx];
       const salonServices = allServices.filter(s => s.salon_id.equals(salon._id));
-      
-      // Determine which services this staff can do based on role
-      let staffServices = [];
-      if (t.role === "Stylist" || t.role === "Senior Stylist") {
-        staffServices = salonServices.filter(s => s.category_id.equals(categoryMap["Hair"]));
-      } else if (t.role === "Beautician") {
-        staffServices = salonServices.filter(s => s.category_id.equals(categoryMap["Beauty"]));
-      } else if (t.role === "Spa Specialist") {
-        staffServices = salonServices.filter(s => s.category_id.equals(categoryMap["Spa"]));
-      } else if (t.role === "Makeup Artist") {
-        staffServices = salonServices.filter(s => s.category_id.equals(categoryMap["Makeup"]));
-      }
+      const targetCatId = categoryMap[def.catName];
+      const matchedServices = salonServices.filter(s => s.category_id.equals(targetCatId));
+      const assignedServices = matchedServices.length > 0 ? matchedServices : salonServices.slice(0, 3);
 
       const staffMember = await Staff.create({
-        full_name: t.full_name,
+        full_name: def.full_name,
         phone: `077${Math.floor(1000000 + Math.random() * 9000000)}`,
-        email: `${t.full_name.toLowerCase().replace(/\s+/g, "")}@salon.com`,
-        role: t.role,
-        specification: t.specification,
-        commission_rate: t.role.includes("Senior") ? 15 : 10,
+        email: `${def.full_name.toLowerCase().replace(/\s+/g, "")}@salon.com`,
+        password_hash: passwordHash,
+        role: def.role,
+        specification: def.spec,
+        commission_rate: 15,
+        salary_payment_frequency: "monthly",
+        salary_payment_count_per_day: 1,
         status: "Active",
         salon_id: salon._id,
-        image: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(t.full_name)}`,
-        services: staffServices.map(s => s._id)
+        image: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(def.full_name)}`,
+        services: assignedServices.map(s => s._id)
       });
       allStaff.push(staffMember);
     }
@@ -249,9 +346,8 @@ const seed = async () => {
     }
     console.log("Updated staff counts for all salons.");
 
-    // 6. Availability records for next 30 days
+    // 6. Generate 30 Days Availability for all Staff
     console.log("Generating 30 days of staff availability schedules (09:00 - 17:00)...");
-    const availabilityDocs = [];
     const slotTemplates = [
       { start_time: "09:00", end_time: "10:00" },
       { start_time: "10:00", end_time: "11:00" },
@@ -263,6 +359,7 @@ const seed = async () => {
       { start_time: "16:00", end_time: "17:00" }
     ];
 
+    const availabilityDocs = [];
     for (const staff of allStaff) {
       for (let day = 0; day < 30; day++) {
         const dateObj = new Date();
@@ -283,21 +380,21 @@ const seed = async () => {
     await StaffAvailability.insertMany(availabilityDocs);
     console.log(`Generated ${availabilityDocs.length} availability records.`);
 
-    // 7. Customers (20 sample customers)
-    console.log("Creating sample customers...");
+    // 7. 20 Customers
+    console.log("Creating 20 sample customer accounts...");
     const customerNames = [
-      "Ruwan Gamage", "Nipuni Perera", "Thisara Silva", "Sachini Fernando", 
-      "Dinuka Herath", "Eranga Bandara", "Kavisha Ranasinghe", "Madhusha Jayawardena", 
-      "Roshan Gunawardena", "Minoli Peiris", "Thilina Ratnayake", "Pathum Nissanka", 
-      "Oshadi Ranasinghe", "Nilanthi Cooray", "Chathura de Silva", "Isuru Udana", 
-      "Hashini Samarakoon", "Devinda Perera", "Nadeesha Hemamali", "Duminda Silva"
+      "Ruwan Gamage", "Nipuni Perera", "Sachini Fernando", "Chathura de Silva",
+      "Dinuka Herath", "Eranga Bandara", "Madhusha Jayawardena", "Roshan Gunawardena",
+      "Minoli Peiris", "Thilina Ratnayake", "Pathum Nissanka", "Oshadi Ranasinghe",
+      "Nilanthi Cooray", "Isuru Udana", "Hashini Samarakoon", "Devinda Perera",
+      "Nadeesha Hemamali", "Duminda Silva", "Vimukthi Wickrama", "Gayani Liyanage"
     ];
 
     const customersData = customerNames.map((name, i) => {
       const email = `${name.toLowerCase().replace(/\s+/g, "")}@example.com`;
       const phone = `07712345${String(i).padStart(2, "0")}`;
       const regDate = new Date();
-      regDate.setDate(regDate.getDate() - (i + 1) * 3); // Registered in the past
+      regDate.setDate(regDate.getDate() - (i + 1) * 3);
 
       return {
         name,
@@ -305,156 +402,272 @@ const seed = async () => {
         email,
         registration_date: regDate,
         password_hash: passwordHash,
-        role: "customer"
+        role: "customer",
+        image: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`
       };
     });
 
     const customers = await Customer.insertMany(customersData);
     console.log(`Created ${customers.length} sample customers.`);
 
-    // 8. Sample Appointments
-    console.log("Generating sample appointments and locking corresponding availability slots...");
-    
-    // Helper to offset date from today
+    // 8. 15+ Detailed Appointments
+    console.log("Generating 15 appointments with full lifecycle statuses...");
     const getFormattedDate = (offset) => {
       const d = new Date();
       d.setDate(d.getDate() + offset);
       return d.toISOString().split("T")[0];
     };
 
+    const pastDate1 = getFormattedDate(-2);
+    const pastDate2 = getFormattedDate(-1);
+    const today = getFormattedDate(0);
     const tomorrow = getFormattedDate(1);
     const dayAfter = getFormattedDate(2);
-    const dayThree = getFormattedDate(3);
+    const futureDate = getFormattedDate(5);
 
-    // Helpers to find specific items
-    const findService = (salonId, name) => allServices.find(s => s.salon_id.equals(salonId) && s.service_name === name);
-    const findStaff = (salonId, name) => allStaff.find(s => s.salon_id.equals(salonId) && s.full_name === name);
+    const findStaffObj = (salonId, name) => allStaff.find(s => s.salon_id.equals(salonId) && s.full_name === name) || allStaff.find(s => s.salon_id.equals(salonId));
+    const findServiceObj = (salonId, name) => allServices.find(s => s.salon_id.equals(salonId) && s.service_name === name) || allServices.find(s => s.salon_id.equals(salonId));
 
-    // Appointment specifications
     const appointmentSpecs = [
-      // 1. Confirmed booking tomorrow for Kasun Perera (Colombo) - 1 hour service (10:00 - 11:00)
+      // 1. Completed appointment (Colombo)
       {
         salon: salons[0],
         customer: customers[0],
         staffName: "Kasun Perera",
-        serviceName: "Hair Cut",
-        date: tomorrow,
+        serviceName: "Signature Haircut & Blowdry",
+        date: pastDate2,
         start_time: "10:00",
-        status: "confirmed"
+        duration: 60,
+        status: "completed",
+        notes: "Regular client, requested classic fade and styling.",
+        feedback: { serviceRating: 5, staffRating: 5, comment: "Exceptional service by Kasun! Loved the precision trim." },
+        bill: { amount: 2500, method: "Card", status: "paid" }
       },
-      // 2. Confirmed booking tomorrow for Kasun Perera (Colombo) - 2 hour service (13:00 - 15:00)
+      // 2. Completed appointment (Colombo)
       {
         salon: salons[0],
         customer: customers[1],
-        staffName: "Kasun Perera",
-        serviceName: "Hair Coloring",
-        date: tomorrow,
-        start_time: "13:00",
-        status: "confirmed"
-      },
-      // 3. Confirmed booking tomorrow for Dilshan Fernando (Colombo) - 3 hour service (09:00 - 12:00)
-      {
-        salon: salons[0],
-        customer: customers[2],
-        staffName: "Dilshan Fernando",
-        serviceName: "Hair Straightening",
-        date: tomorrow,
-        start_time: "09:00",
-        status: "confirmed"
-      },
-      // 4. Pending booking tomorrow for Priyanthi Silva (Colombo) - 2 hour service (14:00 - 16:00)
-      {
-        salon: salons[0],
-        customer: customers[3],
         staffName: "Priyanthi Silva",
-        serviceName: "Facial",
-        date: tomorrow,
+        serviceName: "Deep Hydration Facial",
+        date: pastDate1,
         start_time: "14:00",
-        status: "pending"
+        duration: 90,
+        status: "completed",
+        notes: "Client has sensitive skin. Used organic botanical serums.",
+        feedback: { serviceRating: 5, staffRating: 5, comment: "Skin feels glowing and refreshed. Priyanthi was wonderful." },
+        bill: { amount: 4500, method: "Cash", status: "paid" }
       },
-      // 5. Completed booking dayAfter for Sheron Cooray (Negombo) - 1 hour service (09:00 - 10:00)
+      // 3. Completed appointment (Kandy)
       {
         salon: salons[1],
+        customer: customers[2],
+        staffName: "Anusha Ratnayake",
+        serviceName: "Royal Bridal Makeover",
+        date: pastDate1,
+        start_time: "09:00",
+        duration: 180,
+        status: "completed",
+        notes: "Bridal dressing for Kandyan wedding ceremony.",
+        feedback: { serviceRating: 5, staffRating: 5, comment: "Dream wedding look accomplished! Absolutely stunning makeup." },
+        bill: { amount: 25000, method: "Online", status: "paid" }
+      },
+      // 4. Completed appointment (Galle)
+      {
+        salon: salons[2],
+        customer: customers[3],
+        staffName: "Chamara Fernando",
+        serviceName: "Balayage & Hair Coloring",
+        date: pastDate2,
+        start_time: "11:00",
+        duration: 150,
+        status: "completed",
+        notes: "Caramel balayage blend with tone lock shine.",
+        feedback: { serviceRating: 5, staffRating: 4, comment: "Great color blend and very friendly staff in Galle Fort." },
+        bill: { amount: 12000, method: "Card", status: "paid" }
+      },
+      // 5. Completed appointment (Negombo)
+      {
+        salon: salons[3],
         customer: customers[4],
         staffName: "Sheron Cooray",
-        serviceName: "Hair Wash",
-        date: dayAfter,
-        start_time: "09:00",
-        status: "completed"
+        serviceName: "Executive Beard Grooming",
+        date: pastDate1,
+        start_time: "15:00",
+        duration: 45,
+        status: "completed",
+        notes: "Hot towel therapy and precision outline.",
+        feedback: { serviceRating: 5, staffRating: 5, comment: "Best beard trim in Negombo. Highly recommend Sheron." },
+        bill: { amount: 1800, method: "Cash", status: "paid" }
       },
-      // 6. Cancelled booking dayAfter for Sheron Cooray (Negombo) - 1 hour service (10:00 - 11:00)
+      // 6. Confirmed appointment today (Colombo)
       {
-        salon: salons[1],
+        salon: salons[0],
         customer: customers[5],
-        staffName: "Sheron Cooray",
-        serviceName: "Beard Trim",
-        date: dayAfter,
-        start_time: "10:00",
-        status: "cancelled"
+        staffName: "Sanduni Jayasinghe",
+        serviceName: "Swedish Aromatherapy Massage",
+        date: today,
+        start_time: "13:00",
+        duration: 120,
+        status: "confirmed",
+        notes: "Client requested lavender relaxation oil.",
+        bill: { amount: 7500, method: "Card", status: "pending" }
       },
-      // 7. Confirmed booking tomorrow for Janaki Ramachandran (Jaffna) - 3 hour service (10:00 - 13:00)
+      // 7. Confirmed appointment tomorrow (Jaffna)
       {
-        salon: salons[2],
+        salon: salons[4],
         customer: customers[6],
         staffName: "Janaki Ramachandran",
-        serviceName: "Bridal Makeup",
+        serviceName: "Royal Bridal Makeover",
         date: tomorrow,
         start_time: "10:00",
-        status: "confirmed"
+        duration: 180,
+        status: "confirmed",
+        notes: "Bridal trial makeup and jewellery fitting.",
+        bill: { amount: 25000, method: "Online", status: "pending" }
       },
-      // 8. Rejected booking dayThree for Abirami Visvanathan (Jaffna) - 1 hour service (11:00 - 12:00)
+      // 8. Confirmed appointment tomorrow (Kandy)
+      {
+        salon: salons[1],
+        customer: customers[7],
+        staffName: "Dilshan Bandara",
+        serviceName: "Ayurvedic Head & Scalp Therapy",
+        date: tomorrow,
+        start_time: "11:00",
+        duration: 60,
+        status: "confirmed",
+        notes: "Ayurvedic Neelayadi oil scalp treatment.",
+        bill: { amount: 3000, method: "Cash", status: "pending" }
+      },
+      // 9. Confirmed appointment dayAfter (Gampaha)
+      {
+        salon: salons[5],
+        customer: customers[8],
+        staffName: "Kavisha Ranasinghe",
+        serviceName: "Kids Trendy Haircut",
+        date: dayAfter,
+        start_time: "14:00",
+        duration: 30,
+        status: "confirmed",
+        notes: "Back to school haircuts for 2 kids.",
+        bill: { amount: 1200, method: "Cash", status: "pending" }
+      },
+      // 10. Confirmed appointment future (Kurunegala)
+      {
+        salon: salons[6],
+        customer: customers[9],
+        staffName: "Roshan Gunawardena",
+        serviceName: "Signature Haircut & Blowdry",
+        date: futureDate,
+        start_time: "10:00",
+        duration: 60,
+        status: "confirmed",
+        notes: "Special event styling and blow dry.",
+        bill: { amount: 2500, method: "Card", status: "pending" }
+      },
+      // 11. Pending appointment tomorrow (Matara)
+      {
+        salon: salons[7],
+        customer: customers[10],
+        staffName: "Minoli Peiris",
+        serviceName: "Swedish Aromatherapy Massage",
+        date: tomorrow,
+        start_time: "15:00",
+        duration: 120,
+        status: "pending",
+        notes: "Pending confirmation from client phone verification."
+      },
+      // 12. Pending appointment dayAfter (Batticaloa)
+      {
+        salon: salons[8],
+        customer: customers[11],
+        staffName: "Luxman Balakrishnan",
+        serviceName: "Ayurvedic Head & Scalp Therapy",
+        date: dayAfter,
+        start_time: "10:00",
+        duration: 60,
+        status: "pending",
+        notes: "Online web booking waiting for staff review."
+      },
+      // 13. Pending appointment future (Anuradhapura)
+      {
+        salon: salons[9],
+        customer: customers[12],
+        staffName: "Oshadi Ranasinghe",
+        serviceName: "Deep Hydration Facial",
+        date: futureDate,
+        start_time: "09:30",
+        duration: 90,
+        status: "pending",
+        notes: "First time customer consultation."
+      },
+      // 14. Cancelled appointment past (Colombo)
+      {
+        salon: salons[0],
+        customer: customers[13],
+        staffName: "Kasun Perera",
+        serviceName: "Keratin Smooth Treatment",
+        date: pastDate1,
+        start_time: "09:00",
+        duration: 180,
+        status: "cancelled",
+        notes: "Customer had to reschedule due to travel emergency."
+      },
+      // 15. Rejected appointment past (Galle)
       {
         salon: salons[2],
-        customer: customers[7],
-        staffName: "Abirami Visvanathan",
-        serviceName: "Threading",
-        date: dayThree,
-        start_time: "11:00",
-        status: "rejected"
+        customer: customers[14],
+        staffName: "Niluka Wickramasinghe",
+        serviceName: "Luxury Gel Pedicure & Manicure",
+        date: pastDate2,
+        start_time: "16:00",
+        duration: 60,
+        status: "rejected",
+        notes: "Slot was already booked for a private bridal VIP group."
       }
     ];
+
+    const createdAppointments = [];
+    const createdBills = [];
+    const createdFeedbacks = [];
+    const createdNotifications = [];
 
     for (const spec of appointmentSpecs) {
       const salon = spec.salon;
       const customer = spec.customer;
-      const staff = findStaff(salon._id, spec.staffName);
-      const service = findService(salon._id, spec.serviceName);
+      const staff = findStaffObj(salon._id, spec.staffName);
+      const service = findServiceObj(salon._id, spec.serviceName);
 
-      if (!staff || !service) {
-        console.warn(`Could not find staff ${spec.staffName} or service ${spec.serviceName} for ${salon.name}`);
-        continue;
-      }
-
-      const duration = service.duration;
+      const duration = spec.duration || service.duration || 60;
       const durationHours = Math.ceil(duration / 60);
       const end_time = addHours(spec.start_time, durationHours);
 
-      // Create the Appointment record
       const app = await Appointment.create({
         customer_id: customer._id,
         salon_id: salon._id,
         service_id: service._id,
+        service_ids: [service._id],
         staff_id: staff._id,
         appointment_date: spec.date,
         start_time: spec.start_time,
         end_time: end_time,
         duration: duration,
         status: spec.status,
-        total_price: service.base_price,
-        notes: `Sample ${spec.status} booking for testing.`,
-        confirmed_at: spec.status === "confirmed" || spec.status === "completed" ? new Date() : null,
+        total_price: spec.bill ? spec.bill.amount : service.base_price,
+        notes: spec.notes || "",
+        feedback_submitted: !!spec.feedback,
+        confirmed_at: ["confirmed", "completed"].includes(spec.status) ? new Date() : null,
         rejected_at: spec.status === "rejected" ? new Date() : null,
         cancelled_at: spec.status === "cancelled" ? new Date() : null
       });
+      createdAppointments.push(app);
 
-      // If confirmed or completed, book the slots in StaffAvailability
-      if (spec.status === "confirmed" || spec.status === "completed") {
+      // Lock slots for confirmed & completed appointments
+      if (["confirmed", "completed"].includes(spec.status)) {
         const queryDate = new Date(spec.date);
         queryDate.setHours(0, 0, 0, 0);
         const nextDay = new Date(queryDate);
         nextDay.setDate(nextDay.getDate() + 1);
 
-        // Calculate slots to mark
         const slotStartTimes = [];
         let [h, m] = spec.start_time.split(":").map(Number);
         for (let i = 0; i < durationHours; i++) {
@@ -473,10 +686,91 @@ const seed = async () => {
           );
         }
       }
-    }
-    console.log("Appointments seeded and slot availability updated successfully.");
 
-    console.log("Seeding process completed successfully!");
+      // Bill creation
+      if (spec.bill) {
+        const bill = await Bill.create({
+          appointment_id: app._id,
+          total_amount: spec.bill.amount,
+          bill_date: new Date(spec.date),
+          payment_method: spec.bill.method,
+          payout_status: spec.bill.status,
+          paid_out_at: spec.bill.status === "paid" ? new Date(spec.date) : null
+        });
+        createdBills.push(bill);
+      }
+
+      // Feedback & Review creation
+      if (spec.feedback) {
+        const fb = await Feedback.create({
+          appointment_id: app._id,
+          salon_id: salon._id,
+          customer_id: customer._id,
+          service_id: service._id,
+          staff_id: staff._id,
+          serviceRating: spec.feedback.serviceRating,
+          staffRating: spec.feedback.staffRating,
+          comment: spec.feedback.comment
+        });
+        createdFeedbacks.push(fb);
+
+        await Review.create({
+          appointment_id: app._id,
+          rating: spec.feedback.serviceRating,
+          comment: spec.feedback.comment,
+          review_date: new Date(spec.date)
+        });
+      }
+
+      // Notifications
+      const notif = await Notification.create({
+        recipient_id: customer._id,
+        recipient_model: "Customer",
+        title: `Appointment ${spec.status.toUpperCase()}`,
+        message: `Your booking for ${service.service_name} at ${salon.name} on ${spec.date} at ${spec.start_time} is ${spec.status}.`,
+        is_read: spec.status === "completed",
+        appointment_id: app._id
+      });
+      createdNotifications.push(notif);
+    }
+
+    console.log(`Created ${createdAppointments.length} appointments.`);
+    console.log(`Created ${createdBills.length} billing records.`);
+    console.log(`Created ${createdFeedbacks.length} feedback & review entries.`);
+    console.log(`Created ${createdNotifications.length} notification items.`);
+
+    // 10+ Additional direct reviews for platform showcase
+    console.log("Adding additional platform review entries...");
+    const extraReviewsData = [
+      { rating: 5, comment: "Amazing ambience and world-class service in Colombo!", date: new Date() },
+      { rating: 5, comment: "The bridal package in Kandy was perfection.", date: new Date() },
+      { rating: 4, comment: "Very relaxing massage experience inside Galle Fort.", date: new Date() },
+      { rating: 5, comment: "Staff is highly skilled, very courteous and clean salon.", date: new Date() },
+      { rating: 5, comment: "Fast booking and seamless payment. Best salon network!", date: new Date() }
+    ];
+    for (let i = 0; i < extraReviewsData.length; i++) {
+      await Review.create({
+        appointment_id: createdAppointments[i] ? createdAppointments[i]._id : null,
+        rating: extraReviewsData[i].rating,
+        comment: extraReviewsData[i].comment,
+        review_date: extraReviewsData[i].date
+      });
+    }
+
+    console.log("\n=======================================================");
+    console.log("DATABASE SEED SUMMARY:");
+    console.log(`• Salons:              ${salons.length}`);
+    console.log(`• Service Categories:  ${categories.length}`);
+    console.log(`• Total Services:      ${allServices.length}`);
+    console.log(`• Staff Members:       ${allStaff.length}`);
+    console.log(`• Availability Records:${availabilityDocs.length}`);
+    console.log(`• Customers:           ${customers.length}`);
+    console.log(`• Admin Accounts:      ${adminsData.length}`);
+    console.log(`• Appointments:        ${createdAppointments.length}`);
+    console.log(`• Bills / Invoices:    ${createdBills.length}`);
+    console.log(`• Feedbacks / Reviews: ${createdFeedbacks.length + extraReviewsData.length}`);
+    console.log(`• Notifications:       ${createdNotifications.length}`);
+    console.log("=======================================================\n");
 
   } catch (error) {
     console.error("Error seeding database:", error);
