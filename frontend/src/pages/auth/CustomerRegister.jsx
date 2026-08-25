@@ -7,13 +7,31 @@ const CustomerRegister = () => {
   const [name, setName]                   = useState("");
   const [email, setEmail]                 = useState("");
   const [phone, setPhone]                 = useState("");
+  const [phoneError, setPhoneError]       = useState("");
   const [password, setPassword]           = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading]             = useState(false);
   const navigate = useNavigate();
 
+  const handlePhoneChange = (e) => {
+    const val = e.target.value.replace(/\D/g, "");
+    if (val.length <= 10) {
+      setPhone(val);
+      if (val.length === 10) {
+        setPhoneError("");
+      }
+    }
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault();
+    setPhoneError("");
+
+    if (phone.length !== 10) {
+      setPhoneError("Phone number must be exactly 10 digits");
+      return;
+    }
+
     if (password !== confirmPassword) {
       alert("Passwords do not match!");
       return;
@@ -102,11 +120,16 @@ const CustomerRegister = () => {
               type="tel"
               placeholder="07XXXXXXXX"
               value={phone}
-              onChange={e => setPhone(e.target.value)}
-              className={inputClass}
+              onChange={handlePhoneChange}
+              className={`${inputClass} ${phoneError ? "border-red-500/50 focus:border-red-500" : ""}`}
               autoComplete="new-phone"
               required
             />
+            {phoneError && (
+              <span className="text-xs text-red-400 mt-1 block font-medium">
+                {phoneError}
+              </span>
+            )}
           </div>
 
           {/* Passwords */}

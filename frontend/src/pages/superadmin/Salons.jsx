@@ -17,6 +17,28 @@ import EmptyState from "../../components/ui/EmptyState";
 import Skeleton from "../../components/ui/Skeleton";
 import clsx from "clsx";
 
+const API_BASE = "http://localhost:5000";
+
+/* Helper to render salon logo or fallback icon */
+const SalonLogo = ({ salon, className = "w-full h-full object-cover" }) => {
+  if (salon?.logo) {
+    const src = salon.logo.startsWith("http")
+      ? salon.logo
+      : `${API_BASE}/${salon.logo.replace(/\\/g, "/")}`;
+    return (
+      <img
+        src={src}
+        alt={`${salon.name || "Salon"} logo`}
+        className={className}
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+      />
+    );
+  }
+  return (
+    <Store className="w-6 h-6" />
+  );
+};
+
 /* ── Salon Card Component ── */
 const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
   const navigate = useNavigate();
@@ -49,8 +71,8 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
           {/* Header Row: Icon + Name + Menu */}
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 text-amber-400 group-hover:border-amber-400/50 transition-colors">
-                <Store className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 text-amber-400 overflow-hidden group-hover:border-amber-400/50 transition-colors">
+                <SalonLogo salon={salon} />
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-extrabold text-white truncate leading-tight group-hover:text-amber-400 transition-colors">
@@ -175,9 +197,11 @@ const Salons = () => {
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
   const [sortAsc, setSortAsc] = useState(true);
 
-  const [editSalon, setEditSalon] = useState(null);
+const [editSalon, setEditSalon] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
+  const [editLogo, setEditLogo] = useState(null);
+  const [editLogoPreview, setEditLogoPreview] = useState("");
 
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -208,11 +232,13 @@ const Salons = () => {
 
   const handleView = (id) => navigate(`/salon-admin/${id}/adminDashboard`);
 
-  const handleEditOpen = async (id) => {
+const handleEditOpen = async (id) => {
     try {
       const res = await getSalon(id);
       setEditSalon(res.data);
       setEditForm(res.data);
+      setEditLogo(null);
+      setEditLogoPreview("");
     } catch (err) {
       console.error(err);
       setError("Failed to load salon details for editing");
@@ -223,12 +249,31 @@ const Salons = () => {
     setEditForm({ ...editForm, [e.target.name]: e.target.value });
   };
 
+  const handleEditLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditLogo(file);
+    setEditLogoPreview(URL.createObjectURL(file));
+  };
+
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setEditLoading(true);
     try {
-      await updateSalon(editSalon._id, editForm);
+      const data = new FormData();
+      // Append editable salon fields
+      ["name", "phone", "location", "about", "managerEmail", "managerPassword"].forEach((key) => {
+        if (editForm[key] !== undefined && editForm[key] !== null) {
+          data.append(key, editForm[key]);
+        }
+      });
+      // Append new logo if one was selected
+      if (editLogo) data.append("logo", editLogo);
+
+      await updateSalon(editSalon._id, data);
       setEditSalon(null);
+      setEditLogo(null);
+      setEditLogoPreview("");
       await fetchSalons();
     } catch (err) {
       console.error(err);
@@ -415,8 +460,8 @@ const Salons = () => {
             {filteredSalons.map((salon) => (
               <tr key={salon._id} className="hover:bg-surface-2/60 transition-colors">
                 <Table.Td bold className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs">
-                    <Store className="w-4 h-4" />
+<div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs overflow-hidden">
+                    <SalonLogo salon={salon} className="w-full h-full object-cover" />
                   </div>
                   <span className="text-white font-extrabold text-sm">{salon.name}</span>
                 </Table.Td>
@@ -458,11 +503,36 @@ const Salons = () => {
       )}
 
       {/* Edit Modal */}
-      <Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="✏️ Edit Salon Details" maxWidth="max-w-md">
+<Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="✏️ Edit Salon Details" maxWidth="max-w-md">
         <form onSubmit={handleEditSubmit} autoComplete="off" className="space-y-4 pt-1">
           <Input label="Salon Name" name="name" value={editForm.name || ""} onChange={handleEditChange} required />
           <Input label="Phone Number" name="phone" value={editForm.phone || ""} onChange={handleEditChange} />
           <Input label="Location Address" name="location" value={editForm.location || ""} onChange={handleEditChange} />
+
+          {/* Salon Logo Upload */}
+          <div>
+            <label className="block text-[0.68rem] font-extrabold text-neutral-400 tracking-wider uppercase mb-1.5">
+              Salon Logo <span className="text-amber-400/60 lowercase tracking-widest ml-1 font-bold">(optional)</span>
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-xl bg-surface-2 border border-border overflow-hidden flex-shrink-0 flex items-center justify-center text-neutral-400">
+                {editLogoPreview ? (
+                  <img src={editLogoPreview} alt="New salon logo preview" className="w-full h-full object-cover" />
+                ) : editSalon?.logo ? (
+                  <SalonLogo salon={editSalon} className="w-full h-full object-cover" />
+                ) : (
+                  <Store className="w-6 h-6" />
+                )}
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleEditLogoChange}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-amber-400 file:text-black file:cursor-pointer"
+              />
+            </div>
+            <p className="text-[0.6rem] text-neutral-500 mt-1">Upload a new logo for this salon. It will appear in the manager header and salon directory.</p>
+          </div>
 
           <div className="pt-3 border-t border-border">
             <h4 className="text-xs font-extrabold text-neutral-400 uppercase tracking-wider mb-2">Manager Credentials</h4>

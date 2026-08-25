@@ -24,6 +24,8 @@ import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import Skeleton from "../../components/ui/Skeleton";
 
+const API_BASE = "http://localhost:5000";
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -389,9 +391,18 @@ export default function Dashboard() {
                   key={salon._id} 
                   className="flex items-center justify-between p-3.5 bg-surface-2 border border-border rounded-xl hover:border-accent/30 transition-all duration-200"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-accent-dim border border-accent/20 flex items-center justify-center text-accent">
-                      <Store className="w-4 h-4" />
+<div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-accent-dim border border-accent/20 flex items-center justify-center text-accent overflow-hidden">
+                      {salon.logo ? (
+                        <img
+                          src={salon.logo.startsWith("http") ? salon.logo : `${API_BASE}/${salon.logo.replace(/\\/g, "/")}`}
+                          alt={`${salon.name} logo`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.style.display = "none"; }}
+                        />
+                      ) : (
+                        <Store className="w-4 h-4" />
+                      )}
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-white">{salon.name}</h4>

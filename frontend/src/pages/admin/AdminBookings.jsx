@@ -498,7 +498,7 @@ export default function AdminBookings() {
                   </span>
 
                   <div className="flex items-center gap-2">
-                    {a.status === "pending" && (
+                    {a.status === "pending" && user?.role === "super-admin" && (
                       <>
                         <button
                           onClick={() => handleConfirm(a._id)}
@@ -594,7 +594,7 @@ export default function AdminBookings() {
                   </Table.Td>
                   <Table.Td align="right">
                     <div className="flex items-center justify-end gap-2">
-                      {a.status === "pending" && (
+                      {a.status === "pending" && user?.role === "super-admin" && (
                         <>
                           <button
                             onClick={() => handleConfirm(a._id)}

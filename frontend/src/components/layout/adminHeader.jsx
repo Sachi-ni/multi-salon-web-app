@@ -6,6 +6,8 @@ import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
 import { getSalon } from "../../services/salonService";
 
+const API_BASE = "http://localhost:5000";
+
 const AdminHeader = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [salon, setSalon] = useState(null);
   const [brandSalon, setBrandSalon] = useState(null);
 
   const dropdownRef = useRef(null);
@@ -21,6 +24,15 @@ const AdminHeader = ({ onToggleSidebar }) => {
 
   const displayName = user?.name || "Admin User";
   const displayEmail = user?.email || "";
+
+  // Fetch the salon name & logo for managers / salon staff
+  useEffect(() => {
+    if (user?.salon_id) {
+      getSalon(user.salon_id)
+        .then((res) => setSalon(res.data || null))
+        .catch(() => setSalon(null));
+    }
+  }, [user?.salon_id]);
 
   useEffect(() => {
     if (user) {
@@ -155,8 +167,32 @@ const AdminHeader = ({ onToggleSidebar }) => {
         <Menu className="w-5 h-5 text-white" />
       </button>
 
-      {/* Logo */}
+{/* Logo - show salon name & logo for salon users, else SalonHub */}
       <div className="flex items-center gap-2 text-lg font-black text-accent whitespace-nowrap tracking-tight">
+        {salon?.name ? (
+          <>
+            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-sm font-black text-primary flex-shrink-0 overflow-hidden">
+              {salon.logo ? (
+                <img
+                  src={salon.logo.startsWith("http") ? salon.logo : `${API_BASE}/${salon.logo.replace(/\\/g, "/")}`}
+                  alt={`${salon.name} logo`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : (
+                (salon.name.charAt(0) || "S").toUpperCase()
+              )}
+            </div>
+            <span className="text-white max-w-[160px] truncate">{salon.name}</span>
+          </>
+        ) : (
+          <>
+            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-sm font-black text-primary flex-shrink-0">
+              S
+            </div>
+            <span className="text-white">Salon</span>Hub
+          </>
+        )}
         <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-sm font-black text-primary flex-shrink-0">
           {brandSalon && brandSalon[0]?.toUpperCase() ? brandSalon[0].toUpperCase() : "S"}
         </div>
