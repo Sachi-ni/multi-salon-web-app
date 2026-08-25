@@ -14,10 +14,10 @@ const CustomerRegister = () => {
   const navigate = useNavigate();
 
   const handlePhoneChange = (e) => {
-    const val = e.target.value.replace(/\D/g, "");
-    if (val.length <= 10) {
+    const val = e.target.value.replace(/[^0-9+\s()-]/g, "");
+    if (val.replace(/[\s()-]/g, "").replace(/^\+/, "").length <= 10) {
       setPhone(val);
-      if (val.length === 10) {
+      if (/^\+?[0-9]{10}$/.test(val.replace(/[\s()-]/g, ""))) {
         setPhoneError("");
       }
     }
@@ -27,8 +27,14 @@ const CustomerRegister = () => {
     e.preventDefault();
     setPhoneError("");
 
-    if (phone.length !== 10) {
-      setPhoneError("Phone number must be exactly 10 digits");
+    const normalizedPhone = phone.replace(/[\s()-]/g, "");
+    if (!/^\+?[0-9]{10}$/.test(normalizedPhone)) {
+      setPhoneError("Phone number must contain exactly 10 digits and may start with +");
+      return;
+    }
+
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/.test(password)) {
+      alert("Password must be at least 8 characters and include uppercase, lowercase, number, and special character");
       return;
     }
 
@@ -40,8 +46,8 @@ const CustomerRegister = () => {
     try {
       await axios.post("http://localhost:5000/api/customers/register", {
         name,
-        email,
-        phone,
+        email: email.trim().toLowerCase(),
+        phone: normalizedPhone,
         password,
       });
       alert("Registration successful! Please login.");
@@ -118,11 +124,12 @@ const CustomerRegister = () => {
             </label>
             <input
               type="tel"
-              placeholder="07XXXXXXXX"
+              placeholder="+947XXXXXXXX"
               value={phone}
               onChange={handlePhoneChange}
               className={`${inputClass} ${phoneError ? "border-red-500/50 focus:border-red-500" : ""}`}
               autoComplete="new-phone"
+              pattern="\\+?[0-9\\s()\-]{10,20}"
               required
             />
             {phoneError && (

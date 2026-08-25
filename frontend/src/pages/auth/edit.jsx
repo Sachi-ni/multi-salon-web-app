@@ -36,6 +36,23 @@ const Edit = () => {
   const handleUpdate = async (e) => {
     e.preventDefault();
 
+    const normalizedPhone = phone.replace(/[\s()-]/g, "");
+    const passwordIsStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/.test(password);
+    const emailIsValid = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/.test(email.trim());
+    const phoneIsValid = !normalizedPhone || /^\+?[0-9]{10}$/.test(normalizedPhone);
+
+    if (!emailIsValid) {
+      alert("Please enter a valid email address");
+      return;
+    }
+    if (!phoneIsValid) {
+      alert("Phone number must contain exactly 10 digits and may start with +");
+      return;
+    }
+    if (password && !passwordIsStrong) {
+      alert("Password must be at least 8 characters and include uppercase, lowercase, number, and special character");
+      return;
+    }
     if (password && password !== confirmPassword) {
       alert("Passwords do not match!");
       return;
@@ -46,8 +63,8 @@ const Edit = () => {
 
       const formData = new FormData();
       formData.append("full_name", fname);
-      formData.append("email", email);
-      formData.append("phone", phone);
+      formData.append("email", email.trim().toLowerCase());
+      formData.append("phone", normalizedPhone);
       formData.append("username", username);
       if (password) formData.append("password", password);
       if (image) formData.append("image", image);
@@ -183,6 +200,7 @@ const Edit = () => {
             </label>
             <input
               type="email"
+              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
@@ -195,8 +213,12 @@ const Edit = () => {
             </label>
             <input
               type="tel"
+              pattern="\\+?[0-9\\s()\-]{10,20}"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9+\s()-]/g, "");
+                if (value.replace(/[\s()-]/g, "").replace(/^\+/, "").length <= 10) setPhone(value);
+              }}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
             />
           </div>
@@ -207,6 +229,7 @@ const Edit = () => {
             </label>
             <input
               type="password"
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
@@ -219,6 +242,7 @@ const Edit = () => {
             </label>
             <input
               type="password"
+              minLength={8}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
