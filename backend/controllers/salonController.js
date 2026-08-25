@@ -1,6 +1,35 @@
 import bcrypt from "bcryptjs";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import Salon from "../models/Salon.js";
 import Staff from "../models/Staff.js";
+import Feedback from "../models/Feedback.js";
+
+// __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Compute average rating and count from feedback for a given salon.
+ * Combines serviceRating and staffRating from all feedback records.
+ * Returns rating (0 if no feedback) and ratingCount.
+ */
+const getSalonRating = async (salonId) => {
+  const feedbacks = await Feedback.find({ salon_id: salonId }).select("serviceRating staffRating").lean();
+
+  if (!feedbacks.length) {
+    return { rating: 0, ratingCount: 0 };
+  }
+
+  const total = feedbacks.reduce((sum, f) => sum + (Number(f.serviceRating) || 0) + (Number(f.staffRating) || 0), 0);
+  const count = feedbacks.length;
+
+  return {
+    rating: Math.round((total / (count * 2)) * 10) / 10,
+    ratingCount: count
+  };
+};
 
 export const createSalon = async(req,res)=>{
    try {
@@ -20,11 +49,12 @@ export const createSalon = async(req,res)=>{
         return res.status(400).json({ message: "Manager name, email and password are required." });
       }
 
-         const salon = await Salon.create({
+const salon = await Salon.create({
             name,
             location,
             phone,
             about,
+            logo: req.file ? req.file.path : "",
          });
 
       const salt = await bcrypt.genSalt(10);
@@ -64,11 +94,16 @@ export const getSalons = async(req,res)=>{
         
         // Count actual staff members in the database for this salon
         const actualStaffCount = await Staff.countDocuments({ salon_id: s._id });
-        
+
+        // Compute average rating from feedback (0 if none)
+        const { rating, ratingCount } = await getSalonRating(s._id);
+
         const obj = s.toObject();
         obj.managerName = manager ? manager.full_name : null;
         obj.staffCount = actualStaffCount; // Use actual count from database
-        
+        obj.rating = rating;
+        obj.ratingCount = ratingCount;
+
         return obj;
       }));
 
@@ -94,7 +129,12 @@ export const getSalonById = async(req,res)=>{
       if (manager) {
         salonObj.managerEmail = manager.email;
       }
-      
+
+      // Compute average rating from feedback (0 if none)
+      const { rating, ratingCount } = await getSalonRating(salon._id);
+      salonObj.rating = rating;
+      salonObj.ratingCount = ratingCount;
+
       res.json(salonObj);
    } catch (error) {
       res.status(500).json({ message: error.message });
@@ -103,7 +143,11 @@ export const getSalonById = async(req,res)=>{
 
 export const updateSalon = async(req,res)=>{
    try {
-      const { managerEmail, managerPassword, ...salonData } = req.body;
+const { managerEmail, managerPassword, ...salonData } = req.body;
+      // If a new logo file was uploaded, set it
+      if (req.file) {
+        salonData.logo = req.file.path;
+      }
       const salon = await Salon.findByIdAndUpdate(req.params.id, salonData, { new: true });
       if(!salon) return res.status(404).json({ message: "Salon not found" });
 
@@ -145,6 +189,63 @@ export const deleteSalon = async(req,res)=>{
       const salon = await Salon.findByIdAndDelete(req.params.id);
       if(!salon) return res.status(404).json({ message: "Salon not found" });
       res.json({ message: "Salon deleted successfully" });
+   } catch (error) {
+      res.status(500).json({ message: error.message });
+   }
+};
+
+/**
+ * Upload multiple gallery photos for a salon (super-admin / manager)
+ * Expects req.files (multer array field name "images")
+ */
+export const uploadSalonImages = async (req, res) => {
+   try {
+      const salon = await Salon.findById(req.params.id);
+      if (!salon) return res.status(404).json({ message: "Salon not found" });
+
+      if (!req.files || req.files.length === 0) {
+         return res.status(400).json({ message: "No images uploaded" });
+      }
+
+      const newPaths = req.files.map((f) => f.path.replace(/\\/g, "/"));
+      salon.images = [...(salon.images || []), ...newPaths];
+      await salon.save();
+
+      res.status(201).json({ images: salon.images, message: "Images uploaded successfully" });
+   } catch (error) {
+      res.status(500).json({ message: error.message });
+   }
+};
+
+/**
+ * Remove a single gallery photo from a salon (super-admin / manager)
+ * Expects req.params.filename (the uploaded file name, e.g. abc123)
+ */
+export const removeSalonImage = async (req, res) => {
+   try {
+      const salon = await Salon.findById(req.params.id);
+      if (!salon) return res.status(404).json({ message: "Salon not found" });
+
+      const filename = req.params.filename.replace(/\\/g, "/");
+      const remaining = (salon.images || []).filter((img) => {
+         const imgFile = img.split("/").pop();
+         return imgFile !== filename;
+      });
+
+      salon.images = remaining;
+      await salon.save();
+
+      // Optionally delete the physical file from disk (best-effort)
+      try {
+         const filePath = path.join(__dirname, "../uploads", filename);
+         if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+         }
+      } catch (fileErr) {
+         console.warn("Could not delete image file:", fileErr.message);
+      }
+
+      res.json({ images: salon.images, message: "Image removed successfully" });
    } catch (error) {
       res.status(500).json({ message: error.message });
    }

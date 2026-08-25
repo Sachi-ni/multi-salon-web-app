@@ -59,9 +59,14 @@ export default function SalonDetailsPage() {
     navigate('/book', { state: { salon } });
   };
 
-  const imageUrl = salon.image 
-    ? `http://localhost:5000/${salon.image.replace(/\\/g, '/')}`
-    : "https://images.unsplash.com/photo-1600948836101-f9ffda59d250?q=80&w=2036&auto=format&fit=crop";
+// Build a list of gallery images from uploaded salon photos only (no external links)
+  const galleryImages = (salon.images && salon.images.length > 0)
+    ? salon.images
+    : (salon.logo ? [salon.logo] : []);
+
+  const imageUrl = galleryImages[0] 
+    ? `http://localhost:5000/${galleryImages[0].replace(/\\/g, '/')}`
+    : "/salon_interior.png";
 
   return (
     <div className="bg-primary min-h-screen font-sans flex flex-col">
@@ -82,25 +87,36 @@ export default function SalonDetailsPage() {
               <div className="h-96 rounded-3xl overflow-hidden border border-border">
                 <img src={imageUrl} alt={salon.name} className="w-full h-full object-cover" />
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                 <div className="h-32 rounded-xl overflow-hidden border border-border">
-                   <img src="https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?q=80&w=2022&auto=format&fit=crop" alt="interior" className="w-full h-full object-cover" />
-                 </div>
-                 <div className="h-32 rounded-xl overflow-hidden border border-border">
-                   <img src="https://images.unsplash.com/photo-1562322140-8baeececf3df?q=80&w=2069&auto=format&fit=crop" alt="interior" className="w-full h-full object-cover" />
-                 </div>
-                 <div className="h-32 rounded-xl overflow-hidden border border-border bg-surface flex items-center justify-center text-accent font-bold">
-                   + More
-                 </div>
+<div className="grid grid-cols-3 gap-4">
+                {galleryImages.slice(1).map((img, i) => (
+                  <div key={i} className="h-32 rounded-xl overflow-hidden border border-border">
+                    <img src={`http://localhost:5000/${img.replace(/\\/g, '/')}`} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+                {galleryImages.length <= 1 && (
+                  <>
+                    <div className="h-32 rounded-xl overflow-hidden border border-border bg-surface flex items-center justify-center text-white/40 text-xs font-bold">
+                      No additional photos
+                    </div>
+                    <div className="h-32 rounded-xl overflow-hidden border border-border bg-surface flex items-center justify-center text-white/40 text-xs font-bold">
+                      No additional photos
+                    </div>
+                  </>
+                )}
+                {galleryImages.length > 1 && (
+                  <div className="h-32 rounded-xl overflow-hidden border border-border bg-surface flex items-center justify-center text-accent font-bold">
+                    + {Math.max(galleryImages.length - 1, 0)} More
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Right: Info */}
             <div className="flex flex-col">
-              <div className="flex items-center gap-2 mb-2">
+<div className="flex items-center gap-2 mb-2">
                  <Star className="w-5 h-5 fill-accent text-accent" />
-                 <span className="text-white font-bold text-lg">4.9</span>
-                 <span className="text-muted-2">(1.2k reviews)</span>
+                 <span className="text-white font-bold text-lg">{salon.rating || 0}</span>
+                 <span className="text-muted-2">({salon.ratingCount || 0} reviews)</span>
               </div>
               <h1 className="text-4xl md:text-5xl font-display font-black text-white mb-6">
                 {salon.name}
