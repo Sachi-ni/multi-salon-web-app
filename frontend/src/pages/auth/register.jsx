@@ -15,6 +15,14 @@ const Signup = () => {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    const normalizedPhone = phone.replace(/[\s()-]/g, "");
+    const emailIsValid = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/.test(email.trim());
+    const phoneIsValid = /^\+?[0-9]{10}$/.test(normalizedPhone);
+    const passwordIsStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/.test(password);
+
+    if (!emailIsValid) return alert("Please enter a valid email address");
+    if (!phoneIsValid) return alert("Phone number must contain exactly 10 digits and may start with +");
+    if (!passwordIsStrong) return alert("Password must be at least 8 characters and include uppercase, lowercase, number, and special character");
     if (password !== confirmPassword) {
       alert("Passwords do not match!");
       return;
@@ -24,7 +32,8 @@ const Signup = () => {
       const response = await axios.post("http://localhost:5000/api/auth/register", {
         full_name: fname,
         username: uname,
-        email: email,
+        email: email.trim().toLowerCase(),
+        phone: normalizedPhone,
         password: password,
         role: "super-admin",
       });
@@ -85,7 +94,10 @@ const Signup = () => {
           {/* Phone */}
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Phone <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
-            <input type="tel" placeholder="07---XXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} autoComplete="new-phone" required />
+            <input type="tel" placeholder="0123456789" value={phone} onChange={(e) => {
+              const value = e.target.value.replace(/[^0-9+\s()-]/g, "");
+              if (value.replace(/[\s()-]/g, "").replace(/^\+/, "").length <= 10) setPhone(value);
+            }} className={inputClass} autoComplete="new-phone" pattern="\\+?[0-9\\s()\-]{10,20}" required />
           </div>
 
           {/* Passwords Row */}

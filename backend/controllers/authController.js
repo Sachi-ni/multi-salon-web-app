@@ -4,12 +4,44 @@ import Customer from "../models/Customer.js";
 import bcrypt from "bcryptjs";
 import generateToken from "../utils/generateToken.js";
 
+
+const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/;
+const PHONE_PATTERN = /^\+?[0-9]{10}$/;
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/;
+const COMMON_PASSWORDS = new Set(["12345678", "password", "password123", "qwerty123", "letmein"]);
+
+const validateProfileFields = ({ email, phone, password, username }) => {
+  const normalizedEmail = email?.trim().toLowerCase();
+  const normalizedPhone = phone?.replace(/[\s()-]/g, "");
+
+  if (normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)) {
+    return { message: "Please enter a valid email address" };
+  }
+  if (normalizedPhone && !PHONE_PATTERN.test(normalizedPhone)) {
+    return { message: "Phone number must contain exactly 10 digits and may start with +" };
+  }
+  if (password && !PASSWORD_PATTERN.test(password)) {
+    return { message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character" };
+  }
+  if (password && COMMON_PASSWORDS.has(password.toLowerCase())) {
+    return { message: "Please choose a less common password" };
+  }
+  if (password && username && password.toLowerCase().includes(username.trim().toLowerCase())) {
+    return { message: "Password must not contain your username" };
+  }
+  return { normalizedEmail, normalizedPhone };
+};
+
 export const registerAdmin = async (req, res) => {
   try {
     const { full_name, username, email, phone, password } = req.body;
+    const validation = validateProfileFields({ email, phone, password, username });
+    if (validation.message) return res.status(400).json(validation);
+    const normalizedEmail = validation.normalizedEmail;
+    const normalizedPhone = validation.normalizedPhone;
 
     // Check if admin already exists
-    const existingAdmin = await Admin.findOne({ email });
+    const existingAdmin = await Admin.findOne({ email: normalizedEmail });
     if (existingAdmin) {
       return res.status(400).json({ message: "Admin already exists" });
     }
@@ -28,8 +60,8 @@ export const registerAdmin = async (req, res) => {
     const admin = new Admin({
       full_name,
       username,
-      email,
-      phone,
+      email: normalizedEmail,
+      phone: normalizedPhone,
       password: password_hash,
       role
     });
@@ -144,7 +176,23 @@ export const updateProfile = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to edit this profile" });
     }
 
-const { full_name, email, phone, username, password } = req.body;
+    const { full_name, email, phone, username, password } = req.body;
+    const validation = validateProfileFields({ email, phone, password, username });
+    if (validation.message) return res.status(400).json(validation);
+
+    const normalizedEmail = validation.normalizedEmail;
+    const normalizedPhone = validation.normalizedPhone;
+
+    if (normalizedEmail) {
+      const emailQueries = [
+        Customer.findOne({ email: normalizedEmail, _id: { $ne: id } }),
+        Admin.findOne({ email: normalizedEmail, _id: { $ne: id } }),
+        Staff.findOne({ email: normalizedEmail, _id: { $ne: id } })
+      ];
+      if ((await Promise.all(emailQueries)).some(Boolean)) {
+        return res.status(400).json({ message: "Email is already in use" });
+      }
+    }
 
     // Profile picture upload (if provided)
     const image = req.file ? req.file.path : undefined;
@@ -155,8 +203,8 @@ const { full_name, email, phone, username, password } = req.body;
       if (!user) return res.status(404).json({ message: "User not found" });
 
       user.name = full_name || user.name;
-      user.email = email || user.email;
-      user.phone = phone || user.phone;
+      user.email = normalizedEmail || user.email;
+      user.phone = normalizedPhone || user.phone;
       if (image !== undefined) user.image = image;
 
       if (password) {
@@ -184,8 +232,8 @@ const { full_name, email, phone, username, password } = req.body;
       if (!user) return res.status(404).json({ message: "User not found" });
       
       user.full_name = full_name || user.full_name;
-      user.email = email || user.email;
-      user.phone = phone || user.phone;
+      user.email = normalizedEmail || user.email;
+      user.phone = normalizedPhone || user.phone;
       if (image !== undefined) user.image = image;
 
       if (password) {
@@ -208,8 +256,8 @@ const { full_name, email, phone, username, password } = req.body;
     }
 
     user.full_name = full_name || user.full_name;
-    user.email = email || user.email;
-    user.phone = phone || user.phone;
+    user.email = normalizedEmail || user.email;
+    user.phone = normalizedPhone || user.phone;
     user.username = username || user.username;
     if (image !== undefined) user.image = image;
 
