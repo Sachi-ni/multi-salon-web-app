@@ -75,8 +75,13 @@ export const createStaff = async (req, res) => {
     const salaryPaymentCountPerDay = Number(req.body.salaryPaymentCountPerDay || 1);
     const salaryBalance = Number(req.body.salaryBalance || 0);
 
+    const firstName = req.body.firstName || "";
+    const lastName = req.body.lastName || "";
+
     const staffData = {
-      full_name: req.body.name,
+      first_name: firstName,
+      last_name: lastName,
+      full_name: `${firstName} ${lastName}`.trim(),
       email: req.body.email,
       password_hash,
       phone: req.body.phone,
@@ -296,41 +301,41 @@ export const updateStaff = async (req, res) => {
     const updateData = {};
 
     let services;
+
     if (req.body.services !== undefined) {
       try {
-
         let rawServices = req.body.services;
 
         console.log("RAW SERVICES:", rawServices);
-        console.log("RAW TYPE:", typeof rawServices);
+        console.log("RAW SERVICES TYPE:", typeof rawServices);
 
-
-        // Multer gives array -> take first value
-        if (Array.isArray(rawServices)) {
-          rawServices = rawServices[0];
-        }
-
-
-        // Convert JSON string to array
+        // If FormData sends JSON string
         if (typeof rawServices === "string") {
           services = JSON.parse(rawServices);
         } else {
           services = rawServices;
         }
 
-
-        // Ensure array
+        // Make sure it is an array
         if (!Array.isArray(services)) {
           services = [];
         }
 
+        // Remove invalid/empty IDs
+        services = services.filter(
+          (serviceId) =>
+            typeof serviceId === "string" &&
+            serviceId.trim() !== ""
+        );
 
-        // Remove empty values
-        services = services.filter(Boolean);
-
+        console.log("PARSED SERVICES:", services);
 
       } catch (error) {
-        console.log("SERVICE PARSE ERROR:", error);
+        console.error(
+          "SERVICE PARSE ERROR:",
+          error
+        );
+
         services = [];
       }
     }
@@ -340,8 +345,31 @@ export const updateStaff = async (req, res) => {
 
     const willUpdateServices = services !== undefined;
 
-    if (req.body.name !== undefined)
-      updateData.full_name = req.body.name;
+    if (req.body.firstName !== undefined) {
+      updateData.first_name = req.body.firstName;
+    }
+
+    if (req.body.lastName !== undefined) {
+      updateData.last_name = req.body.lastName;
+    }
+
+    if (
+      req.body.firstName !== undefined ||
+      req.body.lastName !== undefined
+    ) {
+      const firstName =
+        req.body.firstName !== undefined
+          ? req.body.firstName
+          : existing.first_name;
+
+      const lastName =
+        req.body.lastName !== undefined
+          ? req.body.lastName
+          : existing.last_name;
+
+      updateData.full_name =
+        `${firstName} ${lastName}`.trim();
+    }
 
     if (req.body.email !== undefined)
       updateData.email = req.body.email;
