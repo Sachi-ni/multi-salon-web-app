@@ -365,8 +365,20 @@ export default function AdminStaffPage() {
         getServices(salonId),
       ]);
 
-      setStaffList(staffRes.data || []);
-      setServicesList(svcRes.data || []);
+      // Hide manager/staff-admin accounts from this Salon Staff page only
+    const salonStaff = (staffRes.data || []).filter((staff) => {
+      const role = (staff.role || "").toLowerCase().trim();
+
+      return (
+        role !== "manager" &&
+        role !== "staff-admin" &&
+        role !== "staff admin"
+      );
+    });
+
+    setStaffList(salonStaff);
+    setServicesList(svcRes.data || []);
+    
     } catch (err) {
       console.error(err);
       setError("Failed to load staff list");
@@ -401,12 +413,24 @@ export default function AdminStaffPage() {
     setEditStaff(staff);
 
     setEditForm({
-      name: staff.full_name || "",
+      firstName:
+        staff.first_name ||
+        staff.full_name?.split(" ")[0] ||
+        "",
+
+      lastName:
+        staff.last_name ||
+        staff.full_name?.split(" ").slice(1).join(" ") ||
+        "",
+
       email: staff.email || "",
-      specification: staff.specification || "",
-      salaryPaymentCountPerDay:
+
+      paymentFrequency:
+        staff.salary_payment_frequency || "monthly",
+
+      salaryPerDay:
         staff.salary_payment_count_per_day || 0,
-      status: staff.status || "Active",
+
       services:
         staff.services?.map((s) => s._id) || [],
     });
@@ -416,18 +440,52 @@ export default function AdminStaffPage() {
     e.preventDefault();
 
     setEditLoading(true);
+    setError("");
 
     try {
-      await updateStaff(
+      const updateData = {
+        firstName: editForm.firstName || "",
+        lastName: editForm.lastName || "",
+        email: editForm.email || "",
+
+        salaryPaymentFrequency:
+          editForm.paymentFrequency || "monthly",
+
+        salaryPaymentCountPerDay:
+          Number(editForm.salaryPerDay) || 0,
+
+        // IMPORTANT
+        services: Array.isArray(editForm.services)
+          ? editForm.services
+          : [],
+      };
+
+      console.log("UPDATING STAFF:", updateData);
+      console.log("SERVICES BEING SENT:", updateData.services);
+
+      const response = await updateStaff(
         editStaff._id,
-        editForm
+        updateData
+      );
+
+      console.log("UPDATED STAFF RESPONSE:", response.data);
+      console.log(
+        "UPDATED SERVICES:",
+        response.data?.services
       );
 
       setEditStaff(null);
 
-      fetchStaffData();
+      // Reload staff from database
+      await fetchStaffData();
+
     } catch (err) {
-      console.error(err);
+      console.error("UPDATE STAFF ERROR:", err);
+
+      console.error(
+        "SERVER RESPONSE:",
+        err.response?.data
+      );
 
       setError(
         err.response?.data?.message ||
@@ -729,49 +787,199 @@ export default function AdminStaffPage() {
         isOpen={!!editStaff}
         onClose={() => setEditStaff(null)}
         title="✏️ Edit Staff Details"
-        maxWidth="max-w-md"
+        maxWidth="max-w-lg"
       >
         <form
           onSubmit={handleEditSubmit}
           className="space-y-4 pt-1"
         >
+          {/* First Name */}
           <Input
-            label="Full Name"
-            value={editForm.name || ""}
+            label="First Name"
+            value={editForm.firstName || ""}
             onChange={(e) =>
               setEditForm({
                 ...editForm,
-                name: e.target.value,
+                firstName: e.target.value,
               })
             }
             required
           />
 
+          {/* Last Name */}
           <Input
-            label="Specification / Title"
-            value={editForm.specification || ""}
+            label="Last Name"
+            value={editForm.lastName || ""}
             onChange={(e) =>
               setEditForm({
                 ...editForm,
-                specification: e.target.value,
+                lastName: e.target.value,
               })
             }
+            required
           />
 
+          {/* Email */}
           <Input
-            label="Daily Rate (LKR)"
-            type="number"
-            value={
-              editForm.salaryPaymentCountPerDay || 0
-            }
+            label="Email"
+            type="email"
+            value={editForm.email || ""}
             onChange={(e) =>
               setEditForm({
                 ...editForm,
-                salaryPaymentCountPerDay:
-                  Number(e.target.value),
+                email: e.target.value,
               })
             }
+            required
           />
+
+          {/* Payment Frequency */}
+          <div>
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              PAYMENT FREQUENCY 
+              <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">
+                  (required)
+              </span>
+            </label>
+
+            <select
+              value={editForm.paymentFrequency || "monthly"}
+              onChange={(e) =>
+                setEditForm((prev) => ({
+                  ...prev,
+                  paymentFrequency: e.target.value,
+                }))
+              }
+              required
+              className="
+                w-full
+                rounded-xl
+                border
+                border-amber-400/70
+                bg-[#171717]
+                px-3.5
+                py-2.5
+                text-sm
+                font-medium
+                text-white
+                outline-none
+                transition-all
+                duration-200
+                focus:border-amber-400
+                focus:ring-1
+                focus:ring-amber-400/30
+              "
+            >
+              <option value="daily" className="bg-[#1a1a1a] text-white">
+                Daily
+              </option>
+              <option value="weekly" className="bg-[#1a1a1a] text-white">
+                Weekly
+              </option>
+              <option value="monthly" className="bg-[#1a1a1a] text-white">
+                Monthly
+              </option>
+            </select>
+          </div>
+
+          {/* Salary Amount Per Day */}
+          <Input
+            label="Salary Amount Per Day (LKR)"
+            type="number"
+            min="1"
+            value={editForm.salaryPerDay || ""}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                salaryPerDay: Number(e.target.value),
+              })
+            }
+            required
+          />
+
+          {/* Services */}
+          <div>
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              ASSIGNED SERVICES
+              <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">
+                (required)
+              </span>
+            </label>
+
+            <div className="bg-surface border border-border rounded-xl p-3 max-h-48 overflow-y-auto space-y-2">
+              {servicesList.length === 0 ? (
+                <p className="text-xs text-neutral-500">
+                  No services available.
+                </p>
+              ) : (
+                servicesList.map((service) => {
+                  const selected =
+                    Array.isArray(editForm.services) &&
+                    editForm.services.includes(service._id);
+
+                  return (
+                    <label
+                      key={service._id}
+                      className="flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-surface-2 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(e) => {
+                          setEditForm((prev) => {
+                            const currentServices = Array.isArray(
+                              prev.services
+                            )
+                              ? prev.services
+                              : [];
+
+                            let updatedServices;
+
+                            if (e.target.checked) {
+                              // Prevent duplicate service IDs
+                              updatedServices =
+                                currentServices.includes(service._id)
+                                  ? currentServices
+                                  : [
+                                      ...currentServices,
+                                      service._id,
+                                    ];
+                            } else {
+                              updatedServices =
+                                currentServices.filter(
+                                  (id) => id !== service._id
+                                );
+                            }
+
+                            console.log(
+                              "SELECTED SERVICES:",
+                              updatedServices
+                            );
+
+                            return {
+                              ...prev,
+                              services: updatedServices,
+                            };
+                          });
+                        }}
+                        className="accent-amber-400"
+                      />
+
+                      <span className="text-sm text-neutral-200">
+                        {service.service_name}
+                      </span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Selected service count */}
+            <p className="text-[0.65rem] text-neutral-500 mt-1.5">
+              {editForm.services?.length || 0} service
+              {editForm.services?.length === 1 ? "" : "s"} selected
+            </p>
+          </div>
 
           <Modal.Actions>
             <Button
