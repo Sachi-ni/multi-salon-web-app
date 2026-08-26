@@ -16,6 +16,7 @@ const AddStaff = () => {
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [picturePreview, setPicturePreview] = useState("");
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -27,6 +28,7 @@ const AddStaff = () => {
     picture: null,
     salaryPaymentFrequency: "monthly",
     salaryPaymentCountPerDay: 1,
+    salaryBalance: 0,
   });
 
   useEffect(() => {
@@ -68,6 +70,21 @@ const AddStaff = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handlePictureChange = (file) => {
+    if (picturePreview) {
+      URL.revokeObjectURL(picturePreview);
+    }
+
+    if (!file) {
+      setPicturePreview("");
+      setFormData({ ...formData, picture: null });
+      return;
+    }
+
+    setPicturePreview(URL.createObjectURL(file));
+    setFormData({ ...formData, picture: file });
+  };
+
   const handleServiceToggle = (serviceId) => {
     setFormData((current) => {
       const isSelected = current.services.includes(serviceId);
@@ -93,6 +110,7 @@ const AddStaff = () => {
       data.append("salonId", formData.salon);
       data.append("salaryPaymentFrequency", formData.salaryPaymentFrequency);
       data.append("salaryPaymentCountPerDay", formData.salaryPaymentCountPerDay);
+      data.append("salaryBalance", formData.salaryBalance);
 
       formData.services.forEach((serviceId) => {
         data.append("services", serviceId);
@@ -110,6 +128,14 @@ const AddStaff = () => {
   const selectedSalon = salons.find(
     (s) => s._id === formData.salon
   );
+
+  useEffect(() => {
+    return () => {
+      if (picturePreview) {
+        URL.revokeObjectURL(picturePreview);
+      }
+    };
+  }, [picturePreview]);
 
 
   return (
@@ -170,6 +196,24 @@ const AddStaff = () => {
                 />
               </div>
             </div>
+
+            <div className="mt-4">
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                Balance (LKR)
+                <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">
+                  (optional)
+                </span>
+              </label>
+              <input
+                type="number"
+                name="salaryBalance"
+                min="0"
+                value={formData.salaryBalance}
+                onChange={handleChange}
+                placeholder="Enter initial balance"
+                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
+              />
+            </div>
           </div>
 
           <div className="mb-3.5">
@@ -217,10 +261,23 @@ const AddStaff = () => {
             <input
               type="file"
               accept="image/*"
-              onChange={(e) => setFormData({ ...formData, picture: e.target.files[0] })}
+              onChange={(e) => handlePictureChange(e.target.files?.[0] || null)}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
               required
             />
+            {picturePreview && (
+              <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-surface-2 p-3">
+                <img
+                  src={picturePreview}
+                  alt="Selected staff preview"
+                  className="h-16 w-16 rounded-lg object-cover border border-border"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-white">Preview</p>
+                  <p className="text-2xs text-neutral-400 truncate">The selected photo will be uploaded with the staff profile.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2.5 justify-end mt-5 pt-4 border-t border-border">

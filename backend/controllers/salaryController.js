@@ -520,7 +520,10 @@ export const getSalaries = async (req, res) => {
       .lean();
 
     // Filter out managers from results
-    salaries = salaries.filter(s => !s.staff_id || s.staff_id.role !== "manager");
+    salaries = salaries.filter(s => {
+      const role = (s.staff_id?.role || s.staff_role || "").toLowerCase();
+      return !["manager", "staff-admin"].includes(role);
+    });
 
     // Cross-check: only return salaries where staff's salary_payment_frequency matches the queried frequency
     if (frequency) {
@@ -614,6 +617,7 @@ export const getStaffSalaryList = async (req, res) => {
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
+      role: { $not: { $regex: /manager|staff-admin/i } },
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     })
       .select("full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id services")
@@ -677,10 +681,11 @@ export const getStaffWithSalaries = async (req, res) => {
       salonFilter.salon_id = salonId;
     }
 
-    // Get active staff for this salon matching the selected frequency
+    // Get active staff for this salon matching the selected frequency (excluding managers)
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
+      role: { $not: { $regex: /manager|staff-admin/i } },
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     }).lean();
 
@@ -695,9 +700,14 @@ export const getStaffWithSalaries = async (req, res) => {
       period,
     };
 
-    const salaries = await Salary.find(salaryFilter)
+    let salaries = await Salary.find(salaryFilter)
       .populate("staff_id", "full_name email phone role salary_payment_frequency salary_payment_count_per_day commission_rate image")
       .lean();
+
+    salaries = salaries.filter(s => {
+      const role = (s.staff_id?.role || s.staff_role || "").toLowerCase();
+      return !["manager", "staff-admin"].includes(role);
+    });
 
     res.json({ success: true, staff: staffList, salaries });
   } catch (error) {
@@ -722,7 +732,7 @@ export const generatePayroll = async (req, res) => {
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
-      role: { $ne: "manager" },
+      role: { $not: { $regex: /manager|staff-admin/i } },
       salary_payment_frequency: frequency,
     }).lean();
 
@@ -981,7 +991,7 @@ export const initializeSalaries = async (req, res) => {
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
-      role: { $ne: "manager" },
+      role: { $not: { $regex: /manager|staff-admin/i } },
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     }).lean();
 

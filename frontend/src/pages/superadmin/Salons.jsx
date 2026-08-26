@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getSalons, getSalon, updateSalon, deleteSalon } from "../../services/salonService";
-import { 
-  Plus, ArrowUpDown, Store, Search, LayoutGrid, List, 
-  MapPin, User, Users, Coins, ExternalLink, MoreVertical, 
-  Pencil, Trash2, UserPlus, Scissors, Sparkles, Building2
+import {
+  Plus, ArrowUpDown, Store, Search, LayoutGrid, List,
+  MapPin, User, Users, Coins, ExternalLink, MoreVertical,
+  Pencil, Trash2, UserPlus, Scissors, Building2, Phone
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
@@ -14,7 +14,6 @@ import Input from "../../components/ui/Input";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
-import Skeleton from "../../components/ui/Skeleton";
 import clsx from "clsx";
 
 const API_BASE = "http://localhost:5000";
@@ -40,6 +39,20 @@ const SalonLogo = ({ salon, className = "w-full h-full object-cover" }) => {
 };
 
 /* ── Salon Card Component ── */
+const SalonLogo = ({ salon, className = "" }) => {
+  if (!salon?.logo) {
+    return <Store className={className || "w-6 h-6"} />;
+  }
+
+  return (
+    <img
+      src={salon.logo}
+      alt={`${salon.name || "Salon"} logo`}
+      className={className}
+    />
+  );
+};
+
 const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState(false);
@@ -68,7 +81,7 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
         <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400" />
 
         <div className="p-5">
-          {/* Header Row: Icon + Name + Menu */}
+          {/* Header Row: Icon + Name + Phone + Menu */}
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 text-amber-400 overflow-hidden group-hover:border-amber-400/50 transition-colors">
@@ -82,12 +95,18 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
                   <MapPin className="w-3 h-3 text-amber-400 flex-shrink-0" />
                   <span className="truncate">{salon.location || "No address listed"}</span>
                 </p>
+                {salon.phone && (
+                  <p className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5 truncate">
+                    <Phone className="w-3 h-3 text-amber-400/80 flex-shrink-0" />
+                    <span className="truncate">{salon.phone}</span>
+                  </p>
+                )}
               </div>
             </div>
 
             {/* Three-dot Action Dropdown */}
             <div className="relative" ref={menuRef}>
-              <button 
+              <button
                 onClick={() => setOpenMenu(!openMenu)}
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-neutral-400 hover:bg-surface-2 hover:text-white transition-all"
               >
@@ -96,7 +115,7 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
 
               <AnimatePresence>
                 {openMenu && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: -4 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -4 }}
@@ -126,10 +145,18 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
           <div className="grid grid-cols-2 gap-2 mb-4">
             <div className="bg-surface-2/60 border border-border/70 rounded-xl p-2.5 flex flex-col justify-between">
               <span className="text-[0.65rem] font-bold text-neutral-400 uppercase tracking-wider">Manager</span>
-              <span className="text-xs font-extrabold text-white truncate mt-0.5 flex items-center gap-1">
-                <User className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                <span className="truncate">{salon.managerName || "Unassigned"}</span>
-              </span>
+              <div className="mt-0.5 space-y-0.5">
+                <span className="text-xs font-extrabold text-white truncate flex items-center gap-1">
+                  <User className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                  <span className="truncate">{salon.managerName || "Unassigned"}</span>
+                </span>
+                {salon.managerPhone && (
+                  <span className="text-[0.7rem] font-medium text-amber-300/90 truncate flex items-center gap-1">
+                    <Phone className="w-2.5 h-2.5 text-amber-400/80 flex-shrink-0" />
+                    <span className="truncate">{salon.managerPhone}</span>
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="bg-surface-2/60 border border-border/70 rounded-xl p-2.5 flex flex-col justify-between">
@@ -203,6 +230,9 @@ const [editSalon, setEditSalon] = useState(null);
   const [editLogo, setEditLogo] = useState(null);
   const [editLogoPreview, setEditLogoPreview] = useState("");
 
+  const [editLogo, setEditLogo] = useState(null);
+  const [editLogoPreview, setEditLogoPreview] = useState("");
+
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -220,8 +250,8 @@ const [editSalon, setEditSalon] = useState(null);
     }
   };
 
-  useEffect(() => { 
-    fetchSalons(); 
+  useEffect(() => {
+    fetchSalons();
   }, []);
 
   useEffect(() => {
@@ -235,6 +265,9 @@ const [editSalon, setEditSalon] = useState(null);
 const handleEditOpen = async (id) => {
     try {
       const res = await getSalon(id);
+
+      console.log("EDIT SALON DATA:", res.data);
+
       setEditSalon(res.data);
       setEditForm(res.data);
       setEditLogo(null);
@@ -246,7 +279,29 @@ const handleEditOpen = async (id) => {
   };
 
   const handleEditChange = (e) => {
-    setEditForm({ ...editForm, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setEditForm((prev) => {
+      const nextForm = { ...prev, [name]: value };
+      if (name === "managerFirstName" || name === "managerLastName") {
+        const first = name === "managerFirstName" ? value : (prev.managerFirstName || "");
+        const last = name === "managerLastName" ? value : (prev.managerLastName || "");
+        nextForm.managerName = `${first} ${last}`.trim();
+      }
+      return nextForm;
+    });
+  };
+
+  const handleEditLogoChange = (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      setEditLogo(null);
+      setEditLogoPreview("");
+      return;
+    }
+
+    setEditLogo(file);
+    setEditLogoPreview(URL.createObjectURL(file));
   };
 
   const handleEditLogoChange = (e) => {
@@ -450,8 +505,8 @@ const handleEditOpen = async (id) => {
         <Table>
           <Table.Head>
             <Table.Th>Salon Branch</Table.Th>
-            <Table.Th>Location</Table.Th>
-            <Table.Th>Manager</Table.Th>
+            <Table.Th>Location & Phone</Table.Th>
+            <Table.Th>Manager Details</Table.Th>
             <Table.Th>Staff Count</Table.Th>
             <Table.Th align="right">Est. Revenue</Table.Th>
             <Table.Th align="right">Actions</Table.Th>
@@ -465,8 +520,24 @@ const handleEditOpen = async (id) => {
                   </div>
                   <span className="text-white font-extrabold text-sm">{salon.name}</span>
                 </Table.Td>
-                <Table.Td className="text-neutral-300 text-xs">{salon.location || "N/A"}</Table.Td>
-                <Table.Td className="text-amber-400 font-semibold text-xs">{salon.managerName || "Unassigned"}</Table.Td>
+                <Table.Td className="text-neutral-300 text-xs">
+                  <div>{salon.location || "N/A"}</div>
+                  {salon.phone && (
+                    <div className="text-[0.7rem] text-neutral-400 flex items-center gap-1 mt-0.5">
+                      <Phone className="w-2.5 h-2.5 text-amber-400/80" />
+                      {salon.phone}
+                    </div>
+                  )}
+                </Table.Td>
+                <Table.Td className="text-amber-400 font-semibold text-xs">
+                  <div>{salon.managerName || "Unassigned"}</div>
+                  {salon.managerPhone && (
+                    <div className="text-[0.7rem] text-neutral-300 flex items-center gap-1 font-normal mt-0.5">
+                      <Phone className="w-2.5 h-2.5 text-amber-400/80" />
+                      {salon.managerPhone}
+                    </div>
+                  )}
+                </Table.Td>
                 <Table.Td className="text-xs text-neutral-300">{salon.staffCount || 0} Staff</Table.Td>
                 <Table.Td align="right" className="text-amber-400 font-extrabold text-xs">
                   LKR {salon.revenue ? Number(salon.revenue).toLocaleString() : "0"}
