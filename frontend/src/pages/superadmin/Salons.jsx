@@ -39,20 +39,6 @@ const SalonLogo = ({ salon, className = "w-full h-full object-cover" }) => {
 };
 
 /* ── Salon Card Component ── */
-const SalonLogo = ({ salon, className = "" }) => {
-  if (!salon?.logo) {
-    return <Store className={className || "w-6 h-6"} />;
-  }
-
-  return (
-    <img
-      src={salon.logo}
-      alt={`${salon.name || "Salon"} logo`}
-      className={className}
-    />
-  );
-};
-
 const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState(false);
@@ -221,15 +207,12 @@ const Salons = () => {
   const [error, setError] = useState("");
   const [salonList, setSalonList] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
+  const [viewMode, setViewMode] = useState("grid");
   const [sortAsc, setSortAsc] = useState(true);
 
-const [editSalon, setEditSalon] = useState(null);
+  const [editSalon, setEditSalon] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
-  const [editLogo, setEditLogo] = useState(null);
-  const [editLogoPreview, setEditLogoPreview] = useState("");
-
   const [editLogo, setEditLogo] = useState(null);
   const [editLogoPreview, setEditLogoPreview] = useState("");
 
@@ -300,13 +283,6 @@ const handleEditOpen = async (id) => {
       return;
     }
 
-    setEditLogo(file);
-    setEditLogoPreview(URL.createObjectURL(file));
-  };
-
-  const handleEditLogoChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
     setEditLogo(file);
     setEditLogoPreview(URL.createObjectURL(file));
   };
