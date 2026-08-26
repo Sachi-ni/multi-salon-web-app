@@ -9,6 +9,7 @@ import {
   markAsPaid,
   getSalaryDetails,
   updateRate,
+  updateStaffRate,
   getStaffWithSalaries,
 } from "../../services/salaryService";
 
@@ -120,6 +121,9 @@ const getMonthRange = (dateStr) => {
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";
 
+// Prefix used for row ids of staff that do not have a salary record yet
+const FALLBACK_PREFIX = "fallback-";
+
 // ─── Main Component ───────────────────────────────────────────────────────
 
 const Salary = () => {
@@ -208,6 +212,13 @@ const Salary = () => {
       for (const sal of data) {
         rates[sal._id] = sal.rate ?? sal.commission_rate ?? 0;
       }
+      // Seed editable rates for staff without salary records too
+      for (const staff of staffData) {
+        const key = `${FALLBACK_PREFIX}${staff._id}`;
+        if (rates[key] === undefined) {
+          rates[key] = staff.commission_rate ?? 0;
+        }
+      }
       setEditingRates(rates);
       setDirtyRates({});
 
@@ -262,17 +273,45 @@ const Salary = () => {
     setDirtyRates((prev) => ({ ...prev, [salaryId]: true }));
   };
 
-  const handleSaveRate = async (salaryId) => {
-    if (!salaryId || String(salaryId).startsWith("fallback-")) return;
+  const handleSaveRate = async (rowId) => {
+    if (!rowId) return;
 
-    const rate = editingRates[salaryId];
-    if (rate === undefined || rate === null) return;
+    const rawRate = editingRates[rowId];
+    const numericRate = Number(rawRate);
+    if (
+      rawRate === undefined ||
+      rawRate === null ||
+      rawRate === "" ||
+      Number.isNaN(numericRate)
+    ) {
+      setError("Please enter a valid rate before saving");
+      return;
+    }
+
     try {
+      setError("");
+      setSuccessMsg("");
       setLoading(true);
-      await updateRate(salaryId, Number(rate));
-      setDirtyRates((prev) => ({ ...prev, [salaryId]: false }));
-      setSuccessMsg("Rate updated successfully");
+
+      const key = String(rowId);
+      let message = "Rate updated successfully";
+      if (key.startsWith(FALLBACK_PREFIX)) {
+        // Staff without a salary record yet - persist the rate on the staff
+        // and create their salary record for the current period.
+        const staffId = key.slice(FALLBACK_PREFIX.length);
+        await updateStaffRate(staffId, {
+          rate: numericRate,
+          frequency,
+          period: getPeriod(),
+        });
+        message = "Rate saved successfully";
+      } else {
+        await updateRate(rowId, numericRate);
+      }
+
+      setDirtyRates((prev) => ({ ...prev, [rowId]: false }));
       await loadSalaries();
+      setSuccessMsg(message);
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to update rate");
     } finally {
@@ -610,24 +649,35 @@ const Salary = () => {
     }
   };
 
-  // ─── Build display rows (salaries + fallback staff for new periods) ─────
+  // ─── Build display rows (salaries + staff without records) ──────────────
 
   let displayRows = [...salaries];
 
-  // If no salary records exist but we have staff, create fallback rows
-  if (salaries.length === 0 && fallbackStaff.length > 0) {
-    displayRows = fallbackStaff.map((staff) => ({
-      _id: staff._id,
-      staff_id: staff,
-      staff_name: staff.full_name || "",
-      workingAmount: 0,
-      rate: staff.commission_rate || 0,
-      commission_rate: staff.commission_rate || 0,
-      workRate: 0,
-      daySalary: 0,
-      totalSalary: 0,
-      status: "Not Paid",
-    }));
+  // Always show every staff member of the salon under this frequency tab.
+  // Staff that do not have a salary record for the selected period yet are
+  // appended as zero-value rows, so newly added staff appear alongside the
+  // existing rows (earlier staff rows are never removed).
+  if (fallbackStaff.length > 0) {
+    const recordedStaffIds = new Set(
+      displayRows.map((row) => String(row.staff_id?._id || row.staff_id || ""))
+    );
+
+    const pendingRows = fallbackStaff
+      .filter((staff) => !recordedStaffIds.has(String(staff._id)))
+      .map((staff) => ({
+        _id: `${FALLBACK_PREFIX}${staff._id}`,
+        staff_id: staff,
+        staff_name: staff.full_name || "",
+        workingAmount: 0,
+        rate: staff.commission_rate ?? 0,
+        commission_rate: staff.commission_rate ?? 0,
+        workRate: 0,
+        daySalary: 0,
+        totalSalary: 0,
+        status: "Not Paid",
+      }));
+
+    displayRows = [...displayRows, ...pendingRows];
   }
 
   // ─── Filter by search ──────────────────────────────────────────────────
@@ -811,7 +861,8 @@ const Salary = () => {
                 {filteredDisplayRows.map((row) => {
                   const staff = row.staff_id || {};
                   const staffName = staff.name || staff.full_name || row.staff_name || "Unknown";
-                  const isFallback = !row.period || String(row._id).startsWith("fallback-");
+                  const isFallback =
+                    !row.period || String(row._id).startsWith(FALLBACK_PREFIX);
                   const monthlyDayRecord =
                     frequency === "monthly" && Array.isArray(row.dailyRecords)
                       ? row.dailyRecords.find((dr) => toDateKey(dr.date) === selectedMonthlyDateKey)
@@ -872,10 +923,9 @@ const Salary = () => {
                             onChange={(e) => handleRateChange(row._id, e.target.value)}
                             className="w-16 bg-[#1d1d1d] border border-gray-700 rounded px-2 py-1 text-xs text-white text-center outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/20"
                             min="0" max="100" step="0.1"
-                            disabled={isPaid || isFallback}
                           />
                           <span className="text-xs text-gray-400">%</span>
-                          {!isFallback && isDirty && (
+                          {isDirty && (
                             <button
                               onClick={() => handleSaveRate(row._id)}
                               className="p-1 rounded hover:bg-yellow-400/20 text-yellow-400 transition-colors"
