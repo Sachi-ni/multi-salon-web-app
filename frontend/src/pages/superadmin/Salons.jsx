@@ -246,20 +246,28 @@ const Salons = () => {
   const handleView = (id) => navigate(`/salon-admin/${id}/adminDashboard`);
 
 const handleEditOpen = async (id) => {
-    try {
-      const res = await getSalon(id);
+  try {
+    const res = await getSalon(id);
 
-      console.log("EDIT SALON DATA:", res.data);
+    console.log("EDIT SALON DATA:", res.data);
 
-      setEditSalon(res.data);
-      setEditForm(res.data);
-      setEditLogo(null);
-      setEditLogoPreview("");
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load salon details for editing");
-    }
-  };
+    setEditSalon(res.data);
+
+    setEditForm({
+      ...res.data,
+      managerName: res.data.managerName || "",
+      managerPhone: res.data.managerPhone || "",
+      managerEmail: res.data.managerEmail || "",
+      managerPassword: "",
+    });
+
+    setEditLogo(null);
+    setEditLogoPreview("");
+  } catch (err) {
+    console.error(err);
+    setError("Failed to load salon details for editing");
+  }
+};
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
@@ -290,25 +298,47 @@ const handleEditOpen = async (id) => {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setEditLoading(true);
+
     try {
       const data = new FormData();
-      // Append editable salon fields
-      ["name", "phone", "location", "about", "managerEmail", "managerPassword"].forEach((key) => {
-        if (editForm[key] !== undefined && editForm[key] !== null) {
+
+      [
+        "name",
+        "phone",
+        "location",
+        "about",
+        "managerName",
+        "managerPhone",
+        "managerEmail",
+        "managerPassword",
+      ].forEach((key) => {
+        if (
+          editForm[key] !== undefined &&
+          editForm[key] !== null
+        ) {
           data.append(key, editForm[key]);
         }
       });
-      // Append new logo if one was selected
-      if (editLogo) data.append("logo", editLogo);
+
+      // Append new logo if selected
+      if (editLogo) {
+        data.append("logo", editLogo);
+      }
 
       await updateSalon(editSalon._id, data);
+
       setEditSalon(null);
       setEditLogo(null);
       setEditLogoPreview("");
+
       await fetchSalons();
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || "Failed to update salon");
+
+      setError(
+        err.response?.data?.message ||
+        "Failed to update salon"
+      );
     } finally {
       setEditLoading(false);
     }
@@ -552,9 +582,42 @@ const handleEditOpen = async (id) => {
       {/* Edit Modal */}
 <Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="✏️ Edit Salon Details" maxWidth="max-w-md">
         <form onSubmit={handleEditSubmit} autoComplete="off" className="space-y-4 pt-1">
-          <Input label="Salon Name" name="name" value={editForm.name || ""} onChange={handleEditChange} required />
-          <Input label="Phone Number" name="phone" value={editForm.phone || ""} onChange={handleEditChange} />
-          <Input label="Location Address" name="location" value={editForm.location || ""} onChange={handleEditChange} />
+          <Input
+            label="Salon Name"
+            name="name"
+            value={editForm.name || ""}
+            onChange={handleEditChange}
+            required
+          />
+
+          <Input
+            label="Phone Number"
+            name="phone"
+            value={editForm.phone || ""}
+            onChange={handleEditChange}
+          />
+
+          <Input
+            label="Location Address"
+            name="location"
+            value={editForm.location || ""}
+            onChange={handleEditChange}
+          />
+
+          <div>
+            <label className="block text-[0.68rem] font-extrabold text-neutral-400 tracking-wider uppercase mb-1.5">
+              About Salon
+            </label>
+
+            <textarea
+              name="about"
+              value={editForm.about || ""}
+              onChange={handleEditChange}
+              rows={4}
+              placeholder="Enter information about this salon..."
+              className="w-full bg-surface-2 border border-border rounded-xl px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 resize-none"
+            />
+          </div>
 
           {/* Salon Logo Upload */}
           <div>
@@ -582,9 +645,45 @@ const handleEditOpen = async (id) => {
           </div>
 
           <div className="pt-3 border-t border-border">
-            <h4 className="text-xs font-extrabold text-neutral-400 uppercase tracking-wider mb-2">Manager Credentials</h4>
-            <Input label="Manager Email" name="managerEmail" type="email" value={editForm.managerEmail || ""} onChange={handleEditChange} />
-            <Input label="Manager Password" name="managerPassword" type="password" placeholder="Leave blank to keep current password" value={editForm.managerPassword || ""} onChange={handleEditChange} />
+            <h4 className="text-xs font-extrabold text-neutral-400 uppercase tracking-wider mb-3">
+              Manager Details
+            </h4>
+
+            <div className="space-y-3">
+              <Input
+                label="Manager Name"
+                name="managerName"
+                value={editForm.managerName || ""}
+                onChange={handleEditChange}
+                placeholder="Enter manager full name"
+              />
+
+              <Input
+                label="Manager Phone Number"
+                name="managerPhone"
+                value={editForm.managerPhone || ""}
+                onChange={handleEditChange}
+                placeholder="Enter manager phone number"
+              />
+
+              <Input
+                label="Manager Email"
+                name="managerEmail"
+                type="email"
+                value={editForm.managerEmail || ""}
+                onChange={handleEditChange}
+                placeholder="Enter manager email"
+              />
+
+              <Input
+                label="Manager Password"
+                name="managerPassword"
+                type="password"
+                placeholder="Leave blank to keep current password"
+                value={editForm.managerPassword || ""}
+                onChange={handleEditChange}
+              />
+            </div>
           </div>
 
           <Modal.Actions>
