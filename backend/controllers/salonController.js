@@ -108,20 +108,30 @@ export const getSalons = async (req, res) => {
 
     const salonsWithManagers = await Promise.all(
       salons.map(async (s) => {
+        // Get manager details
         const manager = await Staff.findOne({
           salon_id: s._id,
           role: "manager",
-        }).select("full_name");
+        }).select("full_name email phone");
 
+        // Get actual staff count
         const actualStaffCount = await Staff.countDocuments({
           salon_id: s._id,
         });
 
-        const { rating, ratingCount } = await getSalonRating(s._id);
+        // Get rating
+        const { rating, ratingCount } = await getSalonRating(
+          s._id
+        );
 
         const obj = s.toObject();
 
-        obj.managerName = manager ? manager.full_name : null;
+        // Manager information
+        obj.managerName = manager?.full_name || "";
+        obj.managerEmail = manager?.email || "";
+        obj.managerPhone = manager?.phone || "";
+
+        // Other information
         obj.staffCount = actualStaffCount;
         obj.rating = rating;
         obj.ratingCount = ratingCount;
@@ -132,6 +142,8 @@ export const getSalons = async (req, res) => {
 
     res.json(salonsWithManagers);
   } catch (error) {
+    console.error("getSalons error:", error);
+
     res.status(500).json({
       message: error.message,
     });
@@ -153,22 +165,31 @@ export const getSalonById = async (req, res) => {
       salon_id: salon._id,
     });
 
-    // Get manager info
+    // Get manager information
     const manager = await Staff.findOne({
       salon_id: salon._id,
       role: "manager",
-    });
+    }).select("full_name email phone");
 
     const salonObj = salon.toObject();
 
     salonObj.staffCount = actualStaffCount;
 
+    // Add manager details to response
     if (manager) {
-      salonObj.managerEmail = manager.email;
+      salonObj.managerName = manager.full_name || "";
+      salonObj.managerEmail = manager.email || "";
+      salonObj.managerPhone = manager.phone || "";
+    } else {
+      salonObj.managerName = "";
+      salonObj.managerEmail = "";
+      salonObj.managerPhone = "";
     }
 
     // Compute average rating from feedback
-    const { rating, ratingCount } = await getSalonRating(salon._id);
+    const { rating, ratingCount } = await getSalonRating(
+      salon._id
+    );
 
     salonObj.rating = rating;
     salonObj.ratingCount = ratingCount;
@@ -177,6 +198,8 @@ export const getSalonById = async (req, res) => {
 
     res.json(salonObj);
   } catch (error) {
+    console.error("getSalonById error:", error);
+
     res.status(500).json({
       message: error.message,
     });
@@ -186,21 +209,25 @@ export const getSalonById = async (req, res) => {
 export const updateSalon = async (req, res) => {
   try {
     const {
+      managerName,
+      managerPhone,
       managerEmail,
       managerPassword,
       ...salonData
     } = req.body;
 
-    // If a new logo file was uploaded, set it
+    // If a new logo file was uploaded, update logo
     if (req.file) {
-      salonData.logo = req.file.path;
+      salonData.logo = req.file.path.replace(/\\/g, "/");
     }
 
+    // Update salon information
     const salon = await Salon.findByIdAndUpdate(
       req.params.id,
       salonData,
       {
         new: true,
+        runValidators: true,
       }
     );
 
@@ -210,48 +237,88 @@ export const updateSalon = async (req, res) => {
       });
     }
 
-    // Update or create manager if email or password is provided
-    if (managerEmail || managerPassword) {
-      const manager = await Staff.findOne({
-        salon_id: salon._id,
-        role: "manager",
-      });
+    // Find existing manager
+    let manager = await Staff.findOne({
+      salon_id: salon._id,
+      role: "manager",
+    });
 
-      if (manager) {
-        if (managerEmail) {
-          manager.email = managerEmail;
-        }
+    // Update existing manager
+    if (manager) {
+      if (managerName !== undefined) {
+        manager.full_name = managerName;
+      }
 
-        if (managerPassword) {
-          const salt = await bcrypt.genSalt(10);
-          manager.password_hash = await bcrypt.hash(
-            managerPassword,
-            salt
-          );
-        }
+      if (managerPhone !== undefined) {
+        manager.phone = managerPhone;
+      }
 
-        await manager.save();
-      } else if (managerEmail && managerPassword) {
+      if (managerEmail !== undefined && managerEmail !== "") {
+        manager.email = managerEmail;
+      }
+
+      if (
+        managerPassword !== undefined &&
+        managerPassword !== ""
+      ) {
         const salt = await bcrypt.genSalt(10);
-        const password_hash = await bcrypt.hash(
+
+        manager.password_hash = await bcrypt.hash(
           managerPassword,
           salt
         );
-
-        await Staff.create({
-          full_name: salon.name + " Manager",
-          email: managerEmail,
-          phone: salon.phone || "",
-          password_hash,
-          role: "manager",
-          status: "Active",
-          salon_id: salon._id,
-        });
       }
+
+      await manager.save();
     }
 
-    res.json(salon);
+    // Create manager if one does not exist
+    else if (
+      managerName ||
+      managerPhone ||
+      managerEmail ||
+      managerPassword
+    ) {
+      if (!managerEmail || !managerPassword) {
+        return res.status(400).json({
+          message:
+            "Manager email and password are required when creating a new manager.",
+        });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+
+      const password_hash = await bcrypt.hash(
+        managerPassword,
+        salt
+      );
+
+      manager = await Staff.create({
+        full_name:
+          managerName || `${salon.name} Manager`,
+        email: managerEmail,
+        phone: managerPhone || "",
+        password_hash,
+        role: "manager",
+        status: "Active",
+        salon_id: salon._id,
+      });
+    }
+
+    res.json({
+      salon,
+      manager: manager
+        ? {
+            id: manager._id,
+            name: manager.full_name,
+            phone: manager.phone,
+            email: manager.email,
+          }
+        : null,
+    });
   } catch (error) {
+    console.error("updateSalon error:", error);
+
     res.status(500).json({
       message: error.message,
     });
