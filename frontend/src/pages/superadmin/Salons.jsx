@@ -16,6 +16,28 @@ import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import clsx from "clsx";
 
+const API_BASE = "http://localhost:5000";
+
+/* Helper to render salon logo or fallback icon */
+const SalonLogo = ({ salon, className = "w-full h-full object-cover" }) => {
+  if (salon?.logo) {
+    const src = salon.logo.startsWith("http")
+      ? salon.logo
+      : `${API_BASE}/${salon.logo.replace(/\\/g, "/")}`;
+    return (
+      <img
+        src={src}
+        alt={`${salon.name || "Salon"} logo`}
+        className={className}
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+      />
+    );
+  }
+  return (
+    <Store className="w-6 h-6" />
+  );
+};
+
 /* ── Salon Card Component ── */
 const SalonLogo = ({ salon, className = "" }) => {
   if (!salon?.logo) {
@@ -62,8 +84,8 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
           {/* Header Row: Icon + Name + Phone + Menu */}
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 text-amber-400 group-hover:border-amber-400/50 transition-colors">
-                <Store className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 text-amber-400 overflow-hidden group-hover:border-amber-400/50 transition-colors">
+                <SalonLogo salon={salon} />
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-extrabold text-white truncate leading-tight group-hover:text-amber-400 transition-colors">
@@ -202,9 +224,11 @@ const Salons = () => {
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
   const [sortAsc, setSortAsc] = useState(true);
 
-  const [editSalon, setEditSalon] = useState(null);
+const [editSalon, setEditSalon] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
+  const [editLogo, setEditLogo] = useState(null);
+  const [editLogoPreview, setEditLogoPreview] = useState("");
 
   const [editLogo, setEditLogo] = useState(null);
   const [editLogoPreview, setEditLogoPreview] = useState("");
@@ -238,7 +262,7 @@ const Salons = () => {
 
   const handleView = (id) => navigate(`/salon-admin/${id}/adminDashboard`);
 
-  const handleEditOpen = async (id) => {
+const handleEditOpen = async (id) => {
     try {
       const res = await getSalon(id);
 
@@ -280,6 +304,13 @@ const Salons = () => {
     setEditLogoPreview(URL.createObjectURL(file));
   };
 
+  const handleEditLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditLogo(file);
+    setEditLogoPreview(URL.createObjectURL(file));
+  };
+
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setEditLoading(true);
@@ -296,6 +327,8 @@ const Salons = () => {
 
       await updateSalon(editSalon._id, data);
       setEditSalon(null);
+      setEditLogo(null);
+      setEditLogoPreview("");
       await fetchSalons();
     } catch (err) {
       console.error(err);

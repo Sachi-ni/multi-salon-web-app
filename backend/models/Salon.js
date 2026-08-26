@@ -12,6 +12,8 @@ const salonSchema = new mongoose.Schema({
   about: String,
 revenue: { type: Number, default: 0 },
   staffCount: { type: Number, default: 0 },
+  logo: { type: String, default: "" },
+  images: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now }
 });
 

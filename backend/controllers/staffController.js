@@ -3,6 +3,42 @@ import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 import Salary from "../models/Salary.js";
 import Appointment from "../models/Appointment.js";
+import Feedback from "../models/Feedback.js";
+
+// Compute average staff rating from the Feedback collection for all staff
+const attachRatings = async (staffList) => {
+  try {
+    const staffIds = staffList.map((s) => s._id);
+    if (staffIds.length === 0) return staffList;
+
+    const agg = await Feedback.aggregate([
+      { $match: { staff_id: { $in: staffIds } } },
+      {
+        $group: {
+          _id: "$staff_id",
+          avgRating: { $avg: "$staffRating" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const ratingMap = {};
+    agg.forEach((r) => {
+      ratingMap[r._id.toString()] = {
+        rating: Number(r.avgRating.toFixed(1)) || 0,
+        ratingCount: r.count,
+      };
+    });
+
+    return staffList.map((member) => {
+      const meta = ratingMap[member._id.toString()] || { rating: 0, ratingCount: 0 };
+      return { ...member, rating: meta.rating, ratingCount: meta.ratingCount };
+    });
+  } catch (err) {
+    console.error("Error attaching staff ratings:", err);
+    return staffList;
+  }
+};
 
 export const createStaff = async (req, res) => {
   try {
@@ -188,6 +224,9 @@ let formattedStaff = staff.map((member) => ({
       name: member.full_name,
     }));
 
+    // Attach average staff rating from Feedback collection (super-admin & manager views)
+    formattedStaff = await attachRatings(formattedStaff);
+
     res.json(formattedStaff);
   } catch (error) {
     res.status(500).json({
@@ -209,15 +248,18 @@ export const getTeam = async (req, res) => {
       filter.services = serviceId;
     }
 
-    const staff = await Staff.find(filter)
+const staff = await Staff.find(filter)
       .select("-password_hash")
       .populate("salon_id", "name")
       .populate("services", "service_name");
 
-    const formattedStaff = staff.map((member) => ({
+    let formattedStaff = staff.map((member) => ({
       ...member.toObject(),
       name: member.full_name,
     }));
+
+    // Attach average staff rating from Feedback collection (customer team page)
+    formattedStaff = await attachRatings(formattedStaff);
 
     res.json(formattedStaff);
   } catch (error) {

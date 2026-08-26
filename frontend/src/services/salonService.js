@@ -20,3 +20,12 @@ export const getSalonServices = (salonId) =>
 
 export const getSalonById = (id) =>
   api.get(`/salons/${id}`); // ✅ FIXED
+
+export const uploadSalonImages = (id, files) => {
+  const data = new FormData();
+  files.forEach((file) => data.append("images", file));
+  return api.post(`/salons/${id}/images`, data);
+};
+
+export const removeSalonImage = (id, filename) =>
+  api.delete(`/salons/${id}/images/${filename}`);

@@ -2,6 +2,8 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import './App.css';
 
+import ChatWidget from "./components/chatbot/ChatWidget";
+
 import { AuthProvider } from "./context/AuthContext";
 
 // General Pages
@@ -335,6 +337,7 @@ function App() {
         />
         
       </Routes>
+      <ChatWidget />
     </BrowserRouter>
     </AuthProvider>
   );

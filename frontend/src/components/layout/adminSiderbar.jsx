@@ -12,6 +12,7 @@ import {
   Wallet,
   LogOut,
   BarChart2,
+  Image,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -49,11 +50,12 @@ const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
       },
       {
         group: "Business",
-        items: [
+items: [
           { label: "Analytics", path: "/adminAnalytics", icon: BarChart2 },
           { label: "Report", path: "/adminBilling", icon: Receipt },
           { label: "Reviews", path: "/adminReviews", icon: Star },
           { label: "Salary", path: "/adminSalary", icon: Wallet },
+          { label: "Salon Photos", path: "/adminPhotos", icon: Image },
         ],
       },
     ];
