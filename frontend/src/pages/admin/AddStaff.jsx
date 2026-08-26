@@ -28,7 +28,6 @@ const AddStaff = () => {
     picture: null,
     salaryPaymentFrequency: "monthly",
     salaryPaymentCountPerDay: 1,
-    salaryBalance: 0,
   });
 
   useEffect(() => {
@@ -110,7 +109,6 @@ const AddStaff = () => {
       data.append("salonId", formData.salon);
       data.append("salaryPaymentFrequency", formData.salaryPaymentFrequency);
       data.append("salaryPaymentCountPerDay", formData.salaryPaymentCountPerDay);
-      data.append("salaryBalance", formData.salaryBalance);
 
       formData.services.forEach((serviceId) => {
         data.append("services", serviceId);
@@ -195,24 +193,6 @@ const AddStaff = () => {
                   className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
                 />
               </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-                Balance (LKR)
-                <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">
-                  (optional)
-                </span>
-              </label>
-              <input
-                type="number"
-                name="salaryBalance"
-                min="0"
-                value={formData.salaryBalance}
-                onChange={handleChange}
-                placeholder="Enter initial balance"
-                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent"
-              />
             </div>
           </div>
 
