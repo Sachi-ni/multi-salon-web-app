@@ -20,12 +20,13 @@ const staffSchema = new mongoose.Schema({
     default: 1,
     min: 1
   },
-  salary_balance: {
-    type: Number,
-    default: 0,
-    min: 0
+
+  status:{ 
+    type: String,
+    default: "Active", 
+    enum: ["Active", "Inactive"] 
   },
-  status:          { type: String, default: "Active", enum: ["Active", "Inactive"] },
+  
   salon_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Salon",
