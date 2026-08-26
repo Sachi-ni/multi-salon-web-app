@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getServices } from "../../services/serviceService";
@@ -7,8 +7,8 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import Modal from "../../components/ui/Modal";
-import Input from "../../components/ui/Input";
 import EmptyState from "../../components/ui/EmptyState";
+import Input from "../../components/ui/Input";
 import clsx from "clsx";
 import { useAuth } from "../../context/AuthContext";
 
@@ -18,22 +18,13 @@ import {
   Users,
   Star,
   MapPin,
-  Briefcase,
-  Calendar,
   MoreVertical,
   Power,
   Pencil,
   Trash2,
-  ChevronDown,
   LayoutGrid,
   List,
-  UserCheck,
-  Coins,
-  Scissors,
-  Check,
-  Phone,
-  Mail,
-  User
+  Coins
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -177,9 +168,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
                   {staff.full_name}
                 </h3>
                 <p className="text-xs font-semibold text-amber-400 mt-0.5 truncate">
-                  {staff.services?.length > 0
-                    ? staff.services.map((s) => s.service_name).join(", ")
-                    : "No services"}
+                  {staff.specification || staff.role || "Stylist"}
                 </p>
                 <p className="text-2xs text-neutral-400 mt-0.5 truncate flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-neutral-500 flex-shrink-0" />
@@ -276,7 +265,7 @@ export default function AdminStaffPage() {
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchStaffData = async () => {
+  const fetchStaffData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -292,11 +281,11 @@ export default function AdminStaffPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [salonId]);
 
   useEffect(() => {
     fetchStaffData();
-  }, [salonId]);
+  }, [fetchStaffData]);
 
   const handleToggleStatus = async (staff) => {
     try {
@@ -310,6 +299,7 @@ export default function AdminStaffPage() {
   };
 
   const handleEditOpen = (staff) => {
+    const names = (staff.full_name || staff.name || "").split(" ");
     setEditStaff(staff);
     setEditForm({
       name: staff.full_name,
@@ -317,8 +307,7 @@ export default function AdminStaffPage() {
       specification: staff.specification,
 salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 0,
       status: staff.status,
-      services: staff.services?.map((s) => s._id) || [],
-      imageFile: null,
+      services: staff.services?.map(s => s._id) || []
     });
   };
 
@@ -327,7 +316,19 @@ salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 0,
     setEditLoading(true);
 
     try {
-      await updateStaff(editStaff._id, editForm);
+      const payload = {
+        name: `${editForm.firstName} ${editForm.lastName}`.trim(),
+        email: editForm.email,
+        phone: editForm.phone,
+        salaryPaymentFrequency: editForm.salaryPaymentFrequency,
+        salaryPaymentCountPerDay: Number(editForm.salaryPaymentCountPerDay),
+        status: editForm.status,
+        services: editForm.services,
+      };
+      if (editForm.password) {
+        payload.password = editForm.password;
+      }
+      await updateStaff(editStaff._id, payload);
       setEditStaff(null);
       fetchStaffData();
 
@@ -354,14 +355,14 @@ salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 0,
   };
 
   const filteredStaff = useMemo(() => {
-    const visibleStaff = staffList.filter((s) => (s.role || "").toLowerCase() !== "manager");
-    if (!searchTerm) return visibleStaff;
+    if (!searchTerm) return staffList;
     const term = searchTerm.toLowerCase();
-    return visibleStaff.filter((s) => {
+    return staffList.filter((s) => {
       const name = (s.full_name || "").toLowerCase();
-      const spec = (s.services || "").toLowerCase();
+      const spec = (s.specification || "").toLowerCase();
       const email = (s.email || "").toLowerCase();
-      return name.includes(term) || spec.includes(term) || email.includes(term);
+      const phone = (s.phone || "").toLowerCase();
+      return name.includes(term) || phone.includes(term) || email.includes(term);
     });
   }, [staffList, searchTerm]);
 
@@ -386,7 +387,7 @@ salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 0,
         <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <input
-            placeholder="Search staff by name, services, or email..."
+            placeholder="Search staff by name, specification, or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-surface border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 placeholder:text-neutral-500 font-medium"
@@ -461,7 +462,7 @@ salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 0,
           <Table.Head>
             <Table.Th>Photo</Table.Th>
             <Table.Th>Staff Member</Table.Th>
-            <Table.Th>Services</Table.Th>
+            <Table.Th>Specification</Table.Th>
             <Table.Th>Status</Table.Th>
             <Table.Th align="right">Daily Rate</Table.Th>
             <Table.Th align="right">Actions</Table.Th>
@@ -489,22 +490,7 @@ salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 0,
                     <span className="text-2xs text-neutral-400 block">{staff.email}</span>
                   </div>
                 </Table.Td>
-                <Table.Td>
-                  <div className="flex flex-wrap gap-1">
-                    {staff.services?.length > 0 ? (
-                      staff.services.map((service) => (
-                        <span
-                          key={service._id}
-                          className="px-2 py-1 rounded-lg bg-surface-2 text-xs"
-                        >
-                          {service.service_name}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-neutral-500">No services</span>
-                    )}
-                  </div>
-                </Table.Td>
+                <Table.Td className="text-neutral-300 text-xs font-semibold">{staff.specification || staff.role || "Stylist"}</Table.Td>
                 <Table.Td>
                   <Badge variant={staff.status === "Active" ? "success" : "neutral"} dot={true}>
                     {staff.status}
@@ -538,70 +524,11 @@ salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 0,
       )}
 
       {/* Edit Modal */}
-      <Modal isOpen={!!editStaff} onClose={() => setEditStaff(null)} title="✏️ Edit Staff Details" maxWidth="max-w-2xl">
+      <Modal isOpen={!!editStaff} onClose={() => setEditStaff(null)} title="✏️ Edit Staff Details" maxWidth="max-w-md">
         <form onSubmit={handleEditSubmit} className="space-y-4 pt-1">
           <Input label="Full Name" value={editForm.name || ""} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
-          <Input label="Email Address" type="email" value={editForm.email || ""} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Payment Frequency"
-              type="select"
-              value={editForm.salaryPaymentFrequency || "daily"}
-              onChange={(e) => setEditForm({ ...editForm, salaryPaymentFrequency: e.target.value })}
-              className="bg-surface border-border"
-            >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </Input>
-            <Input
-              label="Salary Amount Per Day (LKR)"
-              type="number"
-              min="1"
-              value={editForm.salaryPaymentCountPerDay || 0}
-              onChange={(e) => setEditForm({ ...editForm, salaryPaymentCountPerDay: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Assigned Services</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-surface border border-border rounded-xl p-3">
-              {servicesList.length === 0 ? (
-                <p className="text-xs text-neutral-400">No services available.</p>
-              ) : (
-                servicesList.map((service) => {
-                  const checked = editForm.services?.includes(service._id);
-                  return (
-                    <label key={service._id} className="flex items-center gap-2 rounded-xl border border-border p-3 text-sm text-white cursor-pointer hover:border-amber-400/50">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => {
-                          const currentServices = editForm.services || [];
-                          const nextServices = checked
-                            ? currentServices.filter((id) => id !== service._id)
-                            : [...currentServices, service._id];
-                          setEditForm({ ...editForm, services: nextServices });
-                        }}
-                        className="h-4 w-4 accent-amber-400"
-                      />
-                      <span>{service.service_name}</span>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </div>
- 
-          <div>
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Profile Picture</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setEditForm({ ...editForm, imageFile: e.target.files?.[0] || null })}
-              className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-400 file:text-black file:cursor-pointer"
-            />
-          </div>
+          <Input label="Specification / Title" value={editForm.specification || ""} onChange={(e) => setEditForm({ ...editForm, specification: e.target.value })} />
+          <Input label="Daily Rate (LKR)" type="number" value={editForm.salaryPaymentCountPerDay || 0} onChange={(e) => setEditForm({ ...editForm, salaryPaymentCountPerDay: Number(e.target.value) })} />
 
           <Modal.Actions>
             <Button variant="ghost" type="button" onClick={() => setEditStaff(null)} disabled={editLoading}>Cancel</Button>

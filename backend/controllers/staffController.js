@@ -46,7 +46,7 @@ export const createStaff = async (req, res) => {
       phone: req.body.phone,
       role: req.body.role || "Staff",
       specification: req.body.specification,
-      commission_rate: req.body.commission_rate,
+      commission_rate: req.body.commission_rate || 0,
       salary_payment_frequency: req.body.salaryPaymentFrequency || "monthly",
       salary_payment_count_per_day: Number.isFinite(salaryPaymentCountPerDay) && salaryPaymentCountPerDay > 0 ? salaryPaymentCountPerDay : 1,
       salary_balance: Number.isFinite(salaryBalance) && salaryBalance >= 0 ? salaryBalance : 0,
@@ -69,33 +69,80 @@ export const createStaff = async (req, res) => {
         { $inc: { staffCount: 1 } }
       );
     }
-    // Auto-generate salary rows for current month for this staff (best-effort)
-    try {
-      const now = new Date();
-      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      // We generate only for this staff by invoking Salary logic directly:
-      // If controller exists, we could call it, but here we simply ensure a record exists.
-      // Salary generation logic lives in salaryController; for simplicity we just leave it to /generate-monthly.
-      // Create a placeholder now with basicSalary=0; controller will update snapshot/basicSalary when generate-monthly is called.
-      await Salary.findOneAndUpdate(
-        { salon_id: salonId, staff_id: staff._id, month: monthKey },
-        {
-          $setOnInsert: {
-            salon_id: salonId,
-            staff_id: staff._id,
-            month: monthKey,
-            servicesSnapshot: [],
-            basicSalary: 0,
-            commission: 0,
-            totalSalary: 0,
-            status: "Not Paid",
-            paidAt: null,
+
+    // Auto-generate salary record for current period for this staff (excluding managers)
+    if (!["manager", "staff-admin"].includes((staff.role || "").toLowerCase())) {
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const frequency = staff.salary_payment_frequency || "monthly";
+
+        const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        let period, periodStart, periodEnd, weekNumber = 0;
+
+        if (frequency === "daily") {
+          period = yyyymmdd;
+          periodStart = yyyymmdd;
+          periodEnd = yyyymmdd;
+        } else if (frequency === "weekly") {
+          const d = new Date(yyyymmdd);
+          const dayNum = d.getUTCDay() || 7;
+          d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+          const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+          weekNumber = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+          period = `${year}-W${String(weekNumber).padStart(2, "0")}`;
+
+          const firstDayOfYear = new Date(year, 0, 1);
+          const days = (weekNumber - 1) * 7;
+          const startDate = new Date(firstDayOfYear);
+          startDate.setDate(firstDayOfYear.getDate() + days);
+          const dayOfWeek = startDate.getDay();
+          const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          startDate.setDate(startDate.getDate() + diff);
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 6);
+
+          const toStr = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+          periodStart = toStr(startDate);
+          periodEnd = toStr(endDate);
+        } else {
+          period = `${year}-${String(month).padStart(2, "0")}`;
+          const lastDay = new Date(year, month, 0).getDate();
+          periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+          periodEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        }
+
+        await Salary.findOneAndUpdate(
+          { salon_id: salonId, staff_id: staff._id, period, frequency },
+          {
+            $setOnInsert: {
+              salon_id: salonId,
+              staff_id: staff._id,
+              frequency,
+              period,
+              staff_name: staff.full_name || "",
+              staff_role: staff.role || "",
+              commission_rate: staff.commission_rate || 0,
+              salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+              workingAmount: 0,
+              rate: staff.commission_rate || 0,
+              workRate: 0,
+              daySalary: 0,
+              totalSalary: 0,
+              status: "Not Paid",
+              year,
+              month,
+              weekNumber,
+              dateRange: { start: periodStart, end: periodEnd },
+              dailyRecords: [],
+            },
           },
-        },
-        { upsert: true, new: true }
-      );
-    } catch (e) {
-      // ignore
+          { upsert: true, new: true }
+        );
+      } catch (e) {
+        console.error("Error auto-creating salary row:", e);
+      }
     }
 
     const staffResponse = staff.toObject();
@@ -113,54 +160,30 @@ export const getStaff = async (req, res) => {
     const isSalonScopedAdmin = userRole === "manager";
     const isSuperAdmin = userRole === "super-admin";
 
-    let filter = {
-      role: {
-        $not: {
-          $regex: "^(manager|staff-admin|staff admin)$",
-          $options: "i"
-        }
-      }
-    };
+    let filter = {};
 
     // Manager view
     if (isSalonScopedAdmin) {
       filter = {
         salon_id: req.user.salon_id,
-        role: {
-          $not: {
-            $regex: "^(manager|staff-admin|staff admin)$",
-            $options: "i"
-          }
-        }
       };
-    }
-
-    // Super admin view
-    else if (isSuperAdmin) {
+    } else if (isSuperAdmin) {
+      // super-admin can view staff for a requested salon.
+      // Frontend sends { salonId } query param; map it to salon_id filter.
       if (req.query.salonId) {
-        filter = {
-          salon_id: req.user.salon_id,
-          role: {
-            $not: {
-              $regex: "^(manager|staff-admin|staff admin)$",
-              $options: "i"
-            }
-          }
-        };    
-              } else if (req.user?.salon_id) {
-        filter.salon_id = req.user.salon_id;
+        filter = { salon_id: req.query.salonId };
+      } else if (req.user?.salon_id) {
+        // fallback: if token already contains a salon_id, use it
+        filter = { salon_id: req.user.salon_id };
       }
     }
 
-    console.log("req user:", req.user);
-    console.log("Filter:", filter);
-    
     const staff = await Staff.find(filter)
       .select("-password_hash")
       .populate("salon_id", "name")
       .populate("services", "service_name");
 
-    const formattedStaff = staff.map((member) => ({
+let formattedStaff = staff.map((member) => ({
       ...member.toObject(),
       name: member.full_name,
     }));
@@ -177,15 +200,7 @@ export const getTeam = async (req, res) => {
   try {
     const { salonId, serviceId } = req.query;
 
-    const filter = {
-      status: "Active",
-      role: {
-        $not: {
-          $regex: "^(manager|staff-admin|staff admin)$",
-          $options: "i"
-        }
-      }
-    };
+    const filter = { status: "Active" };
 
     if (salonId) {
       filter.salon_id = salonId;
@@ -217,9 +232,6 @@ export const updateStaff = async (req, res) => {
     const userRole = req.user?.role?.toLowerCase();
     const isManager = userRole === "manager";
     const isSuperAdmin = userRole === "super-admin";
-
-    console.log("Updating Staff ID:", req.params.id);
-    console.log("Request Body:", req.body);
 
     const existing = await Staff.findById(req.params.id);
 
@@ -292,6 +304,14 @@ export const updateStaff = async (req, res) => {
     if (req.body.email !== undefined)
       updateData.email = req.body.email;
 
+    if (req.body.phone !== undefined)
+      updateData.phone = req.body.phone;
+
+    if (req.body.password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password_hash = await bcrypt.hash(req.body.password, salt);
+    }
+
     if (req.body.role !== undefined)
       updateData.role = req.body.role;
 
@@ -332,8 +352,6 @@ export const updateStaff = async (req, res) => {
       updateData.image = req.file.path;
     }
 
-    console.log("Update Data:", updateData);
-
     // Handle salon changes and maintain staff counts
     if (
       isSuperAdmin &&
@@ -360,25 +378,91 @@ export const updateStaff = async (req, res) => {
       .populate("services", "service_name")
       .populate("salon_id", "name");
 
-    // If staff services changed, ensure salary row basics are refreshed for current month (best-effort)
-    if (willUpdateServices) {
-      try {
+    // Update staff snapshots in unpaid salary records if name, count per day, or frequency changed
+    try {
+      const isNonManager = !["manager", "staff-admin"].includes((staff.role || "").toLowerCase());
+      if (isNonManager) {
+        const salonId = staff.salon_id;
+        const frequency = staff.salary_payment_frequency || "monthly";
         const now = new Date();
-        const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        await Salary.findOneAndUpdate(
-          { salon_id: staff.salon_id, staff_id: staff._id, month: monthKey },
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+        let period, periodStart, periodEnd, weekNumber = 0;
+        if (frequency === "daily") {
+          period = yyyymmdd;
+          periodStart = yyyymmdd;
+          periodEnd = yyyymmdd;
+        } else if (frequency === "weekly") {
+          const d = new Date(yyyymmdd);
+          const dayNum = d.getUTCDay() || 7;
+          d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+          const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+          weekNumber = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+          period = `${year}-W${String(weekNumber).padStart(2, "0")}`;
+          const firstDayOfYear = new Date(year, 0, 1);
+          const days = (weekNumber - 1) * 7;
+          const startDate = new Date(firstDayOfYear);
+          startDate.setDate(firstDayOfYear.getDate() + days);
+          const dayOfWeek = startDate.getDay();
+          const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          startDate.setDate(startDate.getDate() + diff);
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 6);
+          const toStr = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+          periodStart = toStr(startDate);
+          periodEnd = toStr(endDate);
+        } else {
+          period = `${year}-${String(month).padStart(2, "0")}`;
+          const lastDay = new Date(year, month, 0).getDate();
+          periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+          periodEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        }
+
+        // Update name and count per day on all unpaid records
+        await Salary.updateMany(
+          { staff_id: staff._id, status: "Not Paid" },
           {
-            $set: { commission: 0, totalSalary: 0, status: "Not Paid" },
-            $unset: { servicesSnapshot: "" },
+            $set: {
+              staff_name: staff.full_name || "",
+              salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+            }
+          }
+        );
+
+        // Ensure a current period record exists with the updated frequency
+        await Salary.findOneAndUpdate(
+          { salon_id: salonId, staff_id: staff._id, period, frequency },
+          {
+            $setOnInsert: {
+              salon_id: salonId,
+              staff_id: staff._id,
+              frequency,
+              period,
+              staff_name: staff.full_name || "",
+              staff_role: staff.role || "",
+              commission_rate: staff.commission_rate || 0,
+              salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+              workingAmount: 0,
+              rate: staff.commission_rate || 0,
+              workRate: 0,
+              daySalary: 0,
+              totalSalary: 0,
+              status: "Not Paid",
+              year,
+              month,
+              weekNumber,
+              dateRange: { start: periodStart, end: periodEnd },
+              dailyRecords: [],
+            },
           },
           { upsert: true, new: true }
         );
-      } catch {
-        // ignore
       }
+    } catch (e) {
+      console.error("Error updating salary snapshot:", e);
     }
-
-    console.log("Updated Staff:", staff);
 
     res.json(staff);
   } catch (error) {

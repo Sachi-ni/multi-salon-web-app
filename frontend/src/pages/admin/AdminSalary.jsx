@@ -1,12 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-import PageHeader from "../../components/ui/PageHeader";
-import Card from "../../components/ui/Card";
-import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
-import EmptyState from "../../components/ui/EmptyState";
-import Input from "../../components/ui/Input";
 import Modal from "../../components/ui/Modal";
 
 import {
@@ -53,15 +48,6 @@ const statusVariant = (status) => {
   return "info";
 };
 
-const toMonthKey = (date) => {
-  const d = new Date(date);
-
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-
-  return `${y}-${m}`;
-};
-
 const toDateKey = (date) => {
   const d = new Date(date);
   const y = d.getFullYear();
@@ -101,27 +87,6 @@ const getMonthLabel = (dateStr) => {
   return `${months[d.getMonth()]} ${d.getFullYear()}`;
 };
 
-const getOrdinalSuffix = (value) => {
-  const mod100 = value % 100;
-  if (mod100 >= 11 && mod100 <= 13) return "th";
-  switch (value % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-};
-
-const getWeekOfMonth = (dateStr) => {
-  const d = new Date(dateStr);
-  const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
-  return Math.ceil((d.getDate() + firstDay.getDay()) / 7);
-};
-
 const isPeriodEnded = (frequency, currentDateStr) => {
   const today = new Date();
   today.setHours(23, 59, 59, 999);
@@ -151,35 +116,6 @@ const getMonthRange = (dateStr) => {
   const lastDay = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDayNum).padStart(2, "0")}`;
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return { start: firstDay, end: lastDay, label: `${months[m]} ${y}` };
-};
-
-const calculateDaySalary = (workRate, salaryPaymentCountPerDay) => {
-  if (workRate === 0) return 0;
-  return salaryPaymentCountPerDay;
-};
-
-const formatPdfDate = (value) => {
-  if (!value) return "N/A";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toISOString().slice(0, 10);
-};
-
-const formatPdfMoney = (value) => {
-  const num = Number(value || 0);
-  return `LKR ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-const getDayShortName = (dateValue) => {
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", { weekday: "short" });
-};
-
-const getMonthPeriodLabel = (dateValue) => {
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 };
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";
@@ -678,21 +614,12 @@ const Salary = () => {
 
   let displayRows = [...salaries];
 
-  // Always include active staff for the selected frequency/period,
-  // even when some salary rows already exist.
-  const existingStaffIds = new Set(
-    salaries
-      .map((row) => row.staff_id?._id || row.staff_id || row.staffId)
-      .filter(Boolean)
-      .map(String)
-  );
-
-  const missingStaffRows = fallbackStaff
-    .filter((staff) => !existingStaffIds.has(String(staff._id)))
-    .map((staff) => ({
-      _id: `fallback-${staff._id}`,
+  // If no salary records exist but we have staff, create fallback rows
+  if (salaries.length === 0 && fallbackStaff.length > 0) {
+    displayRows = fallbackStaff.map((staff) => ({
+      _id: staff._id,
       staff_id: staff,
-      staff_name: staff.name || staff.full_name || "",
+      staff_name: staff.full_name || "",
       workingAmount: 0,
       rate: staff.commission_rate || 0,
       commission_rate: staff.commission_rate || 0,
@@ -700,10 +627,8 @@ const Salary = () => {
       daySalary: 0,
       totalSalary: 0,
       status: "Not Paid",
-      period: null,
     }));
-
-  displayRows = [...displayRows, ...missingStaffRows];
+  }
 
   // ─── Filter by search ──────────────────────────────────────────────────
 

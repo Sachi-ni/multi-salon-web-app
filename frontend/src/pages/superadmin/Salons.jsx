@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getSalons, getSalon, updateSalon, deleteSalon } from "../../services/salonService";
-import { 
-  Plus, ArrowUpDown, Store, Search, LayoutGrid, List, 
-  MapPin, User, Users, Coins, ExternalLink, MoreVertical, 
-  Pencil, Trash2, UserPlus, Scissors, Sparkles, Building2
+import {
+  Plus, ArrowUpDown, Store, Search, LayoutGrid, List,
+  MapPin, User, Users, Coins, ExternalLink, MoreVertical,
+  Pencil, Trash2, UserPlus, Scissors, Building2, Phone
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
@@ -14,10 +14,23 @@ import Input from "../../components/ui/Input";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
-import Skeleton from "../../components/ui/Skeleton";
 import clsx from "clsx";
 
 /* ── Salon Card Component ── */
+const SalonLogo = ({ salon, className = "" }) => {
+  if (!salon?.logo) {
+    return <Store className={className || "w-6 h-6"} />;
+  }
+
+  return (
+    <img
+      src={salon.logo}
+      alt={`${salon.name || "Salon"} logo`}
+      className={className}
+    />
+  );
+};
+
 const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState(false);
@@ -46,7 +59,7 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
         <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400" />
 
         <div className="p-5">
-          {/* Header Row: Icon + Name + Menu */}
+          {/* Header Row: Icon + Name + Phone + Menu */}
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 text-amber-400 group-hover:border-amber-400/50 transition-colors">
@@ -60,12 +73,18 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
                   <MapPin className="w-3 h-3 text-amber-400 flex-shrink-0" />
                   <span className="truncate">{salon.location || "No address listed"}</span>
                 </p>
+                {salon.phone && (
+                  <p className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5 truncate">
+                    <Phone className="w-3 h-3 text-amber-400/80 flex-shrink-0" />
+                    <span className="truncate">{salon.phone}</span>
+                  </p>
+                )}
               </div>
             </div>
 
             {/* Three-dot Action Dropdown */}
             <div className="relative" ref={menuRef}>
-              <button 
+              <button
                 onClick={() => setOpenMenu(!openMenu)}
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-neutral-400 hover:bg-surface-2 hover:text-white transition-all"
               >
@@ -74,7 +93,7 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
 
               <AnimatePresence>
                 {openMenu && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: -4 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -4 }}
@@ -104,10 +123,18 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
           <div className="grid grid-cols-2 gap-2 mb-4">
             <div className="bg-surface-2/60 border border-border/70 rounded-xl p-2.5 flex flex-col justify-between">
               <span className="text-[0.65rem] font-bold text-neutral-400 uppercase tracking-wider">Manager</span>
-              <span className="text-xs font-extrabold text-white truncate mt-0.5 flex items-center gap-1">
-                <User className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                <span className="truncate">{salon.managerName || "Unassigned"}</span>
-              </span>
+              <div className="mt-0.5 space-y-0.5">
+                <span className="text-xs font-extrabold text-white truncate flex items-center gap-1">
+                  <User className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                  <span className="truncate">{salon.managerName || "Unassigned"}</span>
+                </span>
+                {salon.managerPhone && (
+                  <span className="text-[0.7rem] font-medium text-amber-300/90 truncate flex items-center gap-1">
+                    <Phone className="w-2.5 h-2.5 text-amber-400/80 flex-shrink-0" />
+                    <span className="truncate">{salon.managerPhone}</span>
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="bg-surface-2/60 border border-border/70 rounded-xl p-2.5 flex flex-col justify-between">
@@ -179,6 +206,9 @@ const Salons = () => {
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
 
+  const [editLogo, setEditLogo] = useState(null);
+  const [editLogoPreview, setEditLogoPreview] = useState("");
+
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -196,8 +226,8 @@ const Salons = () => {
     }
   };
 
-  useEffect(() => { 
-    fetchSalons(); 
+  useEffect(() => {
+    fetchSalons();
   }, []);
 
   useEffect(() => {
@@ -216,7 +246,8 @@ const Salons = () => {
 
       setEditSalon(res.data);
       setEditForm(res.data);
-
+      setEditLogo(null);
+      setEditLogoPreview("");
     } catch (err) {
       console.error(err);
       setError("Failed to load salon details for editing");
@@ -224,14 +255,46 @@ const Salons = () => {
   };
 
   const handleEditChange = (e) => {
-    setEditForm({ ...editForm, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setEditForm((prev) => {
+      const nextForm = { ...prev, [name]: value };
+      if (name === "managerFirstName" || name === "managerLastName") {
+        const first = name === "managerFirstName" ? value : (prev.managerFirstName || "");
+        const last = name === "managerLastName" ? value : (prev.managerLastName || "");
+        nextForm.managerName = `${first} ${last}`.trim();
+      }
+      return nextForm;
+    });
+  };
+
+  const handleEditLogoChange = (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      setEditLogo(null);
+      setEditLogoPreview("");
+      return;
+    }
+
+    setEditLogo(file);
+    setEditLogoPreview(URL.createObjectURL(file));
   };
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setEditLoading(true);
     try {
-      await updateSalon(editSalon._id, editForm);
+      const data = new FormData();
+      // Append editable salon fields
+      ["name", "phone", "location", "about", "managerEmail", "managerPassword"].forEach((key) => {
+        if (editForm[key] !== undefined && editForm[key] !== null) {
+          data.append(key, editForm[key]);
+        }
+      });
+      // Append new logo if one was selected
+      if (editLogo) data.append("logo", editLogo);
+
+      await updateSalon(editSalon._id, data);
       setEditSalon(null);
       await fetchSalons();
     } catch (err) {
@@ -409,8 +472,8 @@ const Salons = () => {
         <Table>
           <Table.Head>
             <Table.Th>Salon Branch</Table.Th>
-            <Table.Th>Location</Table.Th>
-            <Table.Th>Manager</Table.Th>
+            <Table.Th>Location & Phone</Table.Th>
+            <Table.Th>Manager Details</Table.Th>
             <Table.Th>Staff Count</Table.Th>
             <Table.Th align="right">Est. Revenue</Table.Th>
             <Table.Th align="right">Actions</Table.Th>
@@ -419,13 +482,29 @@ const Salons = () => {
             {filteredSalons.map((salon) => (
               <tr key={salon._id} className="hover:bg-surface-2/60 transition-colors">
                 <Table.Td bold className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs">
-                    <Store className="w-4 h-4" />
+<div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs overflow-hidden">
+                    <SalonLogo salon={salon} className="w-full h-full object-cover" />
                   </div>
                   <span className="text-white font-extrabold text-sm">{salon.name}</span>
                 </Table.Td>
-                <Table.Td className="text-neutral-300 text-xs">{salon.location || "N/A"}</Table.Td>
-                <Table.Td className="text-amber-400 font-semibold text-xs">{salon.managerName || "Unassigned"}</Table.Td>
+                <Table.Td className="text-neutral-300 text-xs">
+                  <div>{salon.location || "N/A"}</div>
+                  {salon.phone && (
+                    <div className="text-[0.7rem] text-neutral-400 flex items-center gap-1 mt-0.5">
+                      <Phone className="w-2.5 h-2.5 text-amber-400/80" />
+                      {salon.phone}
+                    </div>
+                  )}
+                </Table.Td>
+                <Table.Td className="text-amber-400 font-semibold text-xs">
+                  <div>{salon.managerName || "Unassigned"}</div>
+                  {salon.managerPhone && (
+                    <div className="text-[0.7rem] text-neutral-300 flex items-center gap-1 font-normal mt-0.5">
+                      <Phone className="w-2.5 h-2.5 text-amber-400/80" />
+                      {salon.managerPhone}
+                    </div>
+                  )}
+                </Table.Td>
                 <Table.Td className="text-xs text-neutral-300">{salon.staffCount || 0} Staff</Table.Td>
                 <Table.Td align="right" className="text-amber-400 font-extrabold text-xs">
                   LKR {salon.revenue ? Number(salon.revenue).toLocaleString() : "0"}
@@ -462,17 +541,40 @@ const Salons = () => {
       )}
 
       {/* Edit Modal */}
-      <Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="✏️ Edit Salon Details" maxWidth="max-w-md">
+<Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="✏️ Edit Salon Details" maxWidth="max-w-md">
         <form onSubmit={handleEditSubmit} autoComplete="off" className="space-y-4 pt-1">
           <Input label="Salon Name" name="name" value={editForm.name || ""} onChange={handleEditChange} required />
           <Input label="Phone Number" name="phone" value={editForm.phone || ""} onChange={handleEditChange} />
           <Input label="Location Address" name="location" value={editForm.location || ""} onChange={handleEditChange} />
 
+          {/* Salon Logo Upload */}
+          <div>
+            <label className="block text-[0.68rem] font-extrabold text-neutral-400 tracking-wider uppercase mb-1.5">
+              Salon Logo <span className="text-amber-400/60 lowercase tracking-widest ml-1 font-bold">(optional)</span>
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-xl bg-surface-2 border border-border overflow-hidden flex-shrink-0 flex items-center justify-center text-neutral-400">
+                {editLogoPreview ? (
+                  <img src={editLogoPreview} alt="New salon logo preview" className="w-full h-full object-cover" />
+                ) : editSalon?.logo ? (
+                  <SalonLogo salon={editSalon} className="w-full h-full object-cover" />
+                ) : (
+                  <Store className="w-6 h-6" />
+                )}
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleEditLogoChange}
+                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-amber-400 file:text-black file:cursor-pointer"
+              />
+            </div>
+            <p className="text-[0.6rem] text-neutral-500 mt-1">Upload a new logo for this salon. It will appear in the manager header and salon directory.</p>
+          </div>
+
           <div className="pt-3 border-t border-border">
             <h4 className="text-xs font-extrabold text-neutral-400 uppercase tracking-wider mb-2">Manager Credentials</h4>
-            <Input label="Manager Name" name="managerName" value={editForm.managerName || ""} onChange={handleEditChange} />
             <Input label="Manager Email" name="managerEmail" type="email" value={editForm.managerEmail || ""} onChange={handleEditChange} />
-            <Input label="Manager Phone" name="managerPhone" type="tel" value={editForm.managerPhone || ""} onChange={handleEditChange} />
             <Input label="Manager Password" name="managerPassword" type="password" placeholder="Leave blank to keep current password" value={editForm.managerPassword || ""} onChange={handleEditChange} />
           </div>
 
