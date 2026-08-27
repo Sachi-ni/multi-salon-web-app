@@ -10,6 +10,71 @@ import Feedback from "../models/Feedback.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
+const COMMON_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "yahoo.com",
+  "outlook.com",
+  "hotmail.com",
+]);
+const SRI_LANKAN_PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
+const COMMON_PASSWORDS = new Set([
+  "123456",
+  "12345678",
+  "password",
+  "password123",
+  "qwerty",
+]);
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const normalizePhone = (phone) => phone?.trim().replace(/[\s()\-]/g, "");
+
+const validateManagerContact = ({ email, phone, password }) => {
+  const normalizedEmail = email?.trim().toLowerCase();
+  const normalizedPhone = normalizePhone(phone);
+
+  if (normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)) {
+    return { message: "Enter a valid manager email address." };
+  }
+
+  const emailDomain = normalizedEmail?.split("@")[1];
+  if (normalizedEmail && !COMMON_EMAIL_DOMAINS.has(emailDomain)) {
+    return {
+      message: "Manager email must use Gmail, Yahoo, Outlook, or Hotmail (for example, manager@gmail.com).",
+    };
+  }
+
+  if (normalizedPhone && !SRI_LANKAN_PHONE_PATTERN.test(normalizedPhone)) {
+    return {
+      message: "Enter a valid Sri Lankan phone number (for example, 0771234567 or +94771234567).",
+    };
+  }
+
+  if (password) {
+    const isComplex =
+      password.length >= 8 &&
+      /[A-Z]/.test(password) &&
+      /[a-z]/.test(password) &&
+      /\d/.test(password) &&
+      /[!@#$%^&*]/.test(password);
+
+    if (!isComplex || COMMON_PASSWORDS.has(password.toLowerCase())) {
+      return {
+        message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+      };
+    }
+  }
+
+  return { normalizedEmail, normalizedPhone };
+};
+
+const getManagerNameParts = (fullName, manager = {}) => {
+  const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  const firstName = parts.shift() || manager.first_name || "Manager";
+  const lastName = parts.join(" ") || manager.last_name || "Manager";
+
+  return { firstName, lastName };
+};
+
 /**
  * Compute average rating and count from feedback for a given salon.
  * Combines serviceRating and staffRating from all feedback records.
@@ -42,8 +107,6 @@ const getSalonRating = async (salonId) => {
 
 export const createSalon = async (req, res) => {
   try {
-    console.log("createSalon called with body:", req.body);
-
     const {
       name,
       phone,
@@ -61,10 +124,47 @@ export const createSalon = async (req, res) => {
       });
     }
 
+    const validation = validateManagerContact({
+      email: managerEmail,
+      phone: managerPhone,
+      password: managerPassword,
+    });
+
+    if (validation.message) {
+      return res.status(400).json({ message: validation.message });
+    }
+
+    console.log("createSalon requested", {
+      salonName: name,
+      managerEmail: validation.normalizedEmail,
+    });
+
+    const existingManager = await Staff.findOne({
+      email: {
+        $regex: `^${escapeRegex(validation.normalizedEmail)}$`,
+        $options: "i",
+      },
+    }).select("_id");
+
+    if (existingManager) {
+      return res.status(409).json({
+        message: "That manager email is already in use.",
+      });
+    }
+
+    const normalizedSalonPhone = normalizePhone(phone);
+    if (normalizedSalonPhone && !SRI_LANKAN_PHONE_PATTERN.test(normalizedSalonPhone)) {
+      return res.status(400).json({
+        message: "Enter a valid salon phone number (for example, 0771234567 or +94771234567).",
+      });
+    }
+
+    const { firstName, lastName } = getManagerNameParts(managerName);
+
     const salon = await Salon.create({
       name,
       location,
-      phone,
+      phone: normalizedSalonPhone,
       about,
       logo: req.file ? req.file.path : "",
     });
@@ -74,8 +174,10 @@ export const createSalon = async (req, res) => {
 
     const manager = await Staff.create({
       full_name: managerName,
-      email: managerEmail,
-      phone: managerPhone,
+      first_name: firstName,
+      last_name: lastName,
+      email: validation.normalizedEmail,
+      phone: validation.normalizedPhone,
       password_hash,
       role: "manager",
       status: "Active",
@@ -85,14 +187,39 @@ export const createSalon = async (req, res) => {
     salon.staffCount = 1;
     await salon.save();
 
-    res.status(201).json({ salon, manager });
+    console.log("createSalon completed", {
+      salonId: salon._id,
+      salonName: salon.name,
+      managerEmail: manager.email,
+    });
+
+    res.status(201).json({
+      message: "Salon and manager created successfully.",
+      salon: {
+        id: salon._id,
+        name: salon.name,
+      },
+      manager: {
+        id: manager._id,
+        name: manager.full_name,
+      },
+    });
   } catch (error) {
-    console.error("createSalon error:", error);
+    console.error("createSalon error", {
+      errorName: error.name,
+      errorCode: error.code,
+      operation: "createSalon",
+    });
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "That manager email is already in use.",
+      });
+    }
 
     if (process.env.NODE_ENV !== "production") {
       res.status(500).json({
-        message: error.message,
-        stack: error.stack,
+        message: "Unable to create salon.",
       });
     } else {
       res.status(500).json({
@@ -216,6 +343,46 @@ export const updateSalon = async (req, res) => {
       ...salonData
     } = req.body;
 
+    const currentManager = await Staff.findOne({
+      salon_id: req.params.id,
+      role: "manager",
+    });
+    const validation = validateManagerContact({
+      email: managerEmail,
+      phone: managerPhone,
+      password: managerPassword,
+    });
+
+    if (validation.message) {
+      return res.status(400).json({ message: validation.message });
+    }
+
+    const normalizedSalonPhone = normalizePhone(salonData.phone);
+    if (normalizedSalonPhone && !SRI_LANKAN_PHONE_PATTERN.test(normalizedSalonPhone)) {
+      return res.status(400).json({
+        message: "Enter a valid salon phone number (for example, 0771234567 or +94771234567).",
+      });
+    }
+    if (salonData.phone !== undefined) {
+      salonData.phone = normalizedSalonPhone;
+    }
+
+    if (validation.normalizedEmail) {
+      const duplicateManager = await Staff.findOne({
+        email: {
+          $regex: `^${escapeRegex(validation.normalizedEmail)}$`,
+          $options: "i",
+        },
+        ...(currentManager ? { _id: { $ne: currentManager._id } } : {}),
+      });
+
+      if (duplicateManager) {
+        return res.status(409).json({
+          message: "That manager email is already in use.",
+        });
+      }
+    }
+
     // If a new logo file was uploaded, update logo
     if (req.file) {
       salonData.logo = req.file.path.replace(/\\/g, "/");
@@ -238,23 +405,27 @@ export const updateSalon = async (req, res) => {
     }
 
     // Find existing manager
-    let manager = await Staff.findOne({
-      salon_id: salon._id,
-      role: "manager",
-    });
+    let manager = currentManager;
 
     // Update existing manager
     if (manager) {
+      const fullName = managerName !== undefined
+        ? managerName
+        : manager.full_name;
+      const { firstName, lastName } = getManagerNameParts(fullName, manager);
+
       if (managerName !== undefined) {
         manager.full_name = managerName;
       }
+      manager.first_name = firstName;
+      manager.last_name = lastName;
 
       if (managerPhone !== undefined) {
-        manager.phone = managerPhone;
+        manager.phone = validation.normalizedPhone || "";
       }
 
       if (managerEmail !== undefined && managerEmail !== "") {
-        manager.email = managerEmail;
+        manager.email = validation.normalizedEmail;
       }
 
       if (
@@ -294,10 +465,10 @@ export const updateSalon = async (req, res) => {
       );
 
       manager = await Staff.create({
-        full_name:
-          managerName || `${salon.name} Manager`,
-        email: managerEmail,
-        phone: managerPhone || "",
+        full_name: managerName || `${salon.name} Manager`,
+        ...getManagerNameParts(managerName || `${salon.name} Manager`),
+        email: validation.normalizedEmail,
+        phone: validation.normalizedPhone || "",
         password_hash,
         role: "manager",
         status: "Active",
