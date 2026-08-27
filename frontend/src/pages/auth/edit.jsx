@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { X } from "lucide-react";
+import { X, Camera } from "lucide-react";
 import axios from "axios";
+
+const API_BASE = "http://localhost:5000";
 
 const Edit = () => {
   const { user, setUser, token, login } = useAuth();
@@ -14,19 +16,62 @@ const Edit = () => {
   const [username, setUsername] = useState(user?.username || "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState(
+    user?.image
+      ? user.image.startsWith("http")
+        ? user.image
+        : `${API_BASE}/${user.image.replace(/\\/g, "/")}`
+      : ""
+  );
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImage(file);
+    setPreview(URL.createObjectURL(file));
+  };
 
   const handleUpdate = async (e) => {
     e.preventDefault();
 
+    const normalizedPhone = phone.replace(/[\s()-]/g, "");
+    const passwordIsStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/.test(password);
+    const emailIsValid = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/.test(email.trim());
+    const phoneIsValid = !normalizedPhone || /^\+?[0-9]{10}$/.test(normalizedPhone);
+
+    if (!emailIsValid) {
+      alert("Please enter a valid email address");
+      return;
+    }
+    if (!phoneIsValid) {
+      alert("Phone number must contain exactly 10 digits and may start with +");
+      return;
+    }
+    if (password && !passwordIsStrong) {
+      alert("Password must be at least 8 characters and include uppercase, lowercase, number, and special character");
+      return;
+    }
     if (password && password !== confirmPassword) {
       alert("Passwords do not match!");
       return;
     }
 
     try {
+      setUploading(true);
+
+      const formData = new FormData();
+      formData.append("full_name", fname);
+      formData.append("email", email.trim().toLowerCase());
+      formData.append("phone", normalizedPhone);
+      formData.append("username", username);
+      if (password) formData.append("password", password);
+      if (image) formData.append("image", image);
+
       const res = await axios.put(
         `http://localhost:5000/api/auth/user/${user.id}`,
-        { full_name: fname, email, phone, username, password },
+        formData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -37,10 +82,7 @@ const Edit = () => {
         email: res.data.email,
         phone: res.data.phone,
         username: res.data.username,
-        salonName: res.data.salonName,
-        role: res.data.role || user.role,
-        id: res.data.id || user.id,
-        salon_id: res.data.salon_id || user.salon_id,
+        image: res.data.image || user.image,
       };
 
       // If backend returned a new token, use login to sync both user + token
@@ -55,15 +97,15 @@ const Edit = () => {
       if (user?.role === "customer" || user?.role === "user") {
         navigate("/customer/dashboard");
       } else if (user?.role === "super-admin") {
-        navigate("/super-profile");
-      } else if (user?.role === "manager" || user?.role === "staff-admin") {
-        navigate(-1);
+        navigate("/Profile");
       } else {
-        navigate("/profile");
+        navigate(-1);
       }
     } catch (error) {
       console.error("Update error:", error);
       alert(error.response?.data?.message || "Failed to update profile");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -88,7 +130,44 @@ const Edit = () => {
 
         <h1 className="text-2xl font-extrabold text-white mb-6">Edit Profile</h1>
 
-        <form onSubmit={handleUpdate}>
+<form onSubmit={handleUpdate}>
+          {/* Profile Picture */}
+          <div className="mb-5 flex items-center gap-4">
+            <div className="relative">
+              {preview ? (
+                <img
+                  src={preview}
+                  alt="Profile"
+                  className="w-16 h-16 rounded-2xl object-cover border-2 border-accent/40"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-accent-dim border-2 border-accent/40 flex items-center justify-center text-accent font-black text-xl">
+                  {(user?.name || "S").charAt(0).toUpperCase()}
+                </div>
+              )}
+              <label
+                htmlFor="profile-image"
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-lg bg-accent text-primary flex items-center justify-center cursor-pointer hover:bg-accent-hover transition-colors shadow-sm"
+                title="Change photo"
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </label>
+            </div>
+            <div className="flex-1">
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                Profile Picture
+              </label>
+              <input
+                id="profile-image"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="w-full text-xs text-muted-2 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer cursor-pointer"
+              />
+              <p className="text-[0.6rem] text-muted mt-1">Upload a new photo to update your profile picture.</p>
+            </div>
+          </div>
+
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
               Full Name
@@ -121,6 +200,7 @@ const Edit = () => {
             </label>
             <input
               type="email"
+              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
@@ -133,8 +213,12 @@ const Edit = () => {
             </label>
             <input
               type="tel"
+              pattern="\\+?[0-9\\s()\-]{10,20}"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9+\s()-]/g, "");
+                if (value.replace(/[\s()-]/g, "").replace(/^\+/, "").length <= 10) setPhone(value);
+              }}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
             />
           </div>
@@ -145,6 +229,7 @@ const Edit = () => {
             </label>
             <input
               type="password"
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
@@ -157,17 +242,19 @@ const Edit = () => {
             </label>
             <input
               type="password"
+              minLength={8}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
             />
           </div>
 
-          <button
+<button
             className="w-full mt-1.5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase cursor-pointer transition-all duration-200 hover:bg-accent-hover hover:shadow-glow hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
             type="submit"
+            disabled={uploading}
           >
-            Save Changes
+            {uploading ? "Saving..." : "Save Changes"}
           </button>
         </form>
       </div>
@@ -176,4 +263,3 @@ const Edit = () => {
 };
 
 export default Edit;
-

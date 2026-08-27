@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import PageHeader from "../../components/ui/PageHeader";
 import Card from "../../components/ui/Card";
-import Button from "../../components/ui/Button";
+
 
 import { getSalon } from "../../services/salonService";
 import StepSelectService from "../customer/steps/StepSelectService";
@@ -20,7 +20,7 @@ export default function AddApointmnet() {
   const { salonId } = useParams();
 
   const [salon, setSalon] = useState(null);
-  const [loadingSalon, setLoadingSalon] = useState(true);
+
 
   const [step, setStep] = useState(0);
 
@@ -62,7 +62,7 @@ export default function AddApointmnet() {
 
     async function loadSalon() {
       try {
-        setLoadingSalon(true);
+
         if (!salonId) return;
         const res = await getSalon(salonId);
         if (!mounted) return;
@@ -76,7 +76,7 @@ export default function AddApointmnet() {
       } catch (err) {
         console.error("Failed to load salon:", err);
       } finally {
-        if (mounted) setLoadingSalon(false);
+
       }
     }
 
@@ -148,7 +148,7 @@ export default function AddApointmnet() {
   };
 
   const renderConfirm = () => {
-    const totalPrice = booking.services.reduce((sum, s) => sum + s.servicePrice, 0);
+
 
     const formatTime = (time) => {
       if (!time) return "";
@@ -480,7 +480,7 @@ export default function AddApointmnet() {
             <input
               type="date"
               value={booking.date}
-              min={new Date().toISOString().split("T")[0]}
+              min={new Date().toLocaleDateString('en-CA')}
               onChange={(e) => setBooking((prev) => ({ ...prev, date: e.target.value }))}
               className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-accent focus:bg-accent-dim/20 transition-all duration-200 cursor-pointer"
             />

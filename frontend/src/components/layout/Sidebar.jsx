@@ -3,14 +3,15 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
   LayoutDashboard,
+
   Store,
   Users,
   Scissors,
   Calendar,
-  DollarSign,
   LogOut,
   Receipt,
   Star,
+  BarChart2,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -34,8 +35,8 @@ const navItems = [
   {
     group: "Finance",
     items: [
-      { label: "Revenue", path: "/Revenue", icon: DollarSign },
-      { label: "Billing", path: "/superAdminBilling", icon: Receipt },
+      { label: "Analytics", path: "/Analytics", icon: BarChart2 },
+      { label: "Report", path: "/superAdminBilling", icon: Receipt },
     ],
   },
 ];

@@ -6,71 +6,61 @@ import {
   Calendar,
   Users,
   Scissors,
-  DollarSign,
   Receipt,
   Star,
   Wallet,
   LogOut,
+  BarChart2,
+  Image,
 } from "lucide-react";
 import clsx from "clsx";
-
-const navItems = [
-  {
-    group: "Main",
-    items: [
-      {
-        label: "Dashboard",
-        path: "/adminDashboard",
-        icon: LayoutDashboard,
-      },
-      {
-        label: "Appointments",
-        path: "/adminAppointments",
-        icon: Calendar,
-      },
-      {
-        label: "Staff",
-        path: "/adminStaff",
-        icon: Users,
-      },
-      {
-        label: "Services",
-        path: "/adminServices",
-        icon: Scissors,
-      },
-    ],
-  },
-  {
-    group: "Business",
-    items: [
-      {
-        label: "Revenue",
-        path: "/adminRevenue",
-        icon: DollarSign,
-      },
-      {
-        label: "Billing",
-        path: "/adminBilling",
-        icon: Receipt,
-      },
-      {
-        label: "Reviews",
-        path: "/adminReviews",
-        icon: Star,
-      },
-      {
-        label: "Salary",
-        path: "/adminSalary",
-        icon: Wallet,
-      },
-    ],
-  },
-];
 
 const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+
+  const isStandardStaff = user?.role && !["super-admin", "manager", "staff-admin"].includes(user.role);
+
+  const getNavItems = () => {
+    if (isStandardStaff) {
+      return [
+        {
+          group: "Main",
+          items: [
+            { label: "Dashboard", path: "/staff/dashboard", icon: LayoutDashboard },
+            // Optional: Staff can view their own schedule, which is handled in staffDashboard
+            // We can leave Appointments out or point it to a specific view if needed,
+            // but staffDashboard covers their schedule.
+          ],
+        },
+      ];
+    }
+    
+    return [
+      {
+        group: "Main",
+        items: [
+          { label: "Dashboard", path: "/adminDashboard", icon: LayoutDashboard },
+          { label: "Appointments", path: "/adminAppointments", icon: Calendar },
+          { label: "Staff", path: "/adminStaff", icon: Users },
+          { label: "Services", path: "/adminServices", icon: Scissors },
+        ],
+      },
+      {
+        group: "Business",
+items: [
+          { label: "Analytics", path: "/adminAnalytics", icon: BarChart2 },
+          { label: "Report", path: "/adminBilling", icon: Receipt },
+          { label: "Reviews", path: "/adminReviews", icon: Star },
+          { label: "Salary", path: "/adminSalary", icon: Wallet },
+          { label: "Salon Photos", path: "/adminPhotos", icon: Image },
+        ],
+      },
+    ];
+  };
+
+  const navItems = getNavItems();
 
 
   const isActive = (path) => {
@@ -136,6 +126,16 @@ const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
 
         {/* Bottom Section */}
         <div className="p-3 mt-auto">
+          {user?.role === "super-admin" && (
+            <button
+              onClick={() => navigate("/superAdminDashboard")}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-[0.82rem] font-bold text-black bg-amber-400 hover:bg-amber-500 transition-all duration-150 mb-2 shadow-sm"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              Back to Hub
+            </button>
+          )}
+
           {/* System Status */}
           <div className="bg-surface-2 border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-xs mb-2">
             <span className="w-2 h-2 rounded-full bg-success flex-shrink-0 animate-pulse-dot" />

@@ -16,6 +16,7 @@ const router = express.Router();
 // Configure multer for simple disk storage
 const upload = multer({ dest: "uploads/" });
 
+// Customers can view staff — only admins can create/edit/delete
 router.post("/login", loginStaff);
 router.get("/dashboard", protect, getStaffDashboard);
 router.get("/", protect, getStaff);

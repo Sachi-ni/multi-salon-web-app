@@ -17,6 +17,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [salon, setSalon] = useState(null);
+  const [brandSalon, setBrandSalon] = useState(null);
 
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
@@ -40,6 +41,15 @@ const AdminHeader = ({ onToggleSidebar }) => {
         .catch(console.error);
     }
   }, [user]);
+
+  useEffect(() => {
+    const effectiveSalonId = salonId || user?.salon_id;
+    if (!effectiveSalonId) return;
+
+    getSalon(effectiveSalonId)
+      .then((res) => setBrandSalon(res.data?.name || res.data?.salonName || null))
+      .catch(() => setBrandSalon(null));
+  }, [salonId, user?.salon_id]);
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -158,6 +168,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
       </button>
 
       {/* Logo - show salon name & logo for salon users, else SalonHub */}
+{/* Logo - show salon name & logo for salon users, else SalonHub */}
       <div className="flex items-center gap-2 text-lg font-black text-accent whitespace-nowrap tracking-tight">
         {salon?.name ? (
           <>
@@ -174,6 +185,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
               )}
             </div>
             <span className="text-white max-w-[200px] truncate">{salon.name}</span>
+            <span className="text-white max-w-[160px] truncate">{salon.name}</span>
           </>
         ) : (
           <>
@@ -183,6 +195,11 @@ const AdminHeader = ({ onToggleSidebar }) => {
             <span className="text-white">Salon</span>Hub
           </>
         )}
+        <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-sm font-black text-primary flex-shrink-0">
+          {brandSalon && brandSalon[0]?.toUpperCase() ? brandSalon[0].toUpperCase() : "S"}
+        </div>
+         <span className="text-white truncate max-w-[180px]">
+          {brandSalon || "SalonHub"}</span>
       </div>
 
       {/* Role Badge */}

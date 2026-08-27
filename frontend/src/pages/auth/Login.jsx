@@ -22,8 +22,8 @@ const Login = () => {
 
       let data = await res.json();
 
-      // If admin login fails because not found, try staff login
-      if (res.status === 404) {
+      // If admin login fails, try staff login
+      if (!res.ok) {
         res = await fetch("http://localhost:5000/api/staff/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -32,8 +32,8 @@ const Login = () => {
         data = await res.json();
       }
 
-      // If staff login fails because not found, try customer login
-      if (res.status === 404) {
+      // If staff login fails, try customer login
+      if (!res.ok) {
         res = await fetch("http://localhost:5000/api/customers/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -52,18 +52,20 @@ const Login = () => {
       login(userData, token);
 
       // Redirect based on role
-      const roleStr = (data.role || "").toLowerCase();
-      if (roleStr === "super-admin") {
+      if (data.role === "super-admin") {
         navigate("/superAdminDashboard");
-      } else if (roleStr === "staff-admin" || roleStr === "manager") {
-        navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
-      } else if (roleStr === "staff") {
-        navigate("/staff/dashboard");
-      } else if (roleStr === "customer" || roleStr === "user") {
+      } else if (data.role === "customer") {
         navigate("/");
+      } else if (userData.salon_id) {
+        // If they have a salon_id, they are some kind of staff/manager
+        if (data.role === "manager" || data.role === "staff-admin") {
+          navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
+        } else {
+          // Normal staff go to staffDashboard
+          navigate(`/staff/dashboard`);
+        }
       } else {
-        // Any other role implies a staff member with a custom role title
-        navigate("/staff/dashboard");
+        navigate("/");
       }
     } catch (error) {
       console.error("Login error:", error);

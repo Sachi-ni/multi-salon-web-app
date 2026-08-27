@@ -67,6 +67,7 @@ export default function SalonDetailsPage() {
 
   const imageUrl = galleryImages[0] 
     ? mediaUrl(galleryImages[0])
+    ? `http://localhost:5000/${galleryImages[0].replace(/\\/g, '/')}`
     : "/salon_interior.png";
 
   return (
@@ -92,6 +93,7 @@ export default function SalonDetailsPage() {
                 {galleryImages.slice(1).map((img, i) => (
                   <div key={i} className="h-32 rounded-xl overflow-hidden border border-border">
                     <img src={mediaUrl(img)} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
+                    <img src={`http://localhost:5000/${img.replace(/\\/g, '/')}`} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
                 {galleryImages.length <= 1 && (

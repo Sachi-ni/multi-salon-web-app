@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+// Force Webpack reload
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getDailySchedule } from "../../services/appointmentService";
@@ -13,18 +14,19 @@ export default function AdminDailySchedule() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
 
-  const fetchSchedule = () => {
+  const fetchSchedule = useCallback(() => {
     setLoading(true);
     setError("");
     getDailySchedule(salonId, date)
-      .then(res => setSchedule(res.data.schedule || []))
+      .then((res) => setSchedule(res.data.schedule || []))
       .catch((err) => {
         console.error("fetchSchedule error:", err);
         setError("Failed to load schedule.");
       })
       .finally(() => setLoading(false));
-  };
+  }, [salonId, date]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchSchedule(); }, [date]);
 
   // Convert 24h time to 12h format

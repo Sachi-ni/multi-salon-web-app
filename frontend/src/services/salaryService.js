@@ -1,15 +1,12 @@
 import api from "./api";
 
-// Backend currently exposes Salary usage via /revenue/stats aggregation.
-// This service provides best-effort calls for payroll listing + processing.
-// If the backend doesn’t implement these endpoints yet, the UI will fall back to an empty state.
-
-export const getSalarySummary = (params = {}) => api.get("/revenue/stats", { params });
-
-// Salary management
-export const ensureSalaryForMonth = (params = {}) => api.get("/salary/ensure", { params });
 export const getSalaries = (params = {}) => api.get("/salary", { params });
-export const upsertMonthlySalary = (body = {}) => api.post("/salary/upsert", body);
-export const generateMonthForSalon = (body = {}) => api.post("/salary/generate-monthly", body);
-
-
+export const getSalarySummary = (params = {}) => api.get("/salary/summary", { params });
+export const getStaffWithSalaries = (params = {}) => api.get("/salary/staff", { params });
+export const getSalaryDetails = (salaryId) => api.get(`/salary/details/${salaryId}`);
+export const markAsPaid = (salaryId) => api.patch(`/salary/${salaryId}/paid`);
+export const generatePayroll = (body = {}) => api.post("/salary/generate-payroll", body);
+export const initializeSalaries = (body = {}) => api.post("/salary/initialize", body);
+export const updateRate = (salaryId, rate) => api.patch(`/salary/${salaryId}/rate`, { rate });
+export const updateStaffRate = (staffId, body = {}) =>
+  api.patch(`/salary/staff/${staffId}/rate`, body);

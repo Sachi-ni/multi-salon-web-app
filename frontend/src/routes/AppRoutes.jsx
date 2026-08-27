@@ -8,11 +8,10 @@ import TeamPage from "../pages/customer/TeamPage";
 
 import AdminBookings from "../pages/admin/AdminBookings";
 import Dashboard from "../pages/superadmin/Dashboard";
-import Login from "../pages/auth/Login";
+import Login from "../pages/Login";
 
 import NotFound from "../pages/NotFound";
 import Unauthorized from "../pages/Unauthorized";
-import StaffDashboard from "../pages/staff/StaffDashboard";
 
 export default function AppRoutes() {
   return (
@@ -53,11 +52,11 @@ export default function AppRoutes() {
           }
         />
 
-        {/* Admin — only super-admin and staff-admin can view bookings */}
+        {/* Admin — super-admin, staff-admin, and manager can view bookings */}
         <Route
           path="/admin/bookings"
           element={
-            <RoleBasedRoute roles={["super-admin", "staff-admin"]}>
+            <RoleBasedRoute roles={["super-admin", "staff-admin", "manager"]}>
               <AdminBookings />
             </RoleBasedRoute>
           }
@@ -69,16 +68,6 @@ export default function AppRoutes() {
             <RoleBasedRoute roles={["super-admin"]}>
               <Dashboard />
             </RoleBasedRoute>
-          }
-        />
-
-        {/* Staff */}
-        <Route
-          path="/staff/dashboard"
-          element={
-            <ProtectedRoute>
-              <StaffDashboard />
-            </ProtectedRoute>
           }
         />
 

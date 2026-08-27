@@ -21,6 +21,7 @@ const primaryImage = (branch.images && branch.images.length > 0)
 
   const imageUrl = primaryImage 
     ? mediaUrl(primaryImage)
+    ? `http://localhost:5000/${primaryImage.replace(/\\/g, '/')}`
     : "/salon_interior.png";
 
   return (

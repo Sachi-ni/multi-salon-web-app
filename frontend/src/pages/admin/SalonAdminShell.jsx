@@ -6,10 +6,12 @@ import AdminBookings from "./AdminBookings";
 import Services from "./Services";
 import Staff from "./Staff";
 import AdminSalary from "./AdminSalary";
-import AdminStaffScheduleFallback from "./AdminStaffSchedule";
+
 import AddApointmnet from "./AddApointmnet";
 import Billing from "./Billing";
 import AdminReviews from "./AdminReviews";
+import AdminAnalytics from "./AdminAnalytics";
+import SalonPhotos from "./SalonPhotos";
 
 
 export default function SalonAdminShell() {
@@ -31,9 +33,13 @@ export default function SalonAdminShell() {
       <Route path="Reports" element={<div className="text-white">Reports page not implemented yet.</div>} />
 
       {/* Business */}
-      <Route path="adminBilling" element={<Billing />} />
+<Route path="adminBilling" element={<Billing />} />
       <Route path="adminReviews" element={<AdminReviews />} />
       <Route path="adminSalary" element={<AdminSalary />} />
+      <Route path="adminAnalytics" element={<AdminAnalytics />} />
+
+      {/* Salon Photo Gallery management */}
+      <Route path="adminPhotos" element={<SalonPhotos />} />
 
       <Route path="*" element={<Navigate to="adminDashboard" replace />} />
     </Routes>
