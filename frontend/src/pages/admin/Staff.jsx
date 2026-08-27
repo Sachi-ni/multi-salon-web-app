@@ -350,6 +350,7 @@ export default function AdminStaffPage() {
 
   const [editStaff, setEditStaff] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [editPicture, setEditPicture] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
 
   const [deleteId, setDeleteId] = useState(null);
@@ -409,8 +410,25 @@ export default function AdminStaffPage() {
     }
   };
 
+  const handlePictureChange = (file) => {
+    if (!file) {
+      setEditPicture(null);
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image file.");
+      setEditPicture(null);
+      return;
+    }
+
+    setError("");
+    setEditPicture(file);
+  };
+
   const handleEditOpen = (staff) => {
     setEditStaff(staff);
+    setEditPicture(null);
 
     setEditForm({
       firstName:
@@ -454,10 +472,11 @@ export default function AdminStaffPage() {
         salaryPaymentCountPerDay:
           Number(editForm.salaryPerDay) || 0,
 
-        // IMPORTANT
         services: Array.isArray(editForm.services)
           ? editForm.services
           : [],
+
+        ...(editPicture ? { image: editPicture } : {}),
       };
 
       console.log("UPDATING STAFF:", updateData);
@@ -981,6 +1000,16 @@ export default function AdminStaffPage() {
             </p>
           </div>
 
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Profile Picture <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handlePictureChange(e.target.files?.[0] || null)}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
+              required
+            />
+          </div>
           <Modal.Actions>
             <Button
               variant="ghost"

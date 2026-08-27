@@ -183,15 +183,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
               <MapPin className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
               <span className="text-neutral-300 font-medium truncate">{salonName}</span>
             </div>
-
-            {/* Total Bookings */}
-            <div className="flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-              <span className="text-neutral-300 font-medium">
-                <strong className="text-white font-extrabold">{staff.bookings || 0}</strong> Bookings Completed
-              </span>
-            </div>
-
+            
             {/* Daily Salary Rate */}
             {staff.salary_payment_count_per_day && (
               <div className="flex items-center gap-2">
@@ -385,25 +377,23 @@ const Staff = () => {
 
   const handleUpdateStaff = async () => {
     try {
-      const data = new FormData();
-      data.append("name", `${editingStaff.firstName} ${editingStaff.lastName}`);
-      data.append("email", editingStaff.email);
-      data.append("phone", editingStaff.phone || "");
-      if (editingStaff.password) {
-        data.append("password", editingStaff.password);
-      }
-      data.append("salonId", editingStaff.salon);
-      data.append("status", editingStaff.status);
-      data.append("salaryPaymentFrequency", editingStaff.salaryPaymentFrequency);
-      data.append("salaryPaymentCountPerDay", editingStaff.salaryPaymentCountPerDay);
-      if (editingStaff.services.length > 0) {
-        editingStaff.services.forEach((serviceId) => {
-          data.append("services", serviceId);
-        });
-      }
+      const data = {
+        firstName: editingStaff.firstName,
+        lastName: editingStaff.lastName,
+        email: editingStaff.email,
+        phone: editingStaff.phone || "",
+        salonId: editingStaff.salon,
+        status: editingStaff.status,
+        salaryPaymentFrequency: editingStaff.salaryPaymentFrequency,
+        salaryPaymentCountPerDay: editingStaff.salaryPaymentCountPerDay,
+        services: editingStaff.services || []
+      };
 
+      if (editingStaff.password) {
+        data.password = editingStaff.password;
+      }
       if (editingStaff.picture) {
-        data.append("image", editingStaff.picture);
+        data.image = editingStaff.picture;
       }
 
       await updateStaff(editingStaff.id, data);
