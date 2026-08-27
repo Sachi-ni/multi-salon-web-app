@@ -4,9 +4,9 @@ import { getStaff, deleteStaff, updateStaff } from "../../services/staffService"
 import { getSalons } from "../../services/salonService";
 import { getServices } from "../../services/serviceService";
 import { 
-  Plus, Search, Users, Star, MapPin, Briefcase, 
+  Plus, Search, Users, Star, MapPin, 
   Calendar, MoreVertical, Power, Pencil, Trash2, 
-  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Sparkles, Coins
+  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
@@ -291,6 +291,8 @@ const Staff = () => {
       firstName: names[0] || "",
       lastName: names.slice(1).join(" "),
       email: staff.email || "",
+      phone: staff.phone || "",
+      password: "",
       salon: staff.salon_id?._id || staff.salon || "",
       services: assignedServices,
       status: staff.status || "Active",
@@ -386,6 +388,10 @@ const Staff = () => {
       const data = new FormData();
       data.append("name", `${editingStaff.firstName} ${editingStaff.lastName}`);
       data.append("email", editingStaff.email);
+      data.append("phone", editingStaff.phone || "");
+      if (editingStaff.password) {
+        data.append("password", editingStaff.password);
+      }
       data.append("salonId", editingStaff.salon);
       data.append("status", editingStaff.status);
       data.append("salaryPaymentFrequency", editingStaff.salaryPaymentFrequency);
@@ -411,7 +417,10 @@ const Staff = () => {
   };
 
   const filteredStaff = staffList.filter((s) => {
-    const staffName = s.name || "";
+    const role = (s.role || "").toLowerCase();
+    if (["manager", "staff-admin"].includes(role)) return false;
+
+    const staffName = s.name || s.full_name || "";
     const matchesSearch = staffName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === "All Roles" || s.role === selectedRole;
     const salonName = s.salon_id?.name || "";
@@ -654,13 +663,39 @@ const Staff = () => {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Email Address</label>
+                <input
+                  type="email"
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
+                  value={editingStaff.email}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Phone Number</label>
+                <input
+                  type="text"
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
+                  value={editingStaff.phone || ""}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, phone: e.target.value })}
+                  placeholder="Enter phone number"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Email Address</label>
+              <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
+                Change Password <span className="text-neutral-500 font-normal lowercase">(leave blank to keep current)</span>
+              </label>
               <input
-                type="email"
+                type="password"
                 className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
-                value={editingStaff.email}
-                onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
+                value={editingStaff.password || ""}
+                onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
+                placeholder="Enter new password"
+                autoComplete="new-password"
               />
             </div>
 

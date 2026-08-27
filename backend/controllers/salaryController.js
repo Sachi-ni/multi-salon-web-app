@@ -520,7 +520,10 @@ export const getSalaries = async (req, res) => {
       .lean();
 
     // Filter out managers from results
-    salaries = salaries.filter(s => !s.staff_id || s.staff_id.role !== "manager");
+    salaries = salaries.filter(s => {
+      const role = (s.staff_id?.role || s.staff_role || "").toLowerCase();
+      return !["manager", "staff-admin"].includes(role);
+    });
 
     // Cross-check: only return salaries where staff's salary_payment_frequency matches the queried frequency
     if (frequency) {
@@ -614,6 +617,7 @@ export const getStaffSalaryList = async (req, res) => {
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
+      role: { $not: { $regex: /manager|staff-admin/i } },
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     })
       .select("full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id services")
@@ -677,10 +681,11 @@ export const getStaffWithSalaries = async (req, res) => {
       salonFilter.salon_id = salonId;
     }
 
-    // Get active staff for this salon matching the selected frequency
+    // Get active staff for this salon matching the selected frequency (excluding managers)
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
+      role: { $not: { $regex: /manager|staff-admin/i } },
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     }).lean();
 
@@ -695,9 +700,14 @@ export const getStaffWithSalaries = async (req, res) => {
       period,
     };
 
-    const salaries = await Salary.find(salaryFilter)
+    let salaries = await Salary.find(salaryFilter)
       .populate("staff_id", "full_name email phone role salary_payment_frequency salary_payment_count_per_day commission_rate image")
       .lean();
+
+    salaries = salaries.filter(s => {
+      const role = (s.staff_id?.role || s.staff_role || "").toLowerCase();
+      return !["manager", "staff-admin"].includes(role);
+    });
 
     res.json({ success: true, staff: staffList, salaries });
   } catch (error) {
@@ -722,7 +732,7 @@ export const generatePayroll = async (req, res) => {
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
-      role: { $ne: "manager" },
+      role: { $not: { $regex: /manager|staff-admin/i } },
       salary_payment_frequency: frequency,
     }).lean();
 
@@ -981,7 +991,7 @@ export const initializeSalaries = async (req, res) => {
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
-      role: { $ne: "manager" },
+      role: { $not: { $regex: /manager|staff-admin/i } },
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     }).lean();
 
@@ -1096,6 +1106,149 @@ export const updateRate = async (req, res) => {
         dr.totalSalary = dr.daySalary;
       }
       // Recalculate totals using shared helper (which sums daily workRates)
+      recalcWeeklyMonthlyTotals(salary);
+    }
+
+    await salary.save();
+
+    res.json({ success: true, message: "Rate updated successfully", salary });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+// ─── Update rate by staff id (creates the period salary record if missing) ─
+
+export const updateStaffRate = async (req, res) => {
+  try {
+    const { staffId } = req.params;
+    const { rate, frequency, period } = req.body;
+
+    const numericRate = Number(rate);
+    if (rate === undefined || rate === null || isNaN(numericRate)) {
+      return res.status(400).json({ success: false, message: "Rate is required and must be a number" });
+    }
+    if (!frequency || !period) {
+      return res.status(400).json({ success: false, message: "Frequency and period are required" });
+    }
+
+    const staff = await Staff.findById(staffId);
+    if (!staff) {
+      return res.status(404).json({ success: false, message: "Staff not found" });
+    }
+
+    // Salon scoping: non super-admins may only update staff in their own salon
+    if (req.user.role !== "super-admin" && String(staff.salon_id) !== String(req.user.salon_id)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to update this staff member's rate",
+      });
+    }
+
+    // Persist the rate on the staff so future periods pick it up automatically.
+    // Use findByIdAndUpdate (not staff.save()) because older staff documents may
+    // be missing newly-required schema fields (e.g. first_name/last_name); a full
+    // document save would fail validation even though only the rate changed.
+    await Staff.findByIdAndUpdate(staff._id, { commission_rate: numericRate });
+    staff.commission_rate = numericRate;
+
+    const salaryPaymentCountPerDay = staff.salary_payment_count_per_day || 1;
+
+    // Find or create the salary record for this staff / frequency / period
+    let salary = await Salary.findOne({
+      salon_id: staff.salon_id,
+      staff_id: staff._id,
+      frequency,
+      period,
+    });
+
+    if (!salary) {
+      let periodStart, periodEnd;
+      let year, month, weekNumber = 0;
+
+      if (frequency === "daily") {
+        periodStart = period;
+        periodEnd = period;
+        const d = new Date(period);
+        year = d.getFullYear();
+        month = d.getMonth() + 1;
+      } else if (frequency === "weekly") {
+        const parts = period.split("-W");
+        year = parseInt(parts[0]);
+        weekNumber = parseInt(parts[1]);
+        const weekDates = getWeekDates(year, weekNumber);
+        periodStart = weekDates[0];
+        periodEnd = weekDates[6];
+        month = new Date(periodStart).getMonth() + 1;
+      } else {
+        // monthly
+        const parts = period.split("-");
+        year = parseInt(parts[0]);
+        month = parseInt(parts[1]);
+        const daysInMonth = getDaysInMonth(year, month);
+        const monthStr = String(month).padStart(2, "0");
+        periodStart = `${year}-${monthStr}-01`;
+        periodEnd = `${year}-${monthStr}-${daysInMonth}`;
+      }
+
+      let createdSalary;
+      try {
+        createdSalary = await Salary.create({
+          salon_id: staff.salon_id,
+          staff_id: staff._id,
+          frequency,
+          period,
+          staff_name: staff.full_name || "",
+          staff_role: staff.role || "",
+          commission_rate: numericRate,
+          salary_payment_count_per_day: salaryPaymentCountPerDay,
+          workingAmount: 0,
+          rate: numericRate,
+          workRate: 0,
+          daySalary: 0,
+          totalSalary: 0,
+          status: "Not Paid",
+          year,
+          month,
+          weekNumber,
+          dateRange: { start: periodStart, end: periodEnd },
+          dailyRecords: [],
+        });
+      } catch (createErr) {
+        // Defensive: a deployment whose salaries collection still carries a
+        // stale unique index (e.g. salon_id_1_staff_id_1_month_1 from an older
+        // schema) will reject legitimate new records with E11000. Surface a
+        // clear error instead of a misleading 500/404.
+        if (createErr && createErr.code === 11000) {
+          return res.status(409).json({
+            success: false,
+            message:
+              "Could not create the salary record because a conflicting record already exists for this staff member (stale legacy index/data). Please repair the salaries collection indexes.",
+          });
+        }
+        throw createErr;
+      }
+      const salary = createdSalary;
+
+      return res.json({ success: true, message: "Rate saved successfully", salary });
+    }
+
+    // Existing record - apply the new rate and recalculate
+    salary.rate = numericRate;
+    salary.commission_rate = numericRate;
+
+    if (salary.frequency === "daily") {
+      salary.workRate = salary.workingAmount * (numericRate / 100);
+      salary.daySalary = calculateDaySalary(salary.workRate, salary.salary_payment_count_per_day);
+      salary.totalSalary = salary.daySalary;
+    } else {
+      // Weekly or monthly - recalculate each daily record
+      for (const dr of salary.dailyRecords) {
+        dr.rate = numericRate;
+        dr.workRate = dr.workingAmount * (numericRate / 100);
+        dr.daySalary = calculateDaySalary(dr.workRate, salary.salary_payment_count_per_day);
+        dr.totalSalary = dr.daySalary;
+      }
+      // Recalculate totals using shared helper
       recalcWeeklyMonthlyTotals(salary);
     }
 

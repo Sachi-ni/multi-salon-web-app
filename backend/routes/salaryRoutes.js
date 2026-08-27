@@ -11,6 +11,7 @@ import {
   getSalaryDetails,
   initializeSalaries,
   updateRate,
+  updateStaffRate,
 } from "../controllers/salaryController.js";
 const router = express.Router();
 // Salary management: super-admin + staff-admin/managers
@@ -36,6 +37,8 @@ router.patch("/:salaryId/pay", markAsPaid);
 router.post("/generate-payroll", generatePayroll);
 // Initialize/ensure salary records exist for staff
 router.post("/initialize", initializeSalaries);
-// Update rate and recalculate
+// Update rate for a salary record and recalculate
 router.patch("/:salaryId/rate", updateRate);
+// Update rate by staff id (persists on staff and ensures a period salary record)
+router.patch("/staff/:staffId/rate", updateStaffRate);
 export default router;

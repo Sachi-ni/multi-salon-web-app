@@ -1,12 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-import PageHeader from "../../components/ui/PageHeader";
-import Card from "../../components/ui/Card";
-import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
-import EmptyState from "../../components/ui/EmptyState";
-import Input from "../../components/ui/Input";
 import Modal from "../../components/ui/Modal";
 
 import {
@@ -14,6 +9,7 @@ import {
   markAsPaid,
   getSalaryDetails,
   updateRate,
+  updateStaffRate,
   getStaffWithSalaries,
 } from "../../services/salaryService";
 
@@ -51,15 +47,6 @@ const statusVariant = (status) => {
   if (s.includes("pending") || s.includes("not")) return "warning";
   if (s.includes("overdue")) return "danger";
   return "info";
-};
-
-const toMonthKey = (date) => {
-  const d = new Date(date);
-
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-
-  return `${y}-${m}`;
 };
 
 const toDateKey = (date) => {
@@ -101,27 +88,6 @@ const getMonthLabel = (dateStr) => {
   return `${months[d.getMonth()]} ${d.getFullYear()}`;
 };
 
-const getOrdinalSuffix = (value) => {
-  const mod100 = value % 100;
-  if (mod100 >= 11 && mod100 <= 13) return "th";
-  switch (value % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-};
-
-const getWeekOfMonth = (dateStr) => {
-  const d = new Date(dateStr);
-  const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
-  return Math.ceil((d.getDate() + firstDay.getDay()) / 7);
-};
-
 const isPeriodEnded = (frequency, currentDateStr) => {
   const today = new Date();
   today.setHours(23, 59, 59, 999);
@@ -153,36 +119,10 @@ const getMonthRange = (dateStr) => {
   return { start: firstDay, end: lastDay, label: `${months[m]} ${y}` };
 };
 
-const calculateDaySalary = (workRate, salaryPaymentCountPerDay) => {
-  if (workRate === 0) return 0;
-  return salaryPaymentCountPerDay;
-};
-
-const formatPdfDate = (value) => {
-  if (!value) return "N/A";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toISOString().slice(0, 10);
-};
-
-const formatPdfMoney = (value) => {
-  const num = Number(value || 0);
-  return `LKR ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-const getDayShortName = (dateValue) => {
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", { weekday: "short" });
-};
-
-const getMonthPeriodLabel = (dateValue) => {
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-};
-
 const SALARY_REFRESH_KEY = "salary-refresh-token";
+
+// Prefix used for row ids of staff that do not have a salary record yet
+const FALLBACK_PREFIX = "fallback-";
 
 // ─── Main Component ───────────────────────────────────────────────────────
 
@@ -272,6 +212,13 @@ const Salary = () => {
       for (const sal of data) {
         rates[sal._id] = sal.rate ?? sal.commission_rate ?? 0;
       }
+      // Seed editable rates for staff without salary records too
+      for (const staff of staffData) {
+        const key = `${FALLBACK_PREFIX}${staff._id}`;
+        if (rates[key] === undefined) {
+          rates[key] = staff.commission_rate ?? 0;
+        }
+      }
       setEditingRates(rates);
       setDirtyRates({});
 
@@ -326,15 +273,45 @@ const Salary = () => {
     setDirtyRates((prev) => ({ ...prev, [salaryId]: true }));
   };
 
-  const handleSaveRate = async (salaryId) => {
-    const rate = editingRates[salaryId];
-    if (rate === undefined || rate === null) return;
+  const handleSaveRate = async (rowId) => {
+    if (!rowId) return;
+
+    const rawRate = editingRates[rowId];
+    const numericRate = Number(rawRate);
+    if (
+      rawRate === undefined ||
+      rawRate === null ||
+      rawRate === "" ||
+      Number.isNaN(numericRate)
+    ) {
+      setError("Please enter a valid rate before saving");
+      return;
+    }
+
     try {
+      setError("");
+      setSuccessMsg("");
       setLoading(true);
-      await updateRate(salaryId, Number(rate));
-      setDirtyRates((prev) => ({ ...prev, [salaryId]: false }));
-      setSuccessMsg("Rate updated successfully");
+
+      const key = String(rowId);
+      let message = "Rate updated successfully";
+      if (key.startsWith(FALLBACK_PREFIX)) {
+        // Staff without a salary record yet - persist the rate on the staff
+        // and create their salary record for the current period.
+        const staffId = key.slice(FALLBACK_PREFIX.length);
+        await updateStaffRate(staffId, {
+          rate: numericRate,
+          frequency,
+          period: getPeriod(),
+        });
+        message = "Rate saved successfully";
+      } else {
+        await updateRate(rowId, numericRate);
+      }
+
+      setDirtyRates((prev) => ({ ...prev, [rowId]: false }));
       await loadSalaries();
+      setSuccessMsg(message);
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to update rate");
     } finally {
@@ -345,6 +322,7 @@ const Salary = () => {
   // ─── Pay ────────────────────────────────────────────────────────────────
 
   const handlePay = async (salaryId) => {
+    if (!salaryId || String(salaryId).startsWith("fallback-")) return;
     setLoading(true);
     setError("");
     setSuccessMsg("");
@@ -360,6 +338,7 @@ const Salary = () => {
   };
 
   const handleDownloadPdf = async (salaryId) => {
+    if (!salaryId || String(salaryId).startsWith("fallback-")) return;
     setPdfLoading(true);
     setError("");
     try {
@@ -510,7 +489,7 @@ const Salary = () => {
 
       // Staff Information Section
       drawSection("STAFF INFORMATION");
-      drawInfoRow("Full Name", staff.full_name || salary.staff_name || "N/A");
+      drawInfoRow("Full Name", staff.name || staff.full_name || salary.staff_name || "N/A");
       drawInfoRow("Email", staff.email || "N/A");
       yPos += 1;
 
@@ -659,7 +638,7 @@ const Salary = () => {
       yPos += 3;
       doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: "center" });
 
-      const fileName = `salary_slip_${staff.full_name || salary.staff_name || "staff"}_${salary.period}_${salary.frequency}.pdf`;
+      const fileName = `salary_slip_${staff.name || staff.full_name || salary.staff_name || "staff"}_${salary.period}_${salary.frequency}.pdf`;
       doc.save(fileName);
       setShowPdfModal(false);
       setPdfData(null);
@@ -670,31 +649,42 @@ const Salary = () => {
     }
   };
 
-  // ─── Build display rows (salaries + fallback staff for new periods) ─────
+  // ─── Build display rows (salaries + staff without records) ──────────────
 
   let displayRows = [...salaries];
 
-  // If no salary records exist but we have staff, create fallback rows
-  if (salaries.length === 0 && fallbackStaff.length > 0) {
-    displayRows = fallbackStaff.map((staff) => ({
-      _id: staff._id,
-      staff_id: staff,
-      staff_name: staff.full_name || "",
-      workingAmount: 0,
-      rate: staff.commission_rate || 0,
-      commission_rate: staff.commission_rate || 0,
-      workRate: 0,
-      daySalary: 0,
-      totalSalary: 0,
-      status: "Not Paid",
-    }));
+  // Always show every staff member of the salon under this frequency tab.
+  // Staff that do not have a salary record for the selected period yet are
+  // appended as zero-value rows, so newly added staff appear alongside the
+  // existing rows (earlier staff rows are never removed).
+  if (fallbackStaff.length > 0) {
+    const recordedStaffIds = new Set(
+      displayRows.map((row) => String(row.staff_id?._id || row.staff_id || ""))
+    );
+
+    const pendingRows = fallbackStaff
+      .filter((staff) => !recordedStaffIds.has(String(staff._id)))
+      .map((staff) => ({
+        _id: `${FALLBACK_PREFIX}${staff._id}`,
+        staff_id: staff,
+        staff_name: staff.full_name || "",
+        workingAmount: 0,
+        rate: staff.commission_rate ?? 0,
+        commission_rate: staff.commission_rate ?? 0,
+        workRate: 0,
+        daySalary: 0,
+        totalSalary: 0,
+        status: "Not Paid",
+      }));
+
+    displayRows = [...displayRows, ...pendingRows];
   }
 
   // ─── Filter by search ──────────────────────────────────────────────────
 
   const filteredDisplayRows = searchQuery
     ? displayRows.filter((row) => {
-        const name = (row.staff_id?.full_name || row.staff_name || "").toLowerCase();
+        const name = (row.staff_id?.name || row.staff_id?.full_name || row.staff_name || "").toLowerCase();
         return name.includes(searchQuery.toLowerCase());
       })
     : displayRows;
@@ -870,24 +860,37 @@ const Salary = () => {
               <tbody>
                 {filteredDisplayRows.map((row) => {
                   const staff = row.staff_id || {};
-                  const staffName = staff.full_name || row.staff_name || "Unknown";
-                  const isFallback = !row.period; // no period means it's a fallback staff row
+                  const staffName = staff.name || staff.full_name || row.staff_name || "Unknown";
+                  const isFallback =
+                    !row.period || String(row._id).startsWith(FALLBACK_PREFIX);
                   const monthlyDayRecord =
                     frequency === "monthly" && Array.isArray(row.dailyRecords)
                       ? row.dailyRecords.find((dr) => toDateKey(dr.date) === selectedMonthlyDateKey)
                       : null;
+                  const selectedWeeklyRecord =
+                    frequency === "weekly" && Array.isArray(row.dailyRecords)
+                      ? row.dailyRecords.find((dr) => toDateKey(dr.date) === weeklyDate)
+                      : null;
                   const selectedDailyRecord = monthlyDayRecord || null;
                   const workingAmt = frequency === "monthly"
                     ? (selectedDailyRecord?.workingAmount || 0)
-                    : (row.workingAmount || 0);
-                  const currentRate = editingRates[row._id] !== undefined ? editingRates[row._id] : (row.rate ?? row.commission_rate ?? 0);
+                    : frequency === "weekly"
+                      ? (selectedWeeklyRecord?.workingAmount || 0)
+                      : (row.workingAmount || 0);
+                  const currentRate = editingRates[row._id] !== undefined
+                    ? editingRates[row._id]
+                    : (selectedWeeklyRecord?.rate ?? row.rate ?? row.commission_rate ?? 0);
                   const isDirty = dirtyRates[row._id] || false;
                   const workRate = frequency === "monthly"
                     ? (selectedDailyRecord?.workRate || 0)
-                    : (row.workRate || 0);
+                    : frequency === "weekly"
+                      ? (selectedWeeklyRecord?.workRate || 0)
+                      : (row.workRate || 0);
                   const daySalary = frequency === "monthly"
                     ? (selectedDailyRecord?.daySalary || 0)
-                    : (row.daySalary || 0);
+                    : frequency === "weekly"
+                      ? (selectedWeeklyRecord?.daySalary || 0)
+                      : (row.daySalary || 0);
                   const totalSal = frequency === "monthly"
                     ? (Array.isArray(row.dailyRecords)
                         ? row.dailyRecords.reduce((sum, dr) => {
@@ -920,7 +923,6 @@ const Salary = () => {
                             onChange={(e) => handleRateChange(row._id, e.target.value)}
                             className="w-16 bg-[#1d1d1d] border border-gray-700 rounded px-2 py-1 text-xs text-white text-center outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/20"
                             min="0" max="100" step="0.1"
-                            disabled={isPaid}
                           />
                           <span className="text-xs text-gray-400">%</span>
                           {isDirty && (
