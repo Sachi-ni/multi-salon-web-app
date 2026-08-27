@@ -40,16 +40,15 @@ const Profile = () => {
       {/* Profile Card */}
       <Card className="mb-5">
         <div className="flex items-center gap-3.5">
-          <div className="w-[52px] h-[52px] rounded-xl bg-accent flex items-center justify-center text-xl font-black text-primary flex-shrink-0 overflow-hidden">
-            {profile?.image ? (
+          <div className="relative w-[52px] h-[52px] rounded-xl bg-accent flex items-center justify-center text-xl font-black text-primary flex-shrink-0 overflow-hidden">
+            <span aria-hidden="true">{initials}</span>
+            {profile?.image && (
               <img
                 src={mediaUrl(profile.image)}
                 alt={`${profile?.name || "Admin"} profile`}
-                className="w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover"
                 onError={(event) => { event.currentTarget.style.display = "none"; }}
               />
-            ) : (
-              initials
             )}
           </div>
           <div>
