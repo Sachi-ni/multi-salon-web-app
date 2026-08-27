@@ -46,6 +46,27 @@ const getEffectiveRate = (salaryRecord, staffCommissionRate = 0) => {
 
   return safeNumber(staffCommissionRate, 0);
 };
+// ─── Helper: scope salary records to the requesting user's salon ───────────
+// super-admins operate on every salon; staff-admins/managers only their own.
+const salaryBelongsToUserSalon = (salaryRecord, reqUser) => {
+  if (!reqUser || reqUser.role === "super-admin") return true;
+
+  const recordSalonId =
+    salaryRecord?.salon_id?._id ?? salaryRecord?.salon_id;
+
+  if (
+    recordSalonId === undefined ||
+    recordSalonId === null ||
+    reqUser.salon_id === undefined ||
+    reqUser.salon_id === null
+  ) {
+    return false;
+  }
+
+  return String(recordSalonId) === String(reqUser.salon_id);
+};
+
+// ─── Helper Functions ──────────────────────────────────────────────────────
 
 // ─── Helper Functions ──────────────────────────────────────────────────────
 
@@ -69,25 +90,6 @@ const getDaysInMonth = (year, month) => {
   return new Date(year, month, 0).getDate();
 };
 
-const getWeekDates = (year, weekNum) => {
-  const firstDayOfYear = new Date(year, 0, 1);
-  const days = (weekNum - 1) * 7;
-  const startDate = new Date(firstDayOfYear);
-  startDate.setDate(firstDayOfYear.getDate() + days);
-  // Adjust to Monday
-  const dayOfWeek = startDate.getDay();
-  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  startDate.setDate(startDate.getDate() + diff);
-
-  const dates = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(startDate);
-    d.setDate(startDate.getDate() + i);
-    dates.push(toLocalDateStr(d));
-  }
-  return dates;
-};
-
 const calculateDaySalary = (workRate, salaryPaymentCountPerDay = 0) => {
   const numericWorkRate = safeNumber(workRate, 0);
 
@@ -106,6 +108,28 @@ const toLocalDateStr = (date) => {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+};
+
+// Monday-based week start that is ISO-correct for every year.
+// Jan 4 always belongs to ISO week 1, so the Monday of that week plus
+// (weekNum - 1) * 7 days gives the exact ISO week range. This keeps
+// dateRange.start/end aligned with the "YYYY-Www" period labels produced
+// by getISOWeek (the naive "Jan 1 - weekday" approach diverges for years
+// where Jan 1 falls on Fri/Sat/Sun, e.g. 2022 or 2027).
+const getWeekDates = (year, weekNum) => {
+  const jan4 = new Date(year, 0, 4);
+  const dayOfWeek = jan4.getDay(); // 0 = Sunday ... 6 = Saturday
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const startDate = new Date(jan4);
+  startDate.setDate(jan4.getDate() - daysSinceMonday + (weekNum - 1) * 7);
+
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    dates.push(toLocalDateStr(d));
+  }
+  return dates;
 };
 
 // ─── Helper: ensure ALL days in a period have a daily record ──────────────
@@ -322,9 +346,12 @@ export const processSalaryOnCompletion = updateSalaryOnAppointmentCompletion;
 
 const updateSingleStaffSalary = async (staff, salonId, appointmentDate, amount) => {
   if (!staff) return;
-  
-  // Skip managers - they should not have salary records
-  if (staff.role === "manager") return;
+
+  // Skip managers and staff admins - they should not have salary records.
+  // (Matches the role filtering applied by every salary listing endpoint;
+  // otherwise completing an appointment for a staff-admin creates orphan
+  // records that never appear in lists but still inflate summaries.)
+  if (["manager", "staff-admin"].includes((staff.role || "").toLowerCase())) return;
 
   const frequency = staff.salary_payment_frequency || "monthly";
   const commissionRate = staff.commission_rate || 0;
@@ -553,44 +580,35 @@ export const getSalarySummary = async (req, res) => {
     }
     if (frequency) match.frequency = frequency;
 
-    const pipeline = [
-      { $match: match },
-      {
-        $group: {
-          _id: null,
-          totalPending: {
-            $sum: {
-              $cond: [{ $eq: ["$status", "Not Paid"] }, "$totalSalary", 0],
-            },
-          },
-          totalPaid: {
-            $sum: {
-              $cond: [{ $eq: ["$status", "Paid"] }, "$paidTotal", 0],
-            },
-          },
-          pendingCount: {
-            $sum: {
-              $cond: [{ $eq: ["$status", "Not Paid"] }, 1, 0],
-            },
-          },
-          paidCount: {
-            $sum: {
-              $cond: [{ $eq: ["$status", "Paid"] }, 1, 0],
-            },
-          },
-          totalWorkingAmount: { $sum: "$workingAmount" },
-        },
-      },
-    ];
+    // Fetch with staff role info so totals match what lists display
+    // (manager / staff-admin records are excluded everywhere else).
+    let salaryDocs = await Salary.find(match)
+      .populate("staff_id", "role")
+      .select("status totalSalary paidTotal workingAmount staff_role")
+      .lean();
 
-    const result = await Salary.aggregate(pipeline);
-    const summary = result[0] || {
+    salaryDocs = salaryDocs.filter((s) => {
+      const role = (s.staff_id?.role || s.staff_role || "").toLowerCase();
+      return !["manager", "staff-admin"].includes(role);
+    });
+
+    const summary = {
       totalPending: 0,
       totalPaid: 0,
       pendingCount: 0,
       paidCount: 0,
       totalWorkingAmount: 0,
     };
+    for (const s of salaryDocs) {
+      if (s.status === "Paid") {
+        summary.totalPaid += safeNumber(s.paidTotal, 0);
+        summary.paidCount += 1;
+      } else {
+        summary.totalPending += safeNumber(s.totalSalary, 0);
+        summary.pendingCount += 1;
+      }
+      summary.totalWorkingAmount += safeNumber(s.workingAmount, 0);
+    }
 
     res.json({
       success: true,
@@ -641,6 +659,14 @@ export const markAsPaid = async (req, res) => {
     const salary = await Salary.findById(salaryId);
     if (!salary) {
       return res.status(404).json({ success: false, message: "Salary record not found" });
+    }
+
+    // Salon scoping: non super-admins may only pay salaries in their own salon
+    if (!salaryBelongsToUserSalon(salary, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to update this salary record",
+      });
     }
 
     // Capture the totalSalary before paying so reports show the paid value
@@ -958,6 +984,14 @@ export const getSalaryDetails = async (req, res) => {
       return res.status(404).json({ success: false, message: "Salary record not found" });
     }
 
+    // Salon scoping: non super-admins may only view their own salon's slips
+    if (!salaryBelongsToUserSalon(salary, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to view this salary record",
+      });
+    }
+
     const servicesData = Array.isArray(salary.staff_id?.services)
       ? salary.staff_id.services.map((service) => ({
           _id: service._id,
@@ -1089,7 +1123,18 @@ export const updateRate = async (req, res) => {
       return res.status(404).json({ success: false, message: "Salary record not found" });
     }
 
+    // Salon scoping: non super-admins may only update rates in their own salon
+    if (!salaryBelongsToUserSalon(salary, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to update this salary record's rate",
+      });
+    }
+
     const numericRate = Number(rate);
+    if (numericRate < 0) {
+      return res.status(400).json({ success: false, message: "Rate cannot be negative" });
+    }
     salary.rate = numericRate;
 
     // Recalculate work rate and total salary
@@ -1126,6 +1171,9 @@ export const updateStaffRate = async (req, res) => {
     const numericRate = Number(rate);
     if (rate === undefined || rate === null || isNaN(numericRate)) {
       return res.status(400).json({ success: false, message: "Rate is required and must be a number" });
+    }
+    if (numericRate < 0) {
+      return res.status(400).json({ success: false, message: "Rate cannot be negative" });
     }
     if (!frequency || !period) {
       return res.status(400).json({ success: false, message: "Frequency and period are required" });
