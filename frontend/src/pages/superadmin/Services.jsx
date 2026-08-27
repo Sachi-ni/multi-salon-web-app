@@ -394,6 +394,16 @@ const Services = () => {
       setError("Please fill all required fields (Name, Price, Duration, Salon)");
       return;
     }
+    
+    if (Number(formData.base_price) < 0) {
+      setError("Price cannot be a negative value.");
+      return;
+    }
+    
+    if (Number(formData.duration) <= 0) {
+      setError("Duration must be greater than 0.");
+      return;
+    }
 
     try {
       setSaving(true);
