@@ -4,19 +4,13 @@ import { motion } from "framer-motion";
 import {
   Wallet,
   Calendar,
-  CheckCircle2,
-  Clock,
   Search,
-  FileText,
-  FileSpreadsheet,
   Receipt,
   Loader2,
   ChevronLeft,
   ChevronRight,
-  Store,
   Coins,
   TrendingUp,
-  Filter,
   Download,
   Printer
 } from "lucide-react";
@@ -26,9 +20,6 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import PageHeader from "../../components/ui/PageHeader";
-import StatCard from "../../components/ui/StatCard";
-import Card from "../../components/ui/Card";
-import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
