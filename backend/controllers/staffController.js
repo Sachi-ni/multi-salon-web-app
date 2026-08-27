@@ -52,14 +52,15 @@ export const createStaff = async (req, res) => {
     const { password } = req.body;
     let services = [];
     if (req.body.services) {
-      try {
-        if (typeof req.body.services === "string") {
-          services = JSON.parse(req.body.services);
-        } else {
-          services = req.body.services;
+      if (Array.isArray(req.body.services)) {
+        services = req.body.services;
+      } else if (typeof req.body.services === "string") {
+        try {
+          const parsed = JSON.parse(req.body.services);
+          services = Array.isArray(parsed) ? parsed : [req.body.services];
+        } catch {
+          services = [req.body.services];
         }
-      } catch {
-        services = [];
       }
     }
 
@@ -358,41 +359,20 @@ export const updateStaff = async (req, res) => {
     let services;
 
     if (req.body.services !== undefined) {
-      try {
-        let rawServices = req.body.services;
-
-        console.log("RAW SERVICES:", rawServices);
-        console.log("RAW SERVICES TYPE:", typeof rawServices);
-
-        // If FormData sends JSON string
-        if (typeof rawServices === "string") {
-          services = JSON.parse(rawServices);
-        } else {
-          services = rawServices;
+      let rawServices = req.body.services;
+      if (Array.isArray(rawServices)) {
+        services = rawServices;
+      } else if (typeof rawServices === "string") {
+        try {
+          const parsed = JSON.parse(rawServices);
+          services = Array.isArray(parsed) ? parsed : [rawServices];
+        } catch (error) {
+          services = [rawServices];
         }
-
-        // Make sure it is an array
-        if (!Array.isArray(services)) {
-          services = [];
-        }
-
-        // Remove invalid/empty IDs
-        services = services.filter(
-          (serviceId) =>
-            typeof serviceId === "string" &&
-            serviceId.trim() !== ""
-        );
-
-        console.log("PARSED SERVICES:", services);
-
-      } catch (error) {
-        console.error(
-          "SERVICE PARSE ERROR:",
-          error
-        );
-
+      } else {
         services = [];
       }
+      services = services.filter((serviceId) => typeof serviceId === "string" && serviceId.trim() !== "");
     }
 
     console.log("services:", req.body.services);
