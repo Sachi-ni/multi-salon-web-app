@@ -139,9 +139,7 @@ const AddStaff = () => {
       data.append("salonId", formData.salon);
       data.append("salaryPaymentFrequency", formData.salaryPaymentFrequency);
       data.append("salaryPaymentCountPerDay", formData.salaryPaymentCountPerDay);
-      formData.services.forEach((serviceId) => {
-        data.append("services", serviceId);
-      });
+      data.append("services", JSON.stringify(formData.services));
       if (formData.picture) data.append("image", formData.picture);
       await createStaff(data);
       // Navigate back to Salons page to show updated staffCount
