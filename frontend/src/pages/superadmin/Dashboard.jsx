@@ -23,8 +23,7 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import Skeleton from "../../components/ui/Skeleton";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../config";
 
 export default function Dashboard() {
   const navigate = useNavigate();

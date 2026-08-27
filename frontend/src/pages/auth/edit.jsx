@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { X, Camera } from "lucide-react";
 import axios from "axios";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE, API_URL } from "../../config";
 
 const Edit = () => {
   const { user, setUser, token, login } = useAuth();
@@ -70,7 +69,7 @@ const Edit = () => {
       if (image) formData.append("image", image);
 
       const res = await axios.put(
-        `http://localhost:5000/api/auth/user/${user.id}`,
+        `${API_URL}/auth/user/${user.id}`,
         formData,
         { headers: { Authorization: `Bearer ${token}` } }
       );

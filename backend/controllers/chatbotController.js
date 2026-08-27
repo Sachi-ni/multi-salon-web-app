@@ -149,7 +149,7 @@ async function handlePricing() {
 
 async function handleBooking() {
   return {
-    text: "Great choice! 🗓️ You can book an appointment through our booking page. Choose your preferred salon, service, staff, date, and time!\n\n👉 **[Click here to book now](/book)**\n\nIf you already have an account, you can also view your appointments in **My Appointments**.",
+    text: "Great choice! 🗓️ You can book an appointment through our booking page. Choose your preferred salon, service, staff, date, and time!\n\n👉 [Click here to book now](/book)\n\nIf you already have an account, you can also view your appointments in **My Appointments**.",
     quickReplies: ["Our Services", "Salon Locations", "Back to Menu"],
   };
 }
@@ -242,7 +242,7 @@ async function handleBranches() {
 
 async function handleCancel() {
   return {
-    text: "To cancel or reschedule an appointment:\n\n1. Go to **My Appointments** from the navigation menu\n2. Find the appointment you want to modify\n3. Click the **Cancel** button\n\n👉 **[Go to My Appointments](/my-appointments)**\n\nIf you need further assistance, please contact us directly.",
+    text: "To cancel or reschedule an appointment:\n\n1. Go to **My Appointments** from the navigation menu\n2. Find the appointment you want to modify\n3. Click the **Cancel** button\n\n👉 [Go to My Appointments](/my-appointments)\n\nIf you need further assistance, please contact us directly.",
     quickReplies: ["Contact Us", "Book Appointment", "Back to Menu"],
   };
 }

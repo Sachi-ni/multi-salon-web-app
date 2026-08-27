@@ -15,8 +15,7 @@ import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import clsx from "clsx";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../config";
 
 const TIME_SLOTS = [];
 for (let i = 0; i < 24; i++) {
