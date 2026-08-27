@@ -17,6 +17,56 @@ import EmptyState from "../../components/ui/EmptyState";
 import clsx from "clsx";
 
 const API_BASE = "http://localhost:5000";
+const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
+const COMMON_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "yahoo.com",
+  "outlook.com",
+  "hotmail.com",
+]);
+const SRI_LANKAN_PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
+const COMMON_PASSWORDS = new Set(["123456", "12345678", "password", "password123", "qwerty"]);
+const normalizePhone = (phone) => phone.trim().replace(/[\s()-]/g, "");
+
+const validatePhone = (phone, label) => {
+  const normalizedPhone = normalizePhone(phone);
+  return normalizedPhone && !SRI_LANKAN_PHONE_PATTERN.test(normalizedPhone)
+    ? `Enter a valid ${label} phone number (for example, 0771234567 or +94771234567).`
+    : "";
+};
+
+const validateManagerDetails = ({ email, phone, password }) => {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)) {
+    return "Enter a valid manager email address.";
+  }
+
+  const emailDomain = normalizedEmail.split("@")[1];
+  if (normalizedEmail && !COMMON_EMAIL_DOMAINS.has(emailDomain)) {
+    return "Manager email must use Gmail, Yahoo, Outlook, or Hotmail (for example, manager@gmail.com).";
+  }
+
+  const phoneError = validatePhone(phone, "manager");
+  if (phoneError) {
+    return phoneError;
+  }
+
+  if (password) {
+    const isComplex =
+      password.length >= 8 &&
+      /[A-Z]/.test(password) &&
+      /[a-z]/.test(password) &&
+      /\d/.test(password) &&
+      /[!@#$%^&*]/.test(password);
+
+    if (!isComplex || COMMON_PASSWORDS.has(password.toLowerCase())) {
+      return "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
+    }
+  }
+
+  return "";
+};
 
 /* Helper to render salon logo or fallback icon */
 const SalonLogo = ({ salon, className = "w-full h-full object-cover" }) => {
@@ -213,6 +263,7 @@ const Salons = () => {
   const [editSalon, setEditSalon] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState("");
   const [editLogo, setEditLogo] = useState(null);
   const [editLogoPreview, setEditLogoPreview] = useState("");
 
@@ -263,6 +314,7 @@ const handleEditOpen = async (id) => {
 
     setEditLogo(null);
     setEditLogoPreview("");
+    setEditError("");
   } catch (err) {
     console.error(err);
     setError("Failed to load salon details for editing");
@@ -297,6 +349,25 @@ const handleEditOpen = async (id) => {
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
+
+    const validationError = validateManagerDetails({
+      email: editForm.managerEmail || "",
+      phone: editForm.managerPhone || "",
+      password: editForm.managerPassword || "",
+    });
+
+    if (validationError) {
+      setEditError(validationError);
+      return;
+    }
+
+    const salonPhoneError = validatePhone(editForm.phone || "", "salon");
+    if (salonPhoneError) {
+      setEditError(salonPhoneError);
+      return;
+    }
+
+    setEditError("");
     setEditLoading(true);
 
     try {
@@ -335,7 +406,7 @@ const handleEditOpen = async (id) => {
     } catch (err) {
       console.error(err);
 
-      setError(
+      setEditError(
         err.response?.data?.message ||
         "Failed to update salon"
       );
@@ -580,8 +651,14 @@ const handleEditOpen = async (id) => {
       )}
 
       {/* Edit Modal */}
-<Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="✏️ Edit Salon Details" maxWidth="max-w-md">
+      <Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="Edit Salon Details" maxWidth="max-w-md">
         <form onSubmit={handleEditSubmit} autoComplete="off" className="space-y-4 pt-1">
+          {editError && (
+            <div className="px-3 py-2.5 rounded-xl bg-danger-dim border border-danger-border text-xs text-danger font-semibold">
+              {editError}
+            </div>
+          )}
+
           <Input
             label="Salon Name"
             name="name"
@@ -595,6 +672,8 @@ const handleEditOpen = async (id) => {
             name="phone"
             value={editForm.phone || ""}
             onChange={handleEditChange}
+                pattern="(?:\\+94|0)[0-9]{9}"
+                title="Use 0771234567 or +94771234567"
           />
 
           <Input
@@ -664,6 +743,8 @@ const handleEditOpen = async (id) => {
                 value={editForm.managerPhone || ""}
                 onChange={handleEditChange}
                 placeholder="Enter manager phone number"
+                pattern="(?:\\+94|0)[0-9]{9}"
+                title="Use 0771234567 or +94771234567"
               />
 
               <Input
@@ -682,6 +763,7 @@ const handleEditOpen = async (id) => {
                 placeholder="Leave blank to keep current password"
                 value={editForm.managerPassword || ""}
                 onChange={handleEditChange}
+                minLength={8}
               />
             </div>
           </div>

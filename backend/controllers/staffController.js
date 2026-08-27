@@ -5,6 +5,13 @@ import Salary from "../models/Salary.js";
 import Appointment from "../models/Appointment.js";
 import Feedback from "../models/Feedback.js";
 
+const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
+const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
+const PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
+const COMMON_PASSWORDS = new Set(["123456", "12345678", "password", "password123", "qwerty"]);
+const normalizePhone = (phone) => String(phone || "").trim().replace(/[\s()-]/g, "");
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // Compute average staff rating from the Feedback collection for all staff
 const attachRatings = async (staffList) => {
   try {
@@ -60,6 +67,55 @@ export const createStaff = async (req, res) => {
       return res.status(400).json({ message: "Password is required" });
     }
 
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const phone = normalizePhone(req.body.phone);
+    const isStrongPassword =
+      password.length >= 8 &&
+      /[A-Z]/.test(password) &&
+      /[a-z]/.test(password) &&
+      /\d/.test(password) &&
+      /[!@#$%^&*]/.test(password);
+
+    if (!EMAIL_PATTERN.test(email) || !EMAIL_DOMAINS.has(email.split("@")[1])) {
+      return res.status(400).json({
+        message: "Email must be valid and use Gmail, Yahoo, Outlook, or Hotmail.",
+      });
+    }
+
+    if (!PHONE_PATTERN.test(phone)) {
+      return res.status(400).json({
+        message: "Enter a valid Sri Lankan phone number (for example, 0771234567 or +94771234567).",
+      });
+    }
+
+    if (!isStrongPassword || COMMON_PASSWORDS.has(password.toLowerCase())) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+      });
+    }
+
+    const duplicateStaff = await Staff.findOne({
+      email: { $regex: `^${escapeRegex(email)}$`, $options: "i" },
+    });
+    if (duplicateStaff) {
+      return res.status(409).json({ message: "That email is already in use." });
+    }
+
+    const suppliedName = String(req.body.name || "").trim();
+    const nameParts = suppliedName.split(/\s+/).filter(Boolean);
+    const firstName = String(req.body.firstName || nameParts.shift() || "").trim();
+    const lastName = String(req.body.lastName || nameParts.join(" ") || "").trim();
+
+    if (!firstName || !lastName) {
+      return res.status(400).json({
+        message: "First name and last name are required.",
+      });
+    }
+
+    if (!req.body.email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
@@ -74,16 +130,13 @@ export const createStaff = async (req, res) => {
 
     const salaryPaymentCountPerDay = Number(req.body.salaryPaymentCountPerDay || 1);
 
-    const firstName = req.body.firstName || "";
-    const lastName = req.body.lastName || "";
-
     const staffData = {
       first_name: firstName,
       last_name: lastName,
       full_name: `${firstName} ${lastName}`.trim(),
-      email: req.body.email,
+      email,
       password_hash,
-      phone: req.body.phone,
+      phone,
       role: req.body.role || "Staff",
       specification: req.body.specification,
       commission_rate: req.body.commission_rate || 0,
@@ -189,7 +242,11 @@ export const createStaff = async (req, res) => {
 
     res.status(201).json(staffResponse);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("createStaff error:", error);
+    const isValidationError = error.name === "ValidationError" || error.name === "MongoServerError";
+    res.status(isValidationError ? 400 : 500).json({
+      message: isValidationError ? `Staff validation failed: ${error.message}` : error.message,
+    });
   }
 };
 

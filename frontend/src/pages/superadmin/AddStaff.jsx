@@ -9,6 +9,44 @@ import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import { useParams } from "react-router-dom";
 
+const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
+const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
+const PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
+const COMMON_PASSWORDS = new Set(["123456", "12345678", "password", "password123", "qwerty"]);
+
+const normalizePhone = (phone) => phone.trim().replace(/[\s()-]/g, "");
+
+const validateStaffForm = (formData) => {
+  const email = formData.email.trim().toLowerCase();
+  const phone = normalizePhone(formData.phone);
+
+  if (!EMAIL_PATTERN.test(email)) {
+    return "Enter a valid email address.";
+  }
+
+  if (!EMAIL_DOMAINS.has(email.split("@")[1])) {
+    return "Email must use Gmail, Yahoo, Outlook, or Hotmail (for example, staff@gmail.com).";
+  }
+
+  if (!PHONE_PATTERN.test(phone)) {
+    return "Enter a valid Sri Lankan phone number (for example, 0771234567 or +94771234567).";
+  }
+
+  const password = formData.password;
+  const isStrongPassword =
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /\d/.test(password) &&
+    /[!@#$%^&*]/.test(password);
+
+  if (!isStrongPassword || COMMON_PASSWORDS.has(password.toLowerCase())) {
+    return "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
+  }
+
+  return "";
+};
+
 const AddStaff = () => {
   const navigate = useNavigate();
   const { salonId } = useParams();
@@ -16,9 +54,11 @@ const AddStaff = () => {
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
     firstName: "", lastName: "", email: "", password: "",
+    phone: "",
     salon: salonId || "", services: [], picture: null,
     salaryPaymentFrequency: "monthly",
     salaryPaymentCountPerDay: 1,
@@ -81,11 +121,20 @@ const AddStaff = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const validationError = validateStaffForm(formData);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setLoading(true);
+    setError("");
     try {
       const data = new FormData();
-      data.append("name", `${formData.firstName} ${formData.lastName}`);
-      data.append("email", formData.email);
+      data.append("firstName", formData.firstName.trim());
+      data.append("lastName", formData.lastName.trim());
+      data.append("email", formData.email.trim().toLowerCase());
+      data.append("phone", normalizePhone(formData.phone));
       data.append("password", formData.password);
       data.append("salonId", formData.salon);
       data.append("salaryPaymentFrequency", formData.salaryPaymentFrequency);
@@ -98,7 +147,7 @@ const AddStaff = () => {
       // Navigate back to Salons page to show updated staffCount
       navigate("/Salons", { state: { refreshData: true } });
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to add staff");
+      setError(err.response?.data?.message || "Failed to add staff");
     } finally {
       setLoading(false);
     }
@@ -114,11 +163,27 @@ const AddStaff = () => {
           <Card.Subtitle>Fill all required fields</Card.Subtitle>
         </Card.Header>
 
+        {error && (
+          <div className="px-4 py-3 mb-4 rounded-lg bg-danger-dim border border-danger-border text-sm text-danger font-semibold">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} autoComplete="off">
           <Input label="First Name" name="firstName" placeholder="Enter first name" required value={formData.firstName} onChange={handleChange} />
           <Input label="Last Name" name="lastName" placeholder="Enter last name" required value={formData.lastName} onChange={handleChange} />
           <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={handleChange} />
-          <Input label="Password" name="password" type="password" placeholder="Enter password" required value={formData.password} onChange={handleChange} />
+          <Input
+            label="Phone"
+            name="phone"
+            placeholder="0771234567 or +94771234567"
+            required
+            value={formData.phone}
+            onChange={handleChange}
+            pattern="(?:\\+94|0)[0-9]{9}"
+            title="Use 0771234567 or +94771234567"
+          />
+          <Input label="Password" name="password" type="password" placeholder="Enter password" required minLength={8} value={formData.password} onChange={handleChange} />
 
           <div className="mb-3.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
