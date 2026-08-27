@@ -116,11 +116,19 @@ export const createSalon = async (req, res) => {
       managerEmail,
       managerPhone,
       managerPassword,
+      open_time,
+      close_time,
     } = req.body;
 
     if (!managerName || !managerEmail || !managerPassword) {
       return res.status(400).json({
         message: "Manager name, email and password are required.",
+      });
+    }
+
+    if (open_time && close_time && open_time >= close_time) {
+      return res.status(400).json({
+        message: "Opening time must be earlier than closing time.",
       });
     }
 
@@ -166,6 +174,8 @@ export const createSalon = async (req, res) => {
       location,
       phone: normalizedSalonPhone,
       about,
+      open_time,
+      close_time,
       logo: req.file ? req.file.path : "",
     });
 
@@ -365,6 +375,12 @@ export const updateSalon = async (req, res) => {
     }
     if (salonData.phone !== undefined) {
       salonData.phone = normalizedSalonPhone;
+    }
+
+    if (salonData.open_time && salonData.close_time && salonData.open_time >= salonData.close_time) {
+      return res.status(400).json({
+        message: "Opening time must be earlier than closing time.",
+      });
     }
 
     if (validation.normalizedEmail) {

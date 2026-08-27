@@ -8,6 +8,13 @@ import Button from "../../components/ui/Button";
 
 const _API_BASE = "http://localhost:5000";
 
+const TIME_SLOTS = [];
+for (let i = 0; i < 24; i++) {
+  const hour = i.toString().padStart(2, "0");
+  TIME_SLOTS.push(`${hour}:00`);
+  TIME_SLOTS.push(`${hour}:30`);
+}
+
 const AddSalon = () => {
   const navigate = useNavigate();
 
@@ -19,7 +26,9 @@ const AddSalon = () => {
     managerName: "",
     managerEmail: "",
     managerPhone: "",
-    managerPassword: ""
+    managerPassword: "",
+    open_time: "",
+    close_time: ""
   });
   const [logo, setLogo] = useState(null);
   const [logoPreview, setLogoPreview] = useState("");
@@ -41,6 +50,13 @@ const AddSalon = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    if (formData.open_time && formData.close_time && formData.open_time >= formData.close_time) {
+      setError("Opening time must be earlier than closing time.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const data = new FormData();
       Object.entries(formData).forEach(([key, value]) => {
@@ -78,6 +94,42 @@ const AddSalon = () => {
           <Input label="Address" name="location" placeholder="Enter address" required value={formData.location} onChange={handleChange} />
 <Input label="About" name="about" placeholder="Enter about the salon" value={formData.about} onChange={handleChange} />
 
+          <div className="grid grid-cols-2 gap-4 mb-3.5">
+            <div>
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                Opening Time
+              </label>
+              <select
+                name="open_time"
+                value={formData.open_time}
+                onChange={handleChange}
+                required
+                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none focus:border-accent transition-colors cursor-pointer"
+              >
+                <option value="" disabled>Select opening time</option>
+                {TIME_SLOTS.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+                Closing Time
+              </label>
+              <select
+                name="close_time"
+                value={formData.close_time}
+                onChange={handleChange}
+                required
+                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none focus:border-accent transition-colors cursor-pointer"
+              >
+                <option value="" disabled>Select closing time</option>
+                {TIME_SLOTS.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+            </div>
+          </div>
           {/* Salon Logo Upload */}
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
