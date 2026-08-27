@@ -591,12 +591,10 @@ export const removeSalonImage = async (req, res) => {
       });
     }
 
-    const filename = req.params.filename.replace(/\\/g, "/");
+    const filename = path.posix.basename(String(req.params.filename || "").replace(/\\/g, "/"));
 
-    const remaining = (salon.images || []).filter((img) => {
-      const imgFile = img.split("/").pop();
-      return imgFile !== filename;
-    });
+    const removedImage = (salon.images || []).find((img) => img.split("/").pop() === filename);
+    const remaining = (salon.images || []).filter((img) => img.split("/").pop() !== filename);
 
     salon.images = remaining;
 
@@ -604,7 +602,7 @@ export const removeSalonImage = async (req, res) => {
 
     // Remote media is managed by its shared storage provider. Only legacy local
     // uploads have a file on this server to remove.
-    if (isRemoteMedia(filename)) {
+    if (isRemoteMedia(removedImage)) {
       return res.json({ images: salon.images, message: "Image removed successfully" });
     }
 
