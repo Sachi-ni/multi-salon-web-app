@@ -180,16 +180,15 @@ const Header = ({ onToggleSidebar }) => {
           className="flex items-center gap-2.5 cursor-pointer group"
         >
           {/* Avatar */}
-          <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-xs font-black text-primary flex-shrink-0 group-hover:bg-accent-hover transition-colors duration-150 overflow-hidden">
-            {user?.image ? (
+          <div className="relative w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-xs font-black text-primary flex-shrink-0 group-hover:bg-accent-hover transition-colors duration-150 overflow-hidden">
+            <span aria-hidden="true">{initials}</span>
+            {user?.image && (
               <img
                 src={mediaUrl(user.image)}
                 alt={`${user?.name || "Super Admin"} profile`}
-                className="w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover"
                 onError={(event) => { event.currentTarget.style.display = "none"; }}
               />
-            ) : (
-              initials
             )}
           </div>
 
