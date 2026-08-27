@@ -156,19 +156,36 @@ export const getAvailableSlots = async (req, res) => {
       availability = { slots: generatedSlots };
     }
 
-    // 3. Get all confirmed/pending appointments for this staff on this date
-    //    (We exclude slots occupied by confirmed appointments)
-    const existingAppointments = await Appointment.find({
-      staff_id: staffId,
+    // 3. Get all confirmed/pending appointments on this date
+    const validAppointments = await Appointment.find({
       appointment_date: date,
       status: { $in: ["confirmed", "pending"] }
     });
+    
+    const validApptIds = validAppointments.map(a => a._id);
 
-    // 4. Build list of occupied time ranges from confirmed appointments
-    const occupiedRanges = existingAppointments.map(a => ({
-      start: a.start_time,
-      end: a.end_time
-    }));
+    // 4. Get all AppointmentService records for this staff linked to valid appointments
+    const staffServices = await AppointmentService.find({
+      staff_id: staffId,
+      appointment_id: { $in: validApptIds }
+    });
+
+    // 4.5 Build list of occupied time ranges from confirmed appointments and services
+    const occupiedRanges = [];
+
+    // Add from parent appointments if this staff is the primary staff
+    for (const appt of validAppointments) {
+      if (appt.staff_id && appt.staff_id.toString() === staffId) {
+        occupiedRanges.push({ start: appt.start_time, end: appt.end_time });
+      }
+    }
+
+    // Add from specific AppointmentService entries for this staff
+    for (const svc of staffServices) {
+      if (svc.service_start_time && svc.service_end_time) {
+        occupiedRanges.push({ start: svc.service_start_time, end: svc.service_end_time });
+      }
+    }
 
     // 5. Filter available slots — not booked and not overlapping with confirmed appointments
     const freeSlots = availability.slots.filter(slot => {
