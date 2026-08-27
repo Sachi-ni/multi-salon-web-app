@@ -5,8 +5,7 @@ import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
 import { getSalon } from "../../services/salonService";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../config";
 
 const AdminHeader = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
@@ -278,7 +277,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
           <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-primary font-black text-xs overflow-hidden">
             {user?.image ? (
               <img
-                src={user.image.startsWith("http") ? user.image : `http://localhost:5000/${user.image.replace(/\\/g, "/")}`}
+                src={user.image.startsWith("http") ? user.image : `${API_BASE}/${user.image.replace(/\\/g, "/")}`}
                 alt={displayName}
                 className="w-full h-full object-cover"
                 onError={(e) => { e.currentTarget.style.display = "none"; }}

@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, Clock, Phone, Star, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getUploadUrl } from '../../../config';
 
 export default function SalonCard({ branch, index }) {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ const primaryImage = (branch.images && branch.images.length > 0)
     : (branch.logo || null);
 
   const imageUrl = primaryImage 
-    ? `http://localhost:5000/${primaryImage.replace(/\\/g, '/')}`
+    ? getUploadUrl(primaryImage)
     : "/salon_interior.png";
 
   return (

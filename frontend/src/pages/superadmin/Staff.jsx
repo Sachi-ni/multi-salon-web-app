@@ -16,8 +16,7 @@ import EmptyState from "../../components/ui/EmptyState";
 import Table from "../../components/ui/Table";
 import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../config";
 
 /* ── Skeleton Card ── */
 const SkeletonStaffCard = () => (

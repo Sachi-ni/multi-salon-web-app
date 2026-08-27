@@ -36,8 +36,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
-
-const _API_BASE = "http://localhost:5000";
+import { API_BASE as _API_BASE } from "../../config";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();

@@ -5,6 +5,7 @@ import Footer from './landing-sections/Footer';
 import { getSalon } from '../../services/salonService';
 import { getTeam } from '../../services/staffService';
 import { MapPin, Clock, Phone, Star, ChevronLeft } from 'lucide-react';
+import { getUploadUrl } from '../../config';
 
 export default function SalonDetailsPage() {
   const { id } = useParams();
@@ -65,7 +66,7 @@ export default function SalonDetailsPage() {
     : (salon.logo ? [salon.logo] : []);
 
   const imageUrl = galleryImages[0] 
-    ? `http://localhost:5000/${galleryImages[0].replace(/\\/g, '/')}`
+    ? getUploadUrl(galleryImages[0])
     : "/salon_interior.png";
 
   return (
@@ -90,7 +91,7 @@ export default function SalonDetailsPage() {
 <div className="grid grid-cols-3 gap-4">
                 {galleryImages.slice(1).map((img, i) => (
                   <div key={i} className="h-32 rounded-xl overflow-hidden border border-border">
-                    <img src={`http://localhost:5000/${img.replace(/\\/g, '/')}`} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
+                    <img src={getUploadUrl(img)} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
                 {galleryImages.length <= 1 && (
@@ -176,7 +177,7 @@ export default function SalonDetailsPage() {
                   <div key={member._id} className="bg-surface rounded-2xl p-4 border border-border text-center">
                     <div className="w-20 h-20 mx-auto rounded-full bg-surface-2 border-2 border-accent mb-4 overflow-hidden">
                        {member.image ? (
-                         <img src={`http://localhost:5000/${member.image.replace(/\\/g, '/')}`} alt={member.name} className="w-full h-full object-cover" />
+                         <img src={getUploadUrl(member.image)} alt={member.name} className="w-full h-full object-cover" />
                        ) : (
                          <div className="w-full h-full bg-accent/20 flex items-center justify-center text-accent font-bold text-xl">
                             {member.name.charAt(0)}
