@@ -15,13 +15,12 @@ export default function SalonCard({ branch, index }) {
     navigate(`/our-salons/${branch._id}`);
   };
 
-const primaryImage = (branch.images && branch.images.length > 0)
+  const primaryImage = (branch.images && branch.images.length > 0)
     ? branch.images[0]
     : (branch.logo || null);
 
   const imageUrl = primaryImage 
     ? mediaUrl(primaryImage)
-    ? `http://localhost:5000/${primaryImage.replace(/\\/g, '/')}`
     : "/salon_interior.png";
 
   return (

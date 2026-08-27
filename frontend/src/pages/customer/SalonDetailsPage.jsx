@@ -60,14 +60,13 @@ export default function SalonDetailsPage() {
     navigate('/book', { state: { salon } });
   };
 
-// Build a list of gallery images from uploaded salon photos only (no external links)
+  // Build a list of gallery images from uploaded salon photos only (no external links)
   const galleryImages = (salon.images && salon.images.length > 0)
     ? salon.images
     : (salon.logo ? [salon.logo] : []);
 
   const imageUrl = galleryImages[0] 
     ? mediaUrl(galleryImages[0])
-    ? `http://localhost:5000/${galleryImages[0].replace(/\\/g, '/')}`
     : "/salon_interior.png";
 
   return (
@@ -89,11 +88,10 @@ export default function SalonDetailsPage() {
               <div className="h-96 rounded-3xl overflow-hidden border border-border">
                 <img src={imageUrl} alt={salon.name} className="w-full h-full object-cover" />
               </div>
-<div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {galleryImages.slice(1).map((img, i) => (
                   <div key={i} className="h-32 rounded-xl overflow-hidden border border-border">
                     <img src={mediaUrl(img)} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
-                    <img src={`http://localhost:5000/${img.replace(/\\/g, '/')}`} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
                 {galleryImages.length <= 1 && (
@@ -116,7 +114,7 @@ export default function SalonDetailsPage() {
 
             {/* Right: Info */}
             <div className="flex flex-col">
-<div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2">
                  <Star className="w-5 h-5 fill-accent text-accent" />
                  <span className="text-white font-bold text-lg">{salon.rating || 0}</span>
                  <span className="text-muted-2">({salon.ratingCount || 0} reviews)</span>

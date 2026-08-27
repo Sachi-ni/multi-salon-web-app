@@ -104,12 +104,12 @@ const CustomerHeader = () => {
 
   const navLinks = [
     { name: "Home", href: "#home", icon: Home },
-    { name: "About", href: "#about", icon: Info },
-    { name: "Services", href: "#services", icon: Scissors },
+    { name: "About", href: "/about", icon: Info },
+    { name: "Services", href: "/our-services", icon: Scissors },
     { name: "Salons", href: "/our-salons", icon: Store },
     { name: "Our Team", href: "/team", icon: Users },
     { name: "Testimonials", href: "/testimonials", icon: MessageSquare },
-    { name: "Contact", href: "#contact", icon: Phone },
+    { name: "Contact", href: "/contact", icon: Phone },
   ];
 
   const isDashboard = location.pathname.startsWith("/customer/dashboard");

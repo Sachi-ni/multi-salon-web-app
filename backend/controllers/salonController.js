@@ -178,7 +178,6 @@ export const createSalon = async (req, res) => {
       open_time,
       close_time,
       logo: req.file ? await storeMedia(req.file, "salonhub/logos") : "",
-      logo: req.file ? req.file.path : "",
     });
 
     const salt = await bcrypt.genSalt(10);
@@ -404,7 +403,6 @@ export const updateSalon = async (req, res) => {
     // If a new logo file was uploaded, update logo
     if (req.file) {
       salonData.logo = await storeMedia(req.file, "salonhub/logos");
-      salonData.logo = req.file.path.replace(/\\/g, "/");
     }
 
     // Update salon information
@@ -607,87 +605,6 @@ export const removeSalonImage = async (req, res) => {
     }
 
     // Best-effort physical file deletion for legacy local uploads
-    try {
-      const filePath = path.join(
-        __dirname,
-        "../uploads",
-        filename
-      );
-
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    } catch (fileErr) {
-      console.warn(
-        "Could not delete image file:",
-        fileErr.message
-      );
-    }
-
-    res.json({
-      images: salon.images,
-      message: "Image removed successfully",
-
-    if (!salon) {
-      return res.status(404).json({
-        message: "Salon not found",
-      });
-    }
-
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({
-        message: "No images uploaded",
-      });
-    }
-
-    const newPaths = req.files.map((f) =>
-      f.path.replace(/\\/g, "/")
-    );
-
-    salon.images = [
-      ...(salon.images || []),
-      ...newPaths,
-    ];
-
-    await salon.save();
-
-    res.status(201).json({
-      images: salon.images,
-      message: "Images uploaded successfully",
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
-  }
-};
-
-/**
- * Remove a single gallery photo from a salon
- * Expects req.params.filename
- */
-export const removeSalonImage = async (req, res) => {
-  try {
-    const salon = await Salon.findById(req.params.id);
-
-    if (!salon) {
-      return res.status(404).json({
-        message: "Salon not found",
-      });
-    }
-
-    const filename = req.params.filename.replace(/\\/g, "/");
-
-    const remaining = (salon.images || []).filter((img) => {
-      const imgFile = img.split("/").pop();
-      return imgFile !== filename;
-    });
-
-    salon.images = remaining;
-
-    await salon.save();
-
-    // Best-effort physical file deletion
     try {
       const filePath = path.join(
         __dirname,

@@ -18,8 +18,6 @@ import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
 import { mediaUrl } from "../../utils/mediaUrl";
 
-const API_BASE = "http://localhost:5000";
-
 /* ── Skeleton Card ── */
 const SkeletonStaffCard = () => (
   <div className="bg-surface border border-border rounded-2xl p-5 animate-pulse space-y-4 shadow-card">
