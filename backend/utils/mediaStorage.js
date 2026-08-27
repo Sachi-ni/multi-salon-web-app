@@ -7,7 +7,7 @@ const hasCloudinaryConfig = () => Boolean(
   process.env.CLOUDINARY_API_SECRET
 );
 
-const localPath = (file) => file.path.replace(/\\\\/g, "/");
+const localPath = (file) => file.path.replace(/\\/g, "/");
 
 /**
  * Upload a Multer file to Cloudinary when shared media is configured.
