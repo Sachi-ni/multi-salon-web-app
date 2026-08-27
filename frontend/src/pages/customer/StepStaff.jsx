@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { getAvailableStaff } from "../../../services/appointmentService";
+import { getAvailableStaff, getAvailableSlots } from "../../../services/appointmentService";
 
 export default function StepStaff({ booking, onNext, onBack }) {
-  // staffOptions: { [service_id]: [{ staff_id, full_name, free_slots, availabilityId }] }
+  // staffOptions: { [service_id]: [{ staff_id, full_name, role, etc }] }
   const [staffOptions, setStaffOptions] = useState({});
+  const [slotsCache, setSlotsCache] = useState({}); // { [staff_id_service_id]: [slots] }
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState("");
 
@@ -36,7 +37,23 @@ export default function StepStaff({ booking, onNext, onBack }) {
       }
     };
     fetchAll();
-  }, []);
+  }, [booking.date, booking.salonId, booking.services]);
+
+  // Fetch slots for selected staff
+  useEffect(() => {
+    Object.entries(selections).forEach(([service_id, sel]) => {
+      if (sel.staff_id && !slotsCache[`${sel.staff_id}_${service_id}`]) {
+        getAvailableSlots(sel.staff_id, booking.date, service_id, booking.salonId)
+          .then(res => {
+            setSlotsCache(prev => ({
+              ...prev,
+              [`${sel.staff_id}_${service_id}`]: res.data
+            }));
+          })
+          .catch(err => console.error("Error fetching slots", err));
+      }
+    });
+  }, [selections, booking.date, booking.salonId, slotsCache]);
 
   const selectStaff = (service_id, staffMember) => {
     setSelections(prev => ({
@@ -109,18 +126,23 @@ export default function StepStaff({ booking, onNext, onBack }) {
                 {currentSel?.staff_id && (
                   <div className="slot-options">
                     <p>Available slots:</p>
-                    {available
-                      .find(m => m.staff_id === currentSel.staff_id)
-                      ?.free_slots.map((slot, i) => (
-                        <button
-                          key={i}
-                          className={`slot-btn ${currentSel?.slot?.start_time === slot.start_time ? "selected" : ""}`}
-                          onClick={() => selectSlot(s.service_id, slot)}
-                        >
-                          {slot.start_time} – {slot.end_time}
-                        </button>
-                      ))
-                    }
+                    {slotsCache[`${currentSel.staff_id}_${s.service_id}`] ? (
+                      slotsCache[`${currentSel.staff_id}_${s.service_id}`].length > 0 ? (
+                        slotsCache[`${currentSel.staff_id}_${s.service_id}`].map((slot, i) => (
+                          <button
+                            key={i}
+                            className={`slot-btn ${currentSel?.slot?.start_time === slot.start_time ? "selected" : ""}`}
+                            onClick={() => selectSlot(s.service_id, slot)}
+                          >
+                            {slot.start_time} – {slot.end_time}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="text-xs text-neutral-400">No available slots for this staff on this date.</p>
+                      )
+                    ) : (
+                      <p className="text-xs text-neutral-400 animate-pulse">Loading slots...</p>
+                    )}
                   </div>
                 )}
               </>
