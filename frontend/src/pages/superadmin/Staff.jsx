@@ -183,15 +183,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
               <MapPin className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
               <span className="text-neutral-300 font-medium truncate">{salonName}</span>
             </div>
-
-            {/* Total Bookings */}
-            <div className="flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-              <span className="text-neutral-300 font-medium">
-                <strong className="text-white font-extrabold">{staff.bookings || 0}</strong> Bookings Completed
-              </span>
-            </div>
-
+            
             {/* Daily Salary Rate */}
             {staff.salary_payment_count_per_day && (
               <div className="flex items-center gap-2">
