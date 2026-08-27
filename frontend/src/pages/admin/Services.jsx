@@ -7,7 +7,7 @@ import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
-import { Scissors, Clock, MapPin, Search, LayoutGrid, List, Plus, Coins, Pencil, Trash2, MoreVertical, DollarSign } from "lucide-react";
+import { Scissors, Clock, MapPin, Search, LayoutGrid, List, Plus, Coins, Pencil, Trash2, MoreVertical } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 

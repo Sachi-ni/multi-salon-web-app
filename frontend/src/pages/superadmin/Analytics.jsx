@@ -4,9 +4,8 @@ import {
   XCircle, DollarSign, TrendingUp, Activity,
   BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, Sparkles
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+import { motion } from "framer-motion";
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 

@@ -6,7 +6,7 @@ import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 
-const API_BASE = "http://localhost:5000";
+const _API_BASE = "http://localhost:5000";
 
 const AddSalon = () => {
   const navigate = useNavigate();
