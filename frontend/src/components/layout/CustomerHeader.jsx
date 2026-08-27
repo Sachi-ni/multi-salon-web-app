@@ -108,7 +108,7 @@ const CustomerHeader = () => {
     { name: "Services", href: "#services", icon: Scissors },
     { name: "Salons", href: "/our-salons", icon: Store },
     { name: "Our Team", href: "/team", icon: Users },
-    { name: "Testimonials", href: "#testimonials", icon: MessageSquare },
+    { name: "Testimonials", href: "/testimonials", icon: MessageSquare },
     { name: "Contact", href: "#contact", icon: Phone },
   ];
 

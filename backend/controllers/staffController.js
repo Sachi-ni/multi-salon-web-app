@@ -2,20 +2,120 @@ import Staff from "../models/Staff.js";
 import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 import Salary from "../models/Salary.js";
-import Admin from "../models/Admin.js";
 import Appointment from "../models/Appointment.js";
+import Feedback from "../models/Feedback.js";
+import { storeMedia } from "../utils/mediaStorage.js";
+
+const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
+const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
+const PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
+const COMMON_PASSWORDS = new Set(["123456", "12345678", "password", "password123", "qwerty"]);
+const normalizePhone = (phone) => String(phone || "").trim().replace(/[\s()-]/g, "");
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Compute average staff rating from the Feedback collection for all staff
+const attachRatings = async (staffList) => {
+  try {
+    const staffIds = staffList.map((s) => s._id);
+    if (staffIds.length === 0) return staffList;
+
+    const agg = await Feedback.aggregate([
+      { $match: { staff_id: { $in: staffIds } } },
+      {
+        $group: {
+          _id: "$staff_id",
+          avgRating: { $avg: "$staffRating" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const ratingMap = {};
+    agg.forEach((r) => {
+      ratingMap[r._id.toString()] = {
+        rating: Number(r.avgRating.toFixed(1)) || 0,
+        ratingCount: r.count,
+      };
+    });
+
+    return staffList.map((member) => {
+      const meta = ratingMap[member._id.toString()] || { rating: 0, ratingCount: 0 };
+      return { ...member, rating: meta.rating, ratingCount: meta.ratingCount };
+    });
+  } catch (err) {
+    console.error("Error attaching staff ratings:", err);
+    return staffList;
+  }
+};
 
 export const createStaff = async (req, res) => {
   try {
     const { password } = req.body;
-    const services = Array.isArray(req.body.services)
-      ? req.body.services
-      : req.body.services
-        ? [req.body.services]
-        : [];
+    let services = [];
+    if (req.body.services) {
+      if (Array.isArray(req.body.services)) {
+        services = req.body.services;
+      } else if (typeof req.body.services === "string") {
+        try {
+          const parsed = JSON.parse(req.body.services);
+          services = Array.isArray(parsed) ? parsed : [req.body.services];
+        } catch {
+          services = [req.body.services];
+        }
+      }
+    }
 
     if (!password) {
       return res.status(400).json({ message: "Password is required" });
+    }
+
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const phone = normalizePhone(req.body.phone);
+    const isStrongPassword =
+      password.length >= 8 &&
+      /[A-Z]/.test(password) &&
+      /[a-z]/.test(password) &&
+      /\d/.test(password) &&
+      /[!@#$%^&*]/.test(password);
+
+    if (!EMAIL_PATTERN.test(email) || !EMAIL_DOMAINS.has(email.split("@")[1])) {
+      return res.status(400).json({
+        message: "Email must be valid and use Gmail, Yahoo, Outlook, or Hotmail.",
+      });
+    }
+
+    if (!PHONE_PATTERN.test(phone)) {
+      return res.status(400).json({
+        message: "Enter a valid Sri Lankan phone number (for example, 0771234567 or +94771234567).",
+      });
+    }
+
+    if (!isStrongPassword || COMMON_PASSWORDS.has(password.toLowerCase())) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+      });
+    }
+
+    const duplicateStaff = await Staff.findOne({
+      email: { $regex: `^${escapeRegex(email)}$`, $options: "i" },
+    });
+    if (duplicateStaff) {
+      return res.status(409).json({ message: "That email is already in use." });
+    }
+
+    const suppliedName = String(req.body.name || "").trim();
+    const nameParts = suppliedName.split(/\s+/).filter(Boolean);
+    const firstName = String(req.body.firstName || nameParts.shift() || "").trim();
+    const lastName = String(req.body.lastName || nameParts.join(" ") || "").trim();
+
+    if (!firstName || !lastName) {
+      return res.status(400).json({
+        message: "First name and last name are required.",
+      });
+    }
+
+    if (!req.body.email) {
+      return res.status(400).json({ message: "Email is required" });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -33,18 +133,20 @@ export const createStaff = async (req, res) => {
     const salaryPaymentCountPerDay = Number(req.body.salaryPaymentCountPerDay || 1);
 
     const staffData = {
-      full_name: req.body.name,
-      email: req.body.email,
+      first_name: firstName,
+      last_name: lastName,
+      full_name: `${firstName} ${lastName}`.trim(),
+      email,
       password_hash,
-      phone: req.body.phone,
+      phone,
       role: req.body.role || "Staff",
       specification: req.body.specification,
-      commission_rate: req.body.commission_rate,
+      commission_rate: req.body.commission_rate || 0,
       salary_payment_frequency: req.body.salaryPaymentFrequency || "monthly",
       salary_payment_count_per_day: Number.isFinite(salaryPaymentCountPerDay) && salaryPaymentCountPerDay > 0 ? salaryPaymentCountPerDay : 1,
       salon_id: salonId,
       services,
-      image: req.file ? req.file.path : null,
+      image: req.file ? await storeMedia(req.file, "salonhub/staff") : null,
     };
 
     // keep status default aligned with schema enum
@@ -61,33 +163,80 @@ export const createStaff = async (req, res) => {
         { $inc: { staffCount: 1 } }
       );
     }
-    // Auto-generate salary rows for current month for this staff (best-effort)
-    try {
-      const now = new Date();
-      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      // We generate only for this staff by invoking Salary logic directly:
-      // If controller exists, we could call it, but here we simply ensure a record exists.
-      // Salary generation logic lives in salaryController; for simplicity we just leave it to /generate-monthly.
-      // Create a placeholder now with basicSalary=0; controller will update snapshot/basicSalary when generate-monthly is called.
-      await Salary.findOneAndUpdate(
-        { salon_id: salonId, staff_id: staff._id, month: monthKey },
-        {
-          $setOnInsert: {
-            salon_id: salonId,
-            staff_id: staff._id,
-            month: monthKey,
-            servicesSnapshot: [],
-            basicSalary: 0,
-            commission: 0,
-            totalSalary: 0,
-            status: "Not Paid",
-            paidAt: null,
+
+    // Auto-generate salary record for current period for this staff (excluding managers)
+    if (!["manager", "staff-admin"].includes((staff.role || "").toLowerCase())) {
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const frequency = staff.salary_payment_frequency || "monthly";
+
+        const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        let period, periodStart, periodEnd, weekNumber = 0;
+
+        if (frequency === "daily") {
+          period = yyyymmdd;
+          periodStart = yyyymmdd;
+          periodEnd = yyyymmdd;
+        } else if (frequency === "weekly") {
+          const d = new Date(yyyymmdd);
+          const dayNum = d.getUTCDay() || 7;
+          d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+          const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+          weekNumber = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+          period = `${year}-W${String(weekNumber).padStart(2, "0")}`;
+
+          const firstDayOfYear = new Date(year, 0, 1);
+          const days = (weekNumber - 1) * 7;
+          const startDate = new Date(firstDayOfYear);
+          startDate.setDate(firstDayOfYear.getDate() + days);
+          const dayOfWeek = startDate.getDay();
+          const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          startDate.setDate(startDate.getDate() + diff);
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 6);
+
+          const toStr = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+          periodStart = toStr(startDate);
+          periodEnd = toStr(endDate);
+        } else {
+          period = `${year}-${String(month).padStart(2, "0")}`;
+          const lastDay = new Date(year, month, 0).getDate();
+          periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+          periodEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        }
+
+        await Salary.findOneAndUpdate(
+          { salon_id: salonId, staff_id: staff._id, period, frequency },
+          {
+            $setOnInsert: {
+              salon_id: salonId,
+              staff_id: staff._id,
+              frequency,
+              period,
+              staff_name: staff.full_name || "",
+              staff_role: staff.role || "",
+              commission_rate: staff.commission_rate || 0,
+              salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+              workingAmount: 0,
+              rate: staff.commission_rate || 0,
+              workRate: 0,
+              daySalary: 0,
+              totalSalary: 0,
+              status: "Not Paid",
+              year,
+              month,
+              weekNumber,
+              dateRange: { start: periodStart, end: periodEnd },
+              dailyRecords: [],
+            },
           },
-        },
-        { upsert: true, new: true }
-      );
-    } catch (e) {
-      // ignore
+          { upsert: true, new: true }
+        );
+      } catch (e) {
+        console.error("Error auto-creating salary row:", e);
+      }
     }
 
     const staffResponse = staff.toObject();
@@ -95,7 +244,11 @@ export const createStaff = async (req, res) => {
 
     res.status(201).json(staffResponse);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("createStaff error:", error);
+    const isValidationError = error.name === "ValidationError" || error.name === "MongoServerError";
+    res.status(isValidationError ? 400 : 500).json({
+      message: isValidationError ? `Staff validation failed: ${error.message}` : error.message,
+    });
   }
 };
 
@@ -107,7 +260,7 @@ export const getStaff = async (req, res) => {
 
     let filter = {};
 
-    // If the logged-in user belongs to a salon, always scope by their salon_id.
+    // Manager view
     if (isSalonScopedAdmin) {
       filter = {
         salon_id: req.user.salon_id,
@@ -123,18 +276,18 @@ export const getStaff = async (req, res) => {
       }
     }
 
-    console.log("req user:", req.user);
-    console.log("Filter:", filter);
-    
     const staff = await Staff.find(filter)
       .select("-password_hash")
       .populate("salon_id", "name")
       .populate("services", "service_name");
 
-    const formattedStaff = staff.map((member) => ({
+let formattedStaff = staff.map((member) => ({
       ...member.toObject(),
       name: member.full_name,
     }));
+
+    // Attach average staff rating from Feedback collection (super-admin & manager views)
+    formattedStaff = await attachRatings(formattedStaff);
 
     res.json(formattedStaff);
   } catch (error) {
@@ -148,7 +301,12 @@ export const getTeam = async (req, res) => {
   try {
     const { salonId, serviceId } = req.query;
 
-    const filter = { status: "Active" };
+    // The public customer team page must only expose service professionals,
+    // not salon-management accounts.
+    const filter = {
+      status: "Active",
+      role: { $not: /^(manager|staff-admin|super-admin)$/i },
+    };
 
     if (salonId) {
       filter.salon_id = salonId;
@@ -157,15 +315,18 @@ export const getTeam = async (req, res) => {
       filter.services = serviceId;
     }
 
-    const staff = await Staff.find(filter)
+const staff = await Staff.find(filter)
       .select("-password_hash")
       .populate("salon_id", "name")
       .populate("services", "service_name");
 
-    const formattedStaff = staff.map((member) => ({
+    let formattedStaff = staff.map((member) => ({
       ...member.toObject(),
       name: member.full_name,
     }));
+
+    // Attach average staff rating from Feedback collection (customer team page)
+    formattedStaff = await attachRatings(formattedStaff);
 
     res.json(formattedStaff);
   } catch (error) {
@@ -180,9 +341,6 @@ export const updateStaff = async (req, res) => {
     const userRole = req.user?.role?.toLowerCase();
     const isManager = userRole === "manager";
     const isSuperAdmin = userRole === "super-admin";
-
-    console.log("Updating Staff ID:", req.params.id);
-    console.log("Request Body:", req.body);
 
     const existing = await Staff.findById(req.params.id);
 
@@ -204,24 +362,73 @@ export const updateStaff = async (req, res) => {
 
     const updateData = {};
 
-    const services = (
-      Array.isArray(req.body.services)
-        ? req.body.services
-        : req.body.services
-        ? [req.body.services]
-        : undefined
-    )?.filter(Boolean);
+    let services;
+
+    if (req.body.services !== undefined) {
+      let rawServices = req.body.services;
+      if (Array.isArray(rawServices)) {
+        services = rawServices;
+      } else if (typeof rawServices === "string") {
+        try {
+          const parsed = JSON.parse(rawServices);
+          services = Array.isArray(parsed) ? parsed : [rawServices];
+        } catch (error) {
+          services = [rawServices];
+        }
+      } else {
+        services = [];
+      }
+      services = services.filter((serviceId) => typeof serviceId === "string" && serviceId.trim() !== "");
+    }
+
+    console.log("services:", req.body.services);
+    console.log("type:", typeof req.body.services);
 
     const willUpdateServices = services !== undefined;
 
-    if (req.body.name !== undefined)
-      updateData.full_name = req.body.name;
+    if (req.body.firstName !== undefined) {
+      updateData.first_name = req.body.firstName;
+    }
+
+    if (req.body.lastName !== undefined) {
+      updateData.last_name = req.body.lastName;
+    }
+
+    if (
+      req.body.firstName !== undefined ||
+      req.body.lastName !== undefined
+    ) {
+      const firstName =
+        req.body.firstName !== undefined
+          ? req.body.firstName
+          : existing.first_name;
+
+      const lastName =
+        req.body.lastName !== undefined
+          ? req.body.lastName
+          : existing.last_name;
+
+      updateData.full_name =
+        `${firstName} ${lastName}`.trim();
+    }
 
     if (req.body.email !== undefined)
       updateData.email = req.body.email;
 
+    if (req.body.phone !== undefined)
+      updateData.phone = req.body.phone;
+
+    if (req.body.password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password_hash = await bcrypt.hash(req.body.password, salt);
+    }
+
     if (req.body.role !== undefined)
       updateData.role = req.body.role;
+
+    if (req.body.specification !== undefined) {
+      updateData.specification = req.body.specification;
+    }
 
     if (req.body.salaryPaymentFrequency !== undefined)
       updateData.salary_payment_frequency = req.body.salaryPaymentFrequency;
@@ -242,14 +449,14 @@ export const updateStaff = async (req, res) => {
     if (req.body.status !== undefined)
       updateData.status = req.body.status;
 
+    console.log("FINAL SERVICES TO SAVE:", services);
+
     if (services !== undefined)
       updateData.services = services;
 
     if (req.file) {
-      updateData.image = req.file.path;
+      updateData.image = await storeMedia(req.file, "salonhub/staff");
     }
-
-    console.log("Update Data:", updateData);
 
     // Handle salon changes and maintain staff counts
     if (
@@ -271,30 +478,97 @@ export const updateStaff = async (req, res) => {
     const staff = await Staff.findByIdAndUpdate(
       req.params.id,
       updateData,
-      {
-        returnDocument: "after",
-      }
-    ).select("-password_hash");
+      { new: true }
+    )
+      .select("-password_hash")
+      .populate("services", "service_name")
+      .populate("salon_id", "name");
 
-    // If staff services changed, ensure salary row basics are refreshed for current month (best-effort)
-    if (willUpdateServices) {
-      try {
+    // Update staff snapshots in unpaid salary records if name, count per day, or frequency changed
+    try {
+      const isNonManager = !["manager", "staff-admin"].includes((staff.role || "").toLowerCase());
+      if (isNonManager) {
+        const salonId = staff.salon_id;
+        const frequency = staff.salary_payment_frequency || "monthly";
         const now = new Date();
-        const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        await Salary.findOneAndUpdate(
-          { salon_id: staff.salon_id, staff_id: staff._id, month: monthKey },
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+        let period, periodStart, periodEnd, weekNumber = 0;
+        if (frequency === "daily") {
+          period = yyyymmdd;
+          periodStart = yyyymmdd;
+          periodEnd = yyyymmdd;
+        } else if (frequency === "weekly") {
+          const d = new Date(yyyymmdd);
+          const dayNum = d.getUTCDay() || 7;
+          d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+          const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+          weekNumber = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+          period = `${year}-W${String(weekNumber).padStart(2, "0")}`;
+          const firstDayOfYear = new Date(year, 0, 1);
+          const days = (weekNumber - 1) * 7;
+          const startDate = new Date(firstDayOfYear);
+          startDate.setDate(firstDayOfYear.getDate() + days);
+          const dayOfWeek = startDate.getDay();
+          const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          startDate.setDate(startDate.getDate() + diff);
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 6);
+          const toStr = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+          periodStart = toStr(startDate);
+          periodEnd = toStr(endDate);
+        } else {
+          period = `${year}-${String(month).padStart(2, "0")}`;
+          const lastDay = new Date(year, month, 0).getDate();
+          periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+          periodEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        }
+
+        // Update name and count per day on all unpaid records
+        await Salary.updateMany(
+          { staff_id: staff._id, status: "Not Paid" },
           {
-            $set: { commission: 0, totalSalary: 0, status: "Not Paid" },
-            $unset: { servicesSnapshot: "" },
+            $set: {
+              staff_name: staff.full_name || "",
+              salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+            }
+          }
+        );
+
+        // Ensure a current period record exists with the updated frequency
+        await Salary.findOneAndUpdate(
+          { salon_id: salonId, staff_id: staff._id, period, frequency },
+          {
+            $setOnInsert: {
+              salon_id: salonId,
+              staff_id: staff._id,
+              frequency,
+              period,
+              staff_name: staff.full_name || "",
+              staff_role: staff.role || "",
+              commission_rate: staff.commission_rate || 0,
+              salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+              workingAmount: 0,
+              rate: staff.commission_rate || 0,
+              workRate: 0,
+              daySalary: 0,
+              totalSalary: 0,
+              status: "Not Paid",
+              year,
+              month,
+              weekNumber,
+              dateRange: { start: periodStart, end: periodEnd },
+              dailyRecords: [],
+            },
           },
           { upsert: true, new: true }
         );
-      } catch {
-        // ignore
       }
+    } catch (e) {
+      console.error("Error updating salary snapshot:", e);
     }
-
-    console.log("Updated Staff:", staff);
 
     res.json(staff);
   } catch (error) {
@@ -351,60 +625,43 @@ export const deleteStaff = async (req, res) => {
 export const getStaffDashboard = async (req, res) => {
   try {
     const staffId = req.user.id;
-    
-    // 1. Fetch Staff Profile with Salon info
-    const staff = await Staff.findById(staffId)
-      .select("-password_hash")
-      .populate("salon_id", "name location contact_info");
-      
+
+    const staff = await Staff.findById(staffId).populate("salon_id", "name");
     if (!staff) {
-      return res.status(404).json({ message: "Staff profile not found" });
+      return res.status(404).json({ message: "Staff not found" });
     }
 
-    // 2. Fetch Manager for the Salon
-    let managerName = "N/A";
-    let managerPhone = "N/A";
-    
-    if (staff.salon_id) {
-      // Check Admin collection first for staff-admin
-      let manager = await Admin.findOne({
-        salon_id: staff.salon_id._id,
-        role: "staff-admin"
-      });
-      
-      // If not in Admin, check Staff collection for manager
-      if (!manager) {
-        manager = await Staff.findOne({
-          salon_id: staff.salon_id._id,
-          role: "manager"
-        });
-      }
+    // Find the manager of this salon
+    const manager = await Staff.findOne({
+      salon_id: staff.salon_id?._id,
+      role: {
+        $in: [
+          /^manager$/i,
+          /^staff-admin$/i,
+          /^staff admin$/i
+        ]
+      },
+    });
 
-      if (manager) {
-        managerName = manager.full_name || manager.username || "N/A";
-        managerPhone = manager.phone || "N/A";
-      }
-    }
+    const profile = {
+      staffName: staff.full_name,
+      salonName: staff.salon_id?.name || "N/A",
+      managerName: manager ? manager.full_name : "N/A",
+      managerPhone: manager ? manager.phone : "N/A",
+    };
 
-    // 3. Fetch Appointments for this staff
+    // Find all appointments for this staff
     const appointments = await Appointment.find({ staff_id: staffId })
-      .populate("customer_id", "name email phone")
-      .populate("service_id", "service_name price")
-      .populate("service_ids", "service_name price")
-      .sort({ appointment_date: 1, start_time: 1 });
+      .populate("customer_id", "name")
+      .populate("service_ids", "service_name")
+      .sort({ appointment_date: -1 });
 
     res.json({
-      profile: {
-        staffName: staff.full_name,
-        role: staff.role,
-        salonName: staff.salon_id ? staff.salon_id.name : "N/A",
-        managerName,
-        managerPhone,
-      },
-      appointments
+      profile,
+      appointments,
     });
   } catch (error) {
-    console.error("Error fetching staff dashboard:", error);
-    res.status(500).json({ message: error.message });
+    console.error("Error in getStaffDashboard:", error);
+    res.status(500).json({ message: "Server error getting dashboard data" });
   }
 };

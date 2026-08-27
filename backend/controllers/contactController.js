@@ -3,9 +3,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const sendContactMessage = async (req, res) => {
-  const { firstName, lastName, email, message } = req.body;
+  const { firstName, lastName, email, contactNumber, subject, message } = req.body;
 
-  if (!firstName || !lastName || !email || !message) {
+  if (!firstName || !lastName || !email || !contactNumber || !subject || !message) {
     return res.status(400).json({ message: 'All fields are required.' });
   }
 
@@ -21,12 +21,14 @@ export const sendContactMessage = async (req, res) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: process.env.SUPERADMIN_EMAIL,
-      subject: `New Contact Form Message from ${firstName} ${lastName}`,
-      text: `You have received a new message from the contact form.\n\nName: ${firstName} ${lastName}\nEmail: ${email}\nMessage:\n${message}`,
+      subject: `New Contact Form Message: ${subject}`,
+      text: `You have received a new message from the contact form.\n\nName: ${firstName} ${lastName}\nEmail: ${email}\nContact number: ${contactNumber}\nSubject: ${subject}\nMessage:\n${message}`,
       html: `
         <h3>New Contact Form Submission</h3>
         <p><strong>Name:</strong> ${firstName} ${lastName}</p>
         <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Contact number:</strong> ${contactNumber}</p>
+        <p><strong>Subject:</strong> ${subject}</p>
         <p><strong>Message:</strong></p>
         <p>${message.replace(/\n/g, '<br>')}</p>
       `,

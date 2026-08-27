@@ -5,9 +5,7 @@ import Hero from "./landing-sections/Hero";
 import About from "./landing-sections/About";
 import Services from "./landing-sections/Services";
 import WhyChooseUs from "./landing-sections/WhyChooseUs";
-import Testimonials from "./landing-sections/Testimonials";
 import BookingCTA from "./landing-sections/BookingCTA";
-import Contact from "./landing-sections/Contact";
 import Footer from "./landing-sections/Footer";
 
 const Landing = () => {
@@ -37,9 +35,7 @@ const Landing = () => {
       <About />
       <WhyChooseUs />
       <Services />
-      <Testimonials />
       <BookingCTA />
-      <Contact />
       <Footer />
     </div>
   );

@@ -7,6 +7,8 @@ const Contact = () => {
     firstName: "",
     lastName: "",
     email: "",
+    contactNumber: "",
+    subject: "",
     message: ""
   });
   const [status, setStatus] = useState("idle"); // 'idle', 'loading', 'success', 'error'
@@ -23,7 +25,7 @@ const Contact = () => {
       const res = await api.post("/contact", formData);
       setStatus("success");
       setStatusMessage(res.data.message || "Message sent successfully!");
-      setFormData({ firstName: "", lastName: "", email: "", message: "" });
+      setFormData({ firstName: "", lastName: "", email: "", contactNumber: "", subject: "", message: "" });
     } catch (error) {
       console.error(error);
       setStatus("error");
@@ -32,56 +34,81 @@ const Contact = () => {
   };
 
   return (
-    <section id="contact" className="py-24 bg-surface-2 relative">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid lg:grid-cols-2 gap-16">
-          
-          {/* Contact Info */}
-          <div>
-            <div className="text-accent font-bold tracking-widest uppercase text-sm mb-3">Get In Touch</div>
-            <h2 className="text-4xl md:text-5xl font-display font-black text-white mb-8">
-              We'd love to <br /><span className="text-gradient">hear from you.</span>
+    <section id="contact" className="py-12 md:py-16 bg-[#090909] relative overflow-hidden">
+      <div className="max-w-7xl mx-auto px-0 lg:px-6">
+        <div className="grid lg:grid-cols-[0.72fr_1fr_1.55fr] items-stretch min-h-[690px]">
+          <div className="relative min-h-[360px] lg:min-h-0 overflow-hidden">
+            <img src="/salon_interior.png" alt="SalonHub interior" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/10 to-[#090909]/80 lg:bg-gradient-to-r lg:from-transparent lg:to-[#090909]" />
+          </div>
+
+          <div className="px-6 py-12 lg:px-10 lg:py-10 flex flex-col justify-center">
+            <div className="text-accent font-bold tracking-[0.25em] uppercase text-sm mb-4">Contact Us</div>
+            <h2 className="text-4xl md:text-5xl font-display font-black text-white leading-[1.08] mb-5">
+              Let&apos;s make your <span className="text-gradient">next look</span> happen.
             </h2>
-            <p className="text-white/60 text-lg mb-12">
-              Whether you have a question about our services, pricing, or anything else, our team is ready to answer all your questions.
+            <p className="text-white/60 leading-relaxed mb-10">
+              Premier hair care and beauty services, delivered with expert attention and a personal touch.
+            </p>
+          
+            <div className="text-accent font-bold tracking-[0.25em] uppercase text-sm mb-4">Get In Touch</div>
+            <h3 className="text-3xl md:text-4xl font-display font-black text-white mb-5">
+              Start your journey to beautiful hair.
+            </h3>
+            <p className="text-white/60 leading-relaxed mb-10">
+              Reach out for expert hair care and personalized services. Our team is ready to help you find the right experience.
             </p>
 
-            <div className="space-y-8">
+            <div className="space-y-7">
               <div className="flex gap-4 items-start">
-                <div className="bg-surface p-3 rounded-xl border border-border text-accent">
+                <div className="bg-surface p-3 rounded-full border border-border text-accent">
                   <MapPin className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="text-white font-bold text-lg mb-1">Headquarters</h4>
-                  <p className="text-white/60">123 Luxury Ave, Downtown District<br/>New York, NY 10001</p>
+                  <h4 className="text-white font-bold mb-1">Our Location</h4>
+                  <p className="text-white/60">Colombo</p>
                 </div>
               </div>
 
               <div className="flex gap-4 items-start">
-                <div className="bg-surface p-3 rounded-xl border border-border text-accent">
+                <div className="bg-surface p-3 rounded-full border border-border text-accent">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-white font-bold mb-1">Opening Times</h4>
+                  <p className="text-white/60">Monday - Sunday: 9:00 AM - 7:00 PM</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-start">
+                <div className="bg-surface p-3 rounded-full border border-border text-accent">
                   <Phone className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="text-white font-bold text-lg mb-1">Phone</h4>
-                  <p className="text-white/60">+1 (555) 123-4567<br/>+1 (555) 987-6543</p>
+                  <h4 className="text-white font-bold mb-1">Our Phone</h4>
+                  <a href="tel:011256369" className="text-white/60 hover:text-accent transition-colors">011256369</a>
                 </div>
               </div>
 
               <div className="flex gap-4 items-start">
-                <div className="bg-surface p-3 rounded-xl border border-border text-accent">
+                <div className="bg-surface p-3 rounded-full border border-border text-accent">
                   <Mail className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="text-white font-bold text-lg mb-1">Email</h4>
-                  <p className="text-white/60">info@salonhub.com<br/>bookings@salonhub.com</p>
+                  <h4 className="text-white font-bold mb-1">Email Us</h4>
+                  <div className="flex flex-col gap-1">
+                    <a href="mailto:info@salonhub.com" className="text-white/60 hover:text-accent transition-colors">info@salonhub.com</a>
+                    <a href="mailto:bookings@salonhub.com" className="text-white/60 hover:text-accent transition-colors">bookings@salonhub.com</a>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Contact Form */}
-          <div className="glass-card p-8 md:p-10 border-accent/10">
-            <h3 className="text-2xl font-bold text-white mb-6">Send us a message</h3>
+          <div className="mx-6 mb-12 lg:mx-0 lg:my-4 glass-card p-6 md:p-8 lg:p-10 border-accent/10 self-stretch">
+            <div className="text-accent font-bold tracking-[0.25em] uppercase text-sm mb-3">Send A Message</div>
+            <p className="text-white/60 mb-7">Tell us what you have in mind and we&apos;ll get back to you shortly.</p>
             {status === "success" && (
               <div className="mb-6 p-4 bg-green-500/20 border border-green-500 text-green-400 rounded-xl">
                 {statusMessage}
@@ -93,7 +120,7 @@ const Contact = () => {
               </div>
             )}
             <form className="space-y-6" onSubmit={handleSubmit}>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid sm:grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-white/80">First Name</label>
                   <input 
@@ -103,7 +130,7 @@ const Contact = () => {
                     onChange={handleChange}
                     required
                     className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
-                    placeholder="John"
+                    placeholder="Your first name"
                   />
                 </div>
                 <div className="space-y-2">
@@ -115,7 +142,7 @@ const Contact = () => {
                     onChange={handleChange}
                     required
                     className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
-                    placeholder="Doe"
+                    placeholder="Your last name"
                   />
                 </div>
               </div>
@@ -129,8 +156,35 @@ const Contact = () => {
                   onChange={handleChange}
                   required
                   className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
-                  placeholder="john@example.com"
+                  placeholder="Your email"
                 />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-white/80">Contact Number</label>
+                  <input
+                    type="tel"
+                    name="contactNumber"
+                    value={formData.contactNumber}
+                    onChange={handleChange}
+                    required
+                    className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
+                    placeholder="Your contact number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-white/80">Subject</label>
+                  <input
+                    type="text"
+                    name="subject"
+                    value={formData.subject}
+                    onChange={handleChange}
+                    required
+                    className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
+                    placeholder="How can we help?"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -142,7 +196,7 @@ const Contact = () => {
                   onChange={handleChange}
                   required
                   className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors resize-none"
-                  placeholder="How can we help you?"
+                  placeholder="Your message"
                 ></textarea>
               </div>
 

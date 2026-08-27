@@ -10,6 +10,7 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import clsx from "clsx";
+import { mediaUrl } from "../../utils/mediaUrl";
 
 const API_BASE = "http://localhost:5000";
 
@@ -102,7 +103,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete, }) => {
 
   // Build image URL from the uploaded path
   const imageUrl = staff.image
-    ? `${API_BASE}/${staff.image.replace(/\\/g, "/")}`
+    ? mediaUrl(staff.image)
     : null;
 
   return (
