@@ -19,7 +19,7 @@ export default function SalonCard({ branch, index }) {
     ? branch.images[0]
     : (branch.logo || null);
 
-  const imageUrl = primaryImage 
+  const imageUrl = primaryImage
     ? mediaUrl(primaryImage)
     : "/salon_interior.png";
 
