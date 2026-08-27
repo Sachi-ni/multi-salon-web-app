@@ -171,7 +171,7 @@ export default function BookAppointment() {
               <input
                 type="date"
                 value={booking.date}
-                min={new Date().toISOString().split("T")[0]}
+                min={new Date().toLocaleDateString('en-CA')}
                 onChange={e => setBooking(prev => ({ ...prev, date: e.target.value }))}
                 className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-accent focus:bg-accent-dim/20 transition-all duration-200 cursor-pointer"
               />
