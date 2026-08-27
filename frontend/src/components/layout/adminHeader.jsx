@@ -5,8 +5,7 @@ import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
 import { getSalon } from "../../services/salonService";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../config";
 
 const AdminHeader = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();

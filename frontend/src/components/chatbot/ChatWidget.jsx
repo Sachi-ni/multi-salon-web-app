@@ -1,46 +1,68 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Sparkles } from "lucide-react";
 import { sendChatMessage } from "../../services/chatService";
 import "./ChatWidget.css";
 
-/* ── Markdown-lite renderer (bold, links, line breaks) ── */
+/* ── Markdown-lite renderer (bold, italic, links, line breaks) ── */
 function renderBotText(text) {
   if (!text) return null;
 
   return text.split("\n").map((line, i) => {
-    // Process **bold** and [links](/path)
     const parts = [];
     let remaining = line;
     let key = 0;
 
     while (remaining.length > 0) {
-      // Match [text](/link)
       const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
-      // Match **bold**
       const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
+      const italicMatch = remaining.match(/_([^_]+)_/);
 
-      if (linkMatch && (!boldMatch || linkMatch.index < boldMatch.index)) {
-        if (linkMatch.index > 0) {
-          parts.push(<span key={key++}>{remaining.slice(0, linkMatch.index)}</span>);
-        }
-        parts.push(
-          <a key={key++} href={linkMatch[2]} style={{ color: "#f5c800", fontWeight: 600, textDecoration: "underline" }}>
-            {linkMatch[1]}
-          </a>
-        );
-        remaining = remaining.slice(linkMatch.index + linkMatch[0].length);
-      } else if (boldMatch) {
-        if (boldMatch.index > 0) {
-          parts.push(<span key={key++}>{remaining.slice(0, boldMatch.index)}</span>);
-        }
-        parts.push(<strong key={key++}>{boldMatch[1]}</strong>);
-        remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
-      } else {
+      const matches = [];
+      if (linkMatch) matches.push({ type: 'link', match: linkMatch, index: linkMatch.index });
+      if (boldMatch) matches.push({ type: 'bold', match: boldMatch, index: boldMatch.index });
+      if (italicMatch) matches.push({ type: 'italic', match: italicMatch, index: italicMatch.index });
+
+      if (matches.length === 0) {
         parts.push(<span key={key++}>{remaining}</span>);
         remaining = "";
+        break;
       }
+
+      matches.sort((a, b) => a.index - b.index);
+      const firstMatch = matches[0];
+
+      if (firstMatch.index > 0) {
+        parts.push(<span key={key++}>{remaining.slice(0, firstMatch.index)}</span>);
+      }
+
+      if (firstMatch.type === 'link') {
+        const url = firstMatch.match[2];
+        const linkText = firstMatch.match[1];
+        const isInternal = url.startsWith("/");
+        const linkStyle = { color: "#f5c800", fontWeight: 600, textDecoration: "underline" };
+        
+        if (isInternal) {
+          parts.push(
+            <Link key={key++} to={url} style={linkStyle}>
+              {linkText}
+            </Link>
+          );
+        } else {
+          parts.push(
+            <a key={key++} href={url} target="_blank" rel="noopener noreferrer" style={linkStyle}>
+              {linkText}
+            </a>
+          );
+        }
+      } else if (firstMatch.type === 'bold') {
+        parts.push(<strong key={key++}>{firstMatch.match[1]}</strong>);
+      } else if (firstMatch.type === 'italic') {
+        parts.push(<em key={key++}>{firstMatch.match[1]}</em>);
+      }
+
+      remaining = remaining.slice(firstMatch.index + firstMatch.match[0].length);
     }
 
     return (

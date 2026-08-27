@@ -6,6 +6,7 @@ import { getSalon } from '../../services/salonService';
 import { getTeam } from '../../services/staffService';
 import { MapPin, Clock, Phone, Star, ChevronLeft } from 'lucide-react';
 import { mediaUrl } from '../../utils/mediaUrl';
+import { getUploadUrl } from '../../config';
 
 export default function SalonDetailsPage() {
   const { id } = useParams();
@@ -67,6 +68,7 @@ export default function SalonDetailsPage() {
 
   const imageUrl = galleryImages[0] 
     ? mediaUrl(galleryImages[0])
+    ? getUploadUrl(galleryImages[0])
     : "/salon_interior.png";
 
   return (
@@ -92,6 +94,7 @@ export default function SalonDetailsPage() {
                 {galleryImages.slice(1).map((img, i) => (
                   <div key={i} className="h-32 rounded-xl overflow-hidden border border-border">
                     <img src={mediaUrl(img)} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
+                    <img src={getUploadUrl(img)} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
                 {galleryImages.length <= 1 && (
@@ -178,6 +181,7 @@ export default function SalonDetailsPage() {
                     <div className="w-20 h-20 mx-auto rounded-full bg-surface-2 border-2 border-accent mb-4 overflow-hidden">
                        {member.image ? (
                          <img src={mediaUrl(member.image)} alt={member.name} className="w-full h-full object-cover" />
+                         <img src={getUploadUrl(member.image)} alt={member.name} className="w-full h-full object-cover" />
                        ) : (
                          <div className="w-full h-full bg-accent/20 flex items-center justify-center text-accent font-bold text-xl">
                             {member.name.charAt(0)}

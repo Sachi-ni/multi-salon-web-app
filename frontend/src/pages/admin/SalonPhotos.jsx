@@ -8,8 +8,7 @@ import {
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import { getSalon, uploadSalonImages, removeSalonImage } from "../../services/salonService";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../config";
 
 const toAbsolute = (path) => {
   if (!path) return "";

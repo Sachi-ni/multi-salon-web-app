@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { MapPin, Clock, Phone, Star, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { mediaUrl } from '../../../utils/mediaUrl';
+import { getUploadUrl } from '../../../config';
 
 export default function SalonCard({ branch, index }) {
   const navigate = useNavigate();
@@ -21,6 +22,8 @@ export default function SalonCard({ branch, index }) {
 
   const imageUrl = primaryImage
     ? mediaUrl(primaryImage)
+  const imageUrl = primaryImage 
+    ? getUploadUrl(primaryImage)
     : "/salon_interior.png";
 
   return (

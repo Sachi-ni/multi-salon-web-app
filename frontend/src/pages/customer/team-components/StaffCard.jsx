@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Star, MapPin, Briefcase, Calendar } from "lucide-react";
 import { mediaUrl } from '../../../utils/mediaUrl';
+import { getUploadUrl } from '../../../config';
 
 export default function StaffCard({ member, index }) {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function StaffCard({ member, index }) {
 
   const imageUrl = member.image 
     ? mediaUrl(member.image)
+    ? getUploadUrl(member.image)
     : "https://images.unsplash.com/photo-1595959183082-7b570b7e08e2?q=80&w=2071&auto=format&fit=crop";
 
   return (
