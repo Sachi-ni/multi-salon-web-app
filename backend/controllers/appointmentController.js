@@ -64,7 +64,8 @@ export const getAvailableStaff = async (req, res) => {
     const staffList = await Staff.find({
       salon_id: salonId,
       services: { $in: serviceIdList },
-      status: "Active"
+      status: "Active",
+      role: { $not: /^(manager|staff-admin|super-admin)$/i },
     })
       .populate("salon_id", "name")
       .populate("services", "service_name");

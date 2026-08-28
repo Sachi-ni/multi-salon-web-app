@@ -16,6 +16,7 @@ import EmptyState from "../../components/ui/EmptyState";
 import Table from "../../components/ui/Table";
 import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
+import { mediaUrl } from "../../utils/mediaUrl";
 import { API_BASE } from "../../config";
 
 /* ── Skeleton Card ── */
@@ -106,7 +107,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
   const staffServices = staff.services || [];
 
   const imageUrl = staff.image
-    ? `${API_BASE}/${staff.image.replace(/\\/g, "/")}`
+    ? mediaUrl(staff.image)
     : null;
 
   const maxVisibleServices = 3;

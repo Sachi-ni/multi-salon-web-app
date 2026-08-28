@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import Salary from "../models/Salary.js";
 import Appointment from "../models/Appointment.js";
 import Feedback from "../models/Feedback.js";
+import { storeMedia } from "../utils/mediaStorage.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
@@ -145,7 +146,7 @@ export const createStaff = async (req, res) => {
       salary_payment_count_per_day: Number.isFinite(salaryPaymentCountPerDay) && salaryPaymentCountPerDay > 0 ? salaryPaymentCountPerDay : 1,
       salon_id: salonId,
       services,
-      image: req.file ? req.file.path : null,
+      image: req.file ? await storeMedia(req.file, "salonhub/staff") : null,
     };
 
     // keep status default aligned with schema enum
@@ -300,7 +301,12 @@ export const getTeam = async (req, res) => {
   try {
     const { salonId, serviceId } = req.query;
 
-    const filter = { status: "Active" };
+    // The public customer team page must only expose service professionals,
+    // not salon-management accounts.
+    const filter = {
+      status: "Active",
+      role: { $not: /^(manager|staff-admin|super-admin)$/i },
+    };
 
     if (salonId) {
       filter.salon_id = salonId;
@@ -449,7 +455,7 @@ export const updateStaff = async (req, res) => {
       updateData.services = services;
 
     if (req.file) {
-      updateData.image = req.file.path;
+      updateData.image = await storeMedia(req.file, "salonhub/staff");
     }
 
     // Handle salon changes and maintain staff counts
