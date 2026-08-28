@@ -90,7 +90,17 @@ const getDaysInMonth = (year, month) => {
   return new Date(year, month, 0).getDate();
 };
 
-const calculateDaySalary = (workRate, salaryPaymentCountPerDay = 0) => {
+const calculateDaySalary = (
+  workRate,
+  salaryPaymentCountPerDay = 0,
+  isAbsent = false
+) => {
+  // A day manually marked absent by a manager earns nothing, even when the
+  // staff member has a fixed salary-per-day amount.
+  if (isAbsent) {
+    return 0;
+  }
+
   const numericPerDay = safeNumber(salaryPaymentCountPerDay, 0);
   const numericWorkRate = safeNumber(workRate, 0);
 
@@ -171,6 +181,11 @@ const ensureAllDaysInPeriod = (
     daySalary: safeNumber(record.daySalary, 0),
     totalSalary: safeNumber(record.totalSalary, 0),
     status: record.status || "Not Paid",
+
+    // Preserve the manager-marked absence (recalcWeeklyMonthlyTotals applies
+    // it by forcing the day salary to 0).
+    isAbsent: Boolean(record.isAbsent),
+    absentMarkedAt: record.absentMarkedAt || null,
   }));
 
   const existingDates = new Set(
@@ -214,6 +229,8 @@ const ensureAllDaysInPeriod = (
         daySalary: 0,
         totalSalary: 0,
         status: "Not Paid",
+        isAbsent: false,
+        absentMarkedAt: null,
       });
 
       existingDates.add(date);
@@ -248,9 +265,12 @@ const recalcWeeklyMonthlyTotals = (salaryRecord) => {
         ? workingAmount * (rate / 100)
         : 0;
 
+    const isAbsent = Boolean(record.isAbsent);
+
     const daySalary = calculateDaySalary(
       workRate,
-      salaryPaymentCountPerDay
+      salaryPaymentCountPerDay,
+      isAbsent
     );
 
     return {
@@ -262,6 +282,8 @@ const recalcWeeklyMonthlyTotals = (salaryRecord) => {
       daySalary,
       totalSalary: daySalary,
       status: record.status || "Not Paid",
+      isAbsent,
+      absentMarkedAt: record.absentMarkedAt || null,
     };
   });
 
@@ -352,7 +374,11 @@ const refreshSalaryRecord = (salaryRecord) => {
     const workingAmount = safeNumber(salaryRecord.workingAmount, 0);
     const workRate =
       workingAmount > 0 ? workingAmount * (effectiveRate / 100) : 0;
-    const daySalary = calculateDaySalary(workRate, perDay);
+    const daySalary = calculateDaySalary(
+      workRate,
+      perDay,
+      Boolean(salaryRecord.isAbsent)
+    );
 
     salaryRecord.workRate = workRate;
     salaryRecord.daySalary = daySalary;
@@ -570,7 +596,8 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
     salaryRecord.daySalary =
       calculateDaySalary(
         salaryRecord.workRate,
-        salaryPaymentCountPerDay
+        salaryPaymentCountPerDay,
+        Boolean(salaryRecord.isAbsent)
       );
 
     salaryRecord.totalSalary =
@@ -588,6 +615,10 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
       salaryRecord.dailyRecords.map((record) => ({
         ...record,
         date: normalizeSalaryDate(record.date),
+
+        // Preserve the manager-marked absence.
+        isAbsent: Boolean(record.isAbsent),
+        absentMarkedAt: record.absentMarkedAt || null,
       }));
 
     // Find the current appointment date.
@@ -610,6 +641,8 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
         daySalary: 0,
         totalSalary: 0,
         status: "Not Paid",
+        isAbsent: false,
+        absentMarkedAt: null,
       };
 
       salaryRecord.dailyRecords.push(dailyRecord);
@@ -631,7 +664,8 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
     dailyRecord.daySalary =
       calculateDaySalary(
         dailyRecord.workRate,
-        salaryPaymentCountPerDay
+        salaryPaymentCountPerDay,
+        Boolean(dailyRecord.isAbsent)
       );
 
     dailyRecord.totalSalary =
@@ -992,6 +1026,353 @@ export const createAndMarkPaid = async (req, res) => {
   }
 };
 
+// ─── Mark / unmark an absent day (manual manager override) ─────────────────
+// A manager can mark a specific date as absent for a staff member. Absent
+// days earn no salary: daySalary is forced to 0 and the period totals are
+// recalculated. The rest of the salary process keeps working automatically.
+
+// Core: apply (or clear) an absence on one day of a salary record.
+// `dateKey` is only used for weekly/monthly records (daily records represent
+// exactly one day, their own period).
+const applyAbsenceToRecord = (salaryRecord, dateKey, isAbsent) => {
+  const effectiveRate = getEffectiveRate(
+    salaryRecord,
+    salaryRecord.commission_rate
+  );
+
+  if (salaryRecord.frequency === "daily") {
+    // The whole record represents a single day.
+    salaryRecord.isAbsent = isAbsent;
+    salaryRecord.absentMarkedAt = isAbsent ? new Date() : null;
+
+    const workingAmount = safeNumber(salaryRecord.workingAmount, 0);
+    salaryRecord.rate = effectiveRate;
+    salaryRecord.workRate =
+      workingAmount > 0 ? workingAmount * (effectiveRate / 100) : 0;
+    salaryRecord.daySalary = calculateDaySalary(
+      salaryRecord.workRate,
+      salaryRecord.salary_payment_count_per_day,
+      isAbsent
+    );
+    salaryRecord.totalSalary = salaryRecord.daySalary;
+    return;
+  }
+
+  if (!Array.isArray(salaryRecord.dailyRecords)) {
+    salaryRecord.dailyRecords = [];
+  }
+
+  const normalizedDate = normalizeSalaryDate(dateKey);
+
+  if (!normalizedDate) {
+    throw new Error("A valid date is required to mark an absent day");
+  }
+
+  // Normalize stored dates before searching.
+  salaryRecord.dailyRecords = salaryRecord.dailyRecords.map((record) => ({
+    ...record,
+    date: normalizeSalaryDate(record.date),
+    isAbsent: Boolean(record.isAbsent),
+    absentMarkedAt: record.absentMarkedAt || null,
+  }));
+
+  let dailyRecord = salaryRecord.dailyRecords.find(
+    (record) => record.date === normalizedDate
+  );
+
+  // Create the day record when missing so absences can be recorded even for
+  // days without completed appointments.
+  if (!dailyRecord) {
+    dailyRecord = {
+      date: normalizedDate,
+      workingAmount: 0,
+      rate: effectiveRate,
+      workRate: 0,
+      daySalary: 0,
+      totalSalary: 0,
+      status: "Not Paid",
+      isAbsent: false,
+      absentMarkedAt: null,
+    };
+    salaryRecord.dailyRecords.push(dailyRecord);
+  }
+
+  dailyRecord.isAbsent = isAbsent;
+  dailyRecord.absentMarkedAt = isAbsent ? new Date() : null;
+
+  // Recalculate every day and the period totals (absent days contribute 0).
+  recalcWeeklyMonthlyTotals(salaryRecord);
+};
+
+// Validates the request body shared by the absence endpoints.
+const resolveAbsenceRequest = (body) => {
+  const isAbsent = body.isAbsent === undefined ? true : Boolean(body.isAbsent);
+  const date = normalizeSalaryDate(body.date);
+
+  if (!date) {
+    return { error: "A valid date (YYYY-MM-DD) is required" };
+  }
+
+  // Absence can only be recorded for today or past days - future days have
+  // no salary yet.
+  if (date > toLocalDateStr(new Date())) {
+    return { error: "Cannot mark a future date as absent" };
+  }
+
+    return { isAbsent, date };
+};
+
+// Backfill the required period identity fields on legacy salary records that
+// are missing them (frequency, period, year, month, weekNumber), so an absence
+// can be saved without crashing. Mirrors the derivation used when creating
+// records in createAndMarkPaid / markStaffDayAbsent; it only fills MISSING or
+// INVALID values, so valid records are left untouched.
+const periodIdentityValid = (sr) => {
+  if (typeof sr.frequency !== "string" || !sr.frequency) return false;
+  if (typeof sr.period !== "string" || sr.period.length === 0) return false;
+  if (!Number.isFinite(Number(sr.year))) return false;
+  if (!Number.isFinite(Number(sr.month))) return false;
+  if (!Number.isFinite(Number(sr.weekNumber))) return false;
+  return true;
+};
+
+const ensurePeriodIdentifier = (sr, anchorDateKey) => {
+  if (periodIdentityValid(sr)) return;
+
+  const frequency = sr.frequency || "monthly";
+  const anchor = sr.dateRange?.start
+    ? new Date(sr.dateRange.start)
+    : new Date(anchorDateKey || Date.now());
+
+  if (frequency === "daily") {
+    if (!sr.period) sr.period = toLocalDateStr(new Date(anchorDateKey || Date.now()));
+    if (!Number.isFinite(Number(sr.year))) sr.year = anchor.getFullYear();
+    if (!Number.isFinite(Number(sr.month))) sr.month = anchor.getMonth() + 1;
+    if (!Number.isFinite(Number(sr.weekNumber))) sr.weekNumber = 0;
+    return;
+  }
+
+  if (frequency === "weekly") {
+    const year = Number.isFinite(Number(sr.year)) ? Number(sr.year) : anchor.getFullYear();
+    const weekNumber =
+      Number.isFinite(Number(sr.weekNumber)) && sr.weekNumber > 0
+        ? Number(sr.weekNumber)
+        : getISOWeek(toLocalDateStr(anchor));
+    const weekDates = getWeekDates(year, weekNumber);
+    sr.year = year;
+    sr.weekNumber = weekNumber;
+    sr.month = new Date(weekDates[0]).getMonth() + 1;
+    sr.period = `${year}-W${String(weekNumber).padStart(2, "0")}`;
+    if (!sr.dateRange || !sr.dateRange.start || !sr.dateRange.end) {
+      sr.dateRange = { start: weekDates[0], end: weekDates[6] };
+    }
+    return;
+  }
+
+  // monthly
+  const month = anchor.getMonth() + 1;
+  const year = anchor.getFullYear();
+  const daysInMonth = getDaysInMonth(year, month);
+  const monthStr = String(month).padStart(2, "0");
+  sr.year = year;
+  sr.month = month;
+  sr.weekNumber = 0;
+  sr.period = `${year}-${monthStr}`;
+  if (!sr.dateRange || !sr.dateRange.start || !sr.dateRange.end) {
+    sr.dateRange = { start: `${year}-${monthStr}-01`, end: `${year}-${monthStr}-${daysInMonth}` };
+  }
+};
+
+// Mark/unmark an absent day on an existing salary record.
+// PATCH /salary/:salaryId/day-absent   body: { date, isAbsent }
+export const markDayAbsent = async (req, res) => {
+  try {
+    const { salaryId } = req.params;
+
+    const absence = resolveAbsenceRequest(req.body);
+    if (absence.error) {
+      return res.status(400).json({ success: false, message: absence.error });
+    }
+
+    const salary = await Salary.findById(salaryId);
+    if (!salary) {
+      return res.status(404).json({ success: false, message: "Salary record not found" });
+    }
+
+    // Salon scoping: non super-admins may only update their own salon's records
+    if (!salaryBelongsToUserSalon(salary, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to update this salary record",
+      });
+    }
+
+                        // Paid records are historical - their values must not change.
+    if ((salary.status || "") === "Paid") {
+      return res.status(400).json({
+        success: false,
+        message: "This salary record has already been paid and cannot be changed",
+      });
+    }
+
+
+    // Per-day paid check for weekly/monthly: an individual day that has
+    // already been paid cannot be toggled to/from absent.
+    if (salary.frequency === "weekly" || salary.frequency === "monthly") {
+      const normalizedDate = normalizeSalaryDate(absence.date);
+      const dayRecord = (salary.dailyRecords || []).find(
+        (record) => normalizeSalaryDate(record.date) === normalizedDate
+      );
+      if (dayRecord && (dayRecord.status || "") === "Paid") {
+        return res.status(400).json({
+          success: false,
+          message: "This day has already been paid and cannot be changed",
+        });
+      }
+    }
+
+    // Repair legacy records that are missing their required period identity
+    // fields (period/year/month/weekNumber) so the absence update can persist.
+    ensurePeriodIdentifier(salary, absence.date);
+
+    applyAbsenceToRecord(salary, absence.date, absence.isAbsent);
+
+    await salary.save();
+
+    res.json({
+      success: true,
+      message: absence.isAbsent
+        ? "Day marked as absent - salary for that date is now 0"
+        : "Absence removed - salary recalculated",
+      salary,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Mark/unmark an absent day for a staff member that does not have a salary
+// record for the period yet (frontend "fallback" rows). The record is created
+// (Not Paid) first, then the absence is applied.
+// PATCH /salary/staff/:staffId/day-absent
+// body: { frequency, period, date, isAbsent, salonId }
+export const markStaffDayAbsent = async (req, res) => {
+  try {
+    const { staffId } = req.params;
+    const { frequency, period, salonId } = req.body;
+
+    if (!frequency || !period) {
+      return res.status(400).json({
+        success: false,
+        message: "frequency and period are required",
+      });
+    }
+
+    const absence = resolveAbsenceRequest(req.body);
+    if (absence.error) {
+      return res.status(400).json({ success: false, message: absence.error });
+    }
+
+    const salon_id =
+      req.user.role === "super-admin" ? salonId || null : req.user.salon_id;
+
+    if (!salon_id) {
+      return res.status(400).json({
+        success: false,
+        message: "salonId is required to mark this absence",
+      });
+    }
+
+    const staff = await Staff.findOne({ _id: staffId, salon_id });
+    if (!staff) {
+      return res.status(403).json({
+        success: false,
+        message: "Staff not found in your salon",
+      });
+    }
+
+    let salaryRecord = await Salary.findOne({
+      salon_id,
+      staff_id: staffId,
+      period,
+      frequency,
+    });
+
+    if (!salaryRecord) {
+      // Derive the date range covered by the period key.
+      let periodStart;
+      let periodEnd;
+      let year = 0;
+      let month = 0;
+      let weekNumber = 0;
+
+      if (frequency === "daily") {
+        periodStart = period;
+        periodEnd = period;
+        const d = new Date(period);
+        year = d.getFullYear();
+        month = d.getMonth() + 1;
+      } else if (frequency === "weekly") {
+        const parts = period.split("-W");
+        year = parseInt(parts[0], 10);
+        weekNumber = parseInt(parts[1], 10);
+        const weekDates = getWeekDates(year, weekNumber);
+        periodStart = weekDates[0];
+        periodEnd = weekDates[6];
+        month = new Date(periodStart).getMonth() + 1;
+      } else {
+        const parts = period.split("-");
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10);
+        const daysInMonth = getDaysInMonth(year, month);
+        const monthStr = String(month).padStart(2, "0");
+        periodStart = `${year}-${monthStr}-01`;
+        periodEnd = `${year}-${monthStr}-${daysInMonth}`;
+      }
+
+      salaryRecord = new Salary({
+        salon_id,
+        staff_id: staff._id,
+        frequency,
+        period,
+        staff_name: staff.full_name || "",
+        staff_role: staff.role || "",
+        commission_rate: staff.commission_rate || 0,
+        salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+        workingAmount: 0,
+        rate: staff.commission_rate || 0,
+        workRate: 0,
+        daySalary: 0,
+        totalSalary: 0,
+        status: "Not Paid",
+        year,
+        month,
+        weekNumber,
+        dateRange: { start: periodStart, end: periodEnd },
+        dailyRecords: [],
+      });
+
+      // Apply the salary-per-day rules for the elapsed days first, then the
+      // absence below overrides the marked day.
+      refreshSalaryRecord(salaryRecord);
+    }
+
+    applyAbsenceToRecord(salaryRecord, absence.date, absence.isAbsent);
+
+    await salaryRecord.save();
+
+    res.json({
+      success: true,
+      message: absence.isAbsent
+        ? "Day marked as absent - salary for that date is now 0"
+        : "Absence removed - salary recalculated",
+      salary: salaryRecord,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ─── Get all staff with their salary info for a given frequency ────────────
 
 export const getStaffWithSalaries = async (req, res) => {
@@ -1218,8 +1599,12 @@ export const generatePayroll = async (req, res) => {
       if (frequency === "daily") {
         salaryRecord.workingAmount = totalWorkingAmount;
         salaryRecord.workRate = totalWorkingAmount * (effectiveRate / 100);
-        salaryRecord.daySalary = calculateDaySalary(salaryRecord.workRate, salaryPaymentCountPerDay);
-        salaryRecord.totalSalary = calculateDaySalary(salaryRecord.workRate, salaryPaymentCountPerDay);
+        salaryRecord.daySalary = calculateDaySalary(
+          salaryRecord.workRate,
+          salaryPaymentCountPerDay,
+          Boolean(salaryRecord.isAbsent)
+        );
+        salaryRecord.totalSalary = salaryRecord.daySalary;
       } else {
         // Weekly or Monthly: build daily records
         const dateEntries = Object.entries(dailyMap).sort(([a], [b]) => a.localeCompare(b));
@@ -1234,8 +1619,12 @@ export const generatePayroll = async (req, res) => {
             const dailyWorkRate = dr.workingAmount * (effectiveRate / 100);
             dr.workRate = dailyWorkRate;
             dr.rate = effectiveRate;
-            dr.daySalary = calculateDaySalary(dailyWorkRate, salaryPaymentCountPerDay);
-            dr.totalSalary = calculateDaySalary(dailyWorkRate, salaryPaymentCountPerDay);
+            dr.daySalary = calculateDaySalary(
+              dailyWorkRate,
+              salaryPaymentCountPerDay,
+              Boolean(dr.isAbsent)
+            );
+            dr.totalSalary = dr.daySalary;
           }
         }
 
@@ -1251,6 +1640,8 @@ export const generatePayroll = async (req, res) => {
               daySalary: calculateDaySalary(dailyWorkRate, salaryPaymentCountPerDay),
               totalSalary: calculateDaySalary(dailyWorkRate, salaryPaymentCountPerDay),
               status: "Not Paid",
+              isAbsent: false,
+              absentMarkedAt: null,
             });
           }
         }
@@ -1483,14 +1874,22 @@ export const updateRate = async (req, res) => {
     // Recalculate work rate and total salary
     if (salary.frequency === "daily") {
       salary.workRate = salary.workingAmount * (numericRate / 100);
-      salary.daySalary = calculateDaySalary(salary.workRate, salary.salary_payment_count_per_day);
+      salary.daySalary = calculateDaySalary(
+        salary.workRate,
+        salary.salary_payment_count_per_day,
+        Boolean(salary.isAbsent)
+      );
       salary.totalSalary = salary.daySalary;
     } else {
       // Weekly or monthly - recalculate each daily record
       for (const dr of salary.dailyRecords) {
         dr.rate = numericRate;
         dr.workRate = dr.workingAmount * (numericRate / 100);
-        dr.daySalary = calculateDaySalary(dr.workRate, salary.salary_payment_count_per_day);
+        dr.daySalary = calculateDaySalary(
+          dr.workRate,
+          salary.salary_payment_count_per_day,
+          Boolean(dr.isAbsent)
+        );
         dr.totalSalary = dr.daySalary;
       }
       // Recalculate totals using shared helper (which sums daily workRates)
@@ -1629,14 +2028,22 @@ export const updateStaffRate = async (req, res) => {
 
     if (salary.frequency === "daily") {
       salary.workRate = salary.workingAmount * (numericRate / 100);
-      salary.daySalary = calculateDaySalary(salary.workRate, salary.salary_payment_count_per_day);
+      salary.daySalary = calculateDaySalary(
+        salary.workRate,
+        salary.salary_payment_count_per_day,
+        Boolean(salary.isAbsent)
+      );
       salary.totalSalary = salary.daySalary;
     } else {
       // Weekly or monthly - recalculate each daily record
       for (const dr of salary.dailyRecords) {
         dr.rate = numericRate;
         dr.workRate = dr.workingAmount * (numericRate / 100);
-        dr.daySalary = calculateDaySalary(dr.workRate, salary.salary_payment_count_per_day);
+        dr.daySalary = calculateDaySalary(
+          dr.workRate,
+          salary.salary_payment_count_per_day,
+          Boolean(dr.isAbsent)
+        );
         dr.totalSalary = dr.daySalary;
       }
       // Recalculate totals using shared helper
