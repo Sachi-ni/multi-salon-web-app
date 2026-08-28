@@ -7,7 +7,7 @@ import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
-import { Scissors, Clock, MapPin, Search, LayoutGrid, List, Plus, Coins, Pencil, Trash2, MoreVertical, DollarSign } from "lucide-react";
+import { Scissors, Clock, MapPin, Search, LayoutGrid, List, Plus, Coins, Pencil, Trash2, MoreVertical } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 
@@ -295,6 +295,16 @@ export default function AdminServicesPage() {
   const handleSave = async () => {
     if (!formData.service_name || !formData.base_price || !formData.duration) {
       setError("Please fill all required fields (Name, Price, Duration)");
+      return;
+    }
+    
+    if (Number(formData.base_price) < 0) {
+      setError("Price cannot be a negative value.");
+      return;
+    }
+    
+    if (Number(formData.duration) <= 0) {
+      setError("Duration must be greater than 0.");
       return;
     }
 

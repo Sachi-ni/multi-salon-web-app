@@ -1,8 +1,10 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const About = () => {
+  const navigate = useNavigate();
   const benefits = [
     "Award-winning stylists",
     "Premium organic products",
@@ -84,7 +86,7 @@ const About = () => {
           </ul>
 
           <div className="pt-4">
-            <button className="px-8 py-4 bg-surface backdrop-blur-md border border-accent/30 text-white rounded-xl text-base font-bold hover:bg-accent hover:text-primary transition-all duration-300">
+            <button type="button" onClick={() => navigate("/about")} className="px-8 py-4 bg-surface backdrop-blur-md border border-accent/30 text-white rounded-xl text-base font-bold hover:bg-accent hover:text-primary transition-all duration-300">
               Read Full Story
             </button>
           </div>

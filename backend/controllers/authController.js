@@ -3,6 +3,65 @@ import Staff from "../models/Staff.js";
 import Customer from "../models/Customer.js";
 import bcrypt from "bcryptjs";
 import generateToken from "../utils/generateToken.js";
+import { storeMedia } from "../utils/mediaStorage.js";
+
+
+const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/;
+const PHONE_PATTERN = /^\+?[0-9]{10}$/;
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/;
+const COMMON_PASSWORDS = new Set(["12345678", "password", "password123", "qwerty123", "letmein"]);
+
+const validateProfileFields = ({ email, phone, password, username }) => {
+  const normalizedEmail = email?.trim().toLowerCase();
+  const normalizedPhone = phone?.replace(/[\s()-]/g, "");
+
+  if (normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)) {
+    return { message: "Please enter a valid email address" };
+  }
+  if (normalizedPhone && !PHONE_PATTERN.test(normalizedPhone)) {
+    return { message: "Phone number must contain exactly 10 digits and may start with +" };
+  }
+  if (password && !PASSWORD_PATTERN.test(password)) {
+    return { message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character" };
+  }
+  if (password && COMMON_PASSWORDS.has(password.toLowerCase())) {
+    return { message: "Please choose a less common password" };
+  }
+  if (password && username && password.toLowerCase().includes(username.trim().toLowerCase())) {
+    return { message: "Password must not contain your username" };
+  }
+  return { normalizedEmail, normalizedPhone };
+};
+
+export const getProfile = async (req, res) => {
+  try {
+    let user = await Admin.findById(req.user.id).select("-password");
+    let nameField = "full_name";
+
+    if (!user) {
+      user = await Staff.findById(req.user.id).select("-password_hash");
+      nameField = "full_name";
+    }
+    if (!user) {
+      user = await Customer.findById(req.user.id).select("-password_hash");
+      nameField = "name";
+    }
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json({
+      id: user._id,
+      name: user[nameField] || "",
+      username: user.username || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      image: user.image || "",
+      role: user.role,
+      salon_id: user.salon_id || null,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/;
@@ -195,6 +254,7 @@ export const updateProfile = async (req, res) => {
     }
 
     // Profile picture upload (if provided)
+    const image = req.file ? await storeMedia(req.file, "salonhub/profiles") : undefined;
     const image = req.file ? req.file.path : undefined;
 
     let user;
@@ -221,7 +281,7 @@ export const updateProfile = async (req, res) => {
         phone: user.phone,
         image: user.image,
         role: user.role,
-        token: generateToken(user._id) // using user._id instead of whole object based on how customerRegister works
+        token: generateToken(user)
       });
     }
 
@@ -251,7 +311,7 @@ export const updateProfile = async (req, res) => {
         image: user.image,
         role: user.role,
         salon_id: user.salon_id,
-        token: generateToken(user._id)
+        token: generateToken(user)
       });
     }
 
@@ -278,7 +338,7 @@ export const updateProfile = async (req, res) => {
       username: user.username,
       role: user.role,
       salon_id: user.salon_id,
-      token: generateToken(user._id)
+      token: generateToken(user)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

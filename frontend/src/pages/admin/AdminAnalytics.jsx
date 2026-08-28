@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import {
-  Users, UserPlus, Calendar, CheckCircle,
-  XCircle, DollarSign, TrendingUp, Activity,
-  Clock, Scissors, Star, BarChart3,
+  Users, Calendar, CheckCircle,
+  XCircle, DollarSign, TrendingUp,
+  Clock, BarChart3,
   PieChart as PieChartIcon, LineChart as LineChartIcon, Sparkles, Award, Repeat
 } from "lucide-react";
 import { motion } from "framer-motion";
-import {
-  LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 

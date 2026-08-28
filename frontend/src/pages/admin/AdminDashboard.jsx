@@ -8,24 +8,16 @@ import { getDailyReport } from "../../services/billingService";
 
 import {
   Calendar,
-  Wallet,
   Users,
   Star,
   ArrowRight,
   CalendarPlus,
   UserPlus,
-  DollarSign,
-  ClipboardList,
-  Building2,
   MapPin,
   TrendingUp,
-  Clock,
-  Scissors,
-  Check,
   ChevronRight,
   Store,
   Coins,
-  Sparkles,
   MessageSquare
 } from "lucide-react";
 
@@ -41,13 +33,10 @@ import {
 } from "recharts";
 
 import PageHeader from "../../components/ui/PageHeader";
-import StatCard from "../../components/ui/StatCard";
-import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE as _API_BASE } from "../../config";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -65,7 +54,7 @@ const AdminDashboard = () => {
   const [reportData, setReportData] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [_error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState("");
 
   const fetchDashboardData = useCallback(async () => {

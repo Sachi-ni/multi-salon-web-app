@@ -1,13 +1,12 @@
 import { useEffect, useState, useMemo } from "react";
 import PageHeader from "../../components/ui/PageHeader";
 import Table from "../../components/ui/Table";
-import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import { getSalonFeedback } from "../../services/feedbackService";
 import { getSalons } from "../../services/salonService";
 import { 
-  Star, MessageSquare, User, Scissors, Calendar, Clock, 
-  Quote, Store, MapPin, Search, LayoutGrid, List, Filter, ThumbsUp, Sparkles, ChevronDown 
+  Star, MessageSquare, User, Scissors, Calendar, 
+  Quote, MapPin, Search, LayoutGrid, List, ChevronDown 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";

@@ -8,7 +8,6 @@ import {
   Users,
   Scissors,
   Calendar,
-  DollarSign,
   LogOut,
   Receipt,
   Star,

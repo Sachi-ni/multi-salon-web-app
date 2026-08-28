@@ -23,6 +23,19 @@ export default function CustomerServices() {
       .finally(() => setLoading(false));
   }, [selected]);
 
+  const visibleServices = selected === "all"
+    ? Array.from(
+        services.reduce((uniqueServices, service) => {
+          const serviceName = service.service_name || service.name || "";
+          const serviceKey = String(serviceName).trim().replace(/\s+/g, " ").toLowerCase();
+          if (serviceKey && !uniqueServices.has(serviceKey)) {
+            uniqueServices.set(serviceKey, service);
+          }
+          return uniqueServices;
+        }, new Map()).values()
+      )
+    : services;
+
   return (
     <div className="min-h-screen bg-primary">
       <LandingNavbar />
@@ -73,7 +86,7 @@ export default function CustomerServices() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-fade-up" style={{ animationDelay: "200ms" }}>
-            {services.map(s => (
+            {visibleServices.map(s => (
               <div key={s._id} className="bg-surface border border-border rounded-2xl p-6 shadow-card hover:border-accent/50 hover:shadow-glow transition-all duration-300 group">
                 <div className="w-12 h-12 bg-accent/10 border border-accent/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <Scissors className="w-6 h-6 text-accent" />

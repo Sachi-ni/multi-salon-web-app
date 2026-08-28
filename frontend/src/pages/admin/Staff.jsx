@@ -27,8 +27,7 @@ import {
   Coins,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../config";
 
 const buildImageUrl = (image) => {
   if (!image) return null;
