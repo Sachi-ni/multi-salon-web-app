@@ -12,6 +12,8 @@ import {
   updateRate,
   updateStaffRate,
   getStaffWithSalaries,
+  markDayAbsent,
+  markStaffDayAbsent,
 } from "../../services/salaryService";
 import { getSalons } from "../../services/salonService";
 
@@ -420,6 +422,80 @@ const Salary = () => {
       await loadSalaries();
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to mark as paid");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── Absent (manual override: salary for that date becomes 0) ───────────
+
+  const handleToggleAbsent = async (row) => {
+    if (!row) return;
+    const salaryId = String(row._id || "");
+    const isFallbackRow = !row.period || salaryId.startsWith(FALLBACK_PREFIX);
+
+    // The day the absence applies to: the currently selected day.
+    const selectedDay =
+      frequency === "daily"
+        ? (row.period || dailyDate)
+        : frequency === "weekly"
+          ? weeklyDate
+          : selectedMonthlyDateKey;
+
+    const dayRecord =
+      frequency === "monthly"
+        ? (Array.isArray(row.dailyRecords)
+            ? row.dailyRecords.find(
+                (dr) => toDateKey(dr.date) === selectedMonthlyDateKey
+              )
+            : null)
+        : frequency === "weekly"
+          ? (Array.isArray(row.dailyRecords)
+              ? row.dailyRecords.find((dr) => toDateKey(dr.date) === weeklyDate)
+              : null)
+          : null;
+
+    const currentlyAbsent =
+      frequency === "daily"
+        ? Boolean(row.isAbsent)
+        : Boolean(dayRecord?.isAbsent);
+
+    setLoading(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      if (isFallbackRow) {
+        // Staff without a salary record yet - create the record for this
+        // period and mark the day absent in one step.
+        const staffId = row.staff_id?._id || row.staff_id;
+        if (!staffId) {
+          setError("Staff information missing for this row");
+          setLoading(false);
+          return;
+        }
+        await markStaffDayAbsent(staffId, {
+          frequency,
+          period: getPeriod(),
+          date: selectedDay,
+          isAbsent: !currentlyAbsent,
+          salonId:
+            row.staff_id?.salon_id ||
+            (salonId && salonId !== "all" ? salonId : undefined),
+        });
+      } else {
+        await markDayAbsent(salaryId, {
+          date: selectedDay,
+          isAbsent: !currentlyAbsent,
+        });
+      }
+      setSuccessMsg(
+        !currentlyAbsent
+          ? "Day marked as absent - salary for that date is now 0"
+          : "Absence removed - salary recalculated"
+      );
+      await loadSalaries();
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.message || "Failed to update absence");
     } finally {
       setLoading(false);
     }
@@ -1020,14 +1096,30 @@ const Salary = () => {
                     : frequency === "weekly"
                       ? weeklyDate
                       : dailyDate;
+                  // Manager-marked absence for the selected day (manual
+                  // override: the absent day's salary becomes 0).
+                  const selectedPeriodDayRecord =
+                    frequency === "monthly"
+                      ? monthlyDayRecord
+                      : frequency === "weekly"
+                        ? selectedWeeklyRecord
+                        : null;
+                  const isDayAbsent = frequency === "daily"
+                    ? Boolean(row.isAbsent)
+                    : Boolean(selectedPeriodDayRecord?.isAbsent);
                   // Days without completed appointments still earn the fixed
                   // salary-per-day amount (rows without a record included).
+                  // Absent days always display 0.
                   const daySalary = frequency === "monthly"
-                    ? (selectedDailyRecord?.daySalary ||
-                       (isFallback && selectedDateKey <= today ? fallbackPerDay : 0))
+                    ? (isDayAbsent
+                        ? 0
+                        : (selectedDailyRecord?.daySalary ||
+                           (isFallback && selectedDateKey <= today ? fallbackPerDay : 0)))
                     : frequency === "weekly"
-                      ? (selectedWeeklyRecord?.daySalary ||
-                         (isFallback && selectedDateKey <= today ? fallbackPerDay : 0))
+                      ? (isDayAbsent
+                          ? 0
+                          : (selectedWeeklyRecord?.daySalary ||
+                             (isFallback && selectedDateKey <= today ? fallbackPerDay : 0)))
                       : (row.daySalary || 0);
                   const totalSal = frequency === "monthly"
                     ? (Array.isArray(row.dailyRecords)
@@ -1048,6 +1140,19 @@ const Salary = () => {
                   );
                   const canPay = !isPaid && totalSal > 0 && periodEnded;
                   const canDownloadPdf = !isFallback && isPaid;
+                  // Absent toggle: only for days that already passed and are
+                  // not paid yet.
+                  const selectedDayPassed = selectedDateKey <= today;
+                  const selectedDayPaid =
+                    frequency === "daily"
+                      ? isPaid
+                      : (selectedPeriodDayRecord?.status === "Paid" || isPaid);
+                  const canToggleAbsent = !selectedDayPaid && selectedDayPassed;
+                  const absentDisabledReason = selectedDayPaid
+                    ? (frequency === "daily" ? "Salary already paid" : "This day has already been paid")
+                    : !selectedDayPassed
+                      ? "The selected day has not finished yet"
+                      : "";
 
                   return (
                     <tr key={row._id}>
@@ -1081,7 +1186,14 @@ const Salary = () => {
                       </td>
                       <td className="text-right">{formatMoney(workRate)}</td>
                       {frequency !== "daily" && (
-                        <td className="text-right">{formatMoney(daySalary)}</td>
+                        <td className="text-right">
+                          {formatMoney(daySalary)}
+                          {isDayAbsent && (
+                            <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500/20 text-red-400 border border-red-500/30 uppercase">
+                              Absent
+                            </span>
+                          )}
+                        </td>
                       )}
                       <td className="text-right font-bold">{formatMoney(totalSal)}</td>
                       <td>
@@ -1093,6 +1205,23 @@ const Salary = () => {
                         <div className="flex items-center gap-2">
                           {!isPaid ? (
                             <>
+                              <button
+                                onClick={() => handleToggleAbsent(row)}
+                                disabled={!canToggleAbsent}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed ${
+                                  isDayAbsent
+                                    ? "bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30"
+                                    : "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30"
+                                }`}
+                                title={
+                                  absentDisabledReason ||
+                                  (isDayAbsent
+                                    ? "Remove absence - salary for this date is recalculated"
+                                    : "Mark absent - salary for this date becomes 0")
+                                }
+                              >
+                                {isDayAbsent ? "Present" : "Absent"}
+                              </button>
                               <button
                                 onClick={() => handlePay(row)}
                                 disabled={!canPay}
