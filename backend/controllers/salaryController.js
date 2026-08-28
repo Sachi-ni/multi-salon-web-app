@@ -91,13 +91,14 @@ const getDaysInMonth = (year, month) => {
 };
 
 const calculateDaySalary = (workRate, salaryPaymentCountPerDay = 0) => {
+  const numericPerDay = safeNumber(salaryPaymentCountPerDay, 0);
   const numericWorkRate = safeNumber(workRate, 0);
 
+  // No working amount means no appointments were completed for this staff on
+  // this day - the staff still earns the fixed salary-per-day amount.
   if (numericWorkRate <= 0) {
-    return 0;
+    return numericPerDay;
   }
-
-  const numericPerDay = safeNumber(salaryPaymentCountPerDay, 0);
 
   return numericWorkRate > numericPerDay ? numericWorkRate : numericPerDay;
 };
@@ -136,7 +137,8 @@ const getWeekDates = (year, weekNum) => {
 const ensureAllDaysInPeriod = (
   salaryRecord,
   effectiveRate,
-  salaryPaymentCountPerDay
+  salaryPaymentCountPerDay,
+  upToDate
 ) => {
   if (!salaryRecord.dateRange?.start || !salaryRecord.dateRange?.end) {
     return;
@@ -179,9 +181,18 @@ const ensureAllDaysInPeriod = (
     `${normalizeSalaryDate(salaryRecord.dateRange.start)}T00:00:00`
   );
 
-  const endDate = new Date(
+  let endDate = new Date(
     `${normalizeSalaryDate(salaryRecord.dateRange.end)}T00:00:00`
   );
+
+  // Optionally stop filling days at a cap (e.g. today) so future days of the
+  // current period are never pre-created with salary values.
+  if (upToDate) {
+    const upToDateValue = new Date(`${normalizeSalaryDate(upToDate)}T00:00:00`);
+    if (!Number.isNaN(upToDateValue.getTime()) && upToDateValue < endDate) {
+      endDate = upToDateValue;
+    }
+  }
 
   const currentDate = new Date(startDate);
 
@@ -192,7 +203,8 @@ const ensureAllDaysInPeriod = (
       salaryRecord.dailyRecords.push({
         date,
 
-        // No completed appointment means all money values are zero.
+        // No completed appointment means only the salary-per-day amount
+        // applies (applied by recalcWeeklyMonthlyTotals below).
         workingAmount: 0,
 
         // Important: keep the staff commission rate.
@@ -258,23 +270,29 @@ const recalcWeeklyMonthlyTotals = (salaryRecord) => {
     a.date.localeCompare(b.date)
   );
 
-  // Calculate the period totals.
+  // Calculate the period totals. Future-dated day records (if any) must not
+  // inflate the totals of the still-running period.
+  const todayKey = toLocalDateStr(new Date());
+  const countedRecords = salaryRecord.dailyRecords.filter(
+    (record) => !record.date || record.date <= todayKey
+  );
+
   salaryRecord.workingAmount =
-    salaryRecord.dailyRecords.reduce(
+    countedRecords.reduce(
       (total, record) =>
         total + safeNumber(record.workingAmount, 0),
       0
     );
 
   salaryRecord.workRate =
-    salaryRecord.dailyRecords.reduce(
+    countedRecords.reduce(
       (total, record) =>
         total + safeNumber(record.workRate, 0),
       0
     );
 
   salaryRecord.daySalary =
-    salaryRecord.dailyRecords.reduce(
+    countedRecords.reduce(
       (total, record) =>
         total + safeNumber(record.daySalary, 0),
       0
@@ -284,12 +302,126 @@ const recalcWeeklyMonthlyTotals = (salaryRecord) => {
   salaryRecord.totalSalary = salaryRecord.daySalary;
 };
 
+// ─── Refresh salary records so they follow the salary-per-day rules ────────
+// Days without completed appointments still earn the fixed salary-per-day
+// amount, weekly/monthly records cover every day up to today, and all totals
+// are recalculated before the records are returned to the frontend. Paid
+// records keep their historical values.
+const refreshSalaryRecord = (salaryRecord) => {
+  // Backfill the per-day amount snapshot from the staff when it is missing.
+  const staffPerDay = safeNumber(
+    salaryRecord.staff_id?.salary_payment_count_per_day,
+    0
+  );
+  const currentPerDay = safeNumber(
+    salaryRecord.salary_payment_count_per_day,
+    0
+  );
+  const perDay = currentPerDay > 0 ? currentPerDay : staffPerDay;
+
+  const effectiveRate = getEffectiveRate(
+    salaryRecord,
+    salaryRecord.commission_rate
+  );
+
+  const before = {
+    rate: safeNumber(salaryRecord.rate, 0),
+    workingAmount: safeNumber(salaryRecord.workingAmount, 0),
+    workRate: safeNumber(salaryRecord.workRate, 0),
+    daySalary: safeNumber(salaryRecord.daySalary, 0),
+    totalSalary: safeNumber(salaryRecord.totalSalary, 0),
+    dailyRecords: (salaryRecord.dailyRecords || [])
+      .map(
+        (record) =>
+          `${normalizeSalaryDate(record.date)}:${safeNumber(
+            record.daySalary,
+            0
+          )}`
+      )
+      .join(","),
+  };
+
+  if (perDay !== currentPerDay) {
+    salaryRecord.salary_payment_count_per_day = perDay;
+  }
+
+  // Always keep the staff commission rate on the record.
+  salaryRecord.rate = effectiveRate;
+
+  if (salaryRecord.frequency === "daily") {
+    const workingAmount = safeNumber(salaryRecord.workingAmount, 0);
+    const workRate =
+      workingAmount > 0 ? workingAmount * (effectiveRate / 100) : 0;
+    const daySalary = calculateDaySalary(workRate, perDay);
+
+    salaryRecord.workRate = workRate;
+    salaryRecord.daySalary = daySalary;
+    salaryRecord.totalSalary = daySalary;
+  } else {
+    // Weekly/monthly records: materialize every day up to today, then apply
+    // the salary-per-day rules and recalculate the period totals.
+    ensureAllDaysInPeriod(
+      salaryRecord,
+      effectiveRate,
+      perDay,
+      toLocalDateStr(new Date())
+    );
+    recalcWeeklyMonthlyTotals(salaryRecord);
+  }
+
+  const after = {
+    rate: safeNumber(salaryRecord.rate, 0),
+    workingAmount: safeNumber(salaryRecord.workingAmount, 0),
+    workRate: safeNumber(salaryRecord.workRate, 0),
+    daySalary: safeNumber(salaryRecord.daySalary, 0),
+    totalSalary: safeNumber(salaryRecord.totalSalary, 0),
+    dailyRecords: (salaryRecord.dailyRecords || [])
+      .map(
+        (record) =>
+          `${normalizeSalaryDate(record.date)}:${safeNumber(
+            record.daySalary,
+            0
+          )}`
+      )
+      .join(","),
+  };
+
+  return JSON.stringify(before) !== JSON.stringify(after);
+};
+
+const refreshSalariesForResponse = async (salaries) => {
+  const changed = [];
+
+  for (const salaryRecord of salaries) {
+    // Paid records keep their historical values.
+    if ((salaryRecord.status || "") === "Paid") continue;
+
+    try {
+      if (refreshSalaryRecord(salaryRecord)) {
+        changed.push(salaryRecord);
+      }
+    } catch (err) {
+      console.error("Salary refresh failed:", err);
+    }
+  }
+
+  await Promise.all(
+    changed.map((record) =>
+      record.save().catch((err) => {
+        console.error("Failed to persist refreshed salary record:", err.message);
+      })
+    )
+  );
+
+  return salaries;
+};
+
 // ─── Calculate and update salary when appointment is completed ─────────────
 
 export const updateSalaryOnAppointmentCompletion = async (appointmentId) => {
   try {
     const appointment = await Appointment.findById(appointmentId)
-      .populate("staff_id", "full_name commission_rate salary_payment_frequency salary_payment_count_per_day salon_id")
+      .populate("staff_id", "full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id")
       .populate("salon_id", "name");
 
     if (!appointment || appointment.status !== "completed") {
@@ -302,7 +434,7 @@ export const updateSalaryOnAppointmentCompletion = async (appointmentId) => {
     // Get appointment services
     const apptServices = await AppointmentService.find({
       appointment_id: appointment._id,
-    }).populate("staff_id", "full_name commission_rate salary_payment_frequency salary_payment_count_per_day");
+    }).populate("staff_id", "full_name role commission_rate salary_payment_frequency salary_payment_count_per_day");
 
     // If no AppointmentService records, use the main appointment data
     if (!apptServices || apptServices.length === 0) {
@@ -344,16 +476,9 @@ export const updateSalaryOnAppointmentCompletion = async (appointmentId) => {
 
 export const processSalaryOnCompletion = updateSalaryOnAppointmentCompletion;
 
-const updateSingleStaffSalary = async (staff, salonId, appointmentDate, amount) => {
+const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, amount, frequency) => {
   if (!staff) return;
 
-  // Skip managers and staff admins - they should not have salary records.
-  // (Matches the role filtering applied by every salary listing endpoint;
-  // otherwise completing an appointment for a staff-admin creates orphan
-  // records that never appear in lists but still inflate summaries.)
-  if (["manager", "staff-admin"].includes((staff.role || "").toLowerCase())) return;
-
-  const frequency = staff.salary_payment_frequency || "monthly";
   const commissionRate = staff.commission_rate || 0;
   const salaryPaymentCountPerDay = staff.salary_payment_count_per_day || 1;
   const staffId = staff._id;
@@ -522,11 +647,55 @@ const updateSingleStaffSalary = async (staff, salonId, appointmentDate, amount) 
   await salaryRecord.save();
 };
 
+// Dispatcher: accrues the salary amount for a single staff member when an
+// appointment is completed.
+const updateSingleStaffSalary = async (staff, salonId, appointmentDate, amount) => {
+  if (!staff) return;
+
+  // Staff admins do not earn salaries. (Matches the role filtering applied by
+  // every salary listing endpoint; otherwise completing an appointment for a
+  // staff-admin creates orphan records that never appear in lists but still
+  // inflate summaries.)
+  const role = (staff.role || "").toLowerCase();
+  if (role === "staff-admin") return;
+
+  // Managers accrue salary exactly like regular staff on the admin/salary
+  // page: only in the frequency configured on their profile
+  // (salary_payment_frequency). The super-admin manager salary page therefore
+  // shows one record per manager per period just like the admin page shows one
+  // record per staff member.
+  await accrueStaffSalaryForFrequency(
+    staff,
+    salonId,
+    appointmentDate,
+    amount,
+    staff.salary_payment_frequency || "monthly"
+  );
+};
+
+// Resolve the salary role filter used by the listing / payroll endpoints.
+//   "manager"    -> only salon managers (Staff collection role "manager")
+//   "management" -> salon managers AND salon admins (staff-admin)
+//   anything else -> normal staff (managers / staff-admins are excluded)
+const resolveSalaryRole = (roleFilter) => {
+  const role = (roleFilter || "").toLowerCase();
+  if (role === "manager") return "manager";
+  if (role === "management") return "management";
+  return "staff";
+};
+
+// Should a staff record (given its role) be included under a role mode?
+const salaryRoleIncludes = (mode, staffRole) => {
+  const role = (staffRole || "").toLowerCase();
+  if (mode === "manager") return role === "manager";
+  if (mode === "management") return ["manager", "staff-admin"].includes(role);
+  return !["manager", "staff-admin"].includes(role);
+};
 // ─── Get salaries ──────────────────────────────────────────────────────────
 
 export const getSalaries = async (req, res) => {
   try {
-    const { salonId, frequency, period, staffId } = req.query;
+    const { salonId, frequency, period, staffId, role: roleFilter } = req.query;
 
     const filter = {};
 
@@ -543,22 +712,29 @@ export const getSalaries = async (req, res) => {
     let salaries = await Salary.find(filter)
       .populate("staff_id", "full_name email phone role salary_payment_frequency salary_payment_count_per_day commission_rate image")
       .populate("salon_id", "name location phone email")
-      .sort({ "staff_name": 1 })
-      .lean();
+      .sort({ "staff_name": 1 });
 
-    // Filter out managers from results
-    salaries = salaries.filter(s => {
-      const role = (s.staff_id?.role || s.staff_role || "").toLowerCase();
-      return !["manager", "staff-admin"].includes(role);
-    });
+    // Role scoping: the super-admin salary page asks for salon managers only;
+    // every other listing keeps excluding managers / staff-admins.
+    const roleMode = resolveSalaryRole(roleFilter);
+    salaries = salaries.filter((s) =>
+      salaryRoleIncludes(roleMode, s.staff_id?.role || s.staff_role)
+    );
 
-    // Cross-check: only return salaries where staff's salary_payment_frequency matches the queried frequency
+    // Cross-check: only return salaries where the staff member's
+    // salary_payment_frequency matches the queried frequency. This matches the
+    // admin/salary page, where each person only appears in the tab matching
+    // their configured frequency.
     if (frequency) {
       salaries = salaries.filter(s => {
         if (!s.staff_id) return true; // keep if staff data missing (edge case)
         return s.staff_id.salary_payment_frequency === frequency;
       });
     }
+
+    // Apply the salary-per-day rules (days without completed appointments
+    // still earn the salary-per-day amount) before responding.
+    salaries = await refreshSalariesForResponse(salaries);
 
     res.json({ success: true, salaries });
   } catch (error) {
@@ -570,7 +746,7 @@ export const getSalaries = async (req, res) => {
 
 export const getSalarySummary = async (req, res) => {
   try {
-    const { salonId, frequency } = req.query;
+    const { salonId, frequency, role: roleFilter } = req.query;
 
     const match = {};
     if (req.user.role !== "super-admin") {
@@ -587,10 +763,10 @@ export const getSalarySummary = async (req, res) => {
       .select("status totalSalary paidTotal workingAmount staff_role")
       .lean();
 
-    salaryDocs = salaryDocs.filter((s) => {
-      const role = (s.staff_id?.role || s.staff_role || "").toLowerCase();
-      return !["manager", "staff-admin"].includes(role);
-    });
+    const roleMode = resolveSalaryRole(roleFilter);
+    salaryDocs = salaryDocs.filter((s) =>
+      salaryRoleIncludes(roleMode, s.staff_id?.role || s.staff_role)
+    );
 
     const summary = {
       totalPending: 0,
@@ -694,11 +870,133 @@ export const markAsPaid = async (req, res) => {
   }
 };
 
+// -- Create (if missing) and mark a salary record as Paid -------------------
+// Used by the admin/salon salary tables for staff rows that do not have a
+// salary record for the selected period yet (the frontend "fallback" rows).
+// The record is created with the salary-per-day rules applied, then marked as
+// Paid immediately. The UI already prevents paying before the period ends
+// (daily per day, weekly after the week, monthly after the month); this
+// endpoint simply records whatever staff/period/frequency is sent.
+export const createAndMarkPaid = async (req, res) => {
+  try {
+    const { staffId, frequency, period, salonId } = req.body;
+
+    if (!staffId || !frequency || !period) {
+      return res.status(400).json({
+        success: false,
+        message: "staffId, frequency and period are required",
+      });
+    }
+
+    const salon_id =
+      req.user.role === "super-admin" ? salonId || null : req.user.salon_id;
+
+    if (!salon_id) {
+      return res.status(400).json({
+        success: false,
+        message: "salonId is required to pay this salary record",
+      });
+    }
+
+    const staff = await Staff.findOne({ _id: staffId, salon_id });
+    if (!staff) {
+      return res.status(403).json({
+        success: false,
+        message: "Staff not found in your salon",
+      });
+    }
+
+    let salaryRecord = await Salary.findOne({
+      salon_id,
+      staff_id: staffId,
+      period,
+      frequency,
+    });
+
+    if (!salaryRecord) {
+      // Derive the date range covered by the period key.
+      let periodStart;
+      let periodEnd;
+      let year = 0;
+      let month = 0;
+      let weekNumber = 0;
+
+      if (frequency === "daily") {
+        periodStart = period;
+        periodEnd = period;
+        const d = new Date(period);
+        year = d.getFullYear();
+        month = d.getMonth() + 1;
+      } else if (frequency === "weekly") {
+        const parts = period.split("-W");
+        year = parseInt(parts[0], 10);
+        weekNumber = parseInt(parts[1], 10);
+        const weekDates = getWeekDates(year, weekNumber);
+        periodStart = weekDates[0];
+        periodEnd = weekDates[6];
+        month = new Date(periodStart).getMonth() + 1;
+      } else {
+        const parts = period.split("-");
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10);
+        const daysInMonth = getDaysInMonth(year, month);
+        const monthStr = String(month).padStart(2, "0");
+        periodStart = `${year}-${monthStr}-01`;
+        periodEnd = `${year}-${monthStr}-${daysInMonth}`;
+      }
+
+      salaryRecord = new Salary({
+        salon_id,
+        staff_id: staff._id,
+        frequency,
+        period,
+        staff_name: staff.full_name || "",
+        staff_role: staff.role || "",
+        commission_rate: staff.commission_rate || 0,
+        salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+        workingAmount: 0,
+        rate: staff.commission_rate || 0,
+        workRate: 0,
+        daySalary: 0,
+        totalSalary: 0,
+        status: "Not Paid",
+        year,
+        month,
+        weekNumber,
+        dateRange: { start: periodStart, end: periodEnd },
+        dailyRecords: [],
+      });
+
+      // Apply the salary-per-day rules (every elapsed day earns the fixed
+      // salary-per-day amount) before capturing the payable total.
+      refreshSalaryRecord(salaryRecord);
+    }
+
+    // Capture the payable total and mark the record (and its daily records)
+    // as Paid while preserving all computed amounts.
+    salaryRecord.paidTotal = safeNumber(salaryRecord.totalSalary, 0);
+    salaryRecord.status = "Paid";
+    salaryRecord.paidAt = new Date();
+
+    if (Array.isArray(salaryRecord.dailyRecords)) {
+      for (const dr of salaryRecord.dailyRecords) {
+        dr.status = "Paid";
+      }
+    }
+
+    await salaryRecord.save();
+
+    res.json({ success: true, message: "Salary marked as paid", salary: salaryRecord });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ─── Get all staff with their salary info for a given frequency ────────────
 
 export const getStaffWithSalaries = async (req, res) => {
   try {
-    const { salonId, frequency, period } = req.query;
+    const { salonId, frequency, period, role: roleFilter } = req.query;
 
     const salonFilter = {};
     if (req.user.role !== "super-admin") {
@@ -707,11 +1005,25 @@ export const getStaffWithSalaries = async (req, res) => {
       salonFilter.salon_id = salonId;
     }
 
-    // Get active staff for this salon matching the selected frequency (excluding managers)
+    // Role scoping: the super-admin salary page asks for salon managers only;
+    // every other listing keeps excluding managers / staff-admins.
+    const roleMode = resolveSalaryRole(roleFilter);
+
+    const roleMatch =
+      roleMode === "manager"
+        ? { role: { $regex: /^manager$/i } }
+        : roleMode === "management"
+          ? { role: { $in: [/^manager$/i, /^staff-admin$/i] } }
+          : { role: { $not: { $regex: /manager|staff-admin/i } } };
+
+    // Active staff for this salon matching the selected frequency. The
+    // salary_payment_frequency filter is applied for every role mode so that
+    // each person only appears in the tab matching their configured frequency
+    // (same behavior as the admin/salary page).
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
-      role: { $not: { $regex: /manager|staff-admin/i } },
+      ...roleMatch,
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     }).lean();
 
@@ -730,10 +1042,9 @@ export const getStaffWithSalaries = async (req, res) => {
       .populate("staff_id", "full_name email phone role salary_payment_frequency salary_payment_count_per_day commission_rate image")
       .lean();
 
-    salaries = salaries.filter(s => {
-      const role = (s.staff_id?.role || s.staff_role || "").toLowerCase();
-      return !["manager", "staff-admin"].includes(role);
-    });
+    salaries = salaries.filter((s) =>
+      salaryRoleIncludes(roleMode, s.staff_id?.role || s.staff_role)
+    );
 
     res.json({ success: true, staff: staffList, salaries });
   } catch (error) {
@@ -745,7 +1056,7 @@ export const getStaffWithSalaries = async (req, res) => {
 
 export const generatePayroll = async (req, res) => {
   try {
-    const { salonId, frequency, period } = req.body;
+    const { salonId, frequency, period, role: roleFilter } = req.body;
 
     const salonFilter = {};
     if (req.user.role !== "super-admin") {
@@ -754,12 +1065,25 @@ export const generatePayroll = async (req, res) => {
       salonFilter.salon_id = salonId;
     }
 
-    // Get active staff matching the frequency (excluding managers)
+    // Role scoping: super-admin manager salary page asks for salon managers only;
+    // every other payroll keeps excluding managers / staff-admins.
+    const roleMode = resolveSalaryRole(roleFilter);
+
+    const roleMatch =
+      roleMode === "manager"
+        ? { role: { $regex: /^manager$/i } }
+        : roleMode === "management"
+          ? { role: { $in: [/^manager$/i, /^staff-admin$/i] } }
+          : { role: { $not: { $regex: /manager|staff-admin/i } } };
+
+    // Active staff matching the selected frequency. The salary_payment_frequency
+    // filter is applied for every role mode so each person is only paid in the
+    // frequency configured on their profile (same as the admin/salary page).
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
-      role: { $not: { $regex: /manager|staff-admin/i } },
-      salary_payment_frequency: frequency,
+      ...roleMatch,
+      ...(frequency ? { salary_payment_frequency: frequency } : {}),
     }).lean();
 
     let periodStart, periodEnd;
@@ -801,7 +1125,7 @@ export const generatePayroll = async (req, res) => {
     };
 
     const completedAppointments = await Appointment.find(appointmentFilter)
-      .populate("staff_id", "full_name commission_rate salary_payment_frequency salary_payment_count_per_day")
+      .populate("staff_id", "full_name role commission_rate salary_payment_frequency salary_payment_count_per_day")
       .lean();
 
     // Process each staff member
@@ -936,8 +1260,14 @@ export const generatePayroll = async (req, res) => {
       }
 
       // For weekly/monthly, ensure all days in the period are represented
+      // (only up to today so future days never earn salary in advance)
       if (frequency !== "daily") {
-        ensureAllDaysInPeriod(salaryRecord, effectiveRate, salaryPaymentCountPerDay);
+        ensureAllDaysInPeriod(
+          salaryRecord,
+          effectiveRate,
+          salaryPaymentCountPerDay,
+          toLocalDateStr(new Date())
+        );
         // Recalculate totals after filling missing days
         recalcWeeklyMonthlyTotals(salaryRecord);
       }
@@ -1012,7 +1342,7 @@ export const getSalaryDetails = async (req, res) => {
 
 export const initializeSalaries = async (req, res) => {
   try {
-    const { salonId, frequency, period } = req.body;
+    const { salonId, frequency, period, role: roleFilter } = req.body;
 
     const salonFilter = {};
     if (req.user.role !== "super-admin") {
@@ -1021,11 +1351,24 @@ export const initializeSalaries = async (req, res) => {
       salonFilter.salon_id = salonId;
     }
 
-    // Get staff matching the frequency (excluding managers)
+    // Role scoping: super-admin manager salary page asks for salon managers only;
+    // every other initialization keeps excluding managers / staff-admins.
+    const roleMode = resolveSalaryRole(roleFilter);
+
+    const roleMatch =
+      roleMode === "manager"
+        ? { role: { $regex: /^manager$/i } }
+        : roleMode === "management"
+          ? { role: { $in: [/^manager$/i, /^staff-admin$/i] } }
+          : { role: { $not: { $regex: /manager|staff-admin/i } } };
+
+    // Staff matching the selected frequency (all role modes get the
+    // salary_payment_frequency filter so each person is handled in the
+    // frequency configured on their profile, same as the admin/salary page).
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
-      role: { $not: { $regex: /manager|staff-admin/i } },
+      ...roleMatch,
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     }).lean();
 

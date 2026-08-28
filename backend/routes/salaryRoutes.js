@@ -5,6 +5,7 @@ import {
   getSalaries,
   getSalarySummary,
   markAsPaid,
+  createAndMarkPaid,
   getStaffSalaryList,
   getStaffWithSalaries,
   generatePayroll,
@@ -33,6 +34,9 @@ router.get("/pdf/:salaryId", getSalaryDetails);
 // Mark salary as paid
 router.patch("/:salaryId/paid", markAsPaid);
 router.patch("/:salaryId/pay", markAsPaid);
+// Create (if missing) a salary record for a staff member and mark it paid
+// (used by the salary tables for rows that do not have a record yet)
+router.post("/pay", createAndMarkPaid);
 // Generate payroll for a period
 router.post("/generate-payroll", generatePayroll);
 // Initialize/ensure salary records exist for staff
