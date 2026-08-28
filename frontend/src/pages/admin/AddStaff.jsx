@@ -110,9 +110,7 @@ const AddStaff = () => {
       data.append("salaryPaymentFrequency", formData.salaryPaymentFrequency);
       data.append("salaryPaymentCountPerDay", formData.salaryPaymentCountPerDay);
 
-      formData.services.forEach((serviceId) => {
-        data.append("services", serviceId);
-      });
+      data.append("services", JSON.stringify(formData.services));
       if (formData.picture) data.append("image", formData.picture);
       await createStaff(data);
       navigate(`/salon-admin/${formData.salon}/adminStaff`);

@@ -5,6 +5,8 @@ import Footer from './landing-sections/Footer';
 import { getSalon } from '../../services/salonService';
 import { getTeam } from '../../services/staffService';
 import { MapPin, Clock, Phone, Star, ChevronLeft } from 'lucide-react';
+import { mediaUrl } from '../../utils/mediaUrl';
+import { getUploadUrl } from '../../config';
 
 export default function SalonDetailsPage() {
   const { id } = useParams();
@@ -59,13 +61,14 @@ export default function SalonDetailsPage() {
     navigate('/book', { state: { salon } });
   };
 
-// Build a list of gallery images from uploaded salon photos only (no external links)
+  // Build a list of gallery images from uploaded salon photos only (no external links)
   const galleryImages = (salon.images && salon.images.length > 0)
     ? salon.images
     : (salon.logo ? [salon.logo] : []);
 
   const imageUrl = galleryImages[0] 
-    ? `http://localhost:5000/${galleryImages[0].replace(/\\/g, '/')}`
+    ? mediaUrl(galleryImages[0])
+    ? getUploadUrl(galleryImages[0])
     : "/salon_interior.png";
 
   return (
@@ -87,10 +90,11 @@ export default function SalonDetailsPage() {
               <div className="h-96 rounded-3xl overflow-hidden border border-border">
                 <img src={imageUrl} alt={salon.name} className="w-full h-full object-cover" />
               </div>
-<div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {galleryImages.slice(1).map((img, i) => (
                   <div key={i} className="h-32 rounded-xl overflow-hidden border border-border">
-                    <img src={`http://localhost:5000/${img.replace(/\\/g, '/')}`} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
+                    <img src={mediaUrl(img)} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
+                    <img src={getUploadUrl(img)} alt={`${salon.name} gallery ${i + 2}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
                 {galleryImages.length <= 1 && (
@@ -113,7 +117,7 @@ export default function SalonDetailsPage() {
 
             {/* Right: Info */}
             <div className="flex flex-col">
-<div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2">
                  <Star className="w-5 h-5 fill-accent text-accent" />
                  <span className="text-white font-bold text-lg">{salon.rating || 0}</span>
                  <span className="text-muted-2">({salon.ratingCount || 0} reviews)</span>
@@ -176,7 +180,8 @@ export default function SalonDetailsPage() {
                   <div key={member._id} className="bg-surface rounded-2xl p-4 border border-border text-center">
                     <div className="w-20 h-20 mx-auto rounded-full bg-surface-2 border-2 border-accent mb-4 overflow-hidden">
                        {member.image ? (
-                         <img src={`http://localhost:5000/${member.image.replace(/\\/g, '/')}`} alt={member.name} className="w-full h-full object-cover" />
+                         <img src={mediaUrl(member.image)} alt={member.name} className="w-full h-full object-cover" />
+                         <img src={getUploadUrl(member.image)} alt={member.name} className="w-full h-full object-cover" />
                        ) : (
                          <div className="w-full h-full bg-accent/20 flex items-center justify-center text-accent font-bold text-xl">
                             {member.name.charAt(0)}

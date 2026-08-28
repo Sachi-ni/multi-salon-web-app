@@ -2,12 +2,11 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import PageHeader from "../../components/ui/PageHeader";
 import Table from "../../components/ui/Table";
-import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import { getSalonFeedback } from "../../services/feedbackService";
 import { 
   Star, MessageSquare, User, Scissors, Calendar, Clock, 
-  Quote, Store, MapPin, Search, LayoutGrid, List
+  Quote, Search, LayoutGrid, List
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";

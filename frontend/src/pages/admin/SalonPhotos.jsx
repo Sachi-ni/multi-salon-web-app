@@ -8,8 +8,7 @@ import {
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import { getSalon, uploadSalonImages, removeSalonImage } from "../../services/salonService";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../config";
 
 const toAbsolute = (path) => {
   if (!path) return "";
@@ -240,7 +239,7 @@ export default function SalonPhotos() {
               >
                 <img
                   src={toAbsolute(img)}
-                  alt={`${salon?.name || "Salon"} photo ${i + 1}`}
+                  alt={`${salon?.name || "Salon"} ${i + 1}`}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all duration-300 flex items-center justify-center">

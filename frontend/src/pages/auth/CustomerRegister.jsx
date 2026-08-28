@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
+import { API_URL } from "../../config";
 
 const CustomerRegister = () => {
   const [name, setName]                   = useState("");
@@ -44,7 +45,7 @@ const CustomerRegister = () => {
     }
     setLoading(true);
     try {
-      await axios.post("http://localhost:5000/api/customers/register", {
+      await axios.post(`${API_URL}/customers/register`, {
         name,
         email: email.trim().toLowerCase(),
         phone: normalizedPhone,

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
+import { API_URL } from "../../config";
 
 const Signup = () => {
   const [fname, setFname] = useState("");
@@ -29,7 +30,7 @@ const Signup = () => {
     }
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost:5000/api/auth/register", {
+      const response = await axios.post(`${API_URL}/auth/register`, {
         full_name: fname,
         username: uname,
         email: email.trim().toLowerCase(),

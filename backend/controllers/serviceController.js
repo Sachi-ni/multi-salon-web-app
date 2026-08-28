@@ -5,6 +5,14 @@ import ServiceCategory from "../models/ServiceCategory.js";
 
 export const createService = async (req, res) => {
   try {
+    const { base_price, duration } = req.body;
+    if (base_price !== undefined && Number(base_price) < 0) {
+      return res.status(400).json({ message: "Price cannot be a negative value." });
+    }
+    if (duration !== undefined && Number(duration) <= 0) {
+      return res.status(400).json({ message: "Duration must be greater than 0." });
+    }
+
     const service = await Service.create(req.body);
     res.status(201).json(service);
   } catch (error) {
@@ -29,6 +37,14 @@ export const getServices = async (req, res) => {
 
 export const updateService = async (req, res) => {
   try {
+    const { base_price, duration } = req.body;
+    if (base_price !== undefined && Number(base_price) < 0) {
+      return res.status(400).json({ message: "Price cannot be a negative value." });
+    }
+    if (duration !== undefined && Number(duration) <= 0) {
+      return res.status(400).json({ message: "Duration must be greater than 0." });
+    }
+
     const service = await Service.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true,
