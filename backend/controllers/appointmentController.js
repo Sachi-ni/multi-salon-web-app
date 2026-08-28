@@ -60,11 +60,25 @@ export const getAvailableStaff = async (req, res) => {
       return res.status(400).json({ message: "date, serviceId(s) and salonId are required" });
     }
 
+    // Admin users (super-admin / staff-admin / manager) may assign salon
+    // managers & admins as service providers even when those users don't have
+    // the service assigned to their profile. Customers keep seeing only staff
+    // who actually perform the selected services.
+    const userRole = req.user?.role || "";
+    const isAdminUser = ["super-admin", "staff-admin", "manager"].includes(userRole);
+
     // Find active staff in this salon who can perform at least one of the selected services
     const staffList = await Staff.find({
       salon_id: salonId,
-      services: { $in: serviceIdList },
-      status: "Active"
+      status: "Active",
+      ...(isAdminUser
+        ? {
+            $or: [
+              { services: { $in: serviceIdList } },
+              { role: { $in: [/^manager$/i, /^staff-admin$/i] } },
+            ],
+          }
+        : { services: { $in: serviceIdList } }),
     })
       .populate("salon_id", "name")
       .populate("services", "service_name");

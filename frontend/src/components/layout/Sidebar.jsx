@@ -13,6 +13,7 @@ import {
   Receipt,
   Star,
   BarChart2,
+  Wallet
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -38,9 +39,10 @@ const navItems = [
     items: [
       { label: "Analytics", path: "/Analytics", icon: BarChart2 },
       { label: "Report", path: "/superAdminBilling", icon: Receipt },
+      { label: "Salary", path: "/Salary", icon: Wallet },
     ],
   },
-];
+]
 
 const Sidebar = ({ isOpen = true, onClose }) => {
   const navigate = useNavigate();

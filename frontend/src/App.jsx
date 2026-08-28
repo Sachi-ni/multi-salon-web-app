@@ -33,6 +33,7 @@ import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 import Services from "./pages/superadmin/Services.jsx";
 import SuperAdminReviews from "./pages/superadmin/SuperAdminReviews.jsx";
+import SuperAdminSalary from "./pages/superadmin/Salary.jsx";
 
 import CustomerLayout   from "./components/layout/CustomerLayout.jsx";
 import CustomerDashboard from "./pages/customer/Dashboard.jsx";
@@ -145,6 +146,18 @@ function App() {
             <ProtectedRoute allowedRoles={["super-admin"]}>
               <DashboardLayout>
                 <Billing />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Manager Salary & Payroll (super admin only, across all salons) */}
+        <Route
+          path="/Salary"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <SuperAdminSalary />
               </DashboardLayout>
             </ProtectedRoute>
           }

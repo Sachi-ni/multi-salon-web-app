@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
@@ -13,6 +13,7 @@ import {
   updateStaffRate,
   getStaffWithSalaries,
 } from "../../services/salaryService";
+import { getSalons } from "../../services/salonService";
 
 
 import {
@@ -27,8 +28,7 @@ import {
   Lock,
 } from "lucide-react";
 
-import { useAuth } from "../../context/AuthContext";
-import "./admin.css";
+import "../admin/admin.css";
 
 // ─── Utility Helpers ──────────────────────────────────────────────────────
 
@@ -163,10 +163,12 @@ const countElapsedPeriodDays = (frequency, dateStr) => {
 
 const Salary = () => {
   const navigate = useNavigate();
-  const { salonId: routeSalonId } = useParams();
-  const [searchParams] = useSearchParams();
-  const { user } = useAuth();
-  const salonId = routeSalonId || user?.salon_id || searchParams.get("salonId") || "";
+
+  // Manager salary page for super admins: salon managers from every salon are
+  // listed (one manager per salon, matching the admin/salary salary-per-day
+  // calculation), with a salon filter.
+  const [salonId, setSalonId] = useState("all");
+  const [salons, setSalons] = useState([]);
 
   const [frequency, setFrequency] = useState("daily");
 
@@ -201,6 +203,28 @@ const Salary = () => {
 
   const selectedMonthlyDateKey = frequency === "monthly" ? toDateKey(monthlyDate) : "";
 
+  // ─── Load Salons (for the salon filter) ───────────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSalons = async () => {
+      try {
+        const res = await getSalons();
+        if (!cancelled) setSalons(res?.data?.salons || res?.data || []);
+      } catch {
+        if (!cancelled) setSalons([]);
+      }
+    };
+    loadSalons();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const salonNameById = new Map(
+    salons.map((salon) => [String(salon._id), salon.name || "Unnamed Salon"])
+  );
+
   // ─── Period Calculation ────────────────────────────────────────────────
 
   const getPeriod = useCallback(() => {
@@ -232,9 +256,18 @@ const Salary = () => {
 
     try {
       const period = getPeriod();
+      const salaryParams = {
+        frequency,
+        period,
+        // Only salon managers are shown on this page. The salary calculation
+        // (salary-per-day rules, period totals) is identical to the
+        // admin/salary page.
+        role: "manager",
+        ...(salonId && salonId !== "all" ? { salonId } : {}),
+      };
       const [salRes, staffRes] = await Promise.all([
-        getSalaries({ salonId, frequency, period }),
-        getStaffWithSalaries({ salonId, frequency, period }),
+        getSalaries(salaryParams),
+        getStaffWithSalaries(salaryParams),
       ]);
       const data = salRes?.data?.salaries || [];
       setSalaries(data);
@@ -378,7 +411,7 @@ const Salary = () => {
           staffId,
           frequency,
           period: getPeriod(),
-          salonId,
+          salonId: row.staff_id?.salon_id || (salonId && salonId !== "all" ? salonId : undefined),
         });
       } else {
         await markAsPaid(salaryId);
@@ -783,22 +816,35 @@ const Salary = () => {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate(`/salon-admin/${salonId}/adminDashboard`)}
+            onClick={() => navigate("/superAdminDashboard")}
             className="w-8 h-8 rounded-lg bg-[#1d1d1d] border border-gray-700 flex items-center justify-center text-gray-400 hover:text-yellow-400 hover:border-yellow-400/50 transition-all duration-150"
             title="Back to Dashboard"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h1 className="text-xl font-extrabold text-white">Salary & Payroll</h1>
+            <h1 className="text-xl font-extrabold text-white">Salon Manager Salary</h1>
             <p className="text-xs text-gray-400 mt-1">
-              {frequency.charAt(0).toUpperCase() + frequency.slice(1)} — {getPeriodDisplayLabel()}
+              {frequency.charAt(0).toUpperCase() + frequency.slice(1)} — {getPeriodDisplayLabel()} · Salon managers only
             </p>
           </div>
         </div>
 
-        {/* Calendar picker on the right */}
+        {/* Salon filter + Calendar picker on the right */}
         <div className="flex gap-2 items-center">
+          <select
+            value={salonId}
+            onChange={(e) => setSalonId(e.target.value)}
+            className="bg-[#1d1d1d] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none transition-all duration-200 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/20 max-w-[220px]"
+            title="Filter by salon"
+          >
+            <option value="all">All Salons</option>
+            {salons.map((salon) => (
+              <option key={salon._id} value={salon._id}>
+                {salon.name || "Unnamed Salon"}
+              </option>
+            ))}
+          </select>
           {frequency === "daily" && (
             <input
               type="date"
@@ -845,12 +891,12 @@ const Salary = () => {
         <div className="bg-[#161616] border border-yellow-500/20 rounded-xl p-4">
           <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider font-semibold">Pending Pay</div>
           <div className="mt-1 text-xl font-black text-white">{formatMoney(summary.totalPending)}</div>
-          <div className="text-[0.65rem] text-gray-500">{summary.pendingCount} staff</div>
+          <div className="text-[0.65rem] text-gray-500">{summary.pendingCount} managers/admins</div>
         </div>
         <div className="bg-[#161616] border border-yellow-500/20 rounded-xl p-4">
           <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider font-semibold">Total Paid</div>
           <div className="mt-1 text-xl font-black text-white">{formatMoney(summary.totalPaid)}</div>
-          <div className="text-[0.65rem] text-gray-500">{summary.paidCount} staff</div>
+          <div className="text-[0.65rem] text-gray-500">{summary.paidCount} managers/admins</div>
         </div>
         <div className="bg-[#161616] border border-yellow-500/20 rounded-xl p-4">
           <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider font-semibold">Working Amount</div>
@@ -917,7 +963,8 @@ const Salary = () => {
             </div>
             <h3 className="text-sm font-bold text-white mb-1.5">No salary records found</h3>
             <p className="text-xs text-gray-500 max-w-xs">
-              No {frequency} salary data available for this period. Complete appointments to generate salary records.
+              No {frequency} salary data available for this period for the salon managers &amp; admins. Salary is
+              generated from completed appointments; days without appointments still earn the salary-per-day amount.
             </p>
           </div>
         ) : (
@@ -925,7 +972,8 @@ const Salary = () => {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Staff</th>
+                  <th>Manager / Admin</th>
+                  <th>Salon</th>
                   <th>{frequency === "daily" ? "Working Amount" : "Work Amount"}</th>
                   <th>Rate %</th>
                   <th>Work Rate</th>
@@ -1004,6 +1052,11 @@ const Salary = () => {
                   return (
                     <tr key={row._id}>
                       <td className="font-bold text-white">{staffName}</td>
+                      <td className="text-gray-400 text-xs">
+                        {row.salon_id?.name ||
+                         salonNameById.get(String(row.salon_id || staff.salon_id || "")) ||
+                         "—"}
+                      </td>
                       <td className="text-right">{formatMoney(workingAmt)}</td>
                       <td className="text-center">
                         <div className="flex items-center gap-1 justify-center">

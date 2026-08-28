@@ -407,9 +407,6 @@ const Staff = () => {
   };
 
   const filteredStaff = staffList.filter((s) => {
-    const role = (s.role || "").toLowerCase();
-    if (["manager", "staff-admin"].includes(role)) return false;
-
     const staffName = s.name || s.full_name || "";
     const matchesSearch = staffName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === "All Roles" || s.role === selectedRole;
