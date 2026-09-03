@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, Clock, Phone, Star, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -20,8 +19,6 @@ export default function SalonCard({ branch, index }) {
     ? branch.images[0]
     : (branch.logo || null);
 
-  const imageUrl = primaryImage
-    ? mediaUrl(primaryImage)
   const imageUrl = primaryImage 
     ? getUploadUrl(primaryImage)
     : "/salon_interior.png";
