@@ -2,7 +2,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Star, MapPin, Briefcase, Calendar } from "lucide-react";
-import { mediaUrl } from '../../../utils/mediaUrl';
 import { getUploadUrl } from '../../../config';
 
 export default function StaffCard({ member, index }) {
@@ -12,8 +11,7 @@ export default function StaffCard({ member, index }) {
     navigate('/book', { state: { staff: member } });
   };
 
-  const imageUrl = member.image 
-    ? mediaUrl(member.image)
+  const imageUrl = member.image
     ? getUploadUrl(member.image)
     : "https://images.unsplash.com/photo-1595959183082-7b570b7e08e2?q=80&w=2071&auto=format&fit=crop";
 
@@ -45,14 +43,6 @@ export default function StaffCard({ member, index }) {
           <div className="flex items-center gap-2 text-sm">
             <MapPin className="w-4 h-4 text-muted flex-shrink-0" />
             <span className="text-muted-2 truncate">{member.salon_id?.name || member.salonName || "Unknown"}</span>
-          </div>
-          
-          {/* Bookings */}
-          <div className="flex items-center gap-2 text-sm">
-            <Calendar className="w-4 h-4 text-muted flex-shrink-0" />
-            <span className="text-muted-2">
-              <span className="text-white font-semibold">{member.bookings || 0}</span> bookings
-            </span>
           </div>
 
           {/* Services */}

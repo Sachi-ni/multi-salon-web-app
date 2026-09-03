@@ -64,33 +64,6 @@ export const getProfile = async (req, res) => {
 };
 
 
-const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/;
-const PHONE_PATTERN = /^\+?[0-9]{10}$/;
-const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/;
-const COMMON_PASSWORDS = new Set(["12345678", "password", "password123", "qwerty123", "letmein"]);
-
-const validateProfileFields = ({ email, phone, password, username }) => {
-  const normalizedEmail = email?.trim().toLowerCase();
-  const normalizedPhone = phone?.replace(/[\s()-]/g, "");
-
-  if (normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)) {
-    return { message: "Please enter a valid email address" };
-  }
-  if (normalizedPhone && !PHONE_PATTERN.test(normalizedPhone)) {
-    return { message: "Phone number must contain exactly 10 digits and may start with +" };
-  }
-  if (password && !PASSWORD_PATTERN.test(password)) {
-    return { message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character" };
-  }
-  if (password && COMMON_PASSWORDS.has(password.toLowerCase())) {
-    return { message: "Please choose a less common password" };
-  }
-  if (password && username && password.toLowerCase().includes(username.trim().toLowerCase())) {
-    return { message: "Password must not contain your username" };
-  }
-  return { normalizedEmail, normalizedPhone };
-};
-
 export const registerAdmin = async (req, res) => {
   try {
     const { full_name, username, email, phone, password } = req.body;
@@ -255,7 +228,6 @@ export const updateProfile = async (req, res) => {
 
     // Profile picture upload (if provided)
     const image = req.file ? await storeMedia(req.file, "salonhub/profiles") : undefined;
-    const image = req.file ? req.file.path : undefined;
 
     let user;
     if (req.user.role === "customer" || req.user.role === "user") {
