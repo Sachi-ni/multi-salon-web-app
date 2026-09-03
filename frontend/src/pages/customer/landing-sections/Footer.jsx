@@ -1,5 +1,6 @@
 import React from "react";
-import { MapPin, Phone, Mail } from "lucide-react";
+import { MapPin, Phone, Clock, Mail } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Footer = () => {
   return (
@@ -43,10 +44,10 @@ const Footer = () => {
           <div>
             <h4 className="text-white font-bold text-lg mb-6">Quick Links</h4>
             <ul className="space-y-4">
-              <li><a href="#about" className="text-white/60 hover:text-accent transition-colors text-sm">About Us</a></li>
-              <li><a href="#services" className="text-white/60 hover:text-accent transition-colors text-sm">Our Services</a></li>
-              <li><a href="#team" className="text-white/60 hover:text-accent transition-colors text-sm">Our Team</a></li>
-              <li><a href="#salons" className="text-white/60 hover:text-accent transition-colors text-sm">Locations</a></li>
+              <li><Link to="/about" className="text-white/60 hover:text-accent transition-colors text-sm">About Us</Link></li>
+              <li><Link to="/our-services" className="text-white/60 hover:text-accent transition-colors text-sm">Our Services</Link></li>
+              <li><Link to="/team" className="text-white/60 hover:text-accent transition-colors text-sm">Our Team</Link></li>
+              <li><Link to="/our-salons" className="text-white/60 hover:text-accent transition-colors text-sm">Locations</Link></li>
             </ul>
           </div>
 
@@ -65,18 +66,10 @@ const Footer = () => {
           <div>
             <h4 className="text-white font-bold text-lg mb-6">Contact Us</h4>
             <ul className="space-y-4">
-              <li className="flex items-start gap-3 text-white/60 text-sm">
-                <MapPin className="w-5 h-5 text-accent shrink-0" />
-                <span>123 Luxury Ave, Downtown NY 10001</span>
-              </li>
-              <li className="flex items-center gap-3 text-white/60 text-sm">
-                <Phone className="w-5 h-5 text-accent shrink-0" />
-                <span>+1 (555) 123-4567</span>
-              </li>
-              <li className="flex items-center gap-3 text-white/60 text-sm">
-                <Mail className="w-5 h-5 text-accent shrink-0" />
-                <span>info@salonhub.com</span>
-              </li>
+              <li className="flex items-start gap-3 text-white/60 text-sm"><MapPin className="w-5 h-5 text-accent shrink-0" /><span>Colombo</span></li>
+              <li className="flex items-center gap-3 text-white/60 text-sm"><Phone className="w-5 h-5 text-accent shrink-0" /><span>011256369</span></li>
+              <li className="flex items-start gap-3 text-white/60 text-sm"><Mail className="w-5 h-5 text-accent shrink-0 mt-0.5" /><span className="flex flex-col gap-1"><a href="mailto:info@salonhub.com" className="hover:text-accent">info@salonhub.com</a><a href="mailto:bookings@salonhub.com" className="hover:text-accent">bookings@salonhub.com</a></span></li>
+              <li className="flex items-center gap-3 text-white/60 text-sm"><Clock className="w-5 h-5 text-accent shrink-0" /><span>Monday – Sunday: 9:00 AM – 7:00 PM</span></li>
             </ul>
           </div>
 
@@ -88,8 +81,8 @@ const Footer = () => {
             © {new Date().getFullYear()} SalonHub. All rights reserved.
           </p>
           <div className="flex gap-6 text-sm text-white/40">
-            <a href="/privacy" className="hover:text-accent transition-colors">Privacy Policy</a>
-            <a href="/terms" className="hover:text-accent transition-colors">Terms of Service</a>
+            <Link to="/privacy" className="hover:text-accent transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-accent transition-colors">Terms of Service</Link>
           </div>
         </div>
       </div>

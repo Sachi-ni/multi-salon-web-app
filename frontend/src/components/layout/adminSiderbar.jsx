@@ -6,7 +6,6 @@ import {
   Calendar,
   Users,
   Scissors,
-  DollarSign,
   Receipt,
   Star,
   Wallet,

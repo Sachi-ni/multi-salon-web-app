@@ -15,8 +15,14 @@ import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import clsx from "clsx";
+import { API_BASE } from "../../config";
 
-const API_BASE = "http://localhost:5000";
+const TIME_SLOTS = [];
+for (let i = 0; i < 24; i++) {
+  const hour = i.toString().padStart(2, "0");
+  TIME_SLOTS.push(`${hour}:00`);
+  TIME_SLOTS.push(`${hour}:30`);
+}
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 const COMMON_EMAIL_DOMAINS = new Set([
   "gmail.com",
@@ -310,6 +316,8 @@ const handleEditOpen = async (id) => {
       managerPhone: res.data.managerPhone || "",
       managerEmail: res.data.managerEmail || "",
       managerPassword: "",
+      open_time: res.data.open_time || "",
+      close_time: res.data.close_time || "",
     });
 
     setEditLogo(null);
@@ -367,6 +375,11 @@ const handleEditOpen = async (id) => {
       return;
     }
 
+    if (editForm.open_time && editForm.close_time && editForm.open_time >= editForm.close_time) {
+      setEditError("Opening time must be earlier than closing time.");
+      return;
+    }
+
     setEditError("");
     setEditLoading(true);
 
@@ -382,6 +395,8 @@ const handleEditOpen = async (id) => {
         "managerPhone",
         "managerEmail",
         "managerPassword",
+        "open_time",
+        "close_time",
       ].forEach((key) => {
         if (
           editForm[key] !== undefined &&
@@ -696,6 +711,43 @@ const handleEditOpen = async (id) => {
               placeholder="Enter information about this salon..."
               className="w-full bg-surface-2 border border-border rounded-xl px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 resize-none"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[0.68rem] font-extrabold text-neutral-400 tracking-wider uppercase mb-1.5">
+                Opening Time
+              </label>
+              <select
+                name="open_time"
+                value={editForm.open_time || ""}
+                onChange={handleEditChange}
+                required
+                className="w-full bg-surface-2 border border-border rounded-xl px-3.5 py-2.5 text-sm text-white outline-none focus:border-amber-400 transition-colors cursor-pointer"
+              >
+                <option value="" disabled>Select opening time</option>
+                {TIME_SLOTS.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[0.68rem] font-extrabold text-neutral-400 tracking-wider uppercase mb-1.5">
+                Closing Time
+              </label>
+              <select
+                name="close_time"
+                value={editForm.close_time || ""}
+                onChange={handleEditChange}
+                required
+                className="w-full bg-surface-2 border border-border rounded-xl px-3.5 py-2.5 text-sm text-white outline-none focus:border-amber-400 transition-colors cursor-pointer"
+              >
+                <option value="" disabled>Select closing time</option>
+                {TIME_SLOTS.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Salon Logo Upload */}

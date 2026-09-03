@@ -18,6 +18,11 @@ import Landing from "./pages/customer/Landing.jsx";
 import TeamPage from "./pages/customer/TeamPage.jsx";
 import SalonsPage from "./pages/customer/SalonsPage.jsx";
 import SalonDetailsPage from "./pages/customer/SalonDetailsPage.jsx";
+import AboutUs from "./pages/customer/AboutUs.jsx";
+import ContactPage from "./pages/customer/ContactPage.jsx";
+import TestimonialsPage from "./pages/customer/TestimonialsPage.jsx";
+import PrivacyPolicy from "./pages/customer/PrivacyPolicy.jsx";
+import TermsOfService from "./pages/customer/TermsOfService.jsx";
 
 // Super Admin Pages
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
@@ -33,6 +38,7 @@ import Salons from "./pages/superadmin/Salons.jsx";
 import AddAppointment from "./pages/superadmin/AddAppointment.jsx";
 import Services from "./pages/superadmin/Services.jsx";
 import SuperAdminReviews from "./pages/superadmin/SuperAdminReviews.jsx";
+import SuperAdminSalary from "./pages/superadmin/Salary.jsx";
 
 import CustomerLayout   from "./components/layout/CustomerLayout.jsx";
 import CustomerDashboard from "./pages/customer/Dashboard.jsx";
@@ -86,6 +92,11 @@ function App() {
         <Route path="/team" element={<TeamPage />} />
         <Route path="/our-salons" element={<SalonsPage />} />
         <Route path="/our-salons/:id" element={<SalonDetailsPage />} />
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/testimonials" element={<TestimonialsPage />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
 
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
@@ -145,6 +156,18 @@ function App() {
             <ProtectedRoute allowedRoles={["super-admin"]}>
               <DashboardLayout>
                 <Billing />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Manager Salary & Payroll (super admin only, across all salons) */}
+        <Route
+          path="/Salary"
+          element={
+            <ProtectedRoute allowedRoles={["super-admin"]}>
+              <DashboardLayout>
+                <SuperAdminSalary />
               </DashboardLayout>
             </ProtectedRoute>
           }

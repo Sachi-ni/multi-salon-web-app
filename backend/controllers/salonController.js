@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import Salon from "../models/Salon.js";
 import Staff from "../models/Staff.js";
 import Feedback from "../models/Feedback.js";
+import { storeMedia, isRemoteMedia } from "../utils/mediaStorage.js";
 
 // __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -116,11 +117,19 @@ export const createSalon = async (req, res) => {
       managerEmail,
       managerPhone,
       managerPassword,
+      open_time,
+      close_time,
     } = req.body;
 
     if (!managerName || !managerEmail || !managerPassword) {
       return res.status(400).json({
         message: "Manager name, email and password are required.",
+      });
+    }
+
+    if (open_time && close_time && open_time >= close_time) {
+      return res.status(400).json({
+        message: "Opening time must be earlier than closing time.",
       });
     }
 
@@ -166,7 +175,9 @@ export const createSalon = async (req, res) => {
       location,
       phone: normalizedSalonPhone,
       about,
-      logo: req.file ? req.file.path : "",
+      open_time,
+      close_time,
+      logo: req.file ? await storeMedia(req.file, "salonhub/logos") : "",
     });
 
     const salt = await bcrypt.genSalt(10);
@@ -367,6 +378,12 @@ export const updateSalon = async (req, res) => {
       salonData.phone = normalizedSalonPhone;
     }
 
+    if (salonData.open_time && salonData.close_time && salonData.open_time >= salonData.close_time) {
+      return res.status(400).json({
+        message: "Opening time must be earlier than closing time.",
+      });
+    }
+
     if (validation.normalizedEmail) {
       const duplicateManager = await Staff.findOne({
         email: {
@@ -385,7 +402,7 @@ export const updateSalon = async (req, res) => {
 
     // If a new logo file was uploaded, update logo
     if (req.file) {
-      salonData.logo = req.file.path.replace(/\\/g, "/");
+      salonData.logo = await storeMedia(req.file, "salonhub/logos");
     }
 
     // Update salon information
@@ -536,8 +553,8 @@ export const uploadSalonImages = async (req, res) => {
       });
     }
 
-    const newPaths = req.files.map((f) =>
-      f.path.replace(/\\/g, "/")
+    const newPaths = await Promise.all(
+      req.files.map((file) => storeMedia(file, "salonhub/gallery"))
     );
 
     salon.images = [
@@ -572,18 +589,22 @@ export const removeSalonImage = async (req, res) => {
       });
     }
 
-    const filename = req.params.filename.replace(/\\/g, "/");
+    const filename = path.posix.basename(String(req.params.filename || "").replace(/\\/g, "/"));
 
-    const remaining = (salon.images || []).filter((img) => {
-      const imgFile = img.split("/").pop();
-      return imgFile !== filename;
-    });
+    const removedImage = (salon.images || []).find((img) => img.split("/").pop() === filename);
+    const remaining = (salon.images || []).filter((img) => img.split("/").pop() !== filename);
 
     salon.images = remaining;
 
     await salon.save();
 
-    // Best-effort physical file deletion
+    // Remote media is managed by its shared storage provider. Only legacy local
+    // uploads have a file on this server to remove.
+    if (isRemoteMedia(removedImage)) {
+      return res.json({ images: salon.images, message: "Image removed successfully" });
+    }
+
+    // Best-effort physical file deletion for legacy local uploads
     try {
       const filePath = path.join(
         __dirname,

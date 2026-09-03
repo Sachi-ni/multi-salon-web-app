@@ -8,6 +8,7 @@ import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import { Store, UserCheck, Phone, Calendar, Clock, Loader2 } from "lucide-react";
 import clsx from "clsx";
+import { API_URL } from "../../config";
 
 const StaffDashboard = () => {
   const { user, token } = useAuth();
@@ -19,7 +20,7 @@ const StaffDashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/staff/dashboard", {
+        const res = await fetch(`${API_URL}/staff/dashboard`, {
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`

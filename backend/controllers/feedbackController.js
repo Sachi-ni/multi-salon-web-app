@@ -74,6 +74,29 @@ export const getMyFeedback = async (req, res) => {
   }
 };
 
+// Public landing-page testimonials. Only real submitted comments are exposed.
+export const getPublicFeedback = async (req, res) => {
+  try {
+    const feedbacks = await Feedback.find({ comment: { $exists: true, $ne: "" } })
+      .populate("customer_id", "name image")
+      .populate("salon_id", "name")
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    res.json(feedbacks.map((feedback) => ({
+      id: feedback._id,
+      name: feedback.customer_id?.name || "Customer",
+      image: feedback.customer_id?.image || "",
+      salon: feedback.salon_id?.name || "",
+      text: feedback.comment,
+      rating: Math.round(((feedback.serviceRating || 0) + (feedback.staffRating || 0)) / 2),
+    })));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export const getSalonFeedback = async (req, res) => {
   try {
     const salon_id = req.user.role === "super-admin"

@@ -18,7 +18,7 @@ const Hero = () => {
         />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 w-full grid lg:grid-cols-2 gap-12 items-center">
+      <div className="relative z-20 max-w-7xl mx-auto px-6 w-full grid lg:grid-cols-2 gap-12 items-center">
         {/* Text Content */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -45,6 +45,7 @@ const Hero = () => {
 
           <div className="flex flex-wrap gap-4 mt-4">
             <button
+              type="button"
               onClick={() => navigate("/book")}
               className="px-8 py-4 bg-accent text-primary rounded-xl text-base font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-glow transition-all duration-300 hover:-translate-y-1 flex items-center gap-2 group"
             >
@@ -52,9 +53,8 @@ const Hero = () => {
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
-              onClick={() => {
-                document.querySelector("#services")?.scrollIntoView({ behavior: "smooth" });
-              }}
+              type="button"
+              onClick={() => navigate("/our-services")}
               className="px-8 py-4 bg-surface/50 backdrop-blur-md border border-border text-white rounded-xl text-base font-bold hover:bg-surface-2 transition-all duration-300 hover:-translate-y-1"
             >
               Explore Services
@@ -90,7 +90,7 @@ const Hero = () => {
       </div>
 
       {/* Decorative Bottom Gradient */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-primary to-transparent z-10" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-primary to-transparent z-10 pointer-events-none" />
     </section>
   );
 };

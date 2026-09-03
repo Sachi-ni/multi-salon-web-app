@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import Salary from "../models/Salary.js";
 import Appointment from "../models/Appointment.js";
 import Feedback from "../models/Feedback.js";
+import { storeMedia } from "../utils/mediaStorage.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
@@ -52,14 +53,15 @@ export const createStaff = async (req, res) => {
     const { password } = req.body;
     let services = [];
     if (req.body.services) {
-      try {
-        if (typeof req.body.services === "string") {
-          services = JSON.parse(req.body.services);
-        } else {
-          services = req.body.services;
+      if (Array.isArray(req.body.services)) {
+        services = req.body.services;
+      } else if (typeof req.body.services === "string") {
+        try {
+          const parsed = JSON.parse(req.body.services);
+          services = Array.isArray(parsed) ? parsed : [req.body.services];
+        } catch {
+          services = [req.body.services];
         }
-      } catch {
-        services = [];
       }
     }
 
@@ -144,7 +146,7 @@ export const createStaff = async (req, res) => {
       salary_payment_count_per_day: Number.isFinite(salaryPaymentCountPerDay) && salaryPaymentCountPerDay > 0 ? salaryPaymentCountPerDay : 1,
       salon_id: salonId,
       services,
-      image: req.file ? req.file.path : null,
+      image: req.file ? await storeMedia(req.file, "salonhub/staff") : null,
     };
 
     // keep status default aligned with schema enum
@@ -299,7 +301,12 @@ export const getTeam = async (req, res) => {
   try {
     const { salonId, serviceId } = req.query;
 
-    const filter = { status: "Active" };
+    // The public customer team page must only expose service professionals,
+    // not salon-management accounts.
+    const filter = {
+      status: "Active",
+      role: { $not: /^(manager|staff-admin|super-admin)$/i },
+    };
 
     if (salonId) {
       filter.salon_id = salonId;
@@ -358,41 +365,20 @@ export const updateStaff = async (req, res) => {
     let services;
 
     if (req.body.services !== undefined) {
-      try {
-        let rawServices = req.body.services;
-
-        console.log("RAW SERVICES:", rawServices);
-        console.log("RAW SERVICES TYPE:", typeof rawServices);
-
-        // If FormData sends JSON string
-        if (typeof rawServices === "string") {
-          services = JSON.parse(rawServices);
-        } else {
-          services = rawServices;
+      let rawServices = req.body.services;
+      if (Array.isArray(rawServices)) {
+        services = rawServices;
+      } else if (typeof rawServices === "string") {
+        try {
+          const parsed = JSON.parse(rawServices);
+          services = Array.isArray(parsed) ? parsed : [rawServices];
+        } catch (error) {
+          services = [rawServices];
         }
-
-        // Make sure it is an array
-        if (!Array.isArray(services)) {
-          services = [];
-        }
-
-        // Remove invalid/empty IDs
-        services = services.filter(
-          (serviceId) =>
-            typeof serviceId === "string" &&
-            serviceId.trim() !== ""
-        );
-
-        console.log("PARSED SERVICES:", services);
-
-      } catch (error) {
-        console.error(
-          "SERVICE PARSE ERROR:",
-          error
-        );
-
+      } else {
         services = [];
       }
+      services = services.filter((serviceId) => typeof serviceId === "string" && serviceId.trim() !== "");
     }
 
     console.log("services:", req.body.services);
@@ -469,7 +455,7 @@ export const updateStaff = async (req, res) => {
       updateData.services = services;
 
     if (req.file) {
-      updateData.image = req.file.path;
+      updateData.image = await storeMedia(req.file, "salonhub/staff");
     }
 
     // Handle salon changes and maintain staff counts

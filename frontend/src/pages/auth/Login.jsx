@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { motion } from "framer-motion";
+import { API_URL } from "../../config";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ const Login = () => {
     setLoading(true);
     try {
       // Try admin login first
-      let res = await fetch("http://localhost:5000/api/auth/login", {
+      let res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -24,7 +25,7 @@ const Login = () => {
 
       // If admin login fails, try staff login
       if (!res.ok) {
-        res = await fetch("http://localhost:5000/api/staff/login", {
+        res = await fetch(`${API_URL}/staff/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
@@ -34,7 +35,7 @@ const Login = () => {
 
       // If staff login fails, try customer login
       if (!res.ok) {
-        res = await fetch("http://localhost:5000/api/customers/login", {
+        res = await fetch(`${API_URL}/customers/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),

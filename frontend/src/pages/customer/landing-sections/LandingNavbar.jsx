@@ -25,12 +25,12 @@ const LandingNavbar = () => {
 
   const navLinks = [
     { name: "Home", href: "#home" },
-    { name: "About", href: "#about" },
+    { name: "About", href: "/about" },
     { name: "Services", href: "/our-services" },
     { name: "Salons", href: "/our-salons" },
     { name: "Our Team", href: "/team" },
-    { name: "Testimonials", href: "#testimonials" },
-    { name: "Contact", href: "#contact" },
+    { name: "Testimonials", href: "/testimonials" },
+    { name: "Contact", href: "/contact" },
   ];
 
   const scrollToSection = (href) => {
