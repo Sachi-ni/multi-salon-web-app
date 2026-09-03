@@ -63,32 +63,13 @@ export const getProfile = async (req, res) => {
   }
 };
 
-
 export const registerAdmin = async (req, res) => {
   try {
-    const { full_name, username, email, phone, password } = req.body;
+    const { full_name, username, email, phone, password, role } = req.body;
     const validation = validateProfileFields({ email, phone, password, username });
     if (validation.message) return res.status(400).json(validation);
-    const normalizedEmail = validation.normalizedEmail;
-    const normalizedPhone = validation.normalizedPhone;
 
-    // Check if admin already exists
-    const existingAdmin = await Admin.findOne({ email: normalizedEmail });
-    if (existingAdmin) {
-      return res.status(400).json({ message: "Admin already exists" });
-    }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const password_hash = await bcrypt.hash(password, salt);
-
-    // Decide role securely
-    let role = "user"; // default
-    const superAdminExists = await Admin.findOne({ role: "super-admin" });
-    if (!superAdminExists) {
-      role = "super-admin"; // bootstrap first account
-    }
-
+    const password_hash = await bcrypt.hash(password, 10);
     const admin = new Admin({
       full_name,
       username,

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { getSalon } from "../../services/salonService";
 import { getSalonAppointments, confirmAppointment, completeAppointment } from "../../services/appointmentService";
 import { getStaff } from "../../services/staffService";
@@ -41,6 +42,7 @@ import { API_BASE as _API_BASE } from "../../config";
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const params = useParams();
+  const { user } = useAuth();
   let salonId = params.salonId;
   if (!salonId) {
     const match = window.location.pathname.match(/^\/salon-admin\/([^/]+)/);
@@ -191,7 +193,11 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Salon Branch Dashboard" subtitle={`Welcome back, ${salon?.name || "Salon Manager"}!`}>
+      <PageHeader
+        title="Salon Branch Dashboard"
+        subtitle={`Welcome back, ${salon?.name || "Salon Manager"}!`}
+        backTo={user?.role === "super-admin" ? "/superAdminDashboard" : undefined}
+      >
         <Button
           variant="primary"
           icon={CalendarPlus}
