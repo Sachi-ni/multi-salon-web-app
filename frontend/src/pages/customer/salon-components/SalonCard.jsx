@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { MapPin, Clock, Phone, Star, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { mediaUrl } from '../../../utils/mediaUrl';
 import { getUploadUrl } from '../../../config';
 
 export default function SalonCard({ branch, index }) {

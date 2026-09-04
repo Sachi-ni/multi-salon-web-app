@@ -347,7 +347,7 @@ const Salary = () => {
     } finally {
       setLoading(false);
     }
-  }, [salonId, frequency, getPeriod, dailyDate, weeklyDate, monthlyDate]);
+  }, [salonId, frequency, getPeriod]);
 
   useEffect(() => {
     loadSalaries();
@@ -861,48 +861,52 @@ const Salary = () => {
 
   // ─── Build display rows (salaries + staff without records) ──────────────
 
-  let displayRows = [...salaries];
+  const displayRows = useMemo(() => {
+    let rows = [...salaries];
 
-  // Always show every staff member of the salon under this frequency tab.
-  // Staff that do not have a salary record for the selected period yet are
-  // appended as zero-value rows, so newly added staff appear alongside the
-  // existing rows (earlier staff rows are never removed).
-  if (fallbackStaff.length > 0) {
-    const recordedStaffIds = new Set(
-      displayRows.map((row) => String(row.staff_id?._id || row.staff_id || ""))
-    );
+    // Always show every staff member of the salon under this frequency tab.
+    // Staff that do not have a salary record for the selected period yet are
+    // appended as zero-value rows, so newly added staff appear alongside the
+    // existing rows (earlier staff rows are never removed).
+    if (fallbackStaff.length > 0) {
+      const recordedStaffIds = new Set(
+        rows.map((row) => String(row.staff_id?._id || row.staff_id || ""))
+      );
 
-    const pendingRows = fallbackStaff
-      .filter((staff) => !recordedStaffIds.has(String(staff._id)))
-      .map((staff) => {
-        // Days without completed appointments still earn the fixed
-        // salary-per-day amount, so fallback rows show it too.
-        const perDayAmount = Number(staff.salary_payment_count_per_day || 0);
-        const fallbackTotalSalary =
-          frequency === "daily"
-            ? (dailyDate <= today ? perDayAmount : 0)
-            : perDayAmount *
-              countElapsedPeriodDays(
-                frequency,
-                frequency === "weekly" ? weeklyDate : monthlyDate
-              );
+      const pendingRows = fallbackStaff
+        .filter((staff) => !recordedStaffIds.has(String(staff._id)))
+        .map((staff) => {
+          // Days without completed appointments still earn the fixed
+          // salary-per-day amount, so fallback rows show it too.
+          const perDayAmount = Number(staff.salary_payment_count_per_day || 0);
+          const fallbackTotalSalary =
+            frequency === "daily"
+              ? (dailyDate <= today ? perDayAmount : 0)
+              : perDayAmount *
+                countElapsedPeriodDays(
+                  frequency,
+                  frequency === "weekly" ? weeklyDate : monthlyDate
+                );
 
-        return {
-          _id: `${FALLBACK_PREFIX}${staff._id}`,
-          staff_id: staff,
-          staff_name: staff.full_name || "",
-          workingAmount: 0,
-          rate: staff.commission_rate ?? 0,
-          commission_rate: staff.commission_rate ?? 0,
-          workRate: 0,
-          daySalary: fallbackTotalSalary,
-          totalSalary: fallbackTotalSalary,
-          status: "Not Paid",
-        };
-      });
+          return {
+            _id: `${FALLBACK_PREFIX}${staff._id}`,
+            staff_id: staff,
+            staff_name: staff.full_name || "",
+            workingAmount: 0,
+            rate: staff.commission_rate ?? 0,
+            commission_rate: staff.commission_rate ?? 0,
+            workRate: 0,
+            daySalary: fallbackTotalSalary,
+            totalSalary: fallbackTotalSalary,
+            status: "Not Paid",
+          };
+        });
 
-    displayRows = [...displayRows, ...pendingRows];
-  }
+      rows = [...rows, ...pendingRows];
+    }
+
+    return rows;
+  }, [salaries, fallbackStaff, frequency, dailyDate, today, weeklyDate, monthlyDate]);
 
   // ─── Summary cards (computed from the same rows the table renders) ───────
 
