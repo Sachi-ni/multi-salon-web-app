@@ -222,7 +222,9 @@ const seed = async () => {
         phone: "0771110000",
         password: passwordHash,
         role: "super-admin",
-        salon_id: null
+        salon_id: null,
+        mustChangePassword: false,
+        mfaEnrolled: true
       },
       ...salons.map((salon, idx) => {
         const slug = salon.name.split(" ")[0].toLowerCase();
@@ -232,7 +234,7 @@ const seed = async () => {
           email: `${slug}admin@salon.com`,
           phone: `077111${String(idx + 1).padStart(4, "0")}`,
           password: passwordHash,
-          role: "staff-admin",
+          role: "manager",
           salon_id: salon._id
         };
       })

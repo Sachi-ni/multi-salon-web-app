@@ -45,8 +45,8 @@ const CustomerRegister = () => {
     }
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/customers/register`, {
-        name,
+      await axios.post(`${API_URL}/auth/register`, {
+        fullName: name,
         email: email.trim().toLowerCase(),
         phone: normalizedPhone,
         password,

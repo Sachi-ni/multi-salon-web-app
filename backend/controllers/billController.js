@@ -7,7 +7,28 @@ import mongoose from "mongoose";
 
 export const createBill = async (req, res) => {
    try {
-      const bill = await Bill.create(req.body);
+      const { appointment_id, payment_method, bill_date } = req.body;
+      if (!appointment_id) {
+         return res.status(400).json({ message: "appointment_id is required" });
+      }
+
+      const appointment = await Appointment.findById(appointment_id);
+      if (!appointment) {
+         return res.status(404).json({ message: "Appointment not found" });
+      }
+      if (
+         req.user.role !== "super-admin" &&
+         appointment.salon_id?.toString() !== req.user.salon_id?.toString()
+      ) {
+         return res.status(403).json({ message: "Not authorized for this salon" });
+      }
+
+      const bill = await Bill.create({
+         appointment_id: appointment._id,
+         total_amount: appointment.total_price,
+         payment_method,
+         bill_date: bill_date ? new Date(bill_date) : new Date(),
+      });
       res.status(201).json(bill);
    } catch (error) {
       res.status(500).json({ message: error.message });

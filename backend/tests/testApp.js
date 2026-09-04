@@ -1,0 +1,21 @@
+import express from "express";
+import authRoutes from "../routes/authRoutes.js";
+import staffRoutes from "../routes/staffRoutes.js";
+import salonRoutes from "../routes/salonRoutes.js";
+import customerRoutes from "../routes/customerRoutes.js";
+import appointmentRoutes from "../routes/appointmentRoutes.js";
+import billRoutes from "../routes/billRoutes.js";
+import serviceRoutes from "../routes/serviceRoutes.js";
+import reviewRoutes from "../routes/reviewRoutes.js";
+
+const app = express();
+app.use(express.json());
+app.use("/api/auth", authRoutes);
+app.use("/api/staff", staffRoutes);
+app.use("/api/salons", salonRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/appointments", appointmentRoutes);
+app.use("/api/bills", billRoutes);
+app.use("/api/services", serviceRoutes);
+app.use("/api/reviews", reviewRoutes);
+export default app;

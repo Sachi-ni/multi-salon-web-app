@@ -57,7 +57,7 @@ export const getStaffAvailability = async (req, res) => {
       return res.status(404).json({ message: "Staff not found" });
     }
 
-    // staff-admin can only view their own salon's staff
+    // Managers can only view their own salon's staff
     if (
       req.user.role !== "super-admin" &&
       staff.salon_id.toString() !== req.user.salon_id.toString()

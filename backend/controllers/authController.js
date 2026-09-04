@@ -2,8 +2,9 @@ import Admin from "../models/Admin.js";
 import Staff from "../models/Staff.js";
 import Customer from "../models/Customer.js";
 import bcrypt from "bcryptjs";
-import generateToken from "../utils/generateToken.js";
+import generateToken, { generateHardeningToken } from "../utils/generateToken.js";
 import { storeMedia } from "../utils/mediaStorage.js";
+import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
 
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/;
@@ -65,35 +66,45 @@ export const getProfile = async (req, res) => {
 
 export const registerAdmin = async (req, res) => {
   try {
-    const { full_name, username, email, phone, password, role } = req.body;
-    const validation = validateProfileFields({ email, phone, password, username });
+    const { fullName, email, phone, password, preferredSalonId, role } = req.body;
+    const normalizedEmail = email?.trim().toLowerCase();
+    const normalizedPhone = phone?.replace(/[\s()-]/g, "");
+
+    // This public route can only create customers; privileged roles must never be self-registered.
+    if (role && role.toLowerCase() !== "customer") {
+      return res.status(400).json({ message: "Only customer registration is allowed" });
+    }
+    assertNotPrivilegedRole(role);
+
+    const validation = validateProfileFields({ email: normalizedEmail, phone: normalizedPhone, password });
     if (validation.message) return res.status(400).json(validation);
 
-    const password_hash = await bcrypt.hash(password, 10);
-    const admin = new Admin({
-      full_name,
-      username,
+    const existingCustomer = await Customer.findOne({ email: normalizedEmail });
+    // A generic response prevents attackers from discovering registered email addresses.
+    if (existingCustomer) {
+      return res.status(202).json({ message: "If this email is not already registered, your account will be created." });
+    }
+
+    const password_hash = await bcrypt.hash(password, 12);
+    const customer = await Customer.create({
+      name: fullName,
       email: normalizedEmail,
       phone: normalizedPhone,
-      password: password_hash,
-      role
+      preferredSalonId: preferredSalonId || null,
+      password_hash,
+      role: "customer",
     });
 
-    await admin.save();
-
-res.status(201).json({
-      id: admin._id,
-      name: admin.full_name,
-      email: admin.email,
-      phone: admin.phone,
-      image: admin.image,
-      role: admin.role,
-      salon_id: admin.salon_id,
-      token: generateToken(admin)
+    res.status(201).json({
+      id: customer._id,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      role: customer.role,
+      token: generateToken(customer._id),
     });
-
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message });
   }
 };
 
@@ -117,6 +128,19 @@ export const loginAdmin = async (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
 
+    // Do not issue a full session until the seeded SuperAdmin changes the password and enrolls MFA.
+    const requiresPasswordChange = admin.mustChangePassword === true;
+    const requiresMfa = admin.mfaEnrolled === false;
+    // Older SuperAdmin documents predate these fields; only explicit hardening flags block them.
+    if (admin.role === "super-admin" && (requiresPasswordChange || requiresMfa)) {
+      const purpose = requiresPasswordChange ? "change-password" : "mfa-setup";
+      return res.status(200).json({
+        requiresHardening: true,
+        hardeningStep: purpose,
+        token: generateHardeningToken(admin, purpose),
+      });
+    }
+
 res.json({
       id: admin._id,
       name: admin.full_name,
@@ -131,6 +155,25 @@ res.json({
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+};
+
+export const changePassword = async (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ message: "Password is required" });
+  const admin = await Admin.findById(req.user.id);
+  if (!admin) return res.status(404).json({ message: "User not found" });
+  admin.password = await bcrypt.hash(password, 12);
+  admin.mustChangePassword = false;
+  await admin.save();
+  res.json({ message: "Password changed; MFA setup is required", token: generateHardeningToken(admin, "mfa-setup") });
+};
+
+export const setupMfa = async (req, res) => {
+  const admin = await Admin.findById(req.user.id);
+  if (!admin) return res.status(404).json({ message: "User not found" });
+  admin.mfaEnrolled = true;
+  await admin.save();
+  res.json({ message: "MFA setup completed", token: generateToken(admin) });
 };
 
 export const loginStaff = async (req, res) => {
@@ -171,10 +214,10 @@ export const promoteAdmin = async (req, res) => {
     const admin = await Admin.findById(req.params.id);
     if (!admin) return res.status(404).json({ message: "Admin not found" });
 
-    admin.role = "staff-admin";
+    admin.role = "manager";
     await admin.save();
 
-    res.json({ message: "User promoted to staff admin", role: admin.role });
+    res.json({ message: "User promoted to manager", role: admin.role });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -8,11 +8,11 @@ const __dirname = path.dirname(__filename);
 const filePath = path.join(__dirname, 'controllers', 'appointmentController.js');
 let content = fs.readFileSync(filePath, 'utf8');
 
-const regex = /const adminsToNotify = await Admin\.find\(\{\s*role: \{ \$in: \["staff-admin", "manager"\] \},\s*salon_id: ([a-zA-Z._]+)\s*\}\);\s*const notifications = adminsToNotify\.map\(admin => \(\{\s*recipient_id: admin\._id,\s*recipient_model: "Admin",\s*title: "([^"]+)",\s*message: `([^`]+)`,\s*appointment_id: ([a-zA-Z._]+)\s*\}\)\);\s*if \(notifications\.length > 0\) \{\s*await Notification\.insertMany\(notifications\);\s*\}/g;
+const regex = /const adminsToNotify = await Admin\.find\(\{\s*role: "manager",\s*salon_id: ([a-zA-Z._]+)\s*\}\);\s*const notifications = adminsToNotify\.map\(admin => \(\{\s*recipient_id: admin\._id,\s*recipient_model: "Admin",\s*title: "([^"]+)",\s*message: `([^`]+)`,\s*appointment_id: ([a-zA-Z._]+)\s*\}\)\);\s*if \(notifications\.length > 0\) \{\s*await Notification\.insertMany\(notifications\);\s*\}/g;
 
 content = content.replace(regex, (match, pSalonId, pTitle, pMessage, pApptId) => {
   return `const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: ${pSalonId}
       });
       const managersToNotify = await Staff.find({

@@ -121,7 +121,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
   const roleBadgeColor = {
     "super-admin":
       "bg-accent-muted border-accent/35 text-accent",
-    "staff-admin":
+    manager:
       "bg-info-dim border-info-border text-info",
     admin:
       "bg-purple-dim border-purple-border text-purple",

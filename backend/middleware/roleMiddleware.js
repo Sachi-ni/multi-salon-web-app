@@ -14,3 +14,13 @@ export const authorizeRoles = (...roles) => {
     next();
   };
 };
+
+export const requireRole = (roles) => {
+  const allowedRoles = roles.map((role) => role.toLowerCase());
+  return (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.role?.toLowerCase())) {
+      return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+    }
+    next();
+  };
+};

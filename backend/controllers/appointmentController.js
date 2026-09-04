@@ -62,12 +62,12 @@ export const getAvailableStaff = async (req, res) => {
       });
     }
 
-    // Admin users (super-admin / staff-admin / manager) may assign salon
+    // Admin users (super-admin / manager) may assign salon
     // managers & admins as service providers even when those users don't have
     // the service assigned to their profile. Customers keep seeing only staff
     // who actually perform the selected services.
     const userRole = req.user?.role || "";
-    const isAdminUser = ["super-admin", "staff-admin", "manager"].includes(userRole);
+    const isAdminUser = ["super-admin", "manager"].includes(userRole);
 
     // Find active staff in this salon who can perform at least one
     // of the selected services.
@@ -79,12 +79,12 @@ export const getAvailableStaff = async (req, res) => {
         ? {
             $or: [
               { services: { $in: serviceIdList } },
-              { role: { $in: [/^manager$/i, /^staff-admin$/i] } },
+              { role: { $in: [/^manager$/i] } },
             ],
           }
         : {
             services: { $in: serviceIdList },
-            role: { $not: /^(manager|staff-admin|super-admin)$/i },
+            role: { $not: /^(manager|super-admin)$/i },
           }),
     })
       .populate("salon_id", "name")
@@ -468,12 +468,12 @@ export const createAppointment = async (req, res) => {
     const result = populated.toObject();
     result.appointment_services = apptServices;
 
-    // NOTIFICATION: Notify super-admins and staff-admins of this salon, AND managers in Staff
+    // NOTIFICATION: Notify super-admins and managers of this salon
     try {
       const adminsToNotify = await Admin.find({
         $or: [
           { role: "super-admin" },
-          { role: { $in: ["staff-admin", "manager"] }, salon_id: salon_id }
+          { role: "manager", salon_id: salon_id }
         ]
       });
 
@@ -786,7 +786,7 @@ export const confirmAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -896,7 +896,7 @@ export const rejectAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -973,7 +973,7 @@ export const completeAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -1061,7 +1061,7 @@ export const adminCancelAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -1184,7 +1184,7 @@ export const deleteAppointment = async (req, res) => {
     }
 
     // Allow admins to delete any appointment, but customers can only delete their own
-    const isAdmin = ["super-admin", "staff-admin", "manager"].includes(req.user.role);
+    const isAdmin = ["super-admin", "manager"].includes(req.user.role);
     if (!isAdmin && appointment.customer_id?.toString() !== req.user.id) {
       return res.status(403).json({ message: "Not authorized to delete this appointment" });
     }
