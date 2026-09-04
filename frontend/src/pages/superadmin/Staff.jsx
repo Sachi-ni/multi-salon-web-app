@@ -5,7 +5,7 @@ import { getSalons } from "../../services/salonService";
 import { getServices } from "../../services/serviceService";
 import { 
   Plus, Search, Users, Star, MapPin, 
-  Calendar, MoreVertical, Power, Pencil, Trash2, 
+  MoreVertical, Power, Pencil, Trash2, 
   ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,7 +17,6 @@ import Table from "../../components/ui/Table";
 import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
 import { mediaUrl } from "../../utils/mediaUrl";
-import { API_BASE } from "../../config";
 
 /* ── Skeleton Card ── */
 const SkeletonStaffCard = () => (

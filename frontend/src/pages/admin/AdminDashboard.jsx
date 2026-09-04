@@ -37,7 +37,6 @@ import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
-import { API_BASE as _API_BASE } from "../../config";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -56,7 +55,7 @@ const AdminDashboard = () => {
   const [reportData, setReportData] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [_error, setError] = useState("");
+  const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState("");
 
   const fetchDashboardData = useCallback(async () => {
@@ -206,6 +205,12 @@ const AdminDashboard = () => {
           New Appointment
         </Button>
       </PageHeader>
+
+      {error && (
+        <div className="p-4 bg-danger/10 border border-danger/20 text-danger rounded-xl text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Salon Branch Banner */}
       <div className="bg-surface border border-border rounded-2xl p-5 shadow-card flex flex-wrap items-center justify-between gap-4">
