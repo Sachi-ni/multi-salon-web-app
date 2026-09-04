@@ -11,6 +11,10 @@ export const protect = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+      if (decoded.purpose) {
+        return res.status(403).json({ message: "Complete account hardening before using this session" });
+      }
+
       let user = await Admin.findById(decoded.id).select("-password");
       if (!user) {
         user = await Staff.findById(decoded.id).select("-password_hash");
@@ -50,6 +54,8 @@ export const optionalProtect = async (req, res, next) => {
       const token = req.headers.authorization.split(" ")[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+      if (decoded.purpose) return next();
+
       let user = await Admin.findById(decoded.id).select("-password");
       if (!user) user = await Staff.findById(decoded.id).select("-password_hash");
       if (!user) user = await Customer.findById(decoded.id).select("-password_hash");
@@ -66,4 +72,22 @@ export const optionalProtect = async (req, res, next) => {
     }
   }
   next();
+};
+
+export const protectHardening = (purpose) => async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.startsWith("Bearer ")
+      ? req.headers.authorization.split(" ")[1]
+      : null;
+    if (!token) return res.status(401).json({ message: "Not authorized, no token" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.purpose !== purpose) return res.status(403).json({ message: "Invalid hardening token" });
+    const admin = await Admin.findById(decoded.id);
+    if (!admin) return res.status(401).json({ message: "User not found" });
+    req.user = { id: String(admin._id), role: admin.role, salon_id: admin.salon_id ? String(admin.salon_id) : null };
+    next();
+  } catch {
+    res.status(401).json({ message: "Not authorized, token failed" });
+  }
 };

@@ -5,6 +5,7 @@ import Salary from "../models/Salary.js";
 import Appointment from "../models/Appointment.js";
 import Feedback from "../models/Feedback.js";
 import { storeMedia } from "../utils/mediaStorage.js";
+import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
@@ -50,6 +51,8 @@ const attachRatings = async (staffList) => {
 
 export const createStaff = async (req, res) => {
   try {
+    // Defense in depth: this endpoint must never create privileged accounts.
+    assertNotPrivilegedRole(req.body.role);
     const { password } = req.body;
     let services = [];
     if (req.body.services) {
@@ -125,10 +128,21 @@ export const createStaff = async (req, res) => {
     const isManager = role === "manager";
     const isSuperAdmin = role === "super-admin";
 
+    if (!isManager && !isSuperAdmin) {
+      return res.status(403).json({ message: "Only SuperAdmin or a manager can create staff" });
+    }
+
     // Manager can only create staff in their own salon
-    const salonId = isManager
-      ? req.user.salon_id
-      : req.body.salonId;
+    const salonId = isManager ? req.user.salon_id : req.body.salonId;
+    if (!salonId) {
+      return res.status(400).json({ message: "A salon assignment is required" });
+    }
+    if (isManager && !req.user.salon_id) {
+      return res.status(403).json({ message: "Manager is not assigned to a salon" });
+    }
+    if (isSuperAdmin && !(await Salon.exists({ _id: salonId }))) {
+      return res.status(404).json({ message: "Salon not found" });
+    }
 
     const salaryPaymentCountPerDay = Number(req.body.salaryPaymentCountPerDay || 1);
 
@@ -139,7 +153,7 @@ export const createStaff = async (req, res) => {
       email,
       password_hash,
       phone,
-      role: req.body.role || "Staff",
+      role: "staff",
       specification: req.body.specification,
       commission_rate: req.body.commission_rate || 0,
       salary_payment_frequency: req.body.salaryPaymentFrequency || "monthly",
@@ -157,15 +171,15 @@ export const createStaff = async (req, res) => {
     const staff = await Staff.create(staffData);
 
     // Increment salon's staffCount
-    if (req.body.salonId) {
+    if (staff.salon_id) {
       await Salon.findByIdAndUpdate(
-        req.body.salonId,
+        staff.salon_id,
         { $inc: { staffCount: 1 } }
       );
     }
 
     // Auto-generate salary record for current period for this staff (excluding managers)
-    if (!["manager", "staff-admin"].includes((staff.role || "").toLowerCase())) {
+    if ((staff.role || "").toLowerCase() !== "manager") {
       try {
         const now = new Date();
         const year = now.getFullYear();
@@ -246,7 +260,7 @@ export const createStaff = async (req, res) => {
   } catch (error) {
     console.error("createStaff error:", error);
     const isValidationError = error.name === "ValidationError" || error.name === "MongoServerError";
-    res.status(isValidationError ? 400 : 500).json({
+    res.status(error.statusCode || (isValidationError ? 400 : 500)).json({
       message: isValidationError ? `Staff validation failed: ${error.message}` : error.message,
     });
   }
@@ -305,7 +319,7 @@ export const getTeam = async (req, res) => {
     // not salon-management accounts.
     const filter = {
       status: "Active",
-      role: { $not: /^(manager|staff-admin|super-admin)$/i },
+      role: { $not: /^(manager|super-admin)$/i },
     };
 
     if (salonId) {
@@ -423,8 +437,11 @@ export const updateStaff = async (req, res) => {
       updateData.password_hash = await bcrypt.hash(req.body.password, salt);
     }
 
+    if (req.body.role !== undefined && String(req.body.role).toLowerCase() !== "staff") {
+      return res.status(400).json({ message: "Staff role cannot be changed to a privileged role" });
+    }
     if (req.body.role !== undefined)
-      updateData.role = req.body.role;
+      updateData.role = "staff";
 
     if (req.body.specification !== undefined) {
       updateData.specification = req.body.specification;
@@ -443,6 +460,9 @@ export const updateStaff = async (req, res) => {
       isSuperAdmin &&
       req.body.salonId !== undefined
     ) {
+      if (!(await Salon.exists({ _id: req.body.salonId }))) {
+        return res.status(404).json({ message: "Salon not found" });
+      }
       updateData.salon_id = req.body.salonId;
     }
 
@@ -486,7 +506,7 @@ export const updateStaff = async (req, res) => {
 
     // Update staff snapshots in unpaid salary records if name, count per day, or frequency changed
     try {
-      const isNonManager = !["manager", "staff-admin"].includes((staff.role || "").toLowerCase());
+      const isNonManager = (staff.role || "").toLowerCase() !== "manager";
       if (isNonManager) {
         const salonId = staff.salon_id;
         const frequency = staff.salary_payment_frequency || "monthly";
@@ -637,8 +657,7 @@ export const getStaffDashboard = async (req, res) => {
       role: {
         $in: [
           /^manager$/i,
-          /^staff-admin$/i,
-          /^staff admin$/i
+          /^manager$/i
         ]
       },
     });

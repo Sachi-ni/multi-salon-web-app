@@ -23,8 +23,9 @@ const Login = () => {
 
       let data = await res.json();
 
-      // If admin login fails, try staff login
-      if (!res.ok) {
+      // Only try another account type when this email is not an Admin; a bad
+      // SuperAdmin password must never silently become a customer session.
+      if (res.status === 404) {
         res = await fetch(`${API_URL}/staff/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -33,8 +34,8 @@ const Login = () => {
         data = await res.json();
       }
 
-      // If staff login fails, try customer login
-      if (!res.ok) {
+      // Only try customer login when the email is not an Admin or Staff.
+      if (res.status === 404) {
         res = await fetch(`${API_URL}/customers/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -49,6 +50,14 @@ const Login = () => {
         return;
       }
 
+      if (data.requiresHardening) {
+        navigate("/super-admin-hardening", {
+          state: { token: data.token, hardeningStep: data.hardeningStep },
+        });
+        setLoading(false);
+        return;
+      }
+
       const { token, ...userData } = data;
       login(userData, token);
 
@@ -59,7 +68,7 @@ const Login = () => {
         navigate("/");
       } else if (userData.salon_id) {
         // If they have a salon_id, they are some kind of staff/manager
-        if (data.role === "manager" || data.role === "staff-admin") {
+        if (data.role === "manager") {
           navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
         } else {
           // Normal staff go to staffDashboard

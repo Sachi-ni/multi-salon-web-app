@@ -20,7 +20,7 @@ const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const isStandardStaff = user?.role && !["super-admin", "manager", "staff-admin"].includes(user.role);
+  const isStandardStaff = user?.role && !["super-admin", "manager"].includes(user.role);
 
   const getNavItems = () => {
     if (isStandardStaff) {

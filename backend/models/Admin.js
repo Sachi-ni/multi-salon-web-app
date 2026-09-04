@@ -9,14 +9,16 @@ phone:     { type: String },
   password:  { type: String, required: true },
   role: {
     type: String,
-    enum: ["super-admin", "staff-admin", "user"],
+    enum: ["super-admin", "manager", "user"],
     default: "user"
   },
   salon_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Salon",
     default: null // null for super-admin since they oversee all salons
-  }
+  },
+  mustChangePassword: { type: Boolean, default: undefined },
+  mfaEnrolled: { type: Boolean, default: undefined }
 }, { timestamps: true });
 
 export default mongoose.model("Admin", adminSchema);

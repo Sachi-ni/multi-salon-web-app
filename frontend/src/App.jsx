@@ -62,6 +62,7 @@ import AdminAddStaff from "./pages/admin/AddStaff.jsx";
 
 import { useAuth } from "./context/AuthContext";
 import CustomerRegister from "./pages/auth/CustomerRegister.jsx";
+import SuperAdminHardening from "./pages/auth/SuperAdminHardening.jsx";
 
 const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
   const { user } = useAuth();
@@ -104,6 +105,7 @@ function App() {
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/register" element={<Signup />} />
         <Route path="/customer/register" element={<CustomerRegister />} />
+        <Route path="/super-admin-hardening" element={<SuperAdminHardening />} />
 
        <Route
           path="/superAdminDashboard"

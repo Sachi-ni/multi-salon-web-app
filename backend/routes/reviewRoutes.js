@@ -1,5 +1,8 @@
 import express from "express";
 import Review from "../models/Review.js";
+import Appointment from "../models/Appointment.js";
+import { protect } from "../middleware/authMiddleware.js";
+import { requireRole } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
@@ -14,9 +17,18 @@ router.get("/", async (req, res) => {
 });
 
 // Add review
-router.post("/", async (req, res) => {
+router.post("/", protect, requireRole(["customer"]), async (req, res) => {
   try {
-    const review = await Review.create(req.body);
+    const { appointment_id, rating, comment } = req.body;
+    const appointment = await Appointment.findOne({
+      _id: appointment_id,
+      customer_id: req.user.id,
+      status: "completed",
+    });
+    if (!appointment) {
+      return res.status(403).json({ message: "Only the customer of a completed appointment can review it" });
+    }
+    const review = await Review.create({ appointment_id: appointment._id, rating, comment, review_date: new Date() });
     res.status(201).json(review);
   } catch (error) {
     res.status(500).json({ message: error.message });

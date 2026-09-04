@@ -31,12 +31,10 @@ const Signup = () => {
     setLoading(true);
     try {
       const response = await axios.post(`${API_URL}/auth/register`, {
-        full_name: fname,
-        username: uname,
+        fullName: fname,
         email: email.trim().toLowerCase(),
         phone: normalizedPhone,
         password: password,
-        role: "super-admin",
       });
       console.log("Registration successful:", response.data);
       alert("Registration successful! Redirecting to login...");

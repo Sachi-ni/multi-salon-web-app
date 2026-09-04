@@ -346,66 +346,27 @@ export const getSalonById = async (req, res) => {
 
 export const updateSalon = async (req, res) => {
   try {
-    const {
-      managerName,
-      managerPhone,
-      managerEmail,
-      managerPassword,
-      ...salonData
-    } = req.body;
+    // Whitelist salon metadata so this endpoint cannot alter account ownership or credentials.
+    const allowedFields = ["name", "address", "location", "phone", "email", "status", "timezone"];
+    const salonData = Object.fromEntries(
+      allowedFields
+        .filter((field) => req.body[field] !== undefined)
+        .map((field) => [field, req.body[field]])
+    );
 
-    const currentManager = await Staff.findOne({
-      salon_id: req.params.id,
-      role: "manager",
-    });
-    const validation = validateManagerContact({
-      email: managerEmail,
-      phone: managerPhone,
-      password: managerPassword,
-    });
-
-    if (validation.message) {
-      return res.status(400).json({ message: validation.message });
-    }
-
-    const normalizedSalonPhone = normalizePhone(salonData.phone);
-    if (normalizedSalonPhone && !SRI_LANKAN_PHONE_PATTERN.test(normalizedSalonPhone)) {
-      return res.status(400).json({
-        message: "Enter a valid salon phone number (for example, 0771234567 or +94771234567).",
-      });
-    }
     if (salonData.phone !== undefined) {
-      salonData.phone = normalizedSalonPhone;
-    }
-
-    if (salonData.open_time && salonData.close_time && salonData.open_time >= salonData.close_time) {
-      return res.status(400).json({
-        message: "Opening time must be earlier than closing time.",
-      });
-    }
-
-    if (validation.normalizedEmail) {
-      const duplicateManager = await Staff.findOne({
-        email: {
-          $regex: `^${escapeRegex(validation.normalizedEmail)}$`,
-          $options: "i",
-        },
-        ...(currentManager ? { _id: { $ne: currentManager._id } } : {}),
-      });
-
-      if (duplicateManager) {
-        return res.status(409).json({
-          message: "That manager email is already in use.",
+      salonData.phone = normalizePhone(salonData.phone);
+      if (!SRI_LANKAN_PHONE_PATTERN.test(salonData.phone)) {
+        return res.status(400).json({
+          message: "Enter a valid Sri Lankan phone number (for example, 0771234567 or +94771234567).",
         });
       }
     }
 
-    // If a new logo file was uploaded, update logo
     if (req.file) {
       salonData.logo = await storeMedia(req.file, "salonhub/logos");
     }
 
-    // Update salon information
     const salon = await Salon.findByIdAndUpdate(
       req.params.id,
       salonData,
@@ -421,88 +382,8 @@ export const updateSalon = async (req, res) => {
       });
     }
 
-    // Find existing manager
-    let manager = currentManager;
-
-    // Update existing manager
-    if (manager) {
-      const fullName = managerName !== undefined
-        ? managerName
-        : manager.full_name;
-      const { firstName, lastName } = getManagerNameParts(fullName, manager);
-
-      if (managerName !== undefined) {
-        manager.full_name = managerName;
-      }
-      manager.first_name = firstName;
-      manager.last_name = lastName;
-
-      if (managerPhone !== undefined) {
-        manager.phone = validation.normalizedPhone || "";
-      }
-
-      if (managerEmail !== undefined && managerEmail !== "") {
-        manager.email = validation.normalizedEmail;
-      }
-
-      if (
-        managerPassword !== undefined &&
-        managerPassword !== ""
-      ) {
-        const salt = await bcrypt.genSalt(10);
-
-        manager.password_hash = await bcrypt.hash(
-          managerPassword,
-          salt
-        );
-      }
-
-      await manager.save();
-    }
-
-    // Create manager if one does not exist
-    else if (
-      managerName ||
-      managerPhone ||
-      managerEmail ||
-      managerPassword
-    ) {
-      if (!managerEmail || !managerPassword) {
-        return res.status(400).json({
-          message:
-            "Manager email and password are required when creating a new manager.",
-        });
-      }
-
-      const salt = await bcrypt.genSalt(10);
-
-      const password_hash = await bcrypt.hash(
-        managerPassword,
-        salt
-      );
-
-      manager = await Staff.create({
-        full_name: managerName || `${salon.name} Manager`,
-        ...getManagerNameParts(managerName || `${salon.name} Manager`),
-        email: validation.normalizedEmail,
-        phone: validation.normalizedPhone || "",
-        password_hash,
-        role: "manager",
-        status: "Active",
-        salon_id: salon._id,
-      });
-    }
-
     res.json({
       salon,
-      manager: manager
-        ? {
-            id: manager._id,
-            name: manager.full_name,
-            phone: manager.phone,
-            email: manager.email,
-          }
-        : null,
     });
   } catch (error) {
     console.error("updateSalon error:", error);

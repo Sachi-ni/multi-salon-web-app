@@ -22,6 +22,7 @@ const AddStaff = () => {
     firstName: "",
     lastName: "",
     email: "",
+    phone: "",
     password: "",
     salon: salonId,
     services: [],
@@ -105,6 +106,7 @@ const AddStaff = () => {
       const data = new FormData();
       data.append("name", `${formData.firstName} ${formData.lastName}`);
       data.append("email", formData.email);
+      data.append("phone", formData.phone.replace(/[\s()-]/g, ""));
       data.append("password", formData.password);
       data.append("salonId", formData.salon);
       data.append("salaryPaymentFrequency", formData.salaryPaymentFrequency);
@@ -151,6 +153,7 @@ const AddStaff = () => {
           <Input label="First Name" name="firstName" placeholder="Enter first name" required value={formData.firstName} onChange={handleChange} autoComplete="new-name" />
           <Input label="Last Name" name="lastName" placeholder="Enter last name" required value={formData.lastName} onChange={handleChange} autoComplete="new-name" />
           <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={handleChange} autoComplete="new-email" />
+          <Input label="Phone" name="phone" type="tel" placeholder="0771234567 or +94771234567" required value={formData.phone} onChange={handleChange} autoComplete="tel" pattern="(?:\\+94|0)[0-9]{9}" />
           <Input label="Password" name="password" type="password" placeholder="Enter password" required value={formData.password} onChange={handleChange} autoComplete="new-password" />
 
           <div className="mb-3.5">

@@ -17,9 +17,9 @@ import {
   markStaffDayAbsent,
 } from "../controllers/salaryController.js";
 const router = express.Router();
-// Salary management: super-admin + staff-admin/managers
+// Salary management: super-admin + managers
 router.use(protect);
-router.use(authorizeRoles("super-admin", "staff-admin", "manager"));
+router.use(authorizeRoles("super-admin", "manager"));
 // Get salaries with filters
 router.get("/", getSalaries);
 // Get salary summary

@@ -365,14 +365,13 @@ export default function AdminStaffPage() {
         getServices(salonId),
       ]);
 
-      // Hide manager/staff-admin accounts from this Salon Staff page only
+      // Hide manager accounts from this Salon Staff page only
     const salonStaff = (staffRes.data || []).filter((staff) => {
       const role = (staff.role || "").toLowerCase().trim();
 
       return (
         role !== "manager" &&
-        role !== "staff-admin" &&
-        role !== "staff admin"
+        role !== "manager"
       );
     });
 
