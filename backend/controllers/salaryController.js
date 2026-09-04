@@ -90,6 +90,80 @@ const getDaysInMonth = (year, month) => {
   return new Date(year, month, 0).getDate();
 };
 
+// ─── Overdue (carry-forward) helpers ───────────────────────────────────────
+// An unpaid salary record in an ENDED period keeps appearing in the Overdue
+// balance. Overdue is intentionally NOT reset when a new day/week/month is
+// opened: it carries forward until each salary is paid (a paid record is
+// simply excluded from the balance).
+
+// Parse a "YYYY-MM-DD" string as a LOCAL day (avoids the UTC shift that
+// `new Date("2026-07-24")` introduces in timezones west of UTC).
+const parseLocalDateStr = (value) => {
+  if (typeof value === "string" && /^(\d{4})-(\d{2})-(\d{2})$/.test(value)) {
+    const [, y, m, d] = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+// Return a Date for the END of a salary record's period (inclusive of that
+// calendar day). Uses dateRange.end when present, otherwise derives it from
+// the period key (daily "2026-07-24", weekly "2026-W30", monthly "2026-07").
+const getSalaryPeriodEndDate = (salaryRecord) => {
+  const dateRangeEnd = salaryRecord?.dateRange?.end;
+  const rangeParsed = dateRangeEnd ? parseLocalDateStr(dateRangeEnd) : null;
+  if (rangeParsed) return rangeParsed;
+
+  const period = String(salaryRecord?.period || "");
+
+  // Daily: the period itself is the day.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(period)) {
+    return parseLocalDateStr(period);
+  }
+
+  // Weekly: the period covers Monday..Sunday of that ISO week.
+  const weeklyMatch = /^(\d{4})-W(\d{2})$/.exec(period);
+  if (weeklyMatch) {
+    const weekDates = getWeekDates(
+      Number(weeklyMatch[1]),
+      Number(weeklyMatch[2])
+    );
+    if (weekDates && weekDates.length === 7) {
+      return parseLocalDateStr(weekDates[6]); // Sunday
+    }
+    return null;
+  }
+
+  // Monthly: the period covers the whole month.
+  const monthlyMatch = /^(\d{4})-(\d{2})$/.exec(period);
+  if (monthlyMatch) {
+    const year = Number(monthlyMatch[1]);
+    const month = Number(monthlyMatch[2]);
+    const daysInMonth = getDaysInMonth(year, month);
+    return parseLocalDateStr(
+      `${year}-${String(month).padStart(2, "0")}-${daysInMonth}`
+    );
+  }
+
+  return null;
+};
+
+// A period is "over" once its last day has fully PASSED (strictly before
+// today). Only over periods contribute to the Overdue balance: the running
+// day/week/month is still pending, and once it is over its unpaid salary
+// carries forward until paid.
+export const isSalaryPeriodEnded = (salaryRecord) => {
+  const periodEnd = getSalaryPeriodEndDate(salaryRecord);
+  if (!periodEnd) return false;
+
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  periodEnd.setHours(23, 59, 59, 999);
+
+  return periodEnd < today;
+};
+
 const calculateDaySalary = (
   workRate,
   salaryPaymentCountPerDay = 0,
@@ -794,7 +868,7 @@ export const getSalarySummary = async (req, res) => {
     // (manager / staff-admin records are excluded everywhere else).
     let salaryDocs = await Salary.find(match)
       .populate("staff_id", "role")
-      .select("status totalSalary paidTotal workingAmount staff_role")
+      .select("status totalSalary paidTotal workingAmount staff_role period dateRange")
       .lean();
 
     const roleMode = resolveSalaryRole(roleFilter);
@@ -808,6 +882,10 @@ export const getSalarySummary = async (req, res) => {
       pendingCount: 0,
       paidCount: 0,
       totalWorkingAmount: 0,
+      // Carry-forward overdue: unpaid salaries from every ENDED period. This
+      // does not reset when a new day/week/month is opened and it drops only
+      // when a salary record is actually paid.
+      overdue: 0,
     };
     for (const s of salaryDocs) {
       if (s.status === "Paid") {
@@ -816,6 +894,9 @@ export const getSalarySummary = async (req, res) => {
       } else {
         summary.totalPending += safeNumber(s.totalSalary, 0);
         summary.pendingCount += 1;
+        if (isSalaryPeriodEnded(s)) {
+          summary.overdue += safeNumber(s.totalSalary, 0);
+        }
       }
       summary.totalWorkingAmount += safeNumber(s.workingAmount, 0);
     }

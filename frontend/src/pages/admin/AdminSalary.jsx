@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import Badge from "../../components/ui/Badge";
@@ -161,6 +161,54 @@ const countElapsedPeriodDays = (frequency, dateStr) => {
   return Math.round((effectiveEnd - start) / 86400000) + 1;
 };
 
+// Monday (YYYY-MM-DD) of an ISO week — mirrors the backend getWeekDates.
+const getISOWeekMondayStr = (year, weekNo) => {
+  const jan4 = new Date(year, 0, 4);
+  const dayOfWeek = jan4.getDay(); // 0 = Sunday ... 6 = Saturday
+  const offset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(year, 0, 4 + offset + (weekNo - 1) * 7);
+  return toDateKey(monday);
+};
+
+// A date (YYYY-MM-DD) inside a period key:
+//   daily   "2026-09-04" -> "2026-09-04"
+//   weekly  "2026-W36"   -> the week's Monday
+//   monthly "2026-09"    -> "2026-09-01"
+const getPeriodAnchorDateStr = (frequency, periodKey) => {
+  const key = String(periodKey || "");
+  if (frequency === "weekly") {
+    const match = /^(\d{4})-W(\d{1,2})$/.exec(key);
+    return match ? getISOWeekMondayStr(Number(match[1]), Number(match[2])) : "";
+  }
+  if (frequency === "monthly") {
+    return /^\d{4}-\d{2}$/.test(key) ? `${key}-01` : "";
+  }
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : "";
+};
+
+// Last day (YYYY-MM-DD) of the period that contains anchorStr.
+const getPeriodEndDateStr = (frequency, anchorStr) => {
+  if (!anchorStr) return "";
+  if (frequency === "weekly") return getWeekRange(anchorStr).end;
+  const d = new Date(anchorStr);
+  if (Number.isNaN(d.getTime())) return anchorStr;
+  if (frequency === "monthly") {
+    return toDateKey(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+  }
+  return toDateKey(d);
+};
+
+// A day/week/month is "over" once its last day has fully passed (strictly
+// before today). Only over periods feed the Overdue box: the running period
+// is still "pending", and once over, its unpaid salary carries forward.
+const isPeriodOver = (frequency, periodKey) => {
+  const anchorStr = getPeriodAnchorDateStr(frequency, periodKey);
+  if (!anchorStr) return false;
+  const endStr = getPeriodEndDateStr(frequency, anchorStr);
+  if (!endStr) return false;
+  return endStr < toDateKey(new Date());
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────
 
 const Salary = () => {
@@ -178,16 +226,11 @@ const Salary = () => {
   const [monthlyDate, setMonthlyDate] = useState(today);
 
   const [salaries, setSalaries] = useState([]);
+  // Salary records of ALL periods for the current tab — used to carry the
+  // Overdue balance forward across days/weeks/months.
+  const [allSalaries, setAllSalaries] = useState([]);
   // When no salary records exist, we show staff members with default zero values
   const [fallbackStaff, setFallbackStaff] = useState([]);
-  const [summary, setSummary] = useState({
-    totalPending: 0,
-    totalPaid: 0,
-    pendingCount: 0,
-    paidCount: 0,
-    totalWorkingAmount: 0,
-    pendingOverdue: 0,
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -235,10 +278,19 @@ const Salary = () => {
     try {
       const period = getPeriod();
       const [salRes, staffRes] = await Promise.all([
-        getSalaries({ salonId, frequency, period }),
+        // All periods are fetched so the Overdue box can carry forward unpaid
+        // salaries from earlier (over) days/weeks/months; the table still
+        // shows only the selected period (filtered below).
+        getSalaries({ salonId, frequency }),
         getStaffWithSalaries({ salonId, frequency, period }),
       ]);
-      const data = salRes?.data?.salaries || [];
+      const allRecords = salRes?.data?.salaries || [];
+      setAllSalaries(allRecords);
+
+      // Records of the currently selected day/week/month (what the table shows).
+      const data = period
+        ? allRecords.filter((s) => s.period === period)
+        : allRecords;
       setSalaries(data);
 
       // Get staff list for fallback when no salary records exist
@@ -258,20 +310,6 @@ const Salary = () => {
       }
       setEditingRates(rates);
       setDirtyRates({});
-
-      const computedSummary = {
-        totalPending: data.reduce((sum, s) => s.status !== "Paid" ? sum + (s.totalSalary || 0) : sum, 0),
-        totalPaid: data.reduce((sum, s) => s.status === "Paid" ? sum + (s.paidTotal || s.totalSalary || 0) : sum, 0),
-        pendingCount: data.filter(s => s.status !== "Paid").length,
-        paidCount: data.filter(s => s.status === "Paid").length,
-        totalWorkingAmount: data.reduce((sum, s) => sum + (s.workingAmount || 0), 0),
-        pendingOverdue: data.filter(s => {
-          if (s.status === "Paid") return false;
-          const periodDate = frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate;
-          return isPeriodEnded(frequency, periodDate);
-        }).reduce((sum, s) => sum + (s.totalSalary || 0), 0),
-      };
-      setSummary(computedSummary);
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to load salary data");
     } finally {
@@ -827,6 +865,95 @@ const Salary = () => {
     displayRows = [...displayRows, ...pendingRows];
   }
 
+  // ─── Summary cards (computed from the same rows the table renders) ───────
+
+  const summary = useMemo(() => {
+    // Per-row "Total Salary" exactly as the table renders it (monthly is
+    // scoped to the selected day of the month).
+    const rowTotalSalary = (row) => {
+      if (frequency === "monthly" && Array.isArray(row.dailyRecords)) {
+        return row.dailyRecords.reduce((sum, dr) => {
+          return toDateKey(dr.date) <= selectedMonthlyDateKey
+            ? sum + (Number(dr.daySalary) || 0)
+            : sum;
+        }, 0);
+      }
+      return Number(row.totalSalary) || 0;
+    };
+
+    const totalPending = displayRows.reduce(
+      (sum, s) => ((s.status || "Not Paid") !== "Paid" ? sum + rowTotalSalary(s) : sum),
+      0
+    );
+    const pendingCount = displayRows.filter(
+      (s) => (s.status || "Not Paid") !== "Paid"
+    ).length;
+    const totalPaid = displayRows.reduce(
+      (sum, s) =>
+        (s.status || "Not Paid") === "Paid"
+          ? sum + (Number(s.paidTotal ?? s.totalSalary) || 0)
+          : sum,
+      0
+    );
+    const paidCount = displayRows.filter(
+      (s) => (s.status || "Not Paid") === "Paid"
+    ).length;
+    const totalWorkingAmount = displayRows.reduce(
+      (sum, s) => sum + (Number(s.workingAmount) || 0),
+      0
+    );
+
+    // ── Overdue: carry-forward of every OVER period's unpaid salary ────────
+    // Records are grouped by period. For each day/week/month that is already
+    // over, every unpaid record counts; staff of this tab WITHOUT a record in
+    // that period still earn the fixed per-day amount for its days (the same
+    // rule fallback rows use). The balance never resets when a new day/week/
+    // month opens, and paying a salary removes exactly that amount.
+    let pendingOverdue = 0;
+    const byPeriod = new Map();
+    for (const rec of allSalaries) {
+      const periodKey = rec.period;
+      if (!periodKey) continue;
+      if (!byPeriod.has(periodKey)) byPeriod.set(periodKey, new Map());
+      byPeriod
+        .get(periodKey)
+        .set(String(rec.staff_id?._id || rec.staff_id || ""), rec);
+    }
+    for (const [periodKey, staffMap] of byPeriod.entries()) {
+      if (!isPeriodOver(frequency, periodKey)) continue; // still running → not overdue yet
+      const anchorStr = getPeriodAnchorDateStr(frequency, periodKey);
+      const periodEndStr = getPeriodEndDateStr(frequency, anchorStr);
+      for (const rec of staffMap.values()) {
+        if ((rec.status || "Not Paid") !== "Paid") {
+          pendingOverdue += Number(rec.totalSalary) || 0;
+        }
+      }
+      for (const staff of fallbackStaff) {
+        if (staffMap.has(String(staff._id || ""))) continue;
+        // Staff created after this period ended were not employed then.
+        const createdAt = staff.createdAt ? new Date(staff.createdAt) : null;
+        if (
+          createdAt &&
+          !Number.isNaN(createdAt.getTime()) &&
+          toDateKey(createdAt) > periodEndStr
+        ) {
+          continue;
+        }
+        const perDay = Number(staff.salary_payment_count_per_day) || 0;
+        pendingOverdue += perDay * countElapsedPeriodDays(frequency, anchorStr);
+      }
+    }
+
+    return {
+      totalPending,
+      totalPaid,
+      pendingCount,
+      paidCount,
+      totalWorkingAmount,
+      pendingOverdue,
+    };
+  }, [displayRows, allSalaries, fallbackStaff, frequency, selectedMonthlyDateKey]);
+
   // ─── Filter by search ──────────────────────────────────────────────────
 
   const filteredDisplayRows = searchQuery
@@ -931,6 +1058,7 @@ const Salary = () => {
             <div>
               <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider font-semibold">Overdue</div>
               <div className="mt-1 text-xl font-black text-red-400">{formatMoney(summary.pendingOverdue)}</div>
+              <div className="text-[0.65rem] text-red-400/70">Unpaid from over periods</div>
             </div>
           </div>
         </div>
