@@ -8,9 +8,7 @@ import { AuthProvider } from "./context/AuthContext";
 
 // General Pages
 import Login from "./pages/auth/Login.jsx";
-import Signup from "./pages/auth/register.jsx";
 import Edit from "./pages/auth/edit.jsx";
-//import Main from "./pages/dashboard.jsx";
 import Unauthorized from "./pages/Unauthorized.jsx";
 
 //customer pages
@@ -100,10 +98,10 @@ function App() {
         <Route path="/terms" element={<TermsOfService />} />
 
         <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+        <Route path="/signup" element={<CustomerRegister />} />
         <Route path="/editProfile" element={<Edit />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
-        <Route path="/register" element={<Signup />} />
+        <Route path="/register" element={<CustomerRegister />} />
         <Route path="/customer/register" element={<CustomerRegister />} />
         <Route path="/super-admin-hardening" element={<SuperAdminHardening />} />
 

@@ -53,6 +53,17 @@ export const seedSuperAdmin = async () => {
   });
 
   if (existingSuperAdmin) {
+    const hardeningUpdates = {};
+    if (existingSuperAdmin.mustChangePassword === undefined) {
+      hardeningUpdates.mustChangePassword = true;
+    }
+    if (existingSuperAdmin.mfaEnrolled === undefined) {
+      hardeningUpdates.mfaEnrolled = false;
+    }
+    if (Object.keys(hardeningUpdates).length > 0) {
+      await Admin.updateOne({ _id: existingSuperAdmin._id }, { $set: hardeningUpdates });
+      console.log("Existing Super Admin marked for account hardening");
+    }
     console.log("Super Admin already exists");
     return;
   }
@@ -69,7 +80,9 @@ export const seedSuperAdmin = async () => {
     phone: "",
     password: passwordHash,
     role: "super-admin",
-    salon_id: null
+    salon_id: null,
+    mustChangePassword: true,
+    mfaEnrolled: false
   });
 
   console.log("Super Admin created successfully");
