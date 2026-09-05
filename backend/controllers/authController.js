@@ -64,7 +64,7 @@ export const getProfile = async (req, res) => {
   }
 };
 
-export const registerAdmin = async (req, res) => {
+export const registerCustomer = async (req, res) => {
   try {
     const { fullName, email, phone, password, preferredSalonId, role } = req.body;
     const normalizedEmail = email?.trim().toLowerCase();
@@ -160,6 +160,8 @@ res.json({
 export const changePassword = async (req, res) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ message: "Password is required" });
+  const validation = validateProfileFields({ password });
+  if (validation.message) return res.status(400).json(validation);
   const admin = await Admin.findById(req.user.id);
   if (!admin) return res.status(404).json({ message: "User not found" });
   admin.password = await bcrypt.hash(password, 12);

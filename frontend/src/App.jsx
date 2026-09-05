@@ -8,9 +8,7 @@ import { AuthProvider } from "./context/AuthContext";
 
 // General Pages
 import Login from "./pages/auth/Login.jsx";
-//import Signup from "./pages/auth/register.jsx";
 import Edit from "./pages/auth/edit.jsx";
-//import Main from "./pages/dashboard.jsx";
 import Unauthorized from "./pages/Unauthorized.jsx";
 
 //customer pages
