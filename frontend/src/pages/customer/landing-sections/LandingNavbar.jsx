@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../../context/AuthContext";
+import CustomerHeader from "../../../components/layout/CustomerHeader";
 
 const LandingNavbar = () => {
   const navigate = useNavigate();
@@ -22,6 +23,11 @@ const LandingNavbar = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Logged-in customers get the app header (same as the My Appointments page)
+  if (user && (user.role === "customer" || user.role === "user")) {
+    return <CustomerHeader />;
+  }
 
   const navLinks = [
     { name: "Home", href: "#home" },
