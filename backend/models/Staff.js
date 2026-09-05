@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 
 const staffSchema = new mongoose.Schema({
   full_name:       { type: String, required: true },
+  first_name:      { type: String, required: true },
+  last_name:       { type: String, required: true },
   phone:           { type: String, default: "" },
   email:           { type: String, required: true, unique: true },
   password_hash:   { type: String, default: "" },
@@ -18,7 +20,13 @@ const staffSchema = new mongoose.Schema({
     default: 1,
     min: 1
   },
-  status:          { type: String, default: "Active", enum: ["Active", "Inactive"] },
+
+  status:{ 
+    type: String,
+    default: "Active", 
+    enum: ["Active", "Inactive"] 
+  },
+  
   salon_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Salon",

@@ -16,11 +16,13 @@ const AddStaff = () => {
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [picturePreview, setPicturePreview] = useState("");
 
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
+    phone: "",
     password: "",
     salon: salonId,
     services: [],
@@ -68,6 +70,21 @@ const AddStaff = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handlePictureChange = (file) => {
+    if (picturePreview) {
+      URL.revokeObjectURL(picturePreview);
+    }
+
+    if (!file) {
+      setPicturePreview("");
+      setFormData({ ...formData, picture: null });
+      return;
+    }
+
+    setPicturePreview(URL.createObjectURL(file));
+    setFormData({ ...formData, picture: file });
+  };
+
   const handleServiceToggle = (serviceId) => {
     setFormData((current) => {
       const isSelected = current.services.includes(serviceId);
@@ -89,14 +106,13 @@ const AddStaff = () => {
       const data = new FormData();
       data.append("name", `${formData.firstName} ${formData.lastName}`);
       data.append("email", formData.email);
+      data.append("phone", formData.phone.replace(/[\s()-]/g, ""));
       data.append("password", formData.password);
       data.append("salonId", formData.salon);
       data.append("salaryPaymentFrequency", formData.salaryPaymentFrequency);
       data.append("salaryPaymentCountPerDay", formData.salaryPaymentCountPerDay);
 
-      formData.services.forEach((serviceId) => {
-        data.append("services", serviceId);
-      });
+      data.append("services", JSON.stringify(formData.services));
       if (formData.picture) data.append("image", formData.picture);
       await createStaff(data);
       navigate(`/salon-admin/${formData.salon}/adminStaff`);
@@ -110,6 +126,14 @@ const AddStaff = () => {
   const selectedSalon = salons.find(
     (s) => s._id === formData.salon
   );
+
+  useEffect(() => {
+    return () => {
+      if (picturePreview) {
+        URL.revokeObjectURL(picturePreview);
+      }
+    };
+  }, [picturePreview]);
 
 
   return (
@@ -129,6 +153,7 @@ const AddStaff = () => {
           <Input label="First Name" name="firstName" placeholder="Enter first name" required value={formData.firstName} onChange={handleChange} autoComplete="new-name" />
           <Input label="Last Name" name="lastName" placeholder="Enter last name" required value={formData.lastName} onChange={handleChange} autoComplete="new-name" />
           <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={handleChange} autoComplete="new-email" />
+          <Input label="Phone" name="phone" type="tel" placeholder="0771234567 or +94771234567" required value={formData.phone} onChange={handleChange} autoComplete="tel" pattern="(?:\\+94|0)[0-9]{9}" />
           <Input label="Password" name="password" type="password" placeholder="Enter password" required value={formData.password} onChange={handleChange} autoComplete="new-password" />
 
           <div className="mb-3.5">
@@ -217,10 +242,23 @@ const AddStaff = () => {
             <input
               type="file"
               accept="image/*"
-              onChange={(e) => setFormData({ ...formData, picture: e.target.files[0] })}
+              onChange={(e) => handlePictureChange(e.target.files?.[0] || null)}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
               required
             />
+            {picturePreview && (
+              <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-surface-2 p-3">
+                <img
+                  src={picturePreview}
+                  alt="Selected staff preview"
+                  className="h-16 w-16 rounded-lg object-cover border border-border"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-white">Preview</p>
+                  <p className="text-2xs text-neutral-400 truncate">The selected photo will be uploaded with the staff profile.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2.5 justify-end mt-5 pt-4 border-t border-border">

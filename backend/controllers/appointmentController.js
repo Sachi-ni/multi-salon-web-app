@@ -57,14 +57,35 @@ export const getAvailableStaff = async (req, res) => {
     }
 
     if (!date || serviceIdList.length === 0 || !salonId) {
-      return res.status(400).json({ message: "date, serviceId(s) and salonId are required" });
+      return res.status(400).json({
+        message: "date, serviceId(s) and salonId are required"
+      });
     }
 
-    // Find active staff in this salon who can perform at least one of the selected services
+    // Admin users (super-admin / manager) may assign salon
+    // managers & admins as service providers even when those users don't have
+    // the service assigned to their profile. Customers keep seeing only staff
+    // who actually perform the selected services.
+    const userRole = req.user?.role || "";
+    const isAdminUser = ["super-admin", "manager"].includes(userRole);
+
+    // Find active staff in this salon who can perform at least one
+    // of the selected services.
     const staffList = await Staff.find({
       salon_id: salonId,
-      services: { $in: serviceIdList },
-      status: "Active"
+      status: "Active",
+
+      ...(isAdminUser
+        ? {
+            $or: [
+              { services: { $in: serviceIdList } },
+              { role: { $in: [/^manager$/i] } },
+            ],
+          }
+        : {
+            services: { $in: serviceIdList },
+            role: { $not: /^(manager|super-admin)$/i },
+          }),
     })
       .populate("salon_id", "name")
       .populate("services", "service_name");
@@ -156,19 +177,36 @@ export const getAvailableSlots = async (req, res) => {
       availability = { slots: generatedSlots };
     }
 
-    // 3. Get all confirmed/pending appointments for this staff on this date
-    //    (We exclude slots occupied by confirmed appointments)
-    const existingAppointments = await Appointment.find({
-      staff_id: staffId,
+    // 3. Get all confirmed/pending appointments on this date
+    const validAppointments = await Appointment.find({
       appointment_date: date,
       status: { $in: ["confirmed", "pending"] }
     });
+    
+    const validApptIds = validAppointments.map(a => a._id);
 
-    // 4. Build list of occupied time ranges from confirmed appointments
-    const occupiedRanges = existingAppointments.map(a => ({
-      start: a.start_time,
-      end: a.end_time
-    }));
+    // 4. Get all AppointmentService records for this staff linked to valid appointments
+    const staffServices = await AppointmentService.find({
+      staff_id: staffId,
+      appointment_id: { $in: validApptIds }
+    });
+
+    // 4.5 Build list of occupied time ranges from confirmed appointments and services
+    const occupiedRanges = [];
+
+    // Add from parent appointments if this staff is the primary staff
+    for (const appt of validAppointments) {
+      if (appt.staff_id && appt.staff_id.toString() === staffId) {
+        occupiedRanges.push({ start: appt.start_time, end: appt.end_time });
+      }
+    }
+
+    // Add from specific AppointmentService entries for this staff
+    for (const svc of staffServices) {
+      if (svc.service_start_time && svc.service_end_time) {
+        occupiedRanges.push({ start: svc.service_start_time, end: svc.service_end_time });
+      }
+    }
 
     // 5. Filter available slots — not booked and not overlapping with confirmed appointments
     const freeSlots = availability.slots.filter(slot => {
@@ -235,11 +273,30 @@ export const getAvailableSlots = async (req, res) => {
   }
 };
 
+// ─── Concurrency Lock ──────────────────────────────────────────────────────────
+const bookingLocks = {};
+const acquireLocks = async (staffIds) => {
+  const uniqueIds = [...new Set(staffIds.map(id => id.toString()))].sort();
+  for (const id of uniqueIds) {
+    while (bookingLocks[id]) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    bookingLocks[id] = true;
+  }
+  return uniqueIds;
+};
+const releaseLocks = (staffIds) => {
+  for (const id of staffIds) {
+    delete bookingLocks[id];
+  }
+};
+
 // POST /api/appointments
 // Customer creates a pending booking — does NOT mark slots
 // Body (new format): { salon_id, appointment_date, notes, services: [{ service_id, staff_id, start_time }] }
 // Body (legacy format): { salon_id, service_id, staff_id, appointment_date, start_time, notes }
 export const createAppointment = async (req, res) => {
+  let locksAcquired = [];
   try {
     const { salon_id, appointment_date, notes, guest_name, guest_phone } = req.body;
 
@@ -284,6 +341,10 @@ export const createAppointment = async (req, res) => {
       });
     }
 
+    // Acquire locks for all staff involved in this booking to ensure FCFS
+    const staffIdsToLock = serviceEntries.map(e => e.staff_id);
+    locksAcquired = await acquireLocks(staffIdsToLock);
+
     // Resolve each service: get duration, compute end_time, check conflicts
     const resolvedServices = [];
     let totalPrice = 0;
@@ -300,15 +361,32 @@ export const createAppointment = async (req, res) => {
       const durationHours = Math.ceil(service.duration / 60);
       const end_time = addHours(entry.start_time, durationHours);
 
-      // Conflict check for this staff on this date
-      const existingAppointments = await Appointment.find({
-        staff_id: entry.staff_id,
+      // Conflict check for this staff on this date (checking BOTH parent and AppointmentService records)
+      const validAppointments = await Appointment.find({
         appointment_date,
         status: { $in: ["confirmed", "pending"] }
       });
+      const validApptIds = validAppointments.map(a => a._id);
 
-      const isConflict = existingAppointments.some(appt =>
-        timesOverlap(entry.start_time, end_time, appt.start_time, appt.end_time)
+      const staffServices = await AppointmentService.find({
+        staff_id: entry.staff_id,
+        appointment_id: { $in: validApptIds }
+      });
+
+      const occupiedRanges = [];
+      for (const appt of validAppointments) {
+        if (appt.staff_id && appt.staff_id.toString() === entry.staff_id) {
+          occupiedRanges.push({ start: appt.start_time, end: appt.end_time });
+        }
+      }
+      for (const svc of staffServices) {
+        if (svc.service_start_time && svc.service_end_time) {
+          occupiedRanges.push({ start: svc.service_start_time, end: svc.service_end_time });
+        }
+      }
+
+      const isConflict = occupiedRanges.some(range =>
+        timesOverlap(entry.start_time, end_time, range.start, range.end)
       );
 
       if (isConflict) {
@@ -390,12 +468,12 @@ export const createAppointment = async (req, res) => {
     const result = populated.toObject();
     result.appointment_services = apptServices;
 
-    // NOTIFICATION: Notify super-admins and staff-admins of this salon, AND managers in Staff
+    // NOTIFICATION: Notify super-admins and managers of this salon
     try {
       const adminsToNotify = await Admin.find({
         $or: [
           { role: "super-admin" },
-          { role: { $in: ["staff-admin", "manager"] }, salon_id: salon_id }
+          { role: "manager", salon_id: salon_id }
         ]
       });
 
@@ -434,6 +512,10 @@ export const createAppointment = async (req, res) => {
     res.status(201).json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  } finally {
+    if (locksAcquired.length > 0) {
+      releaseLocks(locksAcquired);
+    }
   }
 };
 
@@ -704,7 +786,7 @@ export const confirmAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -814,7 +896,7 @@ export const rejectAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -891,7 +973,7 @@ export const completeAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -979,7 +1061,7 @@ export const adminCancelAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -1102,7 +1184,7 @@ export const deleteAppointment = async (req, res) => {
     }
 
     // Allow admins to delete any appointment, but customers can only delete their own
-    const isAdmin = ["super-admin", "staff-admin", "manager"].includes(req.user.role);
+    const isAdmin = ["super-admin", "manager"].includes(req.user.role);
     if (!isAdmin && appointment.customer_id?.toString() !== req.user.id) {
       return res.status(403).json({ message: "Not authorized to delete this appointment" });
     }

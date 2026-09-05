@@ -1,20 +1,19 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-import PageHeader from "../../components/ui/PageHeader";
-import Card from "../../components/ui/Card";
-import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
-import EmptyState from "../../components/ui/EmptyState";
-import Input from "../../components/ui/Input";
 import Modal from "../../components/ui/Modal";
 
 import {
   getSalaries,
   markAsPaid,
+  createSalaryAndMarkPaid,
   getSalaryDetails,
   updateRate,
+  updateStaffRate,
   getStaffWithSalaries,
+  markDayAbsent,
+  markStaffDayAbsent,
 } from "../../services/salaryService";
 
 
@@ -51,15 +50,6 @@ const statusVariant = (status) => {
   if (s.includes("pending") || s.includes("not")) return "warning";
   if (s.includes("overdue")) return "danger";
   return "info";
-};
-
-const toMonthKey = (date) => {
-  const d = new Date(date);
-
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-
-  return `${y}-${m}`;
 };
 
 const toDateKey = (date) => {
@@ -101,27 +91,6 @@ const getMonthLabel = (dateStr) => {
   return `${months[d.getMonth()]} ${d.getFullYear()}`;
 };
 
-const getOrdinalSuffix = (value) => {
-  const mod100 = value % 100;
-  if (mod100 >= 11 && mod100 <= 13) return "th";
-  switch (value % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-};
-
-const getWeekOfMonth = (dateStr) => {
-  const d = new Date(dateStr);
-  const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
-  return Math.ceil((d.getDate() + firstDay.getDay()) / 7);
-};
-
 const isPeriodEnded = (frequency, currentDateStr) => {
   const today = new Date();
   today.setHours(23, 59, 59, 999);
@@ -153,36 +122,92 @@ const getMonthRange = (dateStr) => {
   return { start: firstDay, end: lastDay, label: `${months[m]} ${y}` };
 };
 
-const calculateDaySalary = (workRate, salaryPaymentCountPerDay) => {
-  if (workRate === 0) return 0;
-  return salaryPaymentCountPerDay;
-};
-
-const formatPdfDate = (value) => {
-  if (!value) return "N/A";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toISOString().slice(0, 10);
-};
-
-const formatPdfMoney = (value) => {
-  const num = Number(value || 0);
-  return `LKR ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-const getDayShortName = (dateValue) => {
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", { weekday: "short" });
-};
-
-const getMonthPeriodLabel = (dateValue) => {
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-};
-
 const SALARY_REFRESH_KEY = "salary-refresh-token";
+
+// Prefix used for row ids of staff that do not have a salary record yet
+const FALLBACK_PREFIX = "fallback-";
+
+// Number of days of a period that have already elapsed (period start up to
+// today). Used for fallback rows so the fixed salary-per-day amount is
+// included in the period totals for days without completed appointments.
+const countElapsedPeriodDays = (frequency, dateStr) => {
+  const selected = new Date(dateStr);
+  if (Number.isNaN(selected.getTime())) return 0;
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  let start;
+  let end;
+
+  if (frequency === "weekly") {
+    const day = selected.getDay() || 7; // ISO week: Monday = 1 ... Sunday = 7
+    start = new Date(selected);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(selected.getDate() - day + 1);
+    end = new Date(start);
+    end.setDate(start.getDate() + 6);
+  } else if (frequency === "monthly") {
+    start = new Date(selected.getFullYear(), selected.getMonth(), 1);
+    end = new Date(selected.getFullYear(), selected.getMonth() + 1, 0);
+  } else {
+    start = new Date(selected);
+    start.setHours(0, 0, 0, 0);
+    end = start;
+  }
+
+  const effectiveEnd = end < todayStart ? end : todayStart;
+  if (effectiveEnd < start) return 0;
+  return Math.round((effectiveEnd - start) / 86400000) + 1;
+};
+
+// Monday (YYYY-MM-DD) of an ISO week — mirrors the backend getWeekDates.
+const getISOWeekMondayStr = (year, weekNo) => {
+  const jan4 = new Date(year, 0, 4);
+  const dayOfWeek = jan4.getDay(); // 0 = Sunday ... 6 = Saturday
+  const offset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(year, 0, 4 + offset + (weekNo - 1) * 7);
+  return toDateKey(monday);
+};
+
+// A date (YYYY-MM-DD) inside a period key:
+//   daily   "2026-09-04" -> "2026-09-04"
+//   weekly  "2026-W36"   -> the week's Monday
+//   monthly "2026-09"    -> "2026-09-01"
+const getPeriodAnchorDateStr = (frequency, periodKey) => {
+  const key = String(periodKey || "");
+  if (frequency === "weekly") {
+    const match = /^(\d{4})-W(\d{1,2})$/.exec(key);
+    return match ? getISOWeekMondayStr(Number(match[1]), Number(match[2])) : "";
+  }
+  if (frequency === "monthly") {
+    return /^\d{4}-\d{2}$/.test(key) ? `${key}-01` : "";
+  }
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : "";
+};
+
+// Last day (YYYY-MM-DD) of the period that contains anchorStr.
+const getPeriodEndDateStr = (frequency, anchorStr) => {
+  if (!anchorStr) return "";
+  if (frequency === "weekly") return getWeekRange(anchorStr).end;
+  const d = new Date(anchorStr);
+  if (Number.isNaN(d.getTime())) return anchorStr;
+  if (frequency === "monthly") {
+    return toDateKey(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+  }
+  return toDateKey(d);
+};
+
+// A day/week/month is "over" once its last day has fully passed (strictly
+// before today). Only over periods feed the Overdue box: the running period
+// is still "pending", and once over, its unpaid salary carries forward.
+const isPeriodOver = (frequency, periodKey) => {
+  const anchorStr = getPeriodAnchorDateStr(frequency, periodKey);
+  if (!anchorStr) return false;
+  const endStr = getPeriodEndDateStr(frequency, anchorStr);
+  if (!endStr) return false;
+  return endStr < toDateKey(new Date());
+};
 
 // ─── Main Component ───────────────────────────────────────────────────────
 
@@ -201,16 +226,11 @@ const Salary = () => {
   const [monthlyDate, setMonthlyDate] = useState(today);
 
   const [salaries, setSalaries] = useState([]);
+  // Salary records of ALL periods for the current tab — used to carry the
+  // Overdue balance forward across days/weeks/months.
+  const [allSalaries, setAllSalaries] = useState([]);
   // When no salary records exist, we show staff members with default zero values
   const [fallbackStaff, setFallbackStaff] = useState([]);
-  const [summary, setSummary] = useState({
-    totalPending: 0,
-    totalPaid: 0,
-    pendingCount: 0,
-    paidCount: 0,
-    totalWorkingAmount: 0,
-    pendingOverdue: 0,
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -258,10 +278,19 @@ const Salary = () => {
     try {
       const period = getPeriod();
       const [salRes, staffRes] = await Promise.all([
-        getSalaries({ salonId, frequency, period }),
+        // All periods are fetched so the Overdue box can carry forward unpaid
+        // salaries from earlier (over) days/weeks/months; the table still
+        // shows only the selected period (filtered below).
+        getSalaries({ salonId, frequency }),
         getStaffWithSalaries({ salonId, frequency, period }),
       ]);
-      const data = salRes?.data?.salaries || [];
+      const allRecords = salRes?.data?.salaries || [];
+      setAllSalaries(allRecords);
+
+      // Records of the currently selected day/week/month (what the table shows).
+      const data = period
+        ? allRecords.filter((s) => s.period === period)
+        : allRecords;
       setSalaries(data);
 
       // Get staff list for fallback when no salary records exist
@@ -272,28 +301,21 @@ const Salary = () => {
       for (const sal of data) {
         rates[sal._id] = sal.rate ?? sal.commission_rate ?? 0;
       }
+      // Seed editable rates for staff without salary records too
+      for (const staff of staffData) {
+        const key = `${FALLBACK_PREFIX}${staff._id}`;
+        if (rates[key] === undefined) {
+          rates[key] = staff.commission_rate ?? 0;
+        }
+      }
       setEditingRates(rates);
       setDirtyRates({});
-
-      const computedSummary = {
-        totalPending: data.reduce((sum, s) => s.status !== "Paid" ? sum + (s.totalSalary || 0) : sum, 0),
-        totalPaid: data.reduce((sum, s) => s.status === "Paid" ? sum + (s.paidTotal || s.totalSalary || 0) : sum, 0),
-        pendingCount: data.filter(s => s.status !== "Paid").length,
-        paidCount: data.filter(s => s.status === "Paid").length,
-        totalWorkingAmount: data.reduce((sum, s) => sum + (s.workingAmount || 0), 0),
-        pendingOverdue: data.filter(s => {
-          if (s.status === "Paid") return false;
-          const periodDate = frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate;
-          return isPeriodEnded(frequency, periodDate);
-        }).reduce((sum, s) => sum + (s.totalSalary || 0), 0),
-      };
-      setSummary(computedSummary);
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to load salary data");
     } finally {
       setLoading(false);
     }
-  }, [salonId, frequency, getPeriod, dailyDate, weeklyDate, monthlyDate]);
+  }, [salonId, frequency, getPeriod]);
 
   useEffect(() => {
     loadSalaries();
@@ -326,15 +348,45 @@ const Salary = () => {
     setDirtyRates((prev) => ({ ...prev, [salaryId]: true }));
   };
 
-  const handleSaveRate = async (salaryId) => {
-    const rate = editingRates[salaryId];
-    if (rate === undefined || rate === null) return;
+  const handleSaveRate = async (rowId) => {
+    if (!rowId) return;
+
+    const rawRate = editingRates[rowId];
+    const numericRate = Number(rawRate);
+    if (
+      rawRate === undefined ||
+      rawRate === null ||
+      rawRate === "" ||
+      Number.isNaN(numericRate)
+    ) {
+      setError("Please enter a valid rate before saving");
+      return;
+    }
+
     try {
+      setError("");
+      setSuccessMsg("");
       setLoading(true);
-      await updateRate(salaryId, Number(rate));
-      setDirtyRates((prev) => ({ ...prev, [salaryId]: false }));
-      setSuccessMsg("Rate updated successfully");
+
+      const key = String(rowId);
+      let message = "Rate updated successfully";
+      if (key.startsWith(FALLBACK_PREFIX)) {
+        // Staff without a salary record yet - persist the rate on the staff
+        // and create their salary record for the current period.
+        const staffId = key.slice(FALLBACK_PREFIX.length);
+        await updateStaffRate(staffId, {
+          rate: numericRate,
+          frequency,
+          period: getPeriod(),
+        });
+        message = "Rate saved successfully";
+      } else {
+        await updateRate(rowId, numericRate);
+      }
+
+      setDirtyRates((prev) => ({ ...prev, [rowId]: false }));
       await loadSalaries();
+      setSuccessMsg(message);
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to update rate");
     } finally {
@@ -344,12 +396,33 @@ const Salary = () => {
 
   // ─── Pay ────────────────────────────────────────────────────────────────
 
-  const handlePay = async (salaryId) => {
+  const handlePay = async (row) => {
+    if (!row) return;
+    const salaryId = row._id;
+    const isFallbackRow = !row.period || String(salaryId).startsWith(FALLBACK_PREFIX);
     setLoading(true);
     setError("");
     setSuccessMsg("");
     try {
-      await markAsPaid(salaryId);
+      if (isFallbackRow) {
+        // No salary record exists yet for this period - create it and mark it
+        // paid in one step so every staff row can be paid once the period has
+        // elapsed (daily per day, weekly after the week, monthly after the month).
+        const staffId = row.staff_id?._id || row.staff_id;
+        if (!staffId) {
+          setError("Staff information missing for this row");
+          setLoading(false);
+          return;
+        }
+        await createSalaryAndMarkPaid({
+          staffId,
+          frequency,
+          period: getPeriod(),
+          salonId,
+        });
+      } else {
+        await markAsPaid(salaryId);
+      }
       setSuccessMsg("Salary marked as paid successfully");
       await loadSalaries();
     } catch (e) {
@@ -359,7 +432,75 @@ const Salary = () => {
     }
   };
 
+  // ─── Absent (manual override: salary for that date becomes 0) ───────────
+
+  const handleToggleAbsent = async (row) => {
+    if (!row) return;
+    const salaryId = String(row._id || "");
+    const isFallbackRow = !row.period || salaryId.startsWith(FALLBACK_PREFIX);
+
+    // The day the absence applies to: the currently selected day.
+    const selectedDay =
+      frequency === "daily"
+        ? (row.period || dailyDate)
+        : frequency === "weekly"
+          ? weeklyDate
+          : selectedMonthlyDateKey;
+
+    const dayRecord =
+      frequency === "monthly"
+        ? (Array.isArray(row.dailyRecords)
+            ? row.dailyRecords.find(
+                (dr) => toDateKey(dr.date) === selectedMonthlyDateKey
+              )
+            : null)
+        : frequency === "weekly"
+          ? (Array.isArray(row.dailyRecords)
+              ? row.dailyRecords.find((dr) => toDateKey(dr.date) === weeklyDate)
+              : null)
+          : null;
+
+    const currentlyAbsent =
+      frequency === "daily"
+        ? Boolean(row.isAbsent)
+        : Boolean(dayRecord?.isAbsent);
+
+    setLoading(true);
+    setError("");
+    setSuccessMsg("");
+    try {
+      if (isFallbackRow) {
+        // Staff without a salary record yet - create the record for this
+        // period and mark the day absent in one step.
+        const staffId = salaryId.slice(FALLBACK_PREFIX.length);
+        await markStaffDayAbsent(staffId, {
+          frequency,
+          period: getPeriod(),
+          date: selectedDay,
+          isAbsent: !currentlyAbsent,
+          salonId,
+        });
+      } else {
+        await markDayAbsent(salaryId, {
+          date: selectedDay,
+          isAbsent: !currentlyAbsent,
+        });
+      }
+      setSuccessMsg(
+        !currentlyAbsent
+          ? "Day marked as absent - salary for that date is now 0"
+          : "Absence removed - salary recalculated"
+      );
+      await loadSalaries();
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.message || "Failed to update absence");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDownloadPdf = async (salaryId) => {
+    if (!salaryId || String(salaryId).startsWith("fallback-")) return;
     setPdfLoading(true);
     setError("");
     try {
@@ -415,9 +556,18 @@ const Salary = () => {
 
       const formatDate = (value) => {
         if (!value) return "N/A";
+        // Print plain YYYY-MM-DD strings as-is to avoid timezone drift.
+        if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          return value;
+        }
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return String(value);
-        return date.toISOString().slice(0, 10);
+        // Format using LOCAL calendar parts - toISOString() converts to UTC
+        // and shifts dates to the previous day for times before local 05:30.
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
       };
 
       const formatMoney = (value) => {
@@ -510,7 +660,7 @@ const Salary = () => {
 
       // Staff Information Section
       drawSection("STAFF INFORMATION");
-      drawInfoRow("Full Name", staff.full_name || salary.staff_name || "N/A");
+      drawInfoRow("Full Name", staff.name || staff.full_name || salary.staff_name || "N/A");
       drawInfoRow("Email", staff.email || "N/A");
       yPos += 1;
 
@@ -659,7 +809,7 @@ const Salary = () => {
       yPos += 3;
       doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: "center" });
 
-      const fileName = `salary_slip_${staff.full_name || salary.staff_name || "staff"}_${salary.period}_${salary.frequency}.pdf`;
+      const fileName = `salary_slip_${staff.name || staff.full_name || salary.staff_name || "staff"}_${salary.period}_${salary.frequency}.pdf`;
       doc.save(fileName);
       setShowPdfModal(false);
       setPdfData(null);
@@ -670,31 +820,149 @@ const Salary = () => {
     }
   };
 
-  // ─── Build display rows (salaries + fallback staff for new periods) ─────
+  // ─── Build display rows (salaries + staff without records) ──────────────
 
-  let displayRows = [...salaries];
+  const displayRows = useMemo(() => {
+    let rows = [...salaries];
 
-  // If no salary records exist but we have staff, create fallback rows
-  if (salaries.length === 0 && fallbackStaff.length > 0) {
-    displayRows = fallbackStaff.map((staff) => ({
-      _id: staff._id,
-      staff_id: staff,
-      staff_name: staff.full_name || "",
-      workingAmount: 0,
-      rate: staff.commission_rate || 0,
-      commission_rate: staff.commission_rate || 0,
-      workRate: 0,
-      daySalary: 0,
-      totalSalary: 0,
-      status: "Not Paid",
-    }));
-  }
+    // Always show every staff member of the salon under this frequency tab.
+    // Staff that do not have a salary record for the selected period yet are
+    // appended as zero-value rows, so newly added staff appear alongside the
+    // existing rows (earlier staff rows are never removed).
+    if (fallbackStaff.length > 0) {
+      const recordedStaffIds = new Set(
+        rows.map((row) => String(row.staff_id?._id || row.staff_id || ""))
+      );
+
+      const pendingRows = fallbackStaff
+        .filter((staff) => !recordedStaffIds.has(String(staff._id)))
+        .map((staff) => {
+          // Days without completed appointments still earn the fixed
+          // salary-per-day amount, so fallback rows show it too.
+          const perDayAmount = Number(staff.salary_payment_count_per_day || 0);
+          const fallbackTotalSalary =
+            frequency === "daily"
+              ? (dailyDate <= today ? perDayAmount : 0)
+              : perDayAmount *
+                countElapsedPeriodDays(
+                  frequency,
+                  frequency === "weekly" ? weeklyDate : monthlyDate
+                );
+
+          return {
+            _id: `${FALLBACK_PREFIX}${staff._id}`,
+            staff_id: staff,
+            staff_name: staff.full_name || "",
+            workingAmount: 0,
+            rate: staff.commission_rate ?? 0,
+            commission_rate: staff.commission_rate ?? 0,
+            workRate: 0,
+            daySalary: fallbackTotalSalary,
+            totalSalary: fallbackTotalSalary,
+            status: "Not Paid",
+          };
+        });
+
+      rows = [...rows, ...pendingRows];
+    }
+
+    return rows;
+  }, [salaries, fallbackStaff, frequency, dailyDate, today, weeklyDate, monthlyDate]);
+
+  // ─── Summary cards (computed from the same rows the table renders) ───────
+
+  const summary = useMemo(() => {
+    // Per-row "Total Salary" exactly as the table renders it (monthly is
+    // scoped to the selected day of the month).
+    const rowTotalSalary = (row) => {
+      if (frequency === "monthly" && Array.isArray(row.dailyRecords)) {
+        return row.dailyRecords.reduce((sum, dr) => {
+          return toDateKey(dr.date) <= selectedMonthlyDateKey
+            ? sum + (Number(dr.daySalary) || 0)
+            : sum;
+        }, 0);
+      }
+      return Number(row.totalSalary) || 0;
+    };
+
+    const totalPending = displayRows.reduce(
+      (sum, s) => ((s.status || "Not Paid") !== "Paid" ? sum + rowTotalSalary(s) : sum),
+      0
+    );
+    const pendingCount = displayRows.filter(
+      (s) => (s.status || "Not Paid") !== "Paid"
+    ).length;
+    const totalPaid = displayRows.reduce(
+      (sum, s) =>
+        (s.status || "Not Paid") === "Paid"
+          ? sum + (Number(s.paidTotal ?? s.totalSalary) || 0)
+          : sum,
+      0
+    );
+    const paidCount = displayRows.filter(
+      (s) => (s.status || "Not Paid") === "Paid"
+    ).length;
+    const totalWorkingAmount = displayRows.reduce(
+      (sum, s) => sum + (Number(s.workingAmount) || 0),
+      0
+    );
+
+    // ── Overdue: carry-forward of every OVER period's unpaid salary ────────
+    // Records are grouped by period. For each day/week/month that is already
+    // over, every unpaid record counts; staff of this tab WITHOUT a record in
+    // that period still earn the fixed per-day amount for its days (the same
+    // rule fallback rows use). The balance never resets when a new day/week/
+    // month opens, and paying a salary removes exactly that amount.
+    let pendingOverdue = 0;
+    const byPeriod = new Map();
+    for (const rec of allSalaries) {
+      const periodKey = rec.period;
+      if (!periodKey) continue;
+      if (!byPeriod.has(periodKey)) byPeriod.set(periodKey, new Map());
+      byPeriod
+        .get(periodKey)
+        .set(String(rec.staff_id?._id || rec.staff_id || ""), rec);
+    }
+    for (const [periodKey, staffMap] of byPeriod.entries()) {
+      if (!isPeriodOver(frequency, periodKey)) continue; // still running → not overdue yet
+      const anchorStr = getPeriodAnchorDateStr(frequency, periodKey);
+      const periodEndStr = getPeriodEndDateStr(frequency, anchorStr);
+      for (const rec of staffMap.values()) {
+        if ((rec.status || "Not Paid") !== "Paid") {
+          pendingOverdue += Number(rec.totalSalary) || 0;
+        }
+      }
+      for (const staff of fallbackStaff) {
+        if (staffMap.has(String(staff._id || ""))) continue;
+        // Staff created after this period ended were not employed then.
+        const createdAt = staff.createdAt ? new Date(staff.createdAt) : null;
+        if (
+          createdAt &&
+          !Number.isNaN(createdAt.getTime()) &&
+          toDateKey(createdAt) > periodEndStr
+        ) {
+          continue;
+        }
+        const perDay = Number(staff.salary_payment_count_per_day) || 0;
+        pendingOverdue += perDay * countElapsedPeriodDays(frequency, anchorStr);
+      }
+    }
+
+    return {
+      totalPending,
+      totalPaid,
+      pendingCount,
+      paidCount,
+      totalWorkingAmount,
+      pendingOverdue,
+    };
+  }, [displayRows, allSalaries, fallbackStaff, frequency, selectedMonthlyDateKey]);
 
   // ─── Filter by search ──────────────────────────────────────────────────
 
   const filteredDisplayRows = searchQuery
     ? displayRows.filter((row) => {
-        const name = (row.staff_id?.full_name || row.staff_name || "").toLowerCase();
+        const name = (row.staff_id?.name || row.staff_id?.full_name || row.staff_name || "").toLowerCase();
         return name.includes(searchQuery.toLowerCase());
       })
     : displayRows;
@@ -794,6 +1062,7 @@ const Salary = () => {
             <div>
               <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider font-semibold">Overdue</div>
               <div className="mt-1 text-xl font-black text-red-400">{formatMoney(summary.pendingOverdue)}</div>
+              <div className="text-[0.65rem] text-red-400/70">Unpaid from over periods</div>
             </div>
           </div>
         </div>
@@ -870,24 +1139,65 @@ const Salary = () => {
               <tbody>
                 {filteredDisplayRows.map((row) => {
                   const staff = row.staff_id || {};
-                  const staffName = staff.full_name || row.staff_name || "Unknown";
-                  const isFallback = !row.period; // no period means it's a fallback staff row
+                  const staffName = staff.name || staff.full_name || row.staff_name || "Unknown";
+                  const isFallback =
+                    !row.period || String(row._id).startsWith(FALLBACK_PREFIX);
                   const monthlyDayRecord =
                     frequency === "monthly" && Array.isArray(row.dailyRecords)
                       ? row.dailyRecords.find((dr) => toDateKey(dr.date) === selectedMonthlyDateKey)
                       : null;
+                  const selectedWeeklyRecord =
+                    frequency === "weekly" && Array.isArray(row.dailyRecords)
+                      ? row.dailyRecords.find((dr) => toDateKey(dr.date) === weeklyDate)
+                      : null;
                   const selectedDailyRecord = monthlyDayRecord || null;
                   const workingAmt = frequency === "monthly"
                     ? (selectedDailyRecord?.workingAmount || 0)
-                    : (row.workingAmount || 0);
-                  const currentRate = editingRates[row._id] !== undefined ? editingRates[row._id] : (row.rate ?? row.commission_rate ?? 0);
+                    : frequency === "weekly"
+                      ? (selectedWeeklyRecord?.workingAmount || 0)
+                      : (row.workingAmount || 0);
+                  const currentRate = editingRates[row._id] !== undefined
+                    ? editingRates[row._id]
+                    : (selectedWeeklyRecord?.rate ?? row.rate ?? row.commission_rate ?? 0);
                   const isDirty = dirtyRates[row._id] || false;
                   const workRate = frequency === "monthly"
                     ? (selectedDailyRecord?.workRate || 0)
-                    : (row.workRate || 0);
+                    : frequency === "weekly"
+                      ? (selectedWeeklyRecord?.workRate || 0)
+                      : (row.workRate || 0);
+                  const fallbackPerDay = isFallback
+                    ? Number(staff.salary_payment_count_per_day || 0)
+                    : 0;
+                  const selectedDateKey = frequency === "monthly"
+                    ? selectedMonthlyDateKey
+                    : frequency === "weekly"
+                      ? weeklyDate
+                      : dailyDate;
+                  // Manager-marked absence for the selected day (manual
+                  // override: the absent day's salary becomes 0).
+                  const selectedPeriodDayRecord =
+                    frequency === "monthly"
+                      ? monthlyDayRecord
+                      : frequency === "weekly"
+                        ? selectedWeeklyRecord
+                        : null;
+                  const isDayAbsent = frequency === "daily"
+                    ? Boolean(row.isAbsent)
+                    : Boolean(selectedPeriodDayRecord?.isAbsent);
+                  // Days without completed appointments still earn the fixed
+                  // salary-per-day amount (rows without a record included).
+                  // Absent days always display 0.
                   const daySalary = frequency === "monthly"
-                    ? (selectedDailyRecord?.daySalary || 0)
-                    : (row.daySalary || 0);
+                    ? (isDayAbsent
+                        ? 0
+                        : (selectedDailyRecord?.daySalary ||
+                           (isFallback && selectedDateKey <= today ? fallbackPerDay : 0)))
+                    : frequency === "weekly"
+                      ? (isDayAbsent
+                          ? 0
+                          : (selectedWeeklyRecord?.daySalary ||
+                             (isFallback && selectedDateKey <= today ? fallbackPerDay : 0)))
+                      : (row.daySalary || 0);
                   const totalSal = frequency === "monthly"
                     ? (Array.isArray(row.dailyRecords)
                         ? row.dailyRecords.reduce((sum, dr) => {
@@ -905,8 +1215,21 @@ const Salary = () => {
                     frequency,
                     frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate
                   );
-                  const canPay = !isFallback && !isPaid && totalSal > 0 && periodEnded;
+                  const canPay = !isPaid && totalSal > 0 && periodEnded;
                   const canDownloadPdf = !isFallback && isPaid;
+                  // Absent toggle: only for days that already passed and are
+                  // not paid yet.
+                  const selectedDayPassed = selectedDateKey <= today;
+                  const selectedDayPaid =
+                    frequency === "daily"
+                      ? isPaid
+                      : (selectedPeriodDayRecord?.status === "Paid" || isPaid);
+                  const canToggleAbsent = !selectedDayPaid && selectedDayPassed;
+                  const absentDisabledReason = selectedDayPaid
+                    ? (frequency === "daily" ? "Salary already paid" : "This day has already been paid")
+                    : !selectedDayPassed
+                      ? "The selected day has not finished yet"
+                      : "";
 
                   return (
                     <tr key={row._id}>
@@ -920,7 +1243,6 @@ const Salary = () => {
                             onChange={(e) => handleRateChange(row._id, e.target.value)}
                             className="w-16 bg-[#1d1d1d] border border-gray-700 rounded px-2 py-1 text-xs text-white text-center outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/20"
                             min="0" max="100" step="0.1"
-                            disabled={isPaid}
                           />
                           <span className="text-xs text-gray-400">%</span>
                           {isDirty && (
@@ -936,7 +1258,14 @@ const Salary = () => {
                       </td>
                       <td className="text-right">{formatMoney(workRate)}</td>
                       {frequency !== "daily" && (
-                        <td className="text-right">{formatMoney(daySalary)}</td>
+                        <td className="text-right">
+                          {formatMoney(daySalary)}
+                          {isDayAbsent && (
+                            <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500/20 text-red-400 border border-red-500/30 uppercase">
+                              Absent
+                            </span>
+                          )}
+                        </td>
                       )}
                       <td className="text-right font-bold">{formatMoney(totalSal)}</td>
                       <td>
@@ -949,10 +1278,27 @@ const Salary = () => {
                           {!isPaid ? (
                             <>
                               <button
-                                onClick={() => handlePay(row._id)}
+                                onClick={() => handleToggleAbsent(row)}
+                                disabled={!canToggleAbsent}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed ${
+                                  isDayAbsent
+                                    ? "bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30"
+                                    : "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30"
+                                }`}
+                                title={
+                                  absentDisabledReason ||
+                                  (isDayAbsent
+                                    ? "Remove absence - salary for this date is recalculated"
+                                    : "Mark absent - salary for this date becomes 0")
+                                }
+                              >
+                                {isDayAbsent ? "Present" : "Absent"}
+                              </button>
+                              <button
+                                onClick={() => handlePay(row)}
                                 disabled={!canPay}
                                 className="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition-all uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
-                                title={!isFallback && periodEnded ? "Mark as Paid" : "Period has not ended yet"}
+                                title={periodEnded ? "Mark as Paid" : "Period has not ended yet - daily can be paid each day, weekly after the week, monthly after the month"}
                               >
                                 Paid
                               </button>

@@ -4,9 +4,9 @@ import { getStaff, deleteStaff, updateStaff } from "../../services/staffService"
 import { getSalons } from "../../services/salonService";
 import { getServices } from "../../services/serviceService";
 import { 
-  Plus, Search, Users, Star, MapPin, Briefcase, 
-  Calendar, MoreVertical, Power, Pencil, Trash2, 
-  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Sparkles, Coins
+  Plus, Search, Users, Star, MapPin, 
+  MoreVertical, Power, Pencil, Trash2, 
+  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
@@ -16,8 +16,7 @@ import EmptyState from "../../components/ui/EmptyState";
 import Table from "../../components/ui/Table";
 import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
-
-const API_BASE = "http://localhost:5000";
+import { mediaUrl } from "../../utils/mediaUrl";
 
 /* ── Skeleton Card ── */
 const SkeletonStaffCard = () => (
@@ -107,7 +106,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
   const staffServices = staff.services || [];
 
   const imageUrl = staff.image
-    ? `${API_BASE}/${staff.image.replace(/\\/g, "/")}`
+    ? mediaUrl(staff.image)
     : null;
 
   const maxVisibleServices = 3;
@@ -183,15 +182,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
               <MapPin className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
               <span className="text-neutral-300 font-medium truncate">{salonName}</span>
             </div>
-
-            {/* Total Bookings */}
-            <div className="flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-              <span className="text-neutral-300 font-medium">
-                <strong className="text-white font-extrabold">{staff.bookings || 0}</strong> Bookings Completed
-              </span>
-            </div>
-
+            
             {/* Daily Salary Rate */}
             {staff.salary_payment_count_per_day && (
               <div className="flex items-center gap-2">
@@ -291,6 +282,8 @@ const Staff = () => {
       firstName: names[0] || "",
       lastName: names.slice(1).join(" "),
       email: staff.email || "",
+      phone: staff.phone || "",
+      password: "",
       salon: staff.salon_id?._id || staff.salon || "",
       services: assignedServices,
       status: staff.status || "Active",
@@ -383,21 +376,23 @@ const Staff = () => {
 
   const handleUpdateStaff = async () => {
     try {
-      const data = new FormData();
-      data.append("name", `${editingStaff.firstName} ${editingStaff.lastName}`);
-      data.append("email", editingStaff.email);
-      data.append("salonId", editingStaff.salon);
-      data.append("status", editingStaff.status);
-      data.append("salaryPaymentFrequency", editingStaff.salaryPaymentFrequency);
-      data.append("salaryPaymentCountPerDay", editingStaff.salaryPaymentCountPerDay);
-      if (editingStaff.services.length > 0) {
-        editingStaff.services.forEach((serviceId) => {
-          data.append("services", serviceId);
-        });
-      }
+      const data = {
+        firstName: editingStaff.firstName,
+        lastName: editingStaff.lastName,
+        email: editingStaff.email,
+        phone: editingStaff.phone || "",
+        salonId: editingStaff.salon,
+        status: editingStaff.status,
+        salaryPaymentFrequency: editingStaff.salaryPaymentFrequency,
+        salaryPaymentCountPerDay: editingStaff.salaryPaymentCountPerDay,
+        services: editingStaff.services || []
+      };
 
+      if (editingStaff.password) {
+        data.password = editingStaff.password;
+      }
       if (editingStaff.picture) {
-        data.append("image", editingStaff.picture);
+        data.image = editingStaff.picture;
       }
 
       await updateStaff(editingStaff.id, data);
@@ -411,7 +406,7 @@ const Staff = () => {
   };
 
   const filteredStaff = staffList.filter((s) => {
-    const staffName = s.name || "";
+    const staffName = s.name || s.full_name || "";
     const matchesSearch = staffName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === "All Roles" || s.role === selectedRole;
     const salonName = s.salon_id?.name || "";
@@ -654,13 +649,39 @@ const Staff = () => {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Email Address</label>
+                <input
+                  type="email"
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
+                  value={editingStaff.email}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Phone Number</label>
+                <input
+                  type="text"
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
+                  value={editingStaff.phone || ""}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, phone: e.target.value })}
+                  placeholder="Enter phone number"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Email Address</label>
+              <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
+                Change Password <span className="text-neutral-500 font-normal lowercase">(leave blank to keep current)</span>
+              </label>
               <input
-                type="email"
+                type="password"
                 className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
-                value={editingStaff.email}
-                onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
+                value={editingStaff.password || ""}
+                onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
+                placeholder="Enter new password"
+                autoComplete="new-password"
               />
             </div>
 

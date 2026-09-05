@@ -18,10 +18,10 @@ import {
 import { getSalons } from "../../services/salonService";
 import { 
   Calendar, Clock, User, Store, Search, LayoutGrid, 
-  List, CheckCircle2, XCircle, AlertCircle, Trash2, 
-  Check, X, Edit2, Filter, Phone, Mail, ChevronDown, Plus, Sparkles, Tag, Hash
+  List, CheckCircle2, AlertCircle, Trash2, 
+  Check, X, Phone, Mail, ChevronDown, Plus, Hash
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import clsx from "clsx";
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";

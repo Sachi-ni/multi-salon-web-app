@@ -6,12 +6,12 @@ import {
   Calendar,
   Users,
   Scissors,
-  DollarSign,
   Receipt,
   Star,
   Wallet,
   LogOut,
   BarChart2,
+  Image,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -20,7 +20,7 @@ const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const isStandardStaff = user?.role && !["super-admin", "manager", "staff-admin"].includes(user.role);
+  const isStandardStaff = user?.role && !["super-admin", "manager"].includes(user.role);
 
   const getNavItems = () => {
     if (isStandardStaff) {
@@ -49,11 +49,12 @@ const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
       },
       {
         group: "Business",
-        items: [
+items: [
           { label: "Analytics", path: "/adminAnalytics", icon: BarChart2 },
           { label: "Report", path: "/adminBilling", icon: Receipt },
           { label: "Reviews", path: "/adminReviews", icon: Star },
           { label: "Salary", path: "/adminSalary", icon: Wallet },
+          { label: "Salon Photos", path: "/adminPhotos", icon: Image },
         ],
       },
     ];

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { motion } from "framer-motion";
+import { API_URL } from "../../config";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ const Login = () => {
     setLoading(true);
     try {
       // Try admin login first
-      let res = await fetch("http://localhost:5000/api/auth/login", {
+      let res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -22,9 +23,10 @@ const Login = () => {
 
       let data = await res.json();
 
-      // If admin login fails, try staff login
-      if (!res.ok) {
-        res = await fetch("http://localhost:5000/api/staff/login", {
+      // Only try another account type when this email is not an Admin; a bad
+      // SuperAdmin password must never silently become a customer session.
+      if (res.status === 404) {
+        res = await fetch(`${API_URL}/staff/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
@@ -32,9 +34,9 @@ const Login = () => {
         data = await res.json();
       }
 
-      // If staff login fails, try customer login
-      if (!res.ok) {
-        res = await fetch("http://localhost:5000/api/customers/login", {
+      // Only try customer login when the email is not an Admin or Staff.
+      if (res.status === 404) {
+        res = await fetch(`${API_URL}/customers/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
@@ -44,6 +46,14 @@ const Login = () => {
 
       if (!res.ok) {
         alert(data.message || "Login failed");
+        setLoading(false);
+        return;
+      }
+
+      if (data.requiresHardening) {
+        navigate("/super-admin-hardening", {
+          state: { token: data.token, hardeningStep: data.hardeningStep },
+        });
         setLoading(false);
         return;
       }
@@ -58,7 +68,7 @@ const Login = () => {
         navigate("/");
       } else if (userData.salon_id) {
         // If they have a salon_id, they are some kind of staff/manager
-        if (data.role === "manager" || data.role === "staff-admin") {
+        if (data.role === "manager") {
           navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
         } else {
           // Normal staff go to staffDashboard

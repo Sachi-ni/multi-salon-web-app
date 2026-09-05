@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Bell, Menu, LogOut, User, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
+import { mediaUrl } from "../../utils/mediaUrl";
 
 const Header = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
@@ -76,7 +77,7 @@ const Header = ({ onToggleSidebar }) => {
 
   const roleBadgeColor = {
     "super-admin": "bg-accent-muted border-accent/35 text-accent",
-    "staff-admin": "bg-info-dim border-info-border text-info",
+    manager: "bg-info-dim border-info-border text-info",
     admin: "bg-purple-dim border-purple-border text-purple",
   };
 
@@ -179,8 +180,16 @@ const Header = ({ onToggleSidebar }) => {
           className="flex items-center gap-2.5 cursor-pointer group"
         >
           {/* Avatar */}
-          <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-xs font-black text-primary flex-shrink-0 group-hover:bg-accent-hover transition-colors duration-150">
-            {initials}
+          <div className="relative w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-xs font-black text-primary flex-shrink-0 group-hover:bg-accent-hover transition-colors duration-150 overflow-hidden">
+            <span aria-hidden="true">{initials}</span>
+            {user?.image && (
+              <img
+                src={mediaUrl(user.image)}
+                alt={`${user?.name || "Super Admin"} profile`}
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={(event) => { event.currentTarget.style.display = "none"; }}
+              />
+            )}
           </div>
 
           {/* Name & Email */}

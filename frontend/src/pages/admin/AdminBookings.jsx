@@ -16,11 +16,11 @@ import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import { 
-  Calendar, Clock, User, Store, Search, LayoutGrid, 
+  Calendar, Clock, User, Search, LayoutGrid, 
   List, CheckCircle2, AlertCircle, Trash2, 
-  Check, X, ChevronDown, Plus, Hash
+  Check, X, Plus, Hash
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import clsx from "clsx";
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";
@@ -498,7 +498,7 @@ export default function AdminBookings() {
                   </span>
 
                   <div className="flex items-center gap-2">
-                    {a.status === "pending" && (
+                    {a.status === "pending" && user?.role === "super-admin" && (
                       <>
                         <button
                           onClick={() => handleConfirm(a._id)}
@@ -594,7 +594,7 @@ export default function AdminBookings() {
                   </Table.Td>
                   <Table.Td align="right">
                     <div className="flex items-center justify-end gap-2">
-                      {a.status === "pending" && (
+                      {a.status === "pending" && user?.role === "super-admin" && (
                         <>
                           <button
                             onClick={() => handleConfirm(a._id)}

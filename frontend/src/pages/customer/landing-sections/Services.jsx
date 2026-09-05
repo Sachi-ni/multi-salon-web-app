@@ -1,99 +1,36 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Scissors, Sparkles, Droplets, Smile, Palette, Wine } from "lucide-react";
+import { Scissors } from "lucide-react";
+import { getServices } from "../../../services/serviceService";
 
 const Services = () => {
-  const services = [
-    {
-      icon: <Scissors className="w-8 h-8" />,
-      title: "Hair Styling",
-      description: "Precision cuts, blowouts, and expert styling tailored to your face shape and lifestyle.",
-      price: "From $45",
-      duration: "45-60 min",
-      image: "https://images.unsplash.com/photo-1562322140-8baeececf3df?q=80&w=2069&auto=format&fit=crop"
-    },
-    {
-      icon: <Palette className="w-8 h-8" />,
-      title: "Color & Highlights",
-      description: "Vibrant coloring, balayage, and highlights using premium, damage-free formulas.",
-      price: "From $120",
-      duration: "90-120 min",
-      image: "https://images.unsplash.com/photo-1600948836101-f9ffda59d250?q=80&w=2036&auto=format&fit=crop"
-    },
-    {
-      icon: <Sparkles className="w-8 h-8" />,
-      title: "Facial Treatments",
-      description: "Rejuvenating luxury facials to cleanse, exfoliate, and nourish your skin.",
-      price: "From $85",
-      duration: "60 min",
-      image: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?q=80&w=2070&auto=format&fit=crop"
-    },
-    {
-      icon: <Smile className="w-8 h-8" />,
-      title: "Bridal Makeup",
-      description: "Flawless, long-lasting makeup application for your special day.",
-      price: "From $150",
-      duration: "90 min",
-      image: "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?q=80&w=2071&auto=format&fit=crop"
-    },
-    {
-      icon: <Droplets className="w-8 h-8" />,
-      title: "Hair Treatments",
-      description: "Deep conditioning, keratin treatments, and scalp therapy for healthy hair.",
-      price: "From $65",
-      duration: "45 min",
-      image: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?q=80&w=2000&auto=format&fit=crop"
-    },
-    {
-      icon: <Wine className="w-8 h-8" />,
-      title: "Spa & Massage",
-      description: "Relaxing full-body massages and spa therapies to melt away stress.",
-      price: "From $100",
-      duration: "60-90 min",
-      image: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop"
-    }
-  ];
+  const [services, setServices] = useState([]);
+
+  useEffect(() => {
+    getServices()
+      .then((response) => setServices((response.data || []).slice(0, 6)))
+      .catch((error) => console.error("Could not load landing services", error));
+  }, []);
+
+  if (!services.length) return null;
 
   return (
     <section id="services" className="py-24 bg-primary relative">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="text-accent font-bold tracking-widest uppercase text-sm mb-3">Our Offerings</div>
-          <h2 className="text-4xl md:text-5xl font-display font-black text-white mb-6">
-            Premium <span className="text-gradient">Services</span>
-          </h2>
-          <p className="text-white/60 text-lg">
-            Indulge in our comprehensive range of grooming and beauty treatments, performed by industry-leading professionals using top-tier products.
-          </p>
+          <h2 className="text-4xl md:text-5xl font-display font-black text-white mb-6">Available <span className="text-gradient">Services</span></h2>
+          <p className="text-white/60 text-lg">Services and prices from our salon database.</p>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {services.map((service, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="group glass-card overflow-hidden card-accent hover:-translate-y-2 transition-all duration-300"
-            >
-              <div className="relative h-48 overflow-hidden">
-                <img 
-                  src={service.image} 
-                  alt={service.title} 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-primary/40 group-hover:bg-primary/20 transition-colors duration-300" />
-              </div>
-              <div className="p-6">
-                <div className="text-white mb-4 bg-surface-3 w-12 h-12 rounded-xl flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-primary transition-colors duration-300">
-                  {service.icon}
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-accent transition-colors">{service.title}</h3>
-                <p className="text-white/60 leading-relaxed mb-2">
-                  {service.description}
-                </p>
-              </div>
+            <motion.div key={service._id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: index * 0.1 }} className="group glass-card card-accent p-6 hover:-translate-y-2 transition-all duration-300">
+              <div className="text-white mb-5 bg-surface-3 w-12 h-12 rounded-xl flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-primary transition-colors duration-300"><Scissors className="w-8 h-8" /></div>
+              <p className="text-accent text-xs font-bold uppercase tracking-wider mb-2">{service.category_id?.category_name || service.salon_id?.name || "Salon service"}</p>
+              <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-accent transition-colors">{service.service_name}</h3>
+              <p className="text-white/60 leading-relaxed min-h-12">{service.description || "No description provided."}</p>
+              <div className="mt-5 pt-4 border-t border-border flex items-center justify-between text-sm"><span className="text-accent font-extrabold">LKR {Number(service.base_price || 0).toLocaleString()}</span><span className="text-white/60">{service.duration} min</span></div>
             </motion.div>
           ))}
         </div>

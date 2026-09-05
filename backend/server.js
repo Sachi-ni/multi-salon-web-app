@@ -19,6 +19,7 @@ import teamRoutes from "./routes/teamRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import salaryRoutes from "./routes/salaryRoutes.js";
 import revenueRoutes from "./routes/revenueRoutes.js";
+import chatbotRoutes from "./routes/chatbotRoutes.js";
 
 
 dotenv.config();
@@ -26,7 +27,10 @@ connectDB();
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  credentials: true
+}));
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
@@ -46,6 +50,7 @@ app.use("/api/team", teamRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/revenue", revenueRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 // Test Route
 app.get("/", (req, res) => {

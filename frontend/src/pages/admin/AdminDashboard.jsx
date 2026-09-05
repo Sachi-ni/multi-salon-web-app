@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { getSalon } from "../../services/salonService";
 import { getSalonAppointments, confirmAppointment, completeAppointment } from "../../services/appointmentService";
 import { getStaff } from "../../services/staffService";
@@ -8,24 +9,16 @@ import { getDailyReport } from "../../services/billingService";
 
 import {
   Calendar,
-  Wallet,
   Users,
   Star,
   ArrowRight,
   CalendarPlus,
   UserPlus,
-  DollarSign,
-  ClipboardList,
-  Building2,
   MapPin,
   TrendingUp,
-  Clock,
-  Scissors,
-  Check,
   ChevronRight,
   Store,
   Coins,
-  Sparkles,
   MessageSquare
 } from "lucide-react";
 
@@ -41,17 +34,14 @@ import {
 } from "recharts";
 
 import PageHeader from "../../components/ui/PageHeader";
-import StatCard from "../../components/ui/StatCard";
-import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 
-const API_BASE = "http://localhost:5000";
-
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const params = useParams();
+  const { user } = useAuth();
   let salonId = params.salonId;
   if (!salonId) {
     const match = window.location.pathname.match(/^\/salon-admin\/([^/]+)/);
@@ -202,7 +192,11 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Salon Branch Dashboard" subtitle={`Welcome back, ${salon?.name || "Salon Manager"}!`}>
+      <PageHeader
+        title="Salon Branch Dashboard"
+        subtitle={`Welcome back, ${salon?.name || "Salon Manager"}!`}
+        backTo={user?.role === "super-admin" ? "/superAdminDashboard" : undefined}
+      >
         <Button
           variant="primary"
           icon={CalendarPlus}
@@ -211,6 +205,12 @@ const AdminDashboard = () => {
           New Appointment
         </Button>
       </PageHeader>
+
+      {error && (
+        <div className="p-4 bg-danger/10 border border-danger/20 text-danger rounded-xl text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Salon Branch Banner */}
       <div className="bg-surface border border-border rounded-2xl p-5 shadow-card flex flex-wrap items-center justify-between gap-4">

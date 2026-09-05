@@ -26,6 +26,13 @@ const dailySalarySchema = new mongoose.Schema({
   },
 
   paidAt: { type: Date, default: null },
+
+  // Manually marked absent by a manager/admin. Absent days earn no salary:
+  // daySalary is forced to 0 regardless of the salary-per-day amount.
+  isAbsent: { type: Boolean, default: false },
+
+  // When the absence was marked (audit information).
+  absentMarkedAt: { type: Date, default: null },
 });
 
 const salarySchema = new mongoose.Schema(
@@ -93,6 +100,11 @@ const salarySchema = new mongoose.Schema(
     },
 
     paidAt: { type: Date, default: null },
+
+    // Manually marked absent (daily frequency records represent one day).
+    // Absent days earn no salary: daySalary is forced to 0.
+    isAbsent: { type: Boolean, default: false },
+    absentMarkedAt: { type: Date, default: null },
 
     // Array of daily records for weekly/monthly aggregation
     dailyRecords: [dailySalarySchema],

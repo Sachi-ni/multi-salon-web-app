@@ -11,10 +11,10 @@ import { authorizeRoles } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
-router.post("/",                  protect, authorizeRoles("super-admin", "staff-admin"), setAvailability);
-router.get("/staff/:staffId",     protect, authorizeRoles("super-admin", "staff-admin"), getStaffAvailability);
-router.get("/salon",              protect, authorizeRoles("super-admin", "staff-admin"), getSalonAvailability);
-router.delete("/:id",             protect, authorizeRoles("super-admin", "staff-admin"), deleteAvailability);
-router.patch("/:id/slots",        protect, authorizeRoles("super-admin", "staff-admin"), updateSlots);
+router.post("/",                  protect, authorizeRoles("super-admin", "manager"), setAvailability);
+router.get("/staff/:staffId",     protect, authorizeRoles("super-admin", "manager"), getStaffAvailability);
+router.get("/salon",              protect, authorizeRoles("super-admin", "manager"), getSalonAvailability);
+router.delete("/:id",             protect, authorizeRoles("super-admin", "manager"), deleteAvailability);
+router.patch("/:id/slots",        protect, authorizeRoles("super-admin", "manager"), updateSlots);
 
 export default router;
