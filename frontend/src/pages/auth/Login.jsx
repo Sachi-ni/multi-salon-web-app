@@ -90,12 +90,12 @@ const Login = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg">
+    <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg overflow-y-auto py-6 px-4">
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="relative z-10 w-[460px] max-w-[96vw] bg-surface border border-border rounded-2xl p-10 shadow-modal"
+        className="relative z-10 w-[460px] max-w-full bg-surface border border-border rounded-2xl p-6 sm:p-10 shadow-modal my-auto"
       >
         {/* Top accent bar */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />

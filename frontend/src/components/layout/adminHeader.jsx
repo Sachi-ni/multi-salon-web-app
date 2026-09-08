@@ -171,7 +171,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
                 (salon.name.charAt(0) || "S").toUpperCase()
               )}
             </div>
-            <span className="text-white max-w-[200px] truncate">{salon.name}</span>
+            <span className="text-white max-w-[120px] sm:max-w-[200px] truncate">{salon.name}</span>
           </>
         ) : (
           <>
@@ -184,7 +184,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
       </div>
 
       {/* Role Badge */}
-      <div className={clsx("px-2.5 py-0.5 rounded-full text-[0.6rem] font-extrabold tracking-widest uppercase whitespace-nowrap border", badgeClass)}>
+      <div className={clsx("hidden sm:inline-flex px-2.5 py-0.5 rounded-full text-[0.6rem] font-extrabold tracking-widest uppercase whitespace-nowrap border", badgeClass)}>
         {roleDisplay}
       </div>
 

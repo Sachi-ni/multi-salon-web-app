@@ -106,7 +106,7 @@ const Header = ({ onToggleSidebar }) => {
       </div>
 
       {/* Role Badge */}
-      <div className={clsx("px-2.5 py-0.5 rounded-full text-[0.6rem] font-extrabold tracking-widest uppercase whitespace-nowrap border", badgeClass)}>
+      <div className={clsx("hidden sm:inline-flex px-2.5 py-0.5 rounded-full text-[0.6rem] font-extrabold tracking-widest uppercase whitespace-nowrap border", badgeClass)}>
         {roleDisplay}
       </div>
 
