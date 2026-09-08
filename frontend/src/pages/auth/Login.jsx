@@ -161,11 +161,17 @@ const Login = () => {
           </button>
         </form>
 
+        <div className="text-right mt-3">
+          <button type="button" onClick={() => navigate("/forgot-password")} className="text-sm text-accent font-bold hover:underline">
+            Forgot password?
+          </button>
+        </div>
+
         {/* Switch */}
         <div className="text-center mt-4 text-[0.82rem] text-muted-2">
           No account?{" "}
           <span
-            onClick={() => navigate("/customer/register")}
+            onClick={() => navigate("/register")}
             className="text-accent cursor-pointer font-bold hover:underline"
           >
             Register here

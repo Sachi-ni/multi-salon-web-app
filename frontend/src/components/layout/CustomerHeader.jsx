@@ -187,7 +187,7 @@ const CustomerHeader = () => {
                 Login
               </button>
               <button
-                onClick={() => navigate("/signup")}
+                onClick={() => navigate("/register")}
                 className="px-4 py-2 rounded-full text-[0.8rem] font-bold text-white/70 hover:text-white hover:bg-white/[0.06] transition-all duration-300 mx-1 whitespace-nowrap"
               >
                 Sign Up
@@ -381,7 +381,7 @@ const CustomerHeader = () => {
                     <span className="text-sm font-semibold">Login</span>
                   </button>
                   <button
-                    onClick={() => { navigate("/signup"); setMobileMenuOpen(false); }}
+                    onClick={() => { navigate("/register"); setMobileMenuOpen(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.05] transition-all text-left"
                   >
                     <User className="w-4 h-4 text-accent/60" />
