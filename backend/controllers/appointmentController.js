@@ -36,6 +36,9 @@ const timesOverlap = (s1, e1, s2, e2) => {
   return s1 < e2 && s2 < e1;
 };
 
+const normalizePhone = (phone) => phone?.replace(/[\s()-]/g, "") || "";
+const PHONE_PATTERN = /^\+?[0-9]{10}$/;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CUSTOMER ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -299,6 +302,7 @@ export const createAppointment = async (req, res) => {
   let locksAcquired = [];
   try {
     const { salon_id, appointment_date, notes, guest_name, guest_phone } = req.body;
+    let normalizedGuestPhone = guest_phone || "";
 
     let customer_id = req.user?.id;
 
@@ -314,6 +318,24 @@ export const createAppointment = async (req, res) => {
       if (!guest_name || !guest_phone) {
         return res.status(400).json({ message: "Guest name and phone are required for unauthenticated bookings" });
       }
+
+      normalizedGuestPhone = normalizePhone(guest_phone);
+      if (!PHONE_PATTERN.test(normalizedGuestPhone)) {
+        return res.status(400).json({ message: "Please enter a valid 10-digit phone number" });
+      }
+
+      const registeredCustomer = await Customer.findOne({
+        $or: [
+          { phone: normalizedGuestPhone },
+          { phone: guest_phone }
+        ]
+      }).select("_id");
+      if (registeredCustomer) {
+        return res.status(409).json({
+          message: "This phone number is already registered. Please log in before booking."
+        });
+      }
+
       customer_id = undefined;
     }
 
@@ -427,7 +449,7 @@ export const createAppointment = async (req, res) => {
     const appointment = await Appointment.create({
       customer_id,
       guest_name: guest_name || "",
-      guest_phone: guest_phone || "",
+      guest_phone: normalizedGuestPhone,
       salon_id,
       service_id: resolvedServices[0].service_id,
       service_ids: resolvedServices.map(s => s.service_id),

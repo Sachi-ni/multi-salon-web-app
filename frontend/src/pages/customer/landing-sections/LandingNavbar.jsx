@@ -103,7 +103,7 @@ const LandingNavbar = () => {
                 Login
               </button>
               <button
-                onClick={() => navigate("/signup")}
+                onClick={() => navigate("/register")}
                 className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
               >
                 Sign Up
@@ -186,7 +186,7 @@ const LandingNavbar = () => {
                     Login
                   </button>
                   <button
-                    onClick={() => navigate("/signup")}
+                    onClick={() => navigate("/register")}
                     className="text-center text-lg font-bold text-white py-3 rounded-xl border border-border hover:bg-surface-2 transition-colors"
                   >
                     Sign Up

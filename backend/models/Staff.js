@@ -32,6 +32,8 @@ const staffSchema = new mongoose.Schema({
     ref: "Salon",
     required: true
   },
+  resetPasswordTokenHash: { type: String, default: null },
+  resetPasswordExpires: { type: Date, default: null },
   image:    { type: String, default: "" },
   services: [{ type: mongoose.Schema.Types.ObjectId, ref: "Service" }] // ← new
 });

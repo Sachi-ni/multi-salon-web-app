@@ -18,7 +18,9 @@ phone:     { type: String },
     default: null // null for super-admin since they oversee all salons
   },
   mustChangePassword: { type: Boolean, default: undefined },
-  mfaEnrolled: { type: Boolean, default: undefined }
+  mfaEnrolled: { type: Boolean, default: undefined },
+  resetPasswordTokenHash: { type: String, default: null },
+  resetPasswordExpires: { type: Date, default: null }
 }, { timestamps: true });
 
 export default mongoose.model("Admin", adminSchema);
