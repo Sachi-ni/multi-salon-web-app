@@ -15,7 +15,7 @@ import {
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/;
 const PHONE_PATTERN = /^\+?[0-9]{10}$/;
-const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/;
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 const COMMON_PASSWORDS = new Set(["12345678", "password", "password123", "qwerty123", "letmein"]);
 const GENERIC_RESET_MESSAGE = "If an account exists, a reset link has been sent.";
 
@@ -30,7 +30,7 @@ const validateProfileFields = ({ email, phone, password, username }) => {
     return { message: "Phone number must contain exactly 10 digits and may start with +" };
   }
   if (password && !PASSWORD_PATTERN.test(password)) {
-    return { message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character" };
+    return { message: "Password must be at least 6 characters and include uppercase, lowercase, and number" };
   }
   if (password && COMMON_PASSWORDS.has(password.toLowerCase())) {
     return { message: "Please choose a less common password" };
