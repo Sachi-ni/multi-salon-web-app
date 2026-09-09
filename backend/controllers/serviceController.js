@@ -36,7 +36,16 @@ export const getServices = async (req, res) => {
   try {
     const { salonId } = req.query;
 
+    const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
+    const activeSalonIds = isAdmin
+      ? null
+      : await Salon.find({ status: "active", isPaused: false }).distinct("_id");
     const filter = salonId ? { salon_id: salonId } : {};
+    if (!isAdmin) {
+      filter.salon_id = salonId
+        ? { $eq: salonId, $in: activeSalonIds }
+        : { $in: activeSalonIds };
+    }
 
     const services = await Service.find(filter)
       .populate("category_id")
@@ -49,7 +58,7 @@ export const getServices = async (req, res) => {
 
 export const updateService = async (req, res) => {
   try {
-    const { service_name, base_price, description, duration, category_id } = req.body;
+    const { service_name, base_price, description, duration, category_id, status } = req.body;
     if (base_price !== undefined && Number(base_price) < 0) {
       return res.status(400).json({ message: "Price cannot be a negative value." });
     }
@@ -79,6 +88,7 @@ export const updateService = async (req, res) => {
       }
       updateData.category_id = category_id;
     }
+    if (status !== undefined) updateData.status = status;
     if (req.user.role === "super-admin" && (req.body.salonId !== undefined || req.body.salon_id !== undefined)) {
       const salonId = req.body.salonId || req.body.salon_id;
       if (!(await Salon.exists({ _id: salonId }))) {

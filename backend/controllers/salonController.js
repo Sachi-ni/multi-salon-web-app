@@ -5,6 +5,8 @@ import { fileURLToPath } from "url";
 import Salon from "../models/Salon.js";
 import Staff from "../models/Staff.js";
 import Feedback from "../models/Feedback.js";
+import Appointment from "../models/Appointment.js";
+import Notification from "../models/Notification.js";
 import { storeMedia, isRemoteMedia } from "../utils/mediaStorage.js";
 
 // __dirname equivalent for ES modules
@@ -242,7 +244,9 @@ export const createSalon = async (req, res) => {
 
 export const getSalons = async (req, res) => {
   try {
-    const salons = await Salon.find();
+    const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
+    const publicFilter = { status: "active", isPaused: false };
+    const salons = await Salon.find(isAdmin ? {} : publicFilter);
 
     const salonsWithManagers = await Promise.all(
       salons.map(async (s) => {
@@ -298,6 +302,11 @@ export const getSalonById = async (req, res) => {
       });
     }
 
+    const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
+    if (!isAdmin && (salon.status !== "active" || salon.isPaused)) {
+      return res.status(404).json({ message: "Salon not found" });
+    }
+
     // Count actual staff members for this salon
     const actualStaffCount = await Staff.countDocuments({
       salon_id: salon._id,
@@ -347,7 +356,7 @@ export const getSalonById = async (req, res) => {
 export const updateSalon = async (req, res) => {
   try {
     // Whitelist salon metadata so this endpoint cannot alter account ownership or credentials.
-    const allowedFields = ["name", "address", "location", "phone", "email", "status", "timezone"];
+    const allowedFields = ["name", "address", "location", "phone", "email", "timezone"];
     const salonData = Object.fromEntries(
       allowedFields
         .filter((field) => req.body[field] !== undefined)
@@ -512,4 +521,83 @@ export const removeSalonImage = async (req, res) => {
       message: error.message,
     });
   }
+};
+
+export const updateSalonStatus = async (req, res) => {
+  try {
+    const { status, reason } = req.body;
+    const { deactivationType } = req.body;
+    if (!["active", "deactivated"].includes(status)) {
+      return res.status(400).json({ message: "Status must be active or deactivated" });
+    }
+    if (status === "deactivated" && !["temporary", "permanent"].includes(deactivationType)) {
+      return res.status(400).json({ message: "Deactivation type must be temporary or permanent" });
+    }
+
+    const update = status === "deactivated"
+      ? { status, deactivationType, deactivatedAt: new Date(), deactivatedReason: String(reason || "").trim() || null, deactivatedBy: req.user.id }
+      : { status, deactivationType: null, deactivatedAt: null, deactivatedReason: null, deactivatedBy: null };
+
+    const existing = await Salon.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: "Salon not found" });
+
+    const salon = await Salon.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!salon) {
+      return res.status(404).json({ message: "Salon not found" });
+    }
+
+    const manager = await Staff.findOne({ salon_id: salon._id, role: "manager" }).select("_id");
+    if (manager) {
+      await Notification.create({
+        recipient_id: manager._id,
+        recipient_model: "Staff",
+        title: status === "deactivated" ? "Salon deactivated" : "Salon reactivated",
+        message: status === "deactivated"
+          ? `Your salon was deactivated (${deactivationType}).${reason ? ` Reason: ${reason}` : ""}`
+          : "Your salon has been reactivated and is available again.",
+      });
+    }
+
+    if (status === "deactivated" && deactivationType === "permanent") {
+      const today = new Date().toISOString().slice(0, 10);
+      const futureBookings = await Appointment.find({
+        salon_id: salon._id,
+        appointment_date: { $gte: today },
+        status: { $in: ["pending", "confirmed"] },
+      }).select("_id customer_id");
+      await Appointment.updateMany(
+        { _id: { $in: futureBookings.map((booking) => booking._id) } },
+        { $set: { status: "cancelled", cancelled_at: new Date() } }
+      );
+      await Notification.insertMany(futureBookings.filter((booking) => booking.customer_id).map((booking) => ({
+        recipient_id: booking.customer_id,
+        recipient_model: "Customer",
+        title: "Booking cancelled",
+        message: `Your upcoming booking at ${salon.name} was cancelled because the salon was permanently deactivated.`,
+        appointment_id: booking._id,
+      })));
+    }
+
+    res.json(salon);
+  } catch (error) {
+    console.error("updateSalonStatus error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const updateSalonPause = async (req, res) => {
+  const { isPaused } = req.body;
+  if (typeof isPaused !== "boolean") return res.status(400).json({ message: "isPaused must be a boolean" });
+  const salon = await Salon.findById(req.params.id);
+  if (!salon) return res.status(404).json({ message: "Salon not found" });
+  const isSuperAdmin = req.user.role?.toLowerCase() === "super-admin";
+  const isOwner = req.user.role?.toLowerCase() === "manager" && salon._id.toString() === req.user.salon_id;
+  if (!isSuperAdmin && !isOwner) return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+  salon.isPaused = isPaused;
+  await salon.save();
+  res.json(salon);
 };
