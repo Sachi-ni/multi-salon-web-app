@@ -14,6 +14,7 @@ import {
   getStaffAppointments,
   getDailySchedule,
   updateAppointmentDuration,
+  updateStaffAssignment,
   deleteAppointment
 } from "../controllers/appointmentController.js";
 import { protect, optionalProtect } from "../middleware/authMiddleware.js";
@@ -35,9 +36,9 @@ router.get("/staff/:staffId", protect, authorizeRoles("super-admin", "staff-admi
 router.get("/", protect, authorizeRoles("super-admin", "staff-admin", "manager"), getSalonAppointments);
 router.patch("/:id/duration", protect, authorizeRoles("super-admin", "staff-admin", "manager"), updateAppointmentDuration);
 router.patch("/:id/confirm", protect, authorizeRoles("super-admin"), confirmAppointment);
-router.patch("/:id/reject", protect, authorizeRoles("super-admin", "staff-admin", "manager"), rejectAppointment);
-router.patch("/:id/complete", protect, authorizeRoles("super-admin", "staff-admin", "manager"), completeAppointment);
-router.patch("/:id/admin-cancel", protect, authorizeRoles("super-admin", "staff-admin", "manager"), adminCancelAppointment);
+router.patch("/:id/reject", protect, authorizeRoles("super-admin", "manager"), rejectAppointment);
+router.patch("/:id/complete", protect, authorizeRoles("super-admin", "manager"), completeAppointment);
+router.patch("/:id/admin-cancel", protect, authorizeRoles("super-admin", "manager"), adminCancelAppointment);
 router.delete("/:id", protect, deleteAppointment);
 
 export default router;

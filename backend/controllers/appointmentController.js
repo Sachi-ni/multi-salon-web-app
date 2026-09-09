@@ -36,6 +36,9 @@ const timesOverlap = (s1, e1, s2, e2) => {
   return s1 < e2 && s2 < e1;
 };
 
+const normalizePhone = (phone) => phone?.replace(/[\s()-]/g, "") || "";
+const PHONE_PATTERN = /^\+?[0-9]{10}$/;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CUSTOMER ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -44,9 +47,11 @@ const timesOverlap = (s1, e1, s2, e2) => {
 // Returns staff who can perform at least one of the selected services AND have free slots on that date
 // Query: ?date=2026-07-01&serviceIds=id1,id2,id3&salonId=xxx
 //        (also supports legacy ?serviceId=xxx)
+// Optional: ?startTime=HH:MM&endTime=HH:MM  → only staff available during that window
+//           ?ignoreAppointmentId=xxx        → exclude this appointment from conflict checks (reassignment)
 export const getAvailableStaff = async (req, res) => {
   try {
-    const { date, serviceId, serviceIds, salonId } = req.query;
+    const { date, serviceId, serviceIds, salonId, startTime, endTime, ignoreAppointmentId } = req.query;
 
     // Support both legacy single serviceId and new comma-separated serviceIds
     let serviceIdList = [];
@@ -90,7 +95,7 @@ export const getAvailableStaff = async (req, res) => {
       .populate("salon_id", "name")
       .populate("services", "service_name");
 
-    const result = staffList.map(staff => ({
+    let result = staffList.map(staff => ({
       staff_id: staff._id,
       full_name: staff.full_name,
       role: staff.role,
@@ -99,6 +104,101 @@ export const getAvailableStaff = async (req, res) => {
       salon: staff.salon_id,
       services: staff.services
     }));
+
+    // ── Optional time-window filter ──────────────────────────────────────────
+    // When startTime & endTime are given, keep only staff who are actually free
+    // during [startTime, endTime) on that date (used by the reassignment modal).
+    if (startTime && endTime) {
+      const tStart = toHHMM(startTime);
+      const tEnd = toHHMM(endTime);
+
+      // 1. Collect existing bookings for that date (excluding the appointment being edited)
+      const apptQuery = { appointment_date: date, status: { $in: ["confirmed", "pending"] } };
+      if (ignoreAppointmentId) apptQuery._id = { $ne: ignoreAppointmentId };
+      const apptsOnDate = await Appointment.find(apptQuery).lean();
+
+      const apptIds = apptsOnDate.map(a => a._id);
+      const serviceAssignments = apptIds.length
+        ? await AppointmentService.find({ appointment_id: { $in: apptIds } }).lean()
+        : [];
+
+      // A confirmed appointment reserves its staff availability slots. During
+      // reassignment, those reservations belong to the appointment being edited
+      // and must not hide its current staff from the available list.
+      let ignoredAppointment = null;
+      const ignoredStaffIds = new Set();
+      if (ignoreAppointmentId) {
+        ignoredAppointment = await Appointment.findById(ignoreAppointmentId).lean();
+        if (ignoredAppointment?.staff_id) ignoredStaffIds.add(ignoredAppointment.staff_id.toString());
+        const ignoredServices = await AppointmentService.find({ appointment_id: ignoreAppointmentId }).lean();
+        ignoredServices.forEach(asv => {
+          if (asv.staff_id) ignoredStaffIds.add(asv.staff_id.toString());
+        });
+      }
+
+      // Build occupied ranges per staff
+      const occupiedByStaff = {};
+      const addRange = (staffId, start, end) => {
+        if (!staffId || !start || !end) return;
+        const key = staffId.toString();
+        if (!occupiedByStaff[key]) occupiedByStaff[key] = [];
+        occupiedByStaff[key].push({ start: toHHMM(start), end: toHHMM(end) });
+      };
+      for (const appt of apptsOnDate) {
+        addRange(appt.staff_id, appt.start_time, appt.end_time);
+      }
+      for (const asv of serviceAssignments) {
+        addRange(asv.staff_id, asv.service_start_time, asv.service_end_time);
+      }
+
+      // 2. Staff availability records for that date (working-hours restrictions)
+      const queryDate = new Date(date);
+      queryDate.setHours(0, 0, 0, 0);
+      const nextDay = new Date(queryDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const availabilityDocs = result.length
+        ? await StaffAvailability.find({
+            staff_id: { $in: result.map(s => s.staff_id) },
+            available_date: { $gte: queryDate, $lt: nextDay }
+          }).lean()
+        : [];
+      const availByStaff = {};
+      for (const doc of availabilityDocs) {
+        availByStaff[doc.staff_id?.toString()] = doc;
+      }
+
+      // 3. Salon working hours (fallback when no availability record exists)
+      const salon = await Salon.findById(salonId).lean();
+      const open = (salon && salon.open_time) ? salon.open_time : "09:00";
+      const close = (salon && salon.close_time) ? salon.close_time : "17:00";
+
+      // 4. Filter — a staff is available at [tStart, tEnd) only if:
+      //    - no existing booking overlaps the window, AND
+      //    - (if an availability record exists) the window fits within one free slot,
+      //    - otherwise the window fits within salon working hours.
+      result = result.filter(staff => {
+        const key = staff.staff_id.toString();
+        const ranges = occupiedByStaff[key] || [];
+        const overlaps = ranges.some(r => tStart < r.end && r.start < tEnd);
+        if (overlaps) return false;
+
+        const availDoc = availByStaff[key];
+        if (availDoc && Array.isArray(availDoc.slots) && availDoc.slots.length > 0) {
+          return availDoc.slots.some(slot => {
+            const s = toHHMM(slot.start_time);
+            const e = toHHMM(slot.end_time);
+            const isCurrentAppointmentSlot = ignoredAppointment &&
+              ignoredStaffIds.has(key) &&
+              s >= toHHMM(ignoredAppointment.start_time) &&
+              e <= toHHMM(ignoredAppointment.end_time);
+            if (slot.is_booked && !isCurrentAppointmentSlot) return false;
+            return s <= tStart && tEnd <= e;
+          });
+        }
+
+        return open <= tStart && tEnd <= close;
+      });
+    }
 
     res.status(200).json(result);
   } catch (err) {
@@ -113,7 +213,7 @@ export const getAvailableStaff = async (req, res) => {
 //        (also supports legacy ?serviceId=xxx)
 export const getAvailableSlots = async (req, res) => {
   try {
-    const { staffId, date, serviceId, serviceIds, salonId } = req.query;
+    const { staffId, date, serviceId, serviceIds, salonId, ignoreAppointmentId } = req.query;
     console.log("getAvailableSlots query:", req.query);
 
     // Support both legacy single serviceId and new comma-separated serviceIds
@@ -191,11 +291,26 @@ export const getAvailableSlots = async (req, res) => {
       appointment_id: { $in: validApptIds }
     });
 
+    let ignoredAppointment = null;
+    let staffHasIgnoredAppointment = false;
+    if (ignoreAppointmentId) {
+      ignoredAppointment = await Appointment.findById(ignoreAppointmentId).lean();
+      staffHasIgnoredAppointment = ignoredAppointment?.staff_id?.toString() === staffId;
+      if (!staffHasIgnoredAppointment) {
+        staffHasIgnoredAppointment = await AppointmentService.exists({
+          appointment_id: ignoreAppointmentId,
+          staff_id: staffId
+        });
+      }
+    }
+
     // 4.5 Build list of occupied time ranges from confirmed appointments and services
     const occupiedRanges = [];
 
     // Add from parent appointments if this staff is the primary staff
+    // (skip the appointment being edited, since this slot query is for reassignment)
     for (const appt of validAppointments) {
+      if (ignoreAppointmentId && appt._id.toString() === ignoreAppointmentId) continue;
       if (appt.staff_id && appt.staff_id.toString() === staffId) {
         occupiedRanges.push({ start: appt.start_time, end: appt.end_time });
       }
@@ -203,6 +318,7 @@ export const getAvailableSlots = async (req, res) => {
 
     // Add from specific AppointmentService entries for this staff
     for (const svc of staffServices) {
+      if (ignoreAppointmentId && svc.appointment_id && svc.appointment_id.toString() === ignoreAppointmentId) continue;
       if (svc.service_start_time && svc.service_end_time) {
         occupiedRanges.push({ start: svc.service_start_time, end: svc.service_end_time });
       }
@@ -210,7 +326,11 @@ export const getAvailableSlots = async (req, res) => {
 
     // 5. Filter available slots — not booked and not overlapping with confirmed appointments
     const freeSlots = availability.slots.filter(slot => {
-      if (slot.is_booked) return false;
+      const isCurrentAppointmentSlot = ignoredAppointment &&
+        staffHasIgnoredAppointment &&
+        toHHMM(slot.start_time) >= toHHMM(ignoredAppointment.start_time) &&
+        toHHMM(slot.end_time) <= toHHMM(ignoredAppointment.end_time);
+      if (slot.is_booked && !isCurrentAppointmentSlot) return false;
 
       // Check if this slot overlaps with any confirmed appointment
       for (const range of occupiedRanges) {
@@ -1169,6 +1289,238 @@ export const getDailySchedule = async (req, res) => {
       schedule: Object.values(grouped)
     });
   } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PATCH /api/appointments/:id/assign-staff
+// Admin/Manager — reassign staff for a confirmed appointment
+// Body: { services: [{ service_id, staff_id, service_start_time, service_end_time, sub_price? }] }
+export const updateStaffAssignment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { services } = req.body;
+
+    if (!services || !Array.isArray(services) || services.length === 0) {
+      return res.status(400).json({ message: "Services array is required" });
+    }
+
+    const appointment = await Appointment.findById(id);
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    if (appointment.status !== "confirmed") {
+      return res.status(400).json({
+        message: `Cannot reassign staff for appointment with status: ${appointment.status}. Only confirmed appointments can be modified.`
+      });
+    }
+
+    // Get salon_id from the appointment
+    const salonId = appointment.salon_id;
+    const salon = await Salon.findById(salonId).lean();
+    const salonOpen = salon?.open_time || "09:00";
+    const salonClose = salon?.close_time || "17:00";
+
+    const appointmentDate = new Date(appointment.appointment_date);
+    appointmentDate.setHours(0, 0, 0, 0);
+    const nextAppointmentDate = new Date(appointmentDate);
+    nextAppointmentDate.setDate(nextAppointmentDate.getDate() + 1);
+
+    const existingAppointmentServices = await AppointmentService.find({ appointment_id: id }).lean();
+    const previousRanges = existingAppointmentServices.map(svc => ({
+      staffId: svc.staff_id?.toString(),
+      start: toHHMM(svc.service_start_time),
+      end: toHHMM(svc.service_end_time)
+    }));
+    if (appointment.staff_id && appointment.start_time && appointment.end_time) {
+      previousRanges.push({
+        staffId: appointment.staff_id.toString(),
+        start: toHHMM(appointment.start_time),
+        end: toHHMM(appointment.end_time)
+      });
+    }
+
+    // Other valid appointments on the same date (for service-level conflict checks)
+    const otherApptIds = await Appointment.find({
+      _id: { $ne: id },
+      appointment_date: appointment.appointment_date,
+      status: { $in: ["confirmed", "pending"] }
+    }).distinct("_id");
+
+    // Validate each service assignment
+    const normalizedServices = [];
+    for (const svc of services) {
+      const serviceStart = toHHMM(svc.service_start_time);
+      const serviceEnd = toHHMM(svc.service_end_time);
+
+      if (!svc.service_id || !svc.staff_id || !serviceStart || !serviceEnd) {
+        return res.status(400).json({
+          message: "Each service must have service_id, staff_id, service_start_time, and service_end_time"
+        });
+      }
+
+      // Basic sanity: end time must be after start time
+      if (serviceStart >= serviceEnd) {
+        return res.status(400).json({
+          message: `Invalid time range for service: start ${serviceStart} must be before end ${serviceEnd}`
+        });
+      }
+
+      // Verify staff belongs to the same salon
+      const staff = await Staff.findById(svc.staff_id);
+      if (!staff || staff.salon_id.toString() !== salonId.toString()) {
+        return res.status(400).json({
+          message: `Staff member does not belong to this salon`
+        });
+      }
+      if (staff.status !== "Active") {
+        return res.status(409).json({
+          message: `Staff member ${staff.full_name} is not active`
+        });
+      }
+
+      // Enforce the same working-hours rules used by the availability endpoints.
+      const availability = await StaffAvailability.findOne({
+        staff_id: staff._id,
+        available_date: { $gte: appointmentDate, $lt: nextAppointmentDate }
+      }).lean();
+      const usesExistingReservation = previousRanges.some(range =>
+        range.staffId === staff._id.toString() &&
+        range.start <= serviceStart && serviceEnd <= range.end
+      );
+      const fitsStaffAvailability = availability?.slots?.length
+        ? availability.slots.some(slot => {
+            if (slot.is_booked && !usesExistingReservation) return false;
+            return toHHMM(slot.start_time) <= serviceStart && serviceEnd <= toHHMM(slot.end_time);
+          })
+        : salonOpen <= serviceStart && serviceEnd <= salonClose;
+      if (!fitsStaffAvailability) {
+        return res.status(409).json({
+          message: `Staff member ${staff.full_name} is not available at ${serviceStart} - ${serviceEnd} on ${appointment.appointment_date}`
+        });
+      }
+
+      const internalConflict = normalizedServices.some(existing =>
+        existing.staff_id.toString() === svc.staff_id.toString() &&
+        timesOverlap(existing.service_start_time, existing.service_end_time, serviceStart, serviceEnd)
+      );
+      if (internalConflict) {
+        return res.status(409).json({
+          message: `Staff member ${staff.full_name} is assigned to overlapping services in this appointment`
+        });
+      }
+
+      // Check for time conflicts with other appointments (excluding this one)
+      const conflictingAppointment = await Appointment.findOne({
+        _id: { $ne: id },
+        staff_id: svc.staff_id,
+        appointment_date: appointment.appointment_date,
+        status: { $in: ["confirmed", "pending"] },
+        $or: [
+          {
+            start_time: { $lt: serviceEnd },
+            end_time: { $gt: serviceStart }
+          }
+        ]
+      });
+
+      if (conflictingAppointment) {
+        return res.status(409).json({
+          message: `Staff member ${staff.full_name} has a conflicting appointment at ${serviceStart} - ${serviceEnd} on ${appointment.appointment_date}`
+        });
+      }
+
+      // Also check service-level assignments (a staff may serve a service under another appointment
+      // even when they are not the parent appointment's primary staff)
+      if (otherApptIds.length > 0) {
+        const conflictingService = await AppointmentService.findOne({
+          staff_id: svc.staff_id,
+          appointment_id: { $in: otherApptIds },
+          service_start_time: { $lt: serviceEnd },
+          service_end_time: { $gt: serviceStart }
+        });
+
+        if (conflictingService) {
+          return res.status(409).json({
+            message: `Staff member ${staff.full_name} is already assigned to another service at ${serviceStart} - ${serviceEnd} on ${appointment.appointment_date}`
+          });
+        }
+      }
+
+      normalizedServices.push({
+        ...svc,
+        service_start_time: serviceStart,
+        service_end_time: serviceEnd
+      });
+    }
+
+    // Move the reservation in the staff availability calendar along with the
+    // appointment assignment. AppointmentService conflict checks still protect
+    // salons that do not maintain an availability record.
+    const availabilityRecords = await StaffAvailability.find({
+      staff_id: { $in: [...new Set([
+        ...previousRanges.map(range => range.staffId),
+        ...normalizedServices.map(svc => svc.staff_id.toString())
+      ].filter(Boolean))] },
+      available_date: { $gte: appointmentDate, $lt: nextAppointmentDate }
+    });
+    for (const record of availabilityRecords) {
+      const staffId = record.staff_id.toString();
+      const oldRanges = previousRanges.filter(range => range.staffId === staffId);
+      const newRanges = normalizedServices
+        .filter(svc => svc.staff_id.toString() === staffId)
+        .map(svc => ({ start: svc.service_start_time, end: svc.service_end_time }));
+
+      record.slots = record.slots.map(slot => {
+        const slotStart = toHHMM(slot.start_time);
+        const belongsToOldAssignment = oldRanges.some(range => range.start <= slotStart && slotStart < range.end);
+        const belongsToNewAssignment = newRanges.some(range => range.start <= slotStart && slotStart < range.end);
+        if (belongsToOldAssignment) slot.is_booked = false;
+        if (belongsToNewAssignment) slot.is_booked = true;
+        return slot;
+      });
+      await record.save();
+    }
+
+    // Delete existing AppointmentService entries for this appointment
+    await AppointmentService.deleteMany({ appointment_id: id });
+
+    // Create new AppointmentService entries
+    const appointmentServices = normalizedServices.map(svc => ({
+      appointment_id: id,
+      service_id: svc.service_id,
+      staff_id: svc.staff_id,
+      sub_price: svc.sub_price || 0,
+      service_start_time: svc.service_start_time,
+      service_end_time: svc.service_end_time
+    }));
+
+    await AppointmentService.insertMany(appointmentServices);
+
+    // Update the main appointment with first service's staff and overall times
+    const firstService = normalizedServices[0];
+    const overallStart = normalizedServices.reduce((min, s) => s.service_start_time < min ? s.service_start_time : min, normalizedServices[0].service_start_time);
+    const overallEnd = normalizedServices.reduce((max, s) => s.service_end_time > max ? s.service_end_time : max, normalizedServices[0].service_end_time);
+
+    appointment.staff_id = firstService.staff_id;
+    appointment.start_time = overallStart;
+    appointment.end_time = overallEnd;
+    appointment.service_ids = normalizedServices.map(s => s.service_id);
+
+    await appointment.save();
+
+    // Populate and return updated appointment
+    const updatedAppointment = await Appointment.findById(id)
+      .populate("customer_id", "name email phone")
+      .populate("service_id", "service_name base_price duration")
+      .populate("service_ids", "service_name base_price duration")
+      .populate("staff_id", "full_name specification image")
+      .populate("salon_id", "name location");
+
+    res.status(200).json(updatedAppointment);
+  } catch (err) {
+    console.error("updateStaffAssignment error:", err);
     res.status(500).json({ message: err.message });
   }
 };
