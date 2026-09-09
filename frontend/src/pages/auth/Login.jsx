@@ -4,6 +4,19 @@ import { useAuth } from "../../context/AuthContext";
 import { motion } from "framer-motion";
 import { API_URL } from "../../config";
 
+const readResponse = async (response) => {
+  const body = await response.text();
+  if (!body) {
+    return { message: `Login request failed (${response.status})` };
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    return { message: body };
+  }
+};
+
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -21,7 +34,7 @@ const Login = () => {
         body: JSON.stringify({ email, password }),
       });
 
-      let data = await res.json();
+      let data = await readResponse(res);
 
       // Only try another account type when this email is not an Admin; a bad
       // SuperAdmin password must never silently become a customer session.
@@ -31,7 +44,7 @@ const Login = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-        data = await res.json();
+        data = await readResponse(res);
       }
 
       // Only try customer login when the email is not an Admin or Staff.
@@ -41,7 +54,7 @@ const Login = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-        data = await res.json();
+        data = await readResponse(res);
       }
 
       if (!res.ok) {
@@ -79,7 +92,7 @@ const Login = () => {
       }
     } catch (error) {
       console.error("Login error:", error);
-      alert("Something went wrong. Please try again.");
+      alert(error.message || "Unable to reach the server. Please try again.");
       setLoading(false);
     }
   };

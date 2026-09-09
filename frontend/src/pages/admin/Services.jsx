@@ -7,7 +7,7 @@ import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
-import { Scissors, Clock, MapPin, Search, LayoutGrid, List, Plus, Coins, Pencil, Trash2, MoreVertical } from "lucide-react";
+import { Scissors, Clock, MapPin, Search, LayoutGrid, List, Plus, Coins, Pencil, Trash2, MoreVertical, Power } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 
@@ -73,8 +73,9 @@ const ActionsMenu = ({ onEdit, onDelete }) => {
 };
 
 /* ─────────── Service Card ─────────── */
-const ServiceCard = ({ service, index, onEdit, onDelete }) => {
+const ServiceCard = ({ service, index, onEdit, onDelete, onToggleStatus }) => {
   const salonName = service.salon_id?.name || "Salon Branch";
+  const isActive = service.status !== "Inactive";
 
   const formatDuration = (mins) => {
     if (!mins) return "0 mins";
@@ -90,10 +91,16 @@ const ServiceCard = ({ service, index, onEdit, onDelete }) => {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04, duration: 0.3 }}
-      className="group bg-surface border border-border rounded-2xl overflow-hidden transition-all duration-300 hover:border-amber-400/40 hover:-translate-y-1 hover:shadow-card-hover flex flex-col justify-between"
+      className={clsx(
+        "group bg-surface border border-border rounded-2xl overflow-hidden transition-all duration-300 hover:border-amber-400/40 hover:-translate-y-1 hover:shadow-card-hover flex flex-col justify-between",
+        !isActive && "opacity-70"
+      )}
     >
       <div>
-        <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400" />
+        <div className={clsx(
+          "h-1",
+          isActive ? "bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400" : "bg-neutral-700"
+        )} />
 
         <div className="p-5">
           <div className="flex items-start gap-3.5 mb-4">
@@ -138,9 +145,19 @@ const ServiceCard = ({ service, index, onEdit, onDelete }) => {
           <Coins className="w-4 h-4" />
           <span>LKR {Number(service.base_price || 0).toLocaleString()}</span>
         </div>
-        <Badge variant="success" dot={true}>
-          Active
-        </Badge>
+        <button
+          onClick={() => onToggleStatus(service)}
+          title={isActive ? "Deactivate Service" : "Activate Service"}
+          className={clsx(
+            "px-3 py-1.5 rounded-lg text-[0.65rem] font-extrabold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5",
+            isActive
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20"
+              : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-700"
+          )}
+        >
+          <Power className="w-3 h-3" />
+          {isActive ? "Active" : "Inactive"}
+        </button>
       </div>
     </motion.div>
   );
@@ -346,6 +363,17 @@ export default function AdminServicesPage() {
     }
   };
 
+  const handleToggleStatus = async (service) => {
+    try {
+      await updateService(service._id, {
+        status: service.status === "Inactive" ? "Active" : "Inactive",
+      });
+      fetchServices();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to update service status");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -436,6 +464,7 @@ export default function AdminServicesPage() {
               index={index}
               onEdit={openEditModal}
               onDelete={handleDelete}
+              onToggleStatus={handleToggleStatus}
             />
           ))}
         </div>

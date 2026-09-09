@@ -1,6 +1,7 @@
 import Admin from "../models/Admin.js";
 import Staff from "../models/Staff.js";
 import Customer from "../models/Customer.js";
+import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 import generateToken, { generateHardeningToken } from "../utils/generateToken.js";
 import { storeMedia } from "../utils/mediaStorage.js";
@@ -280,6 +281,13 @@ export const loginStaff = async (req, res) => {
     const isMatch = await bcrypt.compare(password, staff.password_hash);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid password" });
+    }
+
+    if (staff.salon_id && staff.role !== "super-admin") {
+      const salon = await Salon.findById(staff.salon_id).select("status");
+      if (salon?.status === "deactivated") {
+        return res.status(403).json({ message: "This salon has been deactivated. Staff login is unavailable." });
+      }
     }
 
 res.json({

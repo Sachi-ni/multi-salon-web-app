@@ -273,6 +273,11 @@ export const getStaff = async (req, res) => {
     const isSuperAdmin = userRole === "super-admin";
 
     let filter = {};
+    const isCustomer = !["super-admin", "manager"].includes(userRole);
+
+    if (isCustomer) {
+      filter.salon_id = { $in: await Salon.find({ status: "active", isPaused: false }).distinct("_id") };
+    }
 
     // Manager view
     if (isSalonScopedAdmin) {
@@ -320,10 +325,14 @@ export const getTeam = async (req, res) => {
     const filter = {
       status: "Active",
       role: { $not: /^(manager|super-admin)$/i },
+      salon_id: { $in: await Salon.find({ status: "active", isPaused: false }).distinct("_id") },
     };
 
     if (salonId) {
-      filter.salon_id = salonId;
+      filter.salon_id = {
+        $eq: salonId,
+        $in: await Salon.find({ status: "active", isPaused: false }).distinct("_id"),
+      };
     }
     if (serviceId) {
       filter.services = serviceId;

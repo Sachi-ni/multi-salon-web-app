@@ -65,6 +65,9 @@ export const getAvailableStaff = async (req, res) => {
       });
     }
 
+    const salon = await Salon.findOne({ _id: salonId, status: "active", isPaused: false }).select("_id");
+    if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
+
     // Admin users (super-admin / manager) may assign salon
     // managers & admins as service providers even when those users don't have
     // the service assigned to their profile. Customers keep seeing only staff
@@ -127,9 +130,12 @@ export const getAvailableSlots = async (req, res) => {
       serviceIdList = [serviceId];
     }
 
-    if (!staffId || !date || serviceIdList.length === 0) {
-      return res.status(400).json({ message: "staffId, date, and serviceId(s) are required" });
+    if (!staffId || !date || serviceIdList.length === 0 || !salonId) {
+      return res.status(400).json({ message: "staffId, date, serviceId(s), and salonId are required" });
     }
+
+    const salon = await Salon.findOne({ _id: salonId, status: "active", isPaused: false }).select("_id");
+    if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
 
     // 1. Get total duration from all selected services
     const services = await Service.find({ _id: { $in: serviceIdList } });
@@ -361,6 +367,14 @@ export const createAppointment = async (req, res) => {
       return res.status(400).json({
         message: "salon_id, appointment_date, and at least one service with staff_id and start_time are required"
       });
+    }
+
+    const salon = await Salon.findById(salon_id).select("status");
+    if (!salon || salon.status === "deactivated") {
+      return res.status(400).json({ message: "This salon is unavailable for bookings" });
+    }
+    if (salon.isPaused) {
+      return res.status(400).json({ message: "This salon is temporarily unavailable for bookings" });
     }
 
     // Acquire locks for all staff involved in this booking to ensure FCFS
