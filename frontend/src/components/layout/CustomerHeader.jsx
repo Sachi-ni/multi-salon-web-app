@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Bell, Menu, LogOut, User, ChevronDown, X, Home, Info, Scissors, Store, Users, MessageSquare, Phone, Calendar, CalendarPlus } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
+import { API_BASE } from "../../config";
 
 const CustomerHeader = () => {
   const { user, logout } = useAuth();
@@ -275,9 +276,17 @@ const CustomerHeader = () => {
                     dropdownOpen ? "bg-white/[0.06]" : "hover:bg-white/[0.04]"
                   )}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-[#b8941e] flex items-center justify-center text-[0.7rem] font-black text-primary shadow-[0_0_12px_rgba(212,175,55,0.2)] group-hover:shadow-[0_0_18px_rgba(212,175,55,0.3)] transition-all">
-                    {initials}
-                  </div>
+                  {user?.image ? (
+                    <img
+                      src={user.image.startsWith("http") ? user.image : `${API_BASE}/${user.image.replace(/\\/g, "/")}`}
+                      alt="Profile"
+                      className="w-8 h-8 rounded-lg object-cover shadow-[0_0_12px_rgba(212,175,55,0.2)] group-hover:shadow-[0_0_18px_rgba(212,175,55,0.3)] transition-all"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-[#b8941e] flex items-center justify-center text-[0.7rem] font-black text-primary shadow-[0_0_12px_rgba(212,175,55,0.2)] group-hover:shadow-[0_0_18px_rgba(212,175,55,0.3)] transition-all">
+                      {initials}
+                    </div>
+                  )}
                   <div className="hidden sm:block text-left">
                     <div className="text-[0.78rem] font-bold text-white leading-tight">{user?.name}</div>
                   </div>
