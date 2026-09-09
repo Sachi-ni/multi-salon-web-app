@@ -34,8 +34,8 @@ const CustomerRegister = () => {
       return;
     }
 
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/.test(password)) {
-      alert("Password must be at least 8 characters and include uppercase, lowercase, number, and special character");
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password)) {
+      alert("Password must be at least 6 characters and include uppercase, lowercase, and number");
       return;
     }
 
