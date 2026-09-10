@@ -32,7 +32,7 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[1000] overflow-hidden">
+    <div className="fixed inset-0 flex items-center justify-center z-[1000] overflow-hidden px-4">
       {/* Background Image with Overlay - Similar to Landing Page */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/70 via-primary/60 to-primary/80 z-10" />
