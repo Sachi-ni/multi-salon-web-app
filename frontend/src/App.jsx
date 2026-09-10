@@ -5,6 +5,7 @@ import './App.css';
 import ChatWidget from "./components/chatbot/ChatWidget";
 
 import { AuthProvider } from "./context/AuthContext";
+import { ToastProvider } from "./context/ToastContext";
 
 // General Pages
 import Login from "./pages/auth/Login.jsx";
@@ -86,6 +87,7 @@ const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
 function App() {
   return (
     <AuthProvider>
+    <ToastProvider>
     <BrowserRouter>
       {/* All Routes MUST be inside this container */}
       <Routes>
@@ -364,6 +366,7 @@ function App() {
       </Routes>
       <ChatWidget />
     </BrowserRouter>
+    </ToastProvider>
     </AuthProvider>
   );
 }
