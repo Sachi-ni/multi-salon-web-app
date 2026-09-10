@@ -39,6 +39,20 @@ const timesOverlap = (s1, e1, s2, e2) => {
 const normalizePhone = (phone) => phone?.replace(/[\s()-]/g, "") || "";
 const PHONE_PATTERN = /^\+?[0-9]{10}$/;
 
+// ─── Helper: normalize any time string to a zero-padded "HH:MM" ──────────────
+// Used by the appointment-edit flow (available-staff window filter, available-slots
+// ignore-appointment logic and staff reassignment). Handles "9:00", "09:00",
+// ISO strings like "2026-01-01T09:00:00.000Z" and Date objects.
+const toHHMM = (t) => {
+  if (!t) return "";
+  const s = String(t).trim();
+  const d = /^(\d{1,2}):(\d{2})/.exec(s);
+  if (d) return `${String(Number(d[1])).padStart(2, "0")}:${d[2]}`;
+  const e = /[T\s](\d{1,2}):(\d{2})/.exec(s);
+  if (e) return `${String(Number(e[1])).padStart(2, "0")}:${e[2]}`;
+  return s;
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CUSTOMER ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════════════════
