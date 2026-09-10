@@ -244,7 +244,11 @@ export const createSalon = async (req, res) => {
 export const getSalons = async (req, res) => {
   try {
     const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
-    const publicFilter = { status: "active", isPaused: false };
+    // Public list: everything that is not explicitly deactivated/paused.
+    // Tolerates legacy documents whose status/isPaused fields are missing or
+    // stored with different casing (e.g. "Active") — the strict equality filter
+    // previously hid EVERY salon from customers and broke the booking wizard.
+    const publicFilter = { status: { $not: /^deactivated$/i }, isPaused: { $ne: true } };
     const salons = await Salon.find(isAdmin ? {} : publicFilter);
 
     const salonsWithManagers = await Promise.all(
@@ -302,7 +306,8 @@ export const getSalonById = async (req, res) => {
     }
 
     const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
-    if (!isAdmin && (salon.status !== "active" || salon.isPaused)) {
+    const isSalonPublic = (salon.status || "active").toLowerCase() !== "deactivated" && salon.isPaused !== true;
+    if (!isAdmin && !isSalonPublic) {
       return res.status(404).json({ message: "Salon not found" });
     }
 

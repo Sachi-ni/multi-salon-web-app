@@ -39,7 +39,7 @@ export const getServices = async (req, res) => {
     const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
     const activeSalonIds = isAdmin
       ? null
-      : await Salon.find({ status: "active", isPaused: false }).distinct("_id");
+      : await Salon.find({ status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).distinct("_id");
     const filter = salonId ? { salon_id: salonId } : {};
     if (!isAdmin) {
       filter.salon_id = salonId
