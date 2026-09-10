@@ -37,7 +37,7 @@ const Contact = () => {
     <section id="contact" className="py-12 md:py-16 bg-[#090909] relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-0 lg:px-6">
         <div className="grid lg:grid-cols-[0.72fr_1fr_1.55fr] items-stretch min-h-[690px]">
-          <div className="relative min-h-[360px] lg:min-h-0 overflow-hidden">
+          <div className="relative min-h-[360px] lg:min-h-0 overflow-hidden hidden lg:block">
             <img src="/salon_interior.png" alt="SalonHub interior" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/10 to-[#090909]/80 lg:bg-gradient-to-r lg:from-transparent lg:to-[#090909]" />
           </div>

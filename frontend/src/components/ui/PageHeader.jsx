@@ -35,7 +35,7 @@ const PageHeader = ({
 
       {/* Action buttons */}
       {children && (
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0 w-full sm:w-auto">
           {children}
         </div>
       )}

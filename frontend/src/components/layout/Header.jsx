@@ -133,7 +133,7 @@ const Header = ({ onToggleSidebar }) => {
         </button>
 
         {notifOpen && (
-          <div className="absolute right-0 top-full mt-2 w-80 bg-surface border border-border rounded-xl shadow-modal py-2 animate-scale-in z-50">
+          <div className="absolute right-0 top-full mt-2 w-[min(20rem,calc(100vw-2rem))] bg-surface border border-border rounded-xl shadow-modal py-2 animate-scale-in z-50">
             <div className="flex items-center justify-between px-4 pb-2 border-b border-border">
               <h3 className="text-white font-extrabold text-sm">Notifications</h3>
               {unreadCount > 0 && (

@@ -78,36 +78,36 @@ export default function BookAppointment() {
       {/* Premium Salon-Themed Background */}
       <CustomerDashboardBackground />
 
-      <div className="max-w-2xl mx-auto relative z-10">
+      <div className="max-w-2xl mx-auto relative z-10 px-4 sm:px-0">
 
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-black text-white">Book an Appointment</h1>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl font-black text-white">Book an Appointment</h1>
           <p className="text-muted-2 text-sm mt-1">Follow the steps to complete your booking</p>
         </div>
 
         {/* Step Indicator */}
-        <div className="flex items-center mb-8">
+        <div className="flex items-center mb-6 sm:mb-8">
           {STEPS.map((label, i) => (
             <div key={i} className="flex items-center flex-1 last:flex-none">
               <div className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-200
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-200
                   ${i < step ? "bg-accent text-primary" : ""}
                   ${i === step ? "bg-accent text-primary shadow-glow" : ""}
                   ${i > step ? "bg-surface-2 text-muted-2 border border-border" : ""}
                 `}>
                   {i < step ? (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : i + 1}
                 </div>
-                <span className={`text-2xs mt-1 font-bold tracking-wide
+                <span className={`text-2xs mt-1 font-bold tracking-wide hidden sm:block
                   ${i === step ? "text-accent" : "text-muted-2"}
                 `}>{label}</span>
               </div>
               {i < STEPS.length - 1 && (
-                <div className={`flex-1 h-px mx-2 mb-4 transition-all duration-300
+                <div className={`flex-1 h-px mx-1.5 sm:mx-2 mb-0 sm:mb-4 transition-all duration-300
                   ${i < step ? "bg-accent" : "bg-border"}
                 `} />
               )}
@@ -116,7 +116,7 @@ export default function BookAppointment() {
         </div>
 
         {/* Step Content */}
-        <div className="bg-surface border border-border rounded-2xl p-6 shadow-card animate-fade-up">
+        <div className="bg-surface border border-border rounded-2xl p-4 sm:p-6 shadow-card animate-fade-up">
 
           {/* Step 0 — Salon */}
           {step === 0 && (

@@ -100,7 +100,7 @@ const Signup = () => {
           </div>
 
           {/* Passwords Row */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Password <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
               <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} autoComplete="new-password" required />

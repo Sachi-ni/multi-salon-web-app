@@ -74,7 +74,7 @@ const LandingNavbar = () => {
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden lg:flex items-center gap-6">
           {navLinks.map((link) => (
             <button
               key={link.name}
@@ -87,7 +87,7 @@ const LandingNavbar = () => {
         </nav>
 
         {/* Action Buttons */}
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden lg:flex items-center gap-4">
           {!user ? (
             <>
               <button
@@ -142,7 +142,7 @@ const LandingNavbar = () => {
 
         {/* Mobile Menu Toggle */}
         <button
-          className="md:hidden text-white"
+          className="lg:hidden text-white"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         >
           {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
@@ -156,7 +156,7 @@ const LandingNavbar = () => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-full left-0 right-0 bg-surface/95 backdrop-blur-xl border-b border-border py-6 px-6 flex flex-col gap-6 md:hidden shadow-modal"
+            className="absolute top-full left-0 right-0 bg-surface/95 backdrop-blur-xl border-b border-border py-6 px-6 flex flex-col gap-6 lg:hidden shadow-modal"
           >
             <nav className="flex flex-col gap-4">
               {navLinks.map((link) => (
