@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Clock, BriefcaseBusiness, AlertCircle, CheckCircle2 } from "lucide-react";
 import { getAvailableStaff, updateStaffAssignment, getAvailableSlots } from "../../services/appointmentService";
+import { getUploadUrl } from "../../config";
 
 export default function EditStaffAssignmentModal({ appointment, salonId, onClose, onSuccess }) {
   const [services, setServices] = useState([]);
@@ -244,7 +245,7 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
                           return (
                             <button key={staff.staff_id.toString()} disabled={booked || loadingStaff[index]} onClick={() => handleStaffSelect(index, staff.staff_id, staff.full_name)} className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-all ${booked ? "border-muted cursor-not-allowed opacity-50" : svc.staffId === staff.staff_id.toString() ? "border-accent bg-accent/10" : "border-border hover:border-accent/40 hover:bg-surface-3"}`}>
                               <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-2xs font-bold text-muted-2 overflow-hidden">
-                                {staff.image ? <img src={staff.image} alt={staff.full_name} className="w-full h-full object-cover" /> : staff.full_name?.charAt(0).toUpperCase()}
+                                {staff.image ? <img src={getUploadUrl(staff.image)} alt={staff.full_name} className="w-full h-full object-cover" /> : staff.full_name?.charAt(0).toUpperCase()}
                               </div>
                               <div className="min-w-0">
                                 <p className="text-2xs font-semibold text-white truncate">{staff.full_name}</p>
