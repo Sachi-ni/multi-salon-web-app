@@ -38,8 +38,8 @@ const CustomerRegister = () => {
       return;
     }
 
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/.test(password)) {
-      setFormError("Password must be at least 8 characters and include uppercase, lowercase, number, and special character");
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password)) {
+      setFormError("Password must be at least 6 characters and include uppercase, lowercase, and number");
       return;
     }
 
@@ -68,12 +68,22 @@ const CustomerRegister = () => {
     "w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30";
 
   return (
-    <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg overflow-y-auto py-6 px-4">
+    <div className="fixed inset-0 flex items-center justify-center z-[1000] overflow-y-auto py-6 px-4">
+      {/* Background Image with Overlay */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/70 via-primary/60 to-primary/80 z-10" />
+        <img
+          src="https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=2574&auto=format&fit=crop"
+          alt="Premium Salon Background"
+          className="w-full h-full object-cover object-center opacity-50"
+        />
+      </div>
+
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="relative z-10 w-[460px] max-w-full bg-surface border border-border rounded-2xl p-6 sm:p-10 shadow-modal max-h-[95vh] overflow-y-auto my-auto"
+        className="relative z-10 w-[460px] max-w-full bg-surface/80 backdrop-blur-sm border border-border rounded-2xl p-6 sm:p-10 shadow-modal max-h-[95vh] overflow-y-auto my-auto"
       >
         {/* Top accent bar */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />

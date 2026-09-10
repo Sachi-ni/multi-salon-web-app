@@ -489,24 +489,89 @@ const refreshSalaryRecord = (salaryRecord) => {
   return JSON.stringify(before) !== JSON.stringify(after);
 };
 
+// Refresh unpaid salary records and persist the recomputed values.
+// IMPORTANT: the input array may contain lean objects (plain JS from .lean()
+// queries). Lean objects do not have .save(), so we re-fetch each record as a
+// real Mongoose document before mutating + saving it. Paid records are still
+// skipped so history never changes. The returned array still contains the
+// original (lean) objects for callers that only read fields from them.
 const refreshSalariesForResponse = async (salaries) => {
-  const changed = [];
+  const toPersist = [];
 
   for (const salaryRecord of salaries) {
     // Paid records keep their historical values.
     if ((salaryRecord.status || "") === "Paid") continue;
 
     try {
-      if (refreshSalaryRecord(salaryRecord)) {
-        changed.push(salaryRecord);
+      // Only refresh if the lean object looks like it still needs it. We check
+      // the fields used by refreshSalaryRecord so we do not re-fetch records
+      // that are already consistent.
+      const currentPerDay = safeNumber(
+        salaryRecord.salary_payment_count_per_day,
+        0
+      );
+      const staffPerDay = safeNumber(
+        salaryRecord.staff_id?.salary_payment_count_per_day,
+        0
+      );
+      const effectiveRate = getEffectiveRate(
+        salaryRecord,
+        salaryRecord.commission_rate
+      );
+
+      if (salaryRecord.frequency === "daily") {
+        const workingAmount = safeNumber(salaryRecord.workingAmount, 0);
+        const workRate =
+          workingAmount > 0 ? workingAmount * (effectiveRate / 100) : 0;
+        const daySalary = calculateDaySalary(
+          workRate,
+          currentPerDay || staffPerDay,
+          Boolean(salaryRecord.isAbsent)
+        );
+
+        if (
+          safeNumber(salaryRecord.workRate, 0) === workRate &&
+          safeNumber(salaryRecord.daySalary, 0) === daySalary &&
+          safeNumber(salaryRecord.totalSalary, 0) === daySalary &&
+          safeNumber(salaryRecord.salary_payment_count_per_day, 0) ===
+            currentPerDay &&
+          safeNumber(salaryRecord.rate, 0) === effectiveRate
+        ) {
+          continue;
+        }
+      } else {
+        // weekly/monthly: if the record already has day rows up to today,
+        // assume it is already refreshed. Otherwise we must re-fetch and
+        // re-run ensureAllDaysInPeriod + recalcWeeklyMonthlyTotals.
+        if (
+          Array.isArray(salaryRecord.dailyRecords) &&
+          salaryRecord.dailyRecords.length > 0
+        ) {
+          const todayKey = toLocalDateStr(new Date());
+          const latestDate = salaryRecord.dailyRecords
+            .map((r) => normalizeSalaryDate(r.date))
+            .filter(Boolean)
+            .sort()
+            .slice(-1)[0];
+          if (latestDate && latestDate >= todayKey) {
+            continue;
+          }
+        }
       }
+
+      // Re-fetch the real document, refresh it, then schedule a save.
+      const fresh = await Salary.findById(salaryRecord._id);
+      if (!fresh) continue;
+
+      refreshSalaryRecord(fresh);
+      toPersist.push(fresh);
     } catch (err) {
       console.error("Salary refresh failed:", err);
     }
   }
 
   await Promise.all(
-    changed.map((record) =>
+    toPersist.map((record) =>
       record.save().catch((err) => {
         console.error("Failed to persist refreshed salary record:", err.message);
       })
@@ -520,9 +585,17 @@ const refreshSalariesForResponse = async (salaries) => {
 
 export const updateSalaryOnAppointmentCompletion = async (appointmentId) => {
   try {
-    const appointment = await Appointment.findById(appointmentId)
-      .populate("staff_id", "full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id")
-      .populate("salon_id", "name");
+    // Accept either an ObjectId / string or a pre-loaded Mongoose document.
+    let appointment;
+    if (appointmentId && typeof appointmentId === "object" && appointmentId._id) {
+      appointment = await Appointment.findById(appointmentId._id)
+        .populate("staff_id", "full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id")
+        .populate("salon_id", "name");
+    } else {
+      appointment = await Appointment.findById(appointmentId)
+        .populate("staff_id", "full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id")
+        .populate("salon_id", "name");
+    }
 
     if (!appointment || appointment.status !== "completed") {
       return { success: false, message: "Appointment not completed" };
@@ -760,18 +833,9 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
 const updateSingleStaffSalary = async (staff, salonId, appointmentDate, amount) => {
   if (!staff) return;
 
-  // Managers do not earn salaries. (Matches the role filtering applied by
-  // every salary listing endpoint; otherwise completing an appointment for a
-  // manager creates orphan records that never appear in lists but still
-  // inflate summaries.)
-  const role = (staff.role || "").toLowerCase();
-  if (role === "manager") return;
-
-  // Managers accrue salary exactly like regular staff on the admin/salary
-  // page: only in the frequency configured on their profile
-  // (salary_payment_frequency). The super-admin manager salary page therefore
-  // shows one record per manager per period just like the admin page shows one
-  // record per staff member.
+  // Managers are included here because the super-admin salary page has a
+  // dedicated manager view. Use each staff member's configured frequency so
+  // completed service amounts appear in that manager's salary period.
   await accrueStaffSalaryForFrequency(
     staff,
     salonId,
@@ -844,6 +908,37 @@ export const getSalaries = async (req, res) => {
     // still earn the salary-per-day amount) before responding.
     salaries = await refreshSalariesForResponse(salaries);
 
+    // Return computed values, not whatever the stored document happened to hold
+    // before the refresh above. This keeps both admin salary pages consistent
+    // with the current staff config / current completed appointments / current
+    // date, even for salary records that were created earlier and have not been
+    // touched since.
+    salaries = salaries.map(s => ({
+      ...s,
+      _id: s._id,
+      staff_id: s.staff_id,
+      salon_id: s.salon_id,
+      staff_name: s.staff_name,
+      staff_role: s.staff_role,
+      frequency: s.frequency,
+      period: s.period,
+      year: s.year,
+      month: s.month,
+      weekNumber: s.weekNumber,
+      dateRange: s.dateRange,
+      commission_rate: s.commission_rate,
+      salary_payment_count_per_day: s.salary_payment_count_per_day,
+      status: s.status,
+      paidTotal: s.paidTotal,
+      paidAt: s.paidAt,
+      workingAmount: s.workingAmount,
+      rate: s.rate,
+      workRate: s.workRate,
+      daySalary: s.daySalary,
+      totalSalary: s.totalSalary,
+      dailyRecords: s.dailyRecords,
+    }));
+
     res.json({ success: true, salaries });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -867,14 +962,19 @@ export const getSalarySummary = async (req, res) => {
     // Fetch with staff role info so totals match what lists display
     // (manager records are excluded everywhere else).
     let salaryDocs = await Salary.find(match)
-      .populate("staff_id", "role")
-      .select("status totalSalary paidTotal workingAmount staff_role period dateRange")
+      .populate("staff_id", "role salary_payment_frequency salary_payment_count_per_day")
+      .select("status totalSalary paidTotal workingAmount staff_role period dateRange commission_rate salary_payment_count_per_day workRate daySalary totalSalary dailyRecords")
       .lean();
 
     const roleMode = resolveSalaryRole(roleFilter);
     salaryDocs = salaryDocs.filter((s) =>
       salaryRoleIncludes(roleMode, s.staff_id?.role || s.staff_role)
     );
+
+    // Recompute totals for any unpaid records so the summary always reflects
+    // the current staff config / current date / current completed appointments,
+    // including days with no appointments yet (salary-per-day floor).
+    salaryDocs = await refreshSalariesForResponse(salaryDocs);
 
     const summary = {
       totalPending: 0,
@@ -1508,6 +1608,10 @@ export const getStaffWithSalaries = async (req, res) => {
       salaryRoleIncludes(roleMode, s.staff_id?.role || s.staff_role)
     );
 
+    // Recompute unpaid records so the staff-with-salary view used by both
+    // salary pages always shows current values, not just whatever was stored.
+    salaries = await refreshSalariesForResponse(salaries);
+
     res.json({ success: true, staff: staffList, salaries });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1792,6 +1896,13 @@ export const getSalaryDetails = async (req, res) => {
         success: false,
         message: "You do not have permission to view this salary record",
       });
+    }
+
+    // Recompute the period totals for unpaid records so the PDF/details view
+    // always matches the current date / staff config, including days with no
+    // completed appointments yet.
+    if ((salary.status || "") !== "Paid") {
+      refreshSalaryRecord(salary);
     }
 
     const servicesData = Array.isArray(salary.staff_id?.services)

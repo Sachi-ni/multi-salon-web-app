@@ -81,7 +81,6 @@ const CUSTOMER_ROUTES = [
   "/our-services",
   "/team",
   "/login",
-  "/signup",
   "/register",
   "/customer",
   "/book",

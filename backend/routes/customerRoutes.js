@@ -1,6 +1,6 @@
 import express from "express";
 import Customer from "../models/Customer.js";
-import { registerCustomer, loginCustomer } from "../controllers/customerAuthController.js"
+import { loginCustomer } from "../controllers/customerAuthController.js"
 import { protect } from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/roleMiddleware.js";
 

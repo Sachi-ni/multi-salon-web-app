@@ -4,6 +4,19 @@ import { useAuth } from "../../context/AuthContext";
 import { motion } from "framer-motion";
 import { API_URL } from "../../config";
 
+const readResponse = async (response) => {
+  const body = await response.text();
+  if (!body) {
+    return { message: `Login request failed (${response.status})` };
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    return { message: body };
+  }
+};
+
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -23,7 +36,7 @@ const Login = () => {
         body: JSON.stringify({ email, password }),
       });
 
-      let data = await res.json();
+      let data = await readResponse(res);
 
       // Only try another account type when this email is not an Admin; a bad
       // SuperAdmin password must never silently become a customer session.
@@ -33,7 +46,7 @@ const Login = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-        data = await res.json();
+        data = await readResponse(res);
       }
 
       // Only try customer login when the email is not an Admin or Staff.
@@ -43,7 +56,7 @@ const Login = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-        data = await res.json();
+        data = await readResponse(res);
       }
 
       if (!res.ok) {
@@ -81,7 +94,7 @@ const Login = () => {
       }
     } catch (err) {
       console.error("Login error:", err);
-      setError("Something went wrong. Please try again.");
+      setError(err.message || "Unable to reach the server. Please try again.");
       setLoading(false);
     }
   };
@@ -92,12 +105,22 @@ const Login = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-primary flex items-center justify-center z-[1000] grid-bg overflow-y-auto py-6 px-4">
+    <div className="fixed inset-0 flex items-center justify-center z-[1000] overflow-y-auto py-6 px-4">
+      {/* Background Image with Overlay */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/70 via-primary/60 to-primary/80 z-10" />
+        <img
+          src="https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=2574&auto=format&fit=crop"
+          alt="Premium Salon Background"
+          className="w-full h-full object-cover object-center opacity-50"
+        />
+      </div>
+
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="relative z-10 w-[460px] max-w-full bg-surface border border-border rounded-2xl p-6 sm:p-10 shadow-modal my-auto"
+        className="relative z-10 w-[460px] max-w-full bg-surface/80 backdrop-blur-sm border border-border rounded-2xl p-6 sm:p-10 shadow-modal my-auto"
       >
         {/* Top accent bar */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />
@@ -182,11 +205,17 @@ const Login = () => {
           </button>
         </form>
 
+        <div className="text-right mt-3">
+          <button type="button" onClick={() => navigate("/forgot-password")} className="text-sm text-accent font-bold hover:underline">
+            Forgot password?
+          </button>
+        </div>
+
         {/* Switch */}
         <div className="text-center mt-4 text-[0.82rem] text-muted-2">
           No account?{" "}
           <span
-            onClick={() => navigate("/customer/register")}
+            onClick={() => navigate("/register")}
             className="text-accent cursor-pointer font-bold hover:underline"
           >
             Register here

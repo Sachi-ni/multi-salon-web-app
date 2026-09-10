@@ -139,7 +139,8 @@ const StaffCard = ({
   onToggleStatus,
   onDelete,
 }) => {
-  const isInactive = staff.status === "Inactive";
+  const isActive = staff.status === "Active";
+  const isInactive = !isActive;
 
   const maxVisible = 3;
   const visibleServices =
@@ -326,6 +327,30 @@ const StaffCard = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Footer Bar */}
+      <div className="px-5 py-3 bg-surface-2/30 border-t border-border flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+          <span className="text-xs font-extrabold text-white">
+            {staff.rating || "0.0"}
+          </span>
+        </div>
+
+        <button
+          onClick={() => onToggleStatus(staff)}
+          title={isActive ? "Deactivate Staff" : "Activate Staff"}
+          className={clsx(
+            "px-3 py-1.5 rounded-lg text-[0.65rem] font-extrabold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5",
+            isActive
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20"
+              : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-700"
+          )}
+        >
+          <Power className="w-3 h-3" />
+          {isActive ? "Active" : "Inactive"}
+        </button>
       </div>
     </motion.div>
   );
@@ -999,13 +1024,19 @@ export default function AdminStaffPage() {
           </div>
 
           <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Profile Picture <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Profile Picture</label>
+            {editStaff?.image && (
+              <img
+                src={buildImageUrl(editStaff.image)}
+                alt="Current staff profile"
+                className="mb-2 h-16 w-16 rounded-xl object-cover border border-border"
+              />
+            )}
             <input
               type="file"
               accept="image/*"
               onChange={(e) => handlePictureChange(e.target.files?.[0] || null)}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
-              required
             />
           </div>
           <Modal.Actions>

@@ -18,10 +18,11 @@ import EmptyState from "../../components/ui/EmptyState";
 import { 
   Calendar, Clock, User, Search, LayoutGrid, 
   List, CheckCircle2, AlertCircle, Trash2, 
-  Check, X, Plus, Hash
+  Check, X, Plus, Hash, Edit2
 } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
+import EditStaffAssignmentModal from "../../components/booking/EditStaffAssignmentModal";
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";
 
@@ -50,6 +51,7 @@ export default function AdminBookings() {
 
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
+  const [editingStaffAppointment, setEditingStaffAppointment] = useState(null);
 
   const fetchAppointments = useCallback(() => {
     setLoading(true);
@@ -522,6 +524,15 @@ export default function AdminBookings() {
                     {a.status === "confirmed" && (
                       <>
                         <button
+                          onClick={() => setEditingStaffAppointment(a)}
+                          disabled={isActionLoading}
+                          className="px-4 py-2 rounded-xl bg-surface-2 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
+                          title="Reassign Staff"
+                        >
+                        <Edit2 className="w-4 h-4" />
+                          Edit
+                        </button>
+                        <button
                           onClick={() => handleComplete(a._id)}
                           disabled={isActionLoading}
                           className="px-5 py-2 rounded-xl bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
@@ -613,13 +624,23 @@ export default function AdminBookings() {
                         </>
                       )}
                       {a.status === "confirmed" && (
-                        <button
-                          onClick={() => handleComplete(a._id)}
-                          disabled={isActionLoading}
-                          className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-2xs font-extrabold hover:bg-blue-400 transition-colors"
-                        >
-                          Complete
-                        </button>
+                        <>
+                          <button
+                            onClick={() => setEditingStaffAppointment(a)}
+                            disabled={isActionLoading}
+                            className="p-1.5 rounded-lg bg-surface-2 text-accent hover:bg-accent hover:text-primary transition-colors"
+                            title="Reassign Staff"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleComplete(a._id)}
+                            disabled={isActionLoading}
+                            className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-2xs font-extrabold hover:bg-blue-400 transition-colors"
+                          >
+                            Complete
+                          </button>
+                        </>
                       )}
                       {["completed", "rejected", "cancelled"].includes(a.status) && (
                         <button
@@ -638,6 +659,17 @@ export default function AdminBookings() {
             })}
           </Table.Body>
         </Table>
+      )}
+      {editingStaffAppointment && (
+        <EditStaffAssignmentModal
+          appointment={editingStaffAppointment}
+          salonId={salonId}
+          onClose={() => setEditingStaffAppointment(null)}
+          onSuccess={() => {
+            setEditingStaffAppointment(null);
+            fetchAppointments();
+          }}
+        />
       )}
     </div>
   );

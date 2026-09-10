@@ -19,10 +19,11 @@ import { getSalons } from "../../services/salonService";
 import { 
   Calendar, Clock, User, Store, Search, LayoutGrid, 
   List, CheckCircle2, AlertCircle, Trash2, 
-  Check, X, Phone, Mail, ChevronDown, Plus, Hash
+  Check, X, Phone, Mail, ChevronDown, Plus, Hash, Edit2
 } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
+import EditStaffAssignmentModal from "../../components/booking/EditStaffAssignmentModal";
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";
 
@@ -52,6 +53,9 @@ export default function Appointments() {
   // Duration edit state
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
+
+  // Staff reassignment edit state
+  const [editingStaffAppointment, setEditingStaffAppointment] = useState(null);
 
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
@@ -584,6 +588,15 @@ export default function Appointments() {
                     {a.status === "confirmed" && (
                       <>
                         <button
+                          onClick={() => setEditingStaffAppointment(a)}
+                          disabled={isActionLoading}
+                          className="px-4 py-2 rounded-xl bg-surface-2 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
+                          title="Reassign Staff"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Edit
+                        </button>
+                        <button
                           onClick={() => handleComplete(a._id)}
                           disabled={isActionLoading}
                           className="px-5 py-2 rounded-xl bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
@@ -678,13 +691,23 @@ export default function Appointments() {
                         </>
                       )}
                       {a.status === "confirmed" && (
-                        <button
-                          onClick={() => handleComplete(a._id)}
-                          disabled={isActionLoading}
-                          className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-2xs font-extrabold hover:bg-blue-400 transition-colors"
-                        >
-                          Complete
-                        </button>
+                        <>
+                          <button
+                            onClick={() => setEditingStaffAppointment(a)}
+                            disabled={isActionLoading}
+                            className="px-4 py-2 rounded-xl bg-surface-2 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
+                            title="Reassign Staff"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleComplete(a._id)}
+                            disabled={isActionLoading}
+                            className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-2xs font-extrabold hover:bg-blue-400 transition-colors"
+                          >
+                            Complete
+                          </button>
+                        </>
                       )}
                       {["completed", "rejected", "cancelled"].includes(a.status) && (
                         <button
@@ -703,6 +726,19 @@ export default function Appointments() {
             })}
           </Table.Body>
         </Table>
+      )}
+
+      {/* Staff Reassignment Modal */}
+      {editingStaffAppointment && (
+        <EditStaffAssignmentModal
+          appointment={editingStaffAppointment}
+          salonId={editingStaffAppointment.salon_id?._id || editingStaffAppointment.salon_id}
+          onClose={() => setEditingStaffAppointment(null)}
+          onSuccess={() => {
+            setEditingStaffAppointment(null);
+            fetchAppointments();
+          }}
+        />
       )}
     </div>
   );

@@ -75,11 +75,10 @@ export const createStaff = async (req, res) => {
     const email = String(req.body.email || "").trim().toLowerCase();
     const phone = normalizePhone(req.body.phone);
     const isStrongPassword =
-      password.length >= 8 &&
+      password.length >= 6 &&
       /[A-Z]/.test(password) &&
       /[a-z]/.test(password) &&
-      /\d/.test(password) &&
-      /[!@#$%^&*]/.test(password);
+      /\d/.test(password);
 
     if (!EMAIL_PATTERN.test(email) || !EMAIL_DOMAINS.has(email.split("@")[1])) {
       return res.status(400).json({
@@ -95,7 +94,7 @@ export const createStaff = async (req, res) => {
 
     if (!isStrongPassword || COMMON_PASSWORDS.has(password.toLowerCase())) {
       return res.status(400).json({
-        message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+        message: "Password must be at least 6 characters and include uppercase, lowercase, and number.",
       });
     }
 
@@ -273,6 +272,11 @@ export const getStaff = async (req, res) => {
     const isSuperAdmin = userRole === "super-admin";
 
     let filter = {};
+    const isCustomer = !["super-admin", "manager"].includes(userRole);
+
+    if (isCustomer) {
+      filter.salon_id = { $in: await Salon.find({ status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).distinct("_id") };
+    }
 
     // Manager view
     if (isSalonScopedAdmin) {
@@ -320,10 +324,14 @@ export const getTeam = async (req, res) => {
     const filter = {
       status: "Active",
       role: { $not: /^(manager|super-admin)$/i },
+      salon_id: { $in: await Salon.find({ status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).distinct("_id") },
     };
 
     if (salonId) {
-      filter.salon_id = salonId;
+      filter.salon_id = {
+        $eq: salonId,
+        $in: await Salon.find({ status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).distinct("_id"),
+      };
     }
     if (serviceId) {
       filter.services = serviceId;

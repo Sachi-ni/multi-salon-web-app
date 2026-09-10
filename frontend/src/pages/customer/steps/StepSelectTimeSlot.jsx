@@ -17,7 +17,7 @@ export default function StepSelectTimeSlot({ booking, onNext, onBack }) {
 
     getAvailableSlots(booking.staffId, booking.date, serviceIds, booking.salonId)
       .then(res => setSlots(res.data))
-      .catch(() => setError("Failed to load available time slots."))
+      .catch(err => setError(err?.response?.data?.message || "Failed to load available time slots."))
       .finally(() => setLoading(false));
   }, [booking.staffId, booking.date, booking.services, booking.serviceId, booking.salonId]);
 

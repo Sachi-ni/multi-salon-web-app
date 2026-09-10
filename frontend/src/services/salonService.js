@@ -15,6 +15,9 @@ export const updateSalon = (id, data) =>
 export const deleteSalon = (id) =>
   api.delete(`/salons/${id}`);
 
+export const updateSalonStatus = (id, data) =>
+  api.patch(`/salons/${id}/status`, data);
+
 export const getSalonServices = (salonId) =>
   api.get("/services", { params: { salonId } });
 

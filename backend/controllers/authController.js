@@ -1,16 +1,23 @@
 import Admin from "../models/Admin.js";
 import Staff from "../models/Staff.js";
 import Customer from "../models/Customer.js";
+import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 import generateToken, { generateHardeningToken } from "../utils/generateToken.js";
 import { storeMedia } from "../utils/mediaStorage.js";
 import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
+import {
+  createPasswordResetToken,
+  hashPasswordResetToken,
+  sendPasswordResetEmail,
+} from "../utils/passwordReset.js";
 
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/;
 const PHONE_PATTERN = /^\+?[0-9]{10}$/;
-const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/;
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 const COMMON_PASSWORDS = new Set(["12345678", "password", "password123", "qwerty123", "letmein"]);
+const GENERIC_RESET_MESSAGE = "If an account exists, a reset link has been sent.";
 
 const validateProfileFields = ({ email, phone, password, username }) => {
   const normalizedEmail = email?.trim().toLowerCase();
@@ -23,7 +30,7 @@ const validateProfileFields = ({ email, phone, password, username }) => {
     return { message: "Phone number must contain exactly 10 digits and may start with +" };
   }
   if (password && !PASSWORD_PATTERN.test(password)) {
-    return { message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character" };
+    return { message: "Password must be at least 6 characters and include uppercase, lowercase, and number" };
   }
   if (password && COMMON_PASSWORDS.has(password.toLowerCase())) {
     return { message: "Please choose a less common password" };
@@ -64,7 +71,7 @@ export const getProfile = async (req, res) => {
   }
 };
 
-export const registerAdmin = async (req, res) => {
+export const registerCustomer = async (req, res) => {
   try {
     const { fullName, email, phone, password, preferredSalonId, role } = req.body;
     const normalizedEmail = email?.trim().toLowerCase();
@@ -160,6 +167,8 @@ res.json({
 export const changePassword = async (req, res) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ message: "Password is required" });
+  const validation = validateProfileFields({ password });
+  if (validation.message) return res.status(400).json(validation);
   const admin = await Admin.findById(req.user.id);
   if (!admin) return res.status(404).json({ message: "User not found" });
   admin.password = await bcrypt.hash(password, 12);
@@ -176,6 +185,90 @@ export const setupMfa = async (req, res) => {
   res.json({ message: "MFA setup completed", token: generateToken(admin) });
 };
 
+const findAccountByEmail = async (email) => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const admin = await Admin.findOne({ email: normalizedEmail });
+  if (admin) return { user: admin, passwordField: "password" };
+
+  const staff = await Staff.findOne({ email: normalizedEmail });
+  if (staff) return { user: staff, passwordField: "password_hash" };
+
+  const customer = await Customer.findOne({ email: normalizedEmail });
+  if (customer) return { user: customer, passwordField: "password_hash" };
+
+  return null;
+};
+
+const findAccountByResetHash = async (tokenHash) => {
+  const models = [Admin, Staff, Customer];
+  for (const Model of models) {
+    const user = await Model.findOne({ resetPasswordTokenHash: tokenHash });
+    if (user) return { user, passwordField: Model === Admin ? "password" : "password_hash" };
+  }
+  return null;
+};
+
+export const forgotPassword = async (req, res) => {
+  const normalizedEmail = req.body.email?.trim().toLowerCase();
+  if (!normalizedEmail || !EMAIL_PATTERN.test(normalizedEmail)) {
+    return res.status(400).json({ message: "Please enter a valid email address" });
+  }
+
+  try {
+    const account = await findAccountByEmail(normalizedEmail);
+    if (account) {
+      const { rawToken, tokenHash, expiresAt } = createPasswordResetToken();
+      account.user.resetPasswordTokenHash = tokenHash;
+      account.user.resetPasswordExpires = expiresAt;
+      await account.user.save();
+
+      try {
+        await sendPasswordResetEmail({ email: normalizedEmail, rawToken });
+      } catch (emailError) {
+        console.error("Password reset email delivery failed", { email: normalizedEmail, error: emailError.message });
+      }
+    }
+
+    return res.status(200).json({ message: GENERIC_RESET_MESSAGE });
+  } catch (error) {
+    console.error("Password reset request failed", { error: error.message });
+    return res.status(200).json({ message: GENERIC_RESET_MESSAGE });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (!token || !newPassword) {
+    return res.status(400).json({ message: "Token and new password are required" });
+  }
+
+  const validation = validateProfileFields({ password: newPassword });
+  if (validation.message) return res.status(400).json(validation);
+
+  try {
+    const account = await findAccountByResetHash(hashPasswordResetToken(token));
+    if (!account || !account.user.resetPasswordExpires || account.user.resetPasswordExpires <= new Date()) {
+      if (account) {
+        account.user.resetPasswordTokenHash = null;
+        account.user.resetPasswordExpires = null;
+        await account.user.save();
+      }
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    account.user[account.passwordField] = await bcrypt.hash(newPassword, 12);
+    account.user.resetPasswordTokenHash = null;
+    account.user.resetPasswordExpires = null;
+    if (account.passwordField === "password") account.user.mustChangePassword = false;
+    await account.user.save();
+
+    return res.status(200).json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Password reset failed", { error: error.message });
+    return res.status(500).json({ message: "Unable to reset password. Please try again later." });
+  }
+};
+
 export const loginStaff = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -188,6 +281,13 @@ export const loginStaff = async (req, res) => {
     const isMatch = await bcrypt.compare(password, staff.password_hash);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid password" });
+    }
+
+    if (staff.salon_id && staff.role !== "super-admin") {
+      const salon = await Salon.findById(staff.salon_id).select("status");
+      if (salon?.status === "deactivated") {
+        return res.status(403).json({ message: "This salon has been deactivated. Staff login is unavailable." });
+      }
     }
 
 res.json({

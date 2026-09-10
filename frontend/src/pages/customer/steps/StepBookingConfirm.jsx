@@ -28,6 +28,11 @@ export default function StepBookingConfirm({ booking, onBack }) {
       return;
     }
 
+    if (!user && !/^\+?[0-9]{10}$/.test(guestPhone.replace(/[\s()-]/g, ""))) {
+      setError("Please enter a valid 10-digit phone number.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
@@ -147,6 +152,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
                 value={guestPhone}
                 onChange={(e) => setGuestPhone(e.target.value)}
                 placeholder="Enter your phone number"
+                inputMode="tel"
                 className="w-full bg-surface-3 border border-border rounded-lg px-4 py-2.5 text-white text-sm focus:border-accent focus:outline-none transition-colors"
                 required
               />
