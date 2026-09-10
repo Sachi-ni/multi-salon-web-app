@@ -26,8 +26,8 @@ export default function StepStaff({ booking, onNext, onBack }) {
         const map = {};
         results.forEach(r => { map[r.service_id] = r.staff; });
         setStaffOptions(map);
-      } catch {
-        setError("Failed to load available staff.");
+      } catch (err) {
+        setError(err?.response?.data?.message || "Failed to load available staff.");
       } finally {
         setLoading(false);
       }

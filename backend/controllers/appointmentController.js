@@ -67,7 +67,9 @@ export const getAvailableStaff = async (req, res) => {
       });
     }
 
-    const salon = await Salon.findOne({ _id: salonId, status: "active", isPaused: false }).select("_id");
+    // Public booking filter: exclude only explicitly deactivated/paused salons
+    // (tolerates legacy documents with missing or differently-cased status).
+    const salon = await Salon.findOne({ _id: salonId, status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).select("_id");
     if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
 
     // Admin users (super-admin / manager) may assign salon
@@ -231,7 +233,8 @@ export const getAvailableSlots = async (req, res) => {
       return res.status(400).json({ message: "staffId, date, serviceId(s), and salonId are required" });
     }
 
-    const salon = await Salon.findOne({ _id: salonId, status: "active", isPaused: false }).select("_id");
+    // Public booking filter: exclude only explicitly deactivated/paused salons.
+    const salon = await Salon.findOne({ _id: salonId, status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).select("_id");
     if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
 
     // 1. Get total duration from all selected services

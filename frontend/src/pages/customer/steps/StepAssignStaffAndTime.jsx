@@ -35,8 +35,8 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
     try {
       const res = await getAvailableStaff(booking.date, [current.serviceId], booking.salonId);
       setStaffList(res.data);
-    } catch {
-      setError("Failed to load available staff.");
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to load available staff.");
     } finally {
       setLoading(false);
     }
@@ -64,8 +64,8 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
       });
 
       setSlots(validSlots);
-    } catch {
-      setError("Failed to load available time slots.");
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to load available time slots.");
     } finally {
       setLoading(false);
     }

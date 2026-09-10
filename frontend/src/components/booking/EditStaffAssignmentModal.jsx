@@ -81,9 +81,9 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
           return next;
         });
       }
-    } catch {
+    } catch (err) {
       setAvailableStaffMap((prev) => ({ ...prev, [index]: [] }));
-      setError("Failed to load available staff.");
+      setError(err?.response?.data?.message || "Failed to load available staff.");
     } finally {
       setLoadingStaff((prev) => ({ ...prev, [index]: false }));
     }
@@ -107,9 +107,9 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
         ...prev,
         [index]: [...uniqueSlots.values()].sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time)),
       }));
-    } catch {
+    } catch (err) {
       setAvailableSlotsMap((prev) => ({ ...prev, [index]: [] }));
-      setError("Failed to load alternate time slots.");
+      setError(err?.response?.data?.message || "Failed to load alternate time slots.");
     } finally {
       setLoadingSlots((prev) => ({ ...prev, [index]: false }));
     }
