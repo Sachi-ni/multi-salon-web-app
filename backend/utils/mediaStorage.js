@@ -20,20 +20,24 @@ export const storeMedia = async (file, folder = "salonhub") => {
     return localPath(file);
   }
 
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME.trim();
+  const apiKey = process.env.CLOUDINARY_API_KEY.trim();
+  const apiSecret = process.env.CLOUDINARY_API_SECRET.trim();
+
   const timestamp = Math.floor(Date.now() / 1000);
-  const signaturePayload = `folder=${folder}&timestamp=${timestamp}${process.env.CLOUDINARY_API_SECRET}`;
+  const signaturePayload = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
   const signature = crypto.createHash("sha1").update(signaturePayload).digest("hex");
   const bytes = await fs.readFile(file.path);
   const form = new FormData();
 
   form.append("file", new Blob([bytes], { type: file.mimetype || "application/octet-stream" }), file.originalname || "upload");
-  form.append("api_key", process.env.CLOUDINARY_API_KEY);
+  form.append("api_key", apiKey);
   form.append("timestamp", String(timestamp));
   form.append("folder", folder);
   form.append("signature", signature);
 
   const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
     { method: "POST", body: form }
   );
   const result = await response.json();

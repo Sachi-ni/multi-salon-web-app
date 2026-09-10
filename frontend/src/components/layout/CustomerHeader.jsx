@@ -230,7 +230,7 @@ const CustomerHeader = () => {
                 </button>
 
                 {notifOpen && (
-                  <div className="absolute right-0 top-full mt-3 w-80 bg-[#12121a] border border-white/[0.08] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.6)] py-2 z-50" style={{ animation: "scaleIn 0.2s ease-out" }}>
+                  <div className="absolute right-0 top-full mt-3 w-[min(20rem,calc(100vw-2rem))] bg-[#12121a] border border-white/[0.08] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.6)] py-2 z-50" style={{ animation: "scaleIn 0.2s ease-out" }}>
                     <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.06]">
                       <h3 className="text-white font-extrabold text-sm">Notifications</h3>
                       {unreadCount > 0 && (

@@ -12,6 +12,8 @@ const CustomerRegister = () => {
   const [password, setPassword]           = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading]             = useState(false);
+  const [formError, setFormError]         = useState("");
+  const [formSuccess, setFormSuccess]     = useState("");
   const navigate = useNavigate();
 
   const handlePhoneChange = (e) => {
@@ -27,6 +29,8 @@ const CustomerRegister = () => {
   const handleRegister = async (e) => {
     e.preventDefault();
     setPhoneError("");
+    setFormError("");
+    setFormSuccess("");
 
     const normalizedPhone = phone.replace(/[\s()-]/g, "");
     if (!/^\+?[0-9]{10}$/.test(normalizedPhone)) {
@@ -35,12 +39,12 @@ const CustomerRegister = () => {
     }
 
     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password)) {
-      alert("Password must be at least 6 characters and include uppercase, lowercase, and number");
+      setFormError("Password must be at least 6 characters and include uppercase, lowercase, and number");
       return;
     }
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      setFormError("Passwords do not match!");
       return;
     }
     setLoading(true);
@@ -51,10 +55,10 @@ const CustomerRegister = () => {
         phone: normalizedPhone,
         password,
       });
-      alert("Registration successful! Please login.");
-      navigate("/login");
-    } catch (error) {
-      alert(error.response?.data?.message || "Registration failed. Please try again.");
+      setFormSuccess("Registration successful! Redirecting to login...");
+      setTimeout(() => navigate("/login"), 1200);
+    } catch (err) {
+      setFormError(err.response?.data?.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -64,8 +68,8 @@ const CustomerRegister = () => {
     "w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30";
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[1000] overflow-hidden">
-      {/* Background Image with Overlay - Similar to Landing Page */}
+    <div className="fixed inset-0 flex items-center justify-center z-[1000] overflow-y-auto py-6 px-4">
+      {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/70 via-primary/60 to-primary/80 z-10" />
         <img
@@ -79,7 +83,7 @@ const CustomerRegister = () => {
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="relative z-10 w-[460px] max-w-[96vw] bg-surface/80 backdrop-blur-sm border border-border rounded-2xl p-10 shadow-modal max-h-[95vh] overflow-y-auto"
+        className="relative z-10 w-[460px] max-w-full bg-surface/80 backdrop-blur-sm border border-border rounded-2xl p-6 sm:p-10 shadow-modal max-h-[95vh] overflow-y-auto my-auto"
       >
         {/* Top accent bar */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />
@@ -94,6 +98,32 @@ const CustomerRegister = () => {
 
         <h1 className="text-2xl font-extrabold text-white mb-1">Create Account</h1>
         <p className="text-muted-2 text-sm mb-6">Book appointments at your favourite salon</p>
+
+        {formError && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 px-3.5 py-2.5 rounded-xl bg-danger-dim border border-danger-border text-xs text-danger font-semibold flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{formError}</span>
+          </motion.div>
+        )}
+
+        {formSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 px-3.5 py-2.5 rounded-xl bg-success-dim border border-success-border text-xs text-success font-semibold flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>{formSuccess}</span>
+          </motion.div>
+        )}
 
         <form onSubmit={handleRegister} autoComplete="off">
           {/* Name */}

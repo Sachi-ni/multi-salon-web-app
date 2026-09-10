@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useLocation } from "react-router-dom";
 
 const AdminSalonLayout = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);

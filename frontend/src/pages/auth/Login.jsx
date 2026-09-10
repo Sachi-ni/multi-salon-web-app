@@ -23,8 +23,10 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleLogin = async () => {
+    setError("");
     setLoading(true);
     try {
       // Try admin login first
@@ -58,7 +60,7 @@ const Login = () => {
       }
 
       if (!res.ok) {
-        alert(data.message || "Login failed");
+        setError(data.message || "Login failed");
         setLoading(false);
         return;
       }
@@ -90,9 +92,9 @@ const Login = () => {
       } else {
         navigate("/");
       }
-    } catch (error) {
-      console.error("Login error:", error);
-      alert(error.message || "Unable to reach the server. Please try again.");
+    } catch (err) {
+      console.error("Login error:", err);
+      setError(err.message || "Unable to reach the server. Please try again.");
       setLoading(false);
     }
   };
@@ -103,8 +105,8 @@ const Login = () => {
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[1000] overflow-hidden">
-      {/* Background Image with Overlay - Similar to Landing Page */}
+    <div className="fixed inset-0 flex items-center justify-center z-[1000] overflow-y-auto py-6 px-4">
+      {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/70 via-primary/60 to-primary/80 z-10" />
         <img
@@ -118,7 +120,7 @@ const Login = () => {
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="relative z-10 w-[460px] max-w-[96vw] bg-surface/80 backdrop-blur-sm border border-border rounded-2xl p-10 shadow-modal"
+        className="relative z-10 w-[460px] max-w-full bg-surface/80 backdrop-blur-sm border border-border rounded-2xl p-6 sm:p-10 shadow-modal my-auto"
       >
         {/* Top accent bar */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />
@@ -133,6 +135,19 @@ const Login = () => {
 
         <h1 className="text-2xl font-extrabold text-white mb-6">Welcome Back</h1>
 
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 px-3.5 py-2.5 rounded-xl bg-danger-dim border border-danger-border text-xs text-danger font-semibold flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{error}</span>
+          </motion.div>
+        )}
+
         <form onSubmit={handleSubmit}>
           {/* Email */}
           <div className="mb-3.5">
@@ -143,7 +158,10 @@ const Login = () => {
               type="email"
               placeholder="Enter your email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (error) setError("");
+              }}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
               autoComplete="new-email"
             />
@@ -158,7 +176,10 @@ const Login = () => {
               type="password"
               placeholder="Enter your password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (error) setError("");
+              }}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
               autoComplete="new-password"
             />

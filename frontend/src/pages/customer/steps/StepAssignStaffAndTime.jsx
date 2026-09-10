@@ -229,7 +229,7 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
             <p className="text-muted-2 text-xs">No staff members are available for "{current.serviceName}" on {booking.date}.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {staffList.map(member => (
               <div
                 key={member.staff_id}
@@ -305,7 +305,7 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
             <p className="text-muted-2 text-xs">Try selecting a different staff member.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {slots.map((slot, i) => (
               <button
                 key={i}
@@ -349,7 +349,7 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
                 <p className="text-white font-bold text-sm">{svc.serviceName}</p>
                 <p className="text-accent font-extrabold text-sm">LKR {svc.servicePrice}</p>
               </div>
-              <div className="flex items-center gap-4 text-xs text-muted-2">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-muted-2">
                 <span className="flex items-center gap-1">
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />

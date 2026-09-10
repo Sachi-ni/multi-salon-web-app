@@ -45,7 +45,7 @@ const Modal = ({
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className={clsx(
-              "relative w-[90%] bg-surface border border-border rounded-2xl p-7 shadow-modal max-h-[92vh] overflow-y-auto z-10",
+              "relative w-[92%] sm:w-[90%] bg-surface border border-border rounded-2xl p-4 sm:p-7 shadow-modal max-h-[92vh] overflow-y-auto z-10",
               maxWidth,
               className
             )}

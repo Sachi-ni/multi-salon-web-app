@@ -33,21 +33,21 @@ const Hero = () => {
             </span>
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-display font-black leading-[1.1] tracking-tight text-white">
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-display font-black leading-[1.1] tracking-tight text-white">
             ELEVATE <br />
             <span className="text-gradient">YOUR STYLE.</span> <br />
             EMBRACE LUXURY.
           </h1>
           
-          <p className="text-lg md:text-xl text-white/70 max-w-xl font-light leading-relaxed">
+          <p className="text-base sm:text-lg md:text-xl text-white/70 max-w-xl font-light leading-relaxed">
             Experience world-class grooming and beauty services in an atmosphere of pure luxury. Our expert stylists are dedicated to crafting your perfect look.
           </p>
 
-          <div className="flex flex-wrap gap-4 mt-4">
+          <div className="flex flex-col sm:flex-row gap-4 mt-4 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => navigate("/book")}
-              className="px-8 py-4 bg-accent text-primary rounded-xl text-base font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-glow transition-all duration-300 hover:-translate-y-1 flex items-center gap-2 group"
+              className="w-full sm:w-auto px-8 py-4 bg-accent text-primary rounded-xl text-base font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-glow transition-all duration-300 hover:-translate-y-1 flex items-center justify-center gap-2 group"
             >
               Book Appointment
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -55,7 +55,7 @@ const Hero = () => {
             <button
               type="button"
               onClick={() => navigate("/our-services")}
-              className="px-8 py-4 bg-surface/50 backdrop-blur-md border border-border text-white rounded-xl text-base font-bold hover:bg-surface-2 transition-all duration-300 hover:-translate-y-1"
+              className="w-full sm:w-auto px-8 py-4 bg-surface/50 backdrop-blur-md border border-border text-white rounded-xl text-base font-bold hover:bg-surface-2 transition-all duration-300 hover:-translate-y-1 text-center"
             >
               Explore Services
             </button>
