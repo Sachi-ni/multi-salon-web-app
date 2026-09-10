@@ -39,6 +39,7 @@ router.patch("/:id/confirm", protect, authorizeRoles("super-admin"), confirmAppo
 router.patch("/:id/reject", protect, authorizeRoles("super-admin", "manager"), rejectAppointment);
 router.patch("/:id/complete", protect, authorizeRoles("super-admin", "manager"), completeAppointment);
 router.patch("/:id/admin-cancel", protect, authorizeRoles("super-admin", "manager"), adminCancelAppointment);
+router.patch("/:id/assign-staff", protect, authorizeRoles("super-admin", "staff-admin", "manager"), updateStaffAssignment);
 router.delete("/:id", protect, deleteAppointment);
 
 export default router;

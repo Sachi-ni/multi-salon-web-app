@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { X, Clock, BriefcaseBusiness, AlertCircle, CheckCircle2 } from "lucide-react";
 import { getAvailableStaff, updateStaffAssignment, getAvailableSlots } from "../../services/appointmentService";
 
 export default function EditStaffAssignmentModal({ appointment, salonId, onClose, onSuccess }) {
@@ -19,6 +19,10 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     if (!t) return new Date(NaN);
     if (/^\d{1,2}:\d{2}/.test(t)) { const [h, m] = t.split(":").map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d; }
     return new Date(t);
+  };
+  const timeToMinutes = (time) => {
+    const [hours, minutes] = toHHMM(time).split(":").map(Number);
+    return (hours || 0) * 60 + (minutes || 0);
   };
   const computeEndTime = useCallback((start, dur) => { const d = parseTimeToDate(start); if (isNaN(d.getTime())) return ""; d.setMinutes(d.getMinutes() + (dur || 30)); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }, []);
   const toHHMM = (t) => { if (!t) return ""; const s = String(t).trim(); const d = /^(\d{1,2}):(\d{2})/.exec(s); if (d) return `${String(Number(d[1])).padStart(2, "0")}:${d[2]}`; const e = /[T\s](\d{1,2}):(\d{2})/.exec(s); if (e) return `${String(Number(e[1])).padStart(2, "0")}:${e[2]}`; return s; };
@@ -64,6 +68,7 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     if (!svc || !svc.serviceId) return;
     const st = toHHMM(startTime || svc.startTime);
     const en = toHHMM(endTimeOverride || svc.endTime || computeEndTime(st, svc.duration));
+    setError("");
     setLoadingStaff((prev) => ({ ...prev, [index]: true }));
     try {
       const res = await getAvailableStaff(appointment.appointment_date, [svc.serviceId], salonId, { startTime: st, endTime: en, ignoreAppointmentId: appointment._id });
@@ -98,7 +103,10 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
       slotResponses.forEach((response) => {
         (response.data || []).forEach((slot) => uniqueSlots.set(`${slot.start_time}-${slot.end_time}`, slot));
       });
-      setAvailableSlotsMap((prev) => ({ ...prev, [index]: [...uniqueSlots.values()] }));
+      setAvailableSlotsMap((prev) => ({
+        ...prev,
+        [index]: [...uniqueSlots.values()].sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time)),
+      }));
     } catch {
       setAvailableSlotsMap((prev) => ({ ...prev, [index]: [] }));
       setError("Failed to load alternate time slots.");
@@ -113,12 +121,14 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     });
   }, [services, fetchAvailableStaff]);
 
-  const handleTimeChange = useCallback((index, newStart) => {
-    setServices((prev) => { const next = [...prev]; const svcObj = { ...next[index], staffId: "", staffName: "" }; svcObj.startTime = newStart; svcObj.endTime = computeEndTime(newStart, svcObj.duration); next[index] = svcObj; return next; });
+  const handleTimeChange = useCallback((index, newStart, newEnd) => {
+    const endTime = newEnd || computeEndTime(newStart, services[index]?.duration);
+    setError("");
+    setServices((prev) => { const next = [...prev]; const svcObj = { ...next[index], staffId: "", staffName: "" }; svcObj.startTime = newStart; svcObj.endTime = endTime; next[index] = svcObj; return next; });
     setAvailableSlotsMap((prev) => ({ ...prev, [index]: [] }));
     setAlternateTimeOpenMap((prev) => ({ ...prev, [index]: false }));
-    fetchAvailableStaff(index, newStart);
-  }, [computeEndTime, fetchAvailableStaff]);
+    fetchAvailableStaff(index, newStart, endTime);
+  }, [computeEndTime, fetchAvailableStaff, services]);
 
   const handleStaffSelect = useCallback(async (index, staffId, staffName) => {
     setServices((prev) => { const next = [...prev]; next[index] = { ...next[index], staffId: staffId?.toString() || "", staffName: staffName || "" }; return next; });
@@ -192,8 +202,8 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
             {services.map((svc, index) => {
               const staffList = availableStaffMap[index] || [];
               const slots = availableSlotsMap[index] || [];
-              const pickingSlot = !!svc.staffId && !!slots.length;
               const staffCount = staffList.length;
+              const pickingSlot = staffCount === 0 && !!svc.staffId && !!slots.length && !alternateTimeOpenMap[index];
               const computedEndTime = svc.endTime || computeEndTime(svc.startTime, svc.duration);
               return (
 
@@ -245,22 +255,51 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
                         })}
                       </div>
                       {staffCount === 0 && alternateTimeOpenMap[index] && (
-                        <div className="flex items-center gap-2 mt-3">
-                          <div className="w-full space-y-2">
-                            <p className="text-2xs text-muted-2 font-medium">Available time slots</p>
-                            {loadingSlots[index] ? (
-                              <div className="flex justify-center py-2"><div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>
-                            ) : slots.length === 0 ? (
-                              <p className="text-2xs text-rose/70 italic">No alternate time slots are available.</p>
-                            ) : (
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-44 overflow-y-auto">
-                                {slots.map((slot) => (
-                                  <button key={`${slot.start_time}-${slot.end_time}`} onClick={() => handleTimeChange(index, slot.start_time)} className="px-2 py-2 rounded-lg border border-border bg-surface-3 hover:border-accent/50 hover:bg-accent/10 text-white text-2xs font-semibold transition-all">
-                                    {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
-                                  </button>
-                                ))}
+                        <div className="mt-4 rounded-xl border border-border bg-base p-4 sm:p-5">
+                          <h3 className="text-lg font-extrabold text-white mb-1">Select a Time Slot</h3>
+                          <p className="text-muted-2 text-sm mb-4">Choose your preferred time for the appointment</p>
+                          <div className="mb-5 p-3 bg-surface-2 border border-border rounded-xl">
+                            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-accent" />
+                                <span className="text-muted-2">Duration:</span>
+                                <span className="text-white font-bold">{Math.ceil(svc.duration / 60)} {Math.ceil(svc.duration / 60) === 1 ? "Hour" : "Hours"}</span>
                               </div>
-                            )}
+                              <div className="flex items-center gap-1.5">
+                                <BriefcaseBusiness className="w-3.5 h-3.5 text-accent" />
+                                <span className="text-muted-2">Slots needed:</span>
+                                <span className="text-white font-bold">{Math.ceil(svc.duration / 60)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {loadingSlots[index] ? (
+                            <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>
+                          ) : slots.length === 0 ? (
+                            <p className="text-sm text-rose/70 italic py-4">No alternate time slots are available.</p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto">
+                              {slots.map((slot) => {
+                                return (
+                                  <button
+                                    key={`${slot.start_time}-${slot.end_time}`}
+                                    onClick={() => handleTimeChange(index, slot.start_time, slot.end_time)}
+                                    className="p-3.5 rounded-xl border border-border bg-surface-3 text-left transition-all duration-200 hover:border-accent/50"
+                                  >
+                                    <p className="font-bold text-sm text-white">
+                                      {formatTime(slot.start_time)} — {formatTime(slot.end_time)}
+                                    </p>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <div className="flex justify-between mt-6">
+                            <button
+                              onClick={() => setAlternateTimeOpenMap((prev) => ({ ...prev, [index]: false }))}
+                              className="px-6 py-2.5 bg-surface-2 text-muted-2 text-sm font-bold rounded-lg border border-border hover:border-border-hover transition-all"
+                            >
+                              ← Back
+                            </button>
                           </div>
                         </div>
                       )}
