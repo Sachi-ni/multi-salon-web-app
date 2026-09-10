@@ -67,12 +67,15 @@ export const getAvailableStaff = async (req, res) => {
       });
     }
 
-    // Admin users (super-admin / staff-admin / manager) may assign salon
+    const salon = await Salon.findOne({ _id: salonId, status: "active", isPaused: false }).select("_id");
+    if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
+
+    // Admin users (super-admin / manager) may assign salon
     // managers & admins as service providers even when those users don't have
     // the service assigned to their profile. Customers keep seeing only staff
     // who actually perform the selected services.
     const userRole = req.user?.role || "";
-    const isAdminUser = ["super-admin", "staff-admin", "manager"].includes(userRole);
+    const isAdminUser = ["super-admin", "manager"].includes(userRole);
 
     // Find active staff in this salon who can perform at least one
     // of the selected services.
@@ -84,12 +87,12 @@ export const getAvailableStaff = async (req, res) => {
         ? {
             $or: [
               { services: { $in: serviceIdList } },
-              { role: { $in: [/^manager$/i, /^staff-admin$/i] } },
+              { role: { $in: [/^manager$/i] } },
             ],
           }
         : {
             services: { $in: serviceIdList },
-            role: { $not: /^(manager|staff-admin|super-admin)$/i },
+            role: { $not: /^(manager|super-admin)$/i },
           }),
     })
       .populate("salon_id", "name")
@@ -224,9 +227,12 @@ export const getAvailableSlots = async (req, res) => {
       serviceIdList = [serviceId];
     }
 
-    if (!staffId || !date || serviceIdList.length === 0) {
-      return res.status(400).json({ message: "staffId, date, and serviceId(s) are required" });
+    if (!staffId || !date || serviceIdList.length === 0 || !salonId) {
+      return res.status(400).json({ message: "staffId, date, serviceId(s), and salonId are required" });
     }
+
+    const salon = await Salon.findOne({ _id: salonId, status: "active", isPaused: false }).select("_id");
+    if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
 
     // 1. Get total duration from all selected services
     const services = await Service.find({ _id: { $in: serviceIdList } });
@@ -419,6 +425,7 @@ export const createAppointment = async (req, res) => {
   let locksAcquired = [];
   try {
     const { salon_id, appointment_date, notes, guest_name, guest_phone } = req.body;
+    let normalizedGuestPhone = guest_phone || "";
 
     let customer_id = req.user?.id;
 
@@ -434,6 +441,24 @@ export const createAppointment = async (req, res) => {
       if (!guest_name || !guest_phone) {
         return res.status(400).json({ message: "Guest name and phone are required for unauthenticated bookings" });
       }
+
+      normalizedGuestPhone = normalizePhone(guest_phone);
+      if (!PHONE_PATTERN.test(normalizedGuestPhone)) {
+        return res.status(400).json({ message: "Please enter a valid 10-digit phone number" });
+      }
+
+      const registeredCustomer = await Customer.findOne({
+        $or: [
+          { phone: normalizedGuestPhone },
+          { phone: guest_phone }
+        ]
+      }).select("_id");
+      if (registeredCustomer) {
+        return res.status(409).json({
+          message: "This phone number is already registered. Please log in before booking."
+        });
+      }
+
       customer_id = undefined;
     }
 
@@ -459,6 +484,14 @@ export const createAppointment = async (req, res) => {
       return res.status(400).json({
         message: "salon_id, appointment_date, and at least one service with staff_id and start_time are required"
       });
+    }
+
+    const salon = await Salon.findById(salon_id).select("status");
+    if (!salon || salon.status === "deactivated") {
+      return res.status(400).json({ message: "This salon is unavailable for bookings" });
+    }
+    if (salon.isPaused) {
+      return res.status(400).json({ message: "This salon is temporarily unavailable for bookings" });
     }
 
     // Acquire locks for all staff involved in this booking to ensure FCFS
@@ -547,7 +580,7 @@ export const createAppointment = async (req, res) => {
     const appointment = await Appointment.create({
       customer_id,
       guest_name: guest_name || "",
-      guest_phone: guest_phone || "",
+      guest_phone: normalizedGuestPhone,
       salon_id,
       service_id: resolvedServices[0].service_id,
       service_ids: resolvedServices.map(s => s.service_id),
@@ -588,12 +621,12 @@ export const createAppointment = async (req, res) => {
     const result = populated.toObject();
     result.appointment_services = apptServices;
 
-    // NOTIFICATION: Notify super-admins and staff-admins of this salon, AND managers in Staff
+    // NOTIFICATION: Notify super-admins and managers of this salon
     try {
       const adminsToNotify = await Admin.find({
         $or: [
           { role: "super-admin" },
-          { role: { $in: ["staff-admin", "manager"] }, salon_id: salon_id }
+          { role: "manager", salon_id: salon_id }
         ]
       });
 
@@ -906,7 +939,7 @@ export const confirmAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -1016,7 +1049,7 @@ export const rejectAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -1093,7 +1126,7 @@ export const completeAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -1181,7 +1214,7 @@ export const adminCancelAppointment = async (req, res) => {
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
-        role: { $in: ["staff-admin", "manager"] },
+        role: "manager",
         salon_id: appointment.salon_id
       });
       const managersToNotify = await Staff.find({
@@ -1536,7 +1569,7 @@ export const deleteAppointment = async (req, res) => {
     }
 
     // Allow admins to delete any appointment, but customers can only delete their own
-    const isAdmin = ["super-admin", "staff-admin", "manager"].includes(req.user.role);
+    const isAdmin = ["super-admin", "manager"].includes(req.user.role);
     if (!isAdmin && appointment.customer_id?.toString() !== req.user.id) {
       return res.status(403).json({ message: "Not authorized to delete this appointment" });
     }

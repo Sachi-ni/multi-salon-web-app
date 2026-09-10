@@ -7,7 +7,11 @@ name:              { type: String, required: true },
   image:             { type: String, default: "" },
   registration_date: { type: Date, default: Date.now },
   password_hash:     { type: String, required: true },
-  role:              { type: String, default: "customer" } // ← 
+  role:              { type: String, default: "customer" },
+  resetPasswordTokenHash: { type: String, default: null },
+  resetPasswordExpires: { type: Date, default: null },
+  // Non-binding UI metadata only; never use this field for booking authorization.
+  preferredSalonId:  { type: mongoose.Schema.Types.ObjectId, ref: "Salon", required: false, default: null }
 });
 
 export default mongoose.model("Customer", customerSchema);

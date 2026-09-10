@@ -34,8 +34,8 @@ const CustomerRegister = () => {
       return;
     }
 
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/.test(password)) {
-      alert("Password must be at least 8 characters and include uppercase, lowercase, number, and special character");
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password)) {
+      alert("Password must be at least 6 characters and include uppercase, lowercase, and number");
       return;
     }
 
@@ -45,8 +45,8 @@ const CustomerRegister = () => {
     }
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/customers/register`, {
-        name,
+      await axios.post(`${API_URL}/auth/register`, {
+        fullName: name,
         email: email.trim().toLowerCase(),
         phone: normalizedPhone,
         password,

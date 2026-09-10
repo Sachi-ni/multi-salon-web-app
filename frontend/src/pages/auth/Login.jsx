@@ -4,6 +4,19 @@ import { useAuth } from "../../context/AuthContext";
 import { motion } from "framer-motion";
 import { API_URL } from "../../config";
 
+const readResponse = async (response) => {
+  const body = await response.text();
+  if (!body) {
+    return { message: `Login request failed (${response.status})` };
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    return { message: body };
+  }
+};
+
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -21,30 +34,39 @@ const Login = () => {
         body: JSON.stringify({ email, password }),
       });
 
-      let data = await res.json();
+      let data = await readResponse(res);
 
-      // If admin login fails, try staff login
-      if (!res.ok) {
+      // Only try another account type when this email is not an Admin; a bad
+      // SuperAdmin password must never silently become a customer session.
+      if (res.status === 404) {
         res = await fetch(`${API_URL}/staff/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-        data = await res.json();
+        data = await readResponse(res);
       }
 
-      // If staff login fails, try customer login
-      if (!res.ok) {
+      // Only try customer login when the email is not an Admin or Staff.
+      if (res.status === 404) {
         res = await fetch(`${API_URL}/customers/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-        data = await res.json();
+        data = await readResponse(res);
       }
 
       if (!res.ok) {
         alert(data.message || "Login failed");
+        setLoading(false);
+        return;
+      }
+
+      if (data.requiresHardening) {
+        navigate("/super-admin-hardening", {
+          state: { token: data.token, hardeningStep: data.hardeningStep },
+        });
         setLoading(false);
         return;
       }
@@ -59,7 +81,7 @@ const Login = () => {
         navigate("/");
       } else if (userData.salon_id) {
         // If they have a salon_id, they are some kind of staff/manager
-        if (data.role === "manager" || data.role === "staff-admin") {
+        if (data.role === "manager") {
           navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
         } else {
           // Normal staff go to staffDashboard
@@ -70,7 +92,7 @@ const Login = () => {
       }
     } catch (error) {
       console.error("Login error:", error);
-      alert("Something went wrong. Please try again.");
+      alert(error.message || "Unable to reach the server. Please try again.");
       setLoading(false);
     }
   };
@@ -162,11 +184,17 @@ const Login = () => {
           </button>
         </form>
 
+        <div className="text-right mt-3">
+          <button type="button" onClick={() => navigate("/forgot-password")} className="text-sm text-accent font-bold hover:underline">
+            Forgot password?
+          </button>
+        </div>
+
         {/* Switch */}
         <div className="text-center mt-4 text-[0.82rem] text-muted-2">
           No account?{" "}
           <span
-            onClick={() => navigate("/customer/register")}
+            onClick={() => navigate("/register")}
             className="text-accent cursor-pointer font-bold hover:underline"
           >
             Register here

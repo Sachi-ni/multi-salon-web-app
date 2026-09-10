@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Bell, Menu, LogOut, User, ChevronDown, X, Home, Info, Scissors, Store, Users, MessageSquare, Phone, Calendar, CalendarPlus } from "lucide-react";
 import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
+import { API_BASE } from "../../config";
 
 const CustomerHeader = () => {
   const { user, logout } = useAuth();
@@ -187,7 +188,7 @@ const CustomerHeader = () => {
                 Login
               </button>
               <button
-                onClick={() => navigate("/signup")}
+                onClick={() => navigate("/register")}
                 className="px-4 py-2 rounded-full text-[0.8rem] font-bold text-white/70 hover:text-white hover:bg-white/[0.06] transition-all duration-300 mx-1 whitespace-nowrap"
               >
                 Sign Up
@@ -275,9 +276,17 @@ const CustomerHeader = () => {
                     dropdownOpen ? "bg-white/[0.06]" : "hover:bg-white/[0.04]"
                   )}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-[#b8941e] flex items-center justify-center text-[0.7rem] font-black text-primary shadow-[0_0_12px_rgba(212,175,55,0.2)] group-hover:shadow-[0_0_18px_rgba(212,175,55,0.3)] transition-all">
-                    {initials}
-                  </div>
+                  {user?.image ? (
+                    <img
+                      src={user.image.startsWith("http") ? user.image : `${API_BASE}/${user.image.replace(/\\/g, "/")}`}
+                      alt="Profile"
+                      className="w-8 h-8 rounded-lg object-cover shadow-[0_0_12px_rgba(212,175,55,0.2)] group-hover:shadow-[0_0_18px_rgba(212,175,55,0.3)] transition-all"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-[#b8941e] flex items-center justify-center text-[0.7rem] font-black text-primary shadow-[0_0_12px_rgba(212,175,55,0.2)] group-hover:shadow-[0_0_18px_rgba(212,175,55,0.3)] transition-all">
+                      {initials}
+                    </div>
+                  )}
                   <div className="hidden sm:block text-left">
                     <div className="text-[0.78rem] font-bold text-white leading-tight">{user?.name}</div>
                   </div>
@@ -381,7 +390,7 @@ const CustomerHeader = () => {
                     <span className="text-sm font-semibold">Login</span>
                   </button>
                   <button
-                    onClick={() => { navigate("/signup"); setMobileMenuOpen(false); }}
+                    onClick={() => { navigate("/register"); setMobileMenuOpen(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/[0.05] transition-all text-left"
                   >
                     <User className="w-4 h-4 text-accent/60" />

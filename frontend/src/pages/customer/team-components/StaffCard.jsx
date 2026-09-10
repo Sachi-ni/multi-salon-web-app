@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Star, MapPin, Briefcase, Calendar } from "lucide-react";
+import { Star, MapPin, Briefcase } from "lucide-react";
 import { getUploadUrl } from '../../../config';
 
 export default function StaffCard({ member, index }) {

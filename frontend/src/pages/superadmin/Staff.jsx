@@ -5,7 +5,7 @@ import { getSalons } from "../../services/salonService";
 import { getServices } from "../../services/serviceService";
 import { 
   Plus, Search, Users, Star, MapPin, 
-  Calendar, MoreVertical, Power, Pencil, Trash2, 
+  MoreVertical, Power, Pencil, Trash2, 
   ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,7 +17,6 @@ import Table from "../../components/ui/Table";
 import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
 import { mediaUrl } from "../../utils/mediaUrl";
-import { API_BASE } from "../../config";
 
 /* ── Skeleton Card ── */
 const SkeletonStaffCard = () => (
@@ -237,13 +236,15 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
 
         <button
           onClick={() => onToggleStatus(staff)}
+          title={isActive ? "Deactivate Staff" : "Activate Staff"}
           className={clsx(
-            "px-3 py-1 rounded-lg text-[0.65rem] font-extrabold uppercase tracking-wider transition-all duration-200",
+            "px-3 py-1.5 rounded-lg text-[0.65rem] font-extrabold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5",
             isActive
               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20"
               : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-700"
           )}
         >
+          <Power className="w-3 h-3" />
           {isActive ? "Active" : "Inactive"}
         </button>
       </div>
@@ -757,6 +758,13 @@ const Staff = () => {
 
             <div>
               <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Profile Picture</label>
+              {editingStaff.currentImage && (
+                <img
+                  src={mediaUrl(editingStaff.currentImage)}
+                  alt="Current staff profile"
+                  className="mb-2 h-16 w-16 rounded-xl object-cover border border-border"
+                />
+              )}
               <input
                 type="file"
                 accept="image/*"

@@ -47,7 +47,7 @@ const getEffectiveRate = (salaryRecord, staffCommissionRate = 0) => {
   return safeNumber(staffCommissionRate, 0);
 };
 // ─── Helper: scope salary records to the requesting user's salon ───────────
-// super-admins operate on every salon; staff-admins/managers only their own.
+// Super-admins operate on every salon; managers only their own.
 const salaryBelongsToUserSalon = (salaryRecord, reqUser) => {
   if (!reqUser || reqUser.role === "super-admin") return true;
 
@@ -760,12 +760,12 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
 const updateSingleStaffSalary = async (staff, salonId, appointmentDate, amount) => {
   if (!staff) return;
 
-  // Staff admins do not earn salaries. (Matches the role filtering applied by
+  // Managers do not earn salaries. (Matches the role filtering applied by
   // every salary listing endpoint; otherwise completing an appointment for a
-  // staff-admin creates orphan records that never appear in lists but still
+  // manager creates orphan records that never appear in lists but still
   // inflate summaries.)
   const role = (staff.role || "").toLowerCase();
-  if (role === "staff-admin") return;
+  if (role === "manager") return;
 
   // Managers accrue salary exactly like regular staff on the admin/salary
   // page: only in the frequency configured on their profile
@@ -783,8 +783,8 @@ const updateSingleStaffSalary = async (staff, salonId, appointmentDate, amount) 
 
 // Resolve the salary role filter used by the listing / payroll endpoints.
 //   "manager"    -> only salon managers (Staff collection role "manager")
-//   "management" -> salon managers AND salon admins (staff-admin)
-//   anything else -> normal staff (managers / staff-admins are excluded)
+  //   "management" -> salon managers
+  //   anything else -> normal staff (managers are excluded)
 const resolveSalaryRole = (roleFilter) => {
   const role = (roleFilter || "").toLowerCase();
   if (role === "manager") return "manager";
@@ -796,8 +796,8 @@ const resolveSalaryRole = (roleFilter) => {
 const salaryRoleIncludes = (mode, staffRole) => {
   const role = (staffRole || "").toLowerCase();
   if (mode === "manager") return role === "manager";
-  if (mode === "management") return ["manager", "staff-admin"].includes(role);
-  return !["manager", "staff-admin"].includes(role);
+  if (mode === "management") return role === "manager";
+  return role !== "manager";
 };
 // ─── Get salaries ──────────────────────────────────────────────────────────
 
@@ -823,7 +823,7 @@ export const getSalaries = async (req, res) => {
       .sort({ "staff_name": 1 });
 
     // Role scoping: the super-admin salary page asks for salon managers only;
-    // every other listing keeps excluding managers / staff-admins.
+    // every other listing keeps excluding managers.
     const roleMode = resolveSalaryRole(roleFilter);
     salaries = salaries.filter((s) =>
       salaryRoleIncludes(roleMode, s.staff_id?.role || s.staff_role)
@@ -865,7 +865,7 @@ export const getSalarySummary = async (req, res) => {
     if (frequency) match.frequency = frequency;
 
     // Fetch with staff role info so totals match what lists display
-    // (manager / staff-admin records are excluded everywhere else).
+    // (manager records are excluded everywhere else).
     let salaryDocs = await Salary.find(match)
       .populate("staff_id", "role")
       .select("status totalSalary paidTotal workingAmount staff_role period dateRange")
@@ -926,7 +926,7 @@ export const getStaffSalaryList = async (req, res) => {
     const staffList = await Staff.find({
       ...salonFilter,
       status: "Active",
-      role: { $not: { $regex: /manager|staff-admin/i } },
+      role: { $not: { $regex: /manager/i } },
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     })
       .select("full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id services")
@@ -1468,15 +1468,15 @@ export const getStaffWithSalaries = async (req, res) => {
     }
 
     // Role scoping: the super-admin salary page asks for salon managers only;
-    // every other listing keeps excluding managers / staff-admins.
+    // every other listing keeps excluding managers.
     const roleMode = resolveSalaryRole(roleFilter);
 
     const roleMatch =
       roleMode === "manager"
         ? { role: { $regex: /^manager$/i } }
         : roleMode === "management"
-          ? { role: { $in: [/^manager$/i, /^staff-admin$/i] } }
-          : { role: { $not: { $regex: /manager|staff-admin/i } } };
+          ? { role: { $regex: /^manager$/i } }
+          : { role: { $not: { $regex: /manager/i } } };
 
     // Active staff for this salon matching the selected frequency. The
     // salary_payment_frequency filter is applied for every role mode so that
@@ -1528,15 +1528,15 @@ export const generatePayroll = async (req, res) => {
     }
 
     // Role scoping: super-admin manager salary page asks for salon managers only;
-    // every other payroll keeps excluding managers / staff-admins.
+    // every other payroll keeps excluding managers.
     const roleMode = resolveSalaryRole(roleFilter);
 
     const roleMatch =
       roleMode === "manager"
         ? { role: { $regex: /^manager$/i } }
         : roleMode === "management"
-          ? { role: { $in: [/^manager$/i, /^staff-admin$/i] } }
-          : { role: { $not: { $regex: /manager|staff-admin/i } } };
+          ? { role: { $regex: /^manager$/i } }
+          : { role: { $not: { $regex: /manager/i } } };
 
     // Active staff matching the selected frequency. The salary_payment_frequency
     // filter is applied for every role mode so each person is only paid in the
@@ -1824,15 +1824,15 @@ export const initializeSalaries = async (req, res) => {
     }
 
     // Role scoping: super-admin manager salary page asks for salon managers only;
-    // every other initialization keeps excluding managers / staff-admins.
+    // every other initialization keeps excluding managers.
     const roleMode = resolveSalaryRole(roleFilter);
 
     const roleMatch =
       roleMode === "manager"
         ? { role: { $regex: /^manager$/i } }
         : roleMode === "management"
-          ? { role: { $in: [/^manager$/i, /^staff-admin$/i] } }
-          : { role: { $not: { $regex: /manager|staff-admin/i } } };
+          ? { role: { $regex: /^manager$/i } }
+          : { role: { $not: { $regex: /manager/i } } };
 
     // Staff matching the selected frequency (all role modes get the
     // salary_payment_frequency filter so each person is handled in the

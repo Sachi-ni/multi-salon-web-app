@@ -8,9 +8,7 @@ import { AuthProvider } from "./context/AuthContext";
 
 // General Pages
 import Login from "./pages/auth/Login.jsx";
-import Signup from "./pages/auth/register.jsx";
 import Edit from "./pages/auth/edit.jsx";
-//import Main from "./pages/dashboard.jsx";
 import Unauthorized from "./pages/Unauthorized.jsx";
 
 //customer pages
@@ -62,6 +60,9 @@ import AdminAddStaff from "./pages/admin/AddStaff.jsx";
 
 import { useAuth } from "./context/AuthContext";
 import CustomerRegister from "./pages/auth/CustomerRegister.jsx";
+import SuperAdminHardening from "./pages/auth/SuperAdminHardening.jsx";
+import ForgotPassword from "./pages/auth/ForgotPassword.jsx";
+import ResetPassword from "./pages/auth/ResetPassword.jsx";
 
 const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
   const { user } = useAuth();
@@ -99,11 +100,12 @@ function App() {
         <Route path="/terms" element={<TermsOfService />} />
 
         <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/editProfile" element={<Edit />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
-        <Route path="/register" element={<Signup />} />
-        <Route path="/customer/register" element={<CustomerRegister />} />
+        <Route path="/register" element={<CustomerRegister />} />
+        <Route path="/super-admin-hardening" element={<SuperAdminHardening />} />
 
        <Route
           path="/superAdminDashboard"

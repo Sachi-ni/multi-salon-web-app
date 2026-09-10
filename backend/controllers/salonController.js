@@ -5,6 +5,8 @@ import { fileURLToPath } from "url";
 import Salon from "../models/Salon.js";
 import Staff from "../models/Staff.js";
 import Feedback from "../models/Feedback.js";
+import Appointment from "../models/Appointment.js";
+import Notification from "../models/Notification.js";
 import { storeMedia, isRemoteMedia } from "../utils/mediaStorage.js";
 
 // __dirname equivalent for ES modules
@@ -52,15 +54,14 @@ const validateManagerContact = ({ email, phone, password }) => {
 
   if (password) {
     const isComplex =
-      password.length >= 8 &&
+      password.length >= 6 &&
       /[A-Z]/.test(password) &&
       /[a-z]/.test(password) &&
-      /\d/.test(password) &&
-      /[!@#$%^&*]/.test(password);
+      /\d/.test(password);
 
     if (!isComplex || COMMON_PASSWORDS.has(password.toLowerCase())) {
       return {
-        message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+        message: "Password must be at least 6 characters and include uppercase, lowercase, and number.",
       };
     }
   }
@@ -242,7 +243,9 @@ export const createSalon = async (req, res) => {
 
 export const getSalons = async (req, res) => {
   try {
-    const salons = await Salon.find();
+    const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
+    const publicFilter = { status: "active", isPaused: false };
+    const salons = await Salon.find(isAdmin ? {} : publicFilter);
 
     const salonsWithManagers = await Promise.all(
       salons.map(async (s) => {
@@ -298,6 +301,11 @@ export const getSalonById = async (req, res) => {
       });
     }
 
+    const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
+    if (!isAdmin && (salon.status !== "active" || salon.isPaused)) {
+      return res.status(404).json({ message: "Salon not found" });
+    }
+
     // Count actual staff members for this salon
     const actualStaffCount = await Staff.countDocuments({
       salon_id: salon._id,
@@ -346,66 +354,27 @@ export const getSalonById = async (req, res) => {
 
 export const updateSalon = async (req, res) => {
   try {
-    const {
-      managerName,
-      managerPhone,
-      managerEmail,
-      managerPassword,
-      ...salonData
-    } = req.body;
+    // Whitelist salon metadata so this endpoint cannot alter account ownership or credentials.
+    const allowedFields = ["name", "address", "location", "phone", "email", "timezone"];
+    const salonData = Object.fromEntries(
+      allowedFields
+        .filter((field) => req.body[field] !== undefined)
+        .map((field) => [field, req.body[field]])
+    );
 
-    const currentManager = await Staff.findOne({
-      salon_id: req.params.id,
-      role: "manager",
-    });
-    const validation = validateManagerContact({
-      email: managerEmail,
-      phone: managerPhone,
-      password: managerPassword,
-    });
-
-    if (validation.message) {
-      return res.status(400).json({ message: validation.message });
-    }
-
-    const normalizedSalonPhone = normalizePhone(salonData.phone);
-    if (normalizedSalonPhone && !SRI_LANKAN_PHONE_PATTERN.test(normalizedSalonPhone)) {
-      return res.status(400).json({
-        message: "Enter a valid salon phone number (for example, 0771234567 or +94771234567).",
-      });
-    }
     if (salonData.phone !== undefined) {
-      salonData.phone = normalizedSalonPhone;
-    }
-
-    if (salonData.open_time && salonData.close_time && salonData.open_time >= salonData.close_time) {
-      return res.status(400).json({
-        message: "Opening time must be earlier than closing time.",
-      });
-    }
-
-    if (validation.normalizedEmail) {
-      const duplicateManager = await Staff.findOne({
-        email: {
-          $regex: `^${escapeRegex(validation.normalizedEmail)}$`,
-          $options: "i",
-        },
-        ...(currentManager ? { _id: { $ne: currentManager._id } } : {}),
-      });
-
-      if (duplicateManager) {
-        return res.status(409).json({
-          message: "That manager email is already in use.",
+      salonData.phone = normalizePhone(salonData.phone);
+      if (!SRI_LANKAN_PHONE_PATTERN.test(salonData.phone)) {
+        return res.status(400).json({
+          message: "Enter a valid Sri Lankan phone number (for example, 0771234567 or +94771234567).",
         });
       }
     }
 
-    // If a new logo file was uploaded, update logo
     if (req.file) {
       salonData.logo = await storeMedia(req.file, "salonhub/logos");
     }
 
-    // Update salon information
     const salon = await Salon.findByIdAndUpdate(
       req.params.id,
       salonData,
@@ -421,88 +390,8 @@ export const updateSalon = async (req, res) => {
       });
     }
 
-    // Find existing manager
-    let manager = currentManager;
-
-    // Update existing manager
-    if (manager) {
-      const fullName = managerName !== undefined
-        ? managerName
-        : manager.full_name;
-      const { firstName, lastName } = getManagerNameParts(fullName, manager);
-
-      if (managerName !== undefined) {
-        manager.full_name = managerName;
-      }
-      manager.first_name = firstName;
-      manager.last_name = lastName;
-
-      if (managerPhone !== undefined) {
-        manager.phone = validation.normalizedPhone || "";
-      }
-
-      if (managerEmail !== undefined && managerEmail !== "") {
-        manager.email = validation.normalizedEmail;
-      }
-
-      if (
-        managerPassword !== undefined &&
-        managerPassword !== ""
-      ) {
-        const salt = await bcrypt.genSalt(10);
-
-        manager.password_hash = await bcrypt.hash(
-          managerPassword,
-          salt
-        );
-      }
-
-      await manager.save();
-    }
-
-    // Create manager if one does not exist
-    else if (
-      managerName ||
-      managerPhone ||
-      managerEmail ||
-      managerPassword
-    ) {
-      if (!managerEmail || !managerPassword) {
-        return res.status(400).json({
-          message:
-            "Manager email and password are required when creating a new manager.",
-        });
-      }
-
-      const salt = await bcrypt.genSalt(10);
-
-      const password_hash = await bcrypt.hash(
-        managerPassword,
-        salt
-      );
-
-      manager = await Staff.create({
-        full_name: managerName || `${salon.name} Manager`,
-        ...getManagerNameParts(managerName || `${salon.name} Manager`),
-        email: validation.normalizedEmail,
-        phone: validation.normalizedPhone || "",
-        password_hash,
-        role: "manager",
-        status: "Active",
-        salon_id: salon._id,
-      });
-    }
-
     res.json({
       salon,
-      manager: manager
-        ? {
-            id: manager._id,
-            name: manager.full_name,
-            phone: manager.phone,
-            email: manager.email,
-          }
-        : null,
     });
   } catch (error) {
     console.error("updateSalon error:", error);
@@ -631,4 +520,83 @@ export const removeSalonImage = async (req, res) => {
       message: error.message,
     });
   }
+};
+
+export const updateSalonStatus = async (req, res) => {
+  try {
+    const { status, reason } = req.body;
+    const { deactivationType } = req.body;
+    if (!["active", "deactivated"].includes(status)) {
+      return res.status(400).json({ message: "Status must be active or deactivated" });
+    }
+    if (status === "deactivated" && !["temporary", "permanent"].includes(deactivationType)) {
+      return res.status(400).json({ message: "Deactivation type must be temporary or permanent" });
+    }
+
+    const update = status === "deactivated"
+      ? { status, deactivationType, deactivatedAt: new Date(), deactivatedReason: String(reason || "").trim() || null, deactivatedBy: req.user.id }
+      : { status, deactivationType: null, deactivatedAt: null, deactivatedReason: null, deactivatedBy: null };
+
+    const existing = await Salon.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: "Salon not found" });
+
+    const salon = await Salon.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!salon) {
+      return res.status(404).json({ message: "Salon not found" });
+    }
+
+    const manager = await Staff.findOne({ salon_id: salon._id, role: "manager" }).select("_id");
+    if (manager) {
+      await Notification.create({
+        recipient_id: manager._id,
+        recipient_model: "Staff",
+        title: status === "deactivated" ? "Salon deactivated" : "Salon reactivated",
+        message: status === "deactivated"
+          ? `Your salon was deactivated (${deactivationType}).${reason ? ` Reason: ${reason}` : ""}`
+          : "Your salon has been reactivated and is available again.",
+      });
+    }
+
+    if (status === "deactivated" && deactivationType === "permanent") {
+      const today = new Date().toISOString().slice(0, 10);
+      const futureBookings = await Appointment.find({
+        salon_id: salon._id,
+        appointment_date: { $gte: today },
+        status: { $in: ["pending", "confirmed"] },
+      }).select("_id customer_id");
+      await Appointment.updateMany(
+        { _id: { $in: futureBookings.map((booking) => booking._id) } },
+        { $set: { status: "cancelled", cancelled_at: new Date() } }
+      );
+      await Notification.insertMany(futureBookings.filter((booking) => booking.customer_id).map((booking) => ({
+        recipient_id: booking.customer_id,
+        recipient_model: "Customer",
+        title: "Booking cancelled",
+        message: `Your upcoming booking at ${salon.name} was cancelled because the salon was permanently deactivated.`,
+        appointment_id: booking._id,
+      })));
+    }
+
+    res.json(salon);
+  } catch (error) {
+    console.error("updateSalonStatus error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const updateSalonPause = async (req, res) => {
+  const { isPaused } = req.body;
+  if (typeof isPaused !== "boolean") return res.status(400).json({ message: "isPaused must be a boolean" });
+  const salon = await Salon.findById(req.params.id);
+  if (!salon) return res.status(404).json({ message: "Salon not found" });
+  const isSuperAdmin = req.user.role?.toLowerCase() === "super-admin";
+  const isOwner = req.user.role?.toLowerCase() === "manager" && salon._id.toString() === req.user.salon_id;
+  if (!isSuperAdmin && !isOwner) return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+  salon.isPaused = isPaused;
+  await salon.save();
+  res.json(salon);
 };

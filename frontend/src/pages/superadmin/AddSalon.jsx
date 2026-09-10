@@ -5,7 +5,6 @@ import PageHeader from "../../components/ui/PageHeader";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
-import { API_BASE as _API_BASE } from "../../config";
 
 const TIME_SLOTS = [];
 for (let i = 0; i < 24; i++) {

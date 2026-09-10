@@ -8,6 +8,6 @@ const router = express.Router();
 router.post("/", protect, submitFeedback);
 router.get("/public", getPublicFeedback);
 router.get("/my", protect, getMyFeedback);
-router.get("/salon", protect, authorizeRoles("super-admin", "staff-admin", "manager"), getSalonFeedback);
+router.get("/salon", protect, authorizeRoles("super-admin", "manager"), getSalonFeedback);
 
 export default router;
