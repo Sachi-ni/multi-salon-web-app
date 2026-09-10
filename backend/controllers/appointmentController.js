@@ -1125,7 +1125,7 @@ export const completeAppointment = async (req, res) => {
 
     // SALARY: Process salary calculation for completed appointment
     try {
-      await processSalaryOnCompletion(appointment);
+      await processSalaryOnCompletion(appointment._id);
       console.log(`Salary processed for appointment ${appointment._id}`);
     } catch (salaryErr) {
       console.error("Failed to process salary:", salaryErr);
