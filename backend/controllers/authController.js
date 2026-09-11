@@ -159,7 +159,9 @@ export const loginAdmin = async (req, res) => {
       } catch (emailError) {
         console.error("SuperAdmin OTP email delivery failed:", emailError.message);
         if (process.env.NODE_ENV !== "test") {
-          return res.status(500).json({ message: "Failed to send verification code. Please check email configuration." });
+          return res.status(500).json({
+            message: `Failed to send verification code: ${emailError.message || "Please check email configuration."}`
+          });
         }
       }
 
@@ -304,7 +306,9 @@ export const resendSuperAdminOtp = async (req, res) => {
     } catch (emailError) {
       console.error("SuperAdmin OTP resend email failed:", emailError.message);
       if (process.env.NODE_ENV !== "test") {
-        return res.status(500).json({ message: "Failed to send verification code. Please check email configuration." });
+        return res.status(500).json({
+          message: `Failed to send verification code: ${emailError.message || "Please check email configuration."}`
+        });
       }
     }
 
