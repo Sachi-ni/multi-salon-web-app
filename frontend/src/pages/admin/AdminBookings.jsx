@@ -225,25 +225,30 @@ export default function AdminBookings() {
         </div>
       )}
 
-      {/* Status Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {STATUS_FILTERS.map((f) => {
-          const isActive = filter === f;
-          return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={clsx(
-                "px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap",
-                isActive
-                  ? "bg-amber-400 text-black shadow-sm font-extrabold"
-                  : "bg-surface border border-border text-neutral-400 hover:text-white hover:border-amber-400/30"
-              )}
-            >
-              {f}
-            </button>
-          );
-        })}
+      {/* Status Filter Tabs & Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {STATUS_FILTERS.map((f) => {
+            const isActive = filter === f;
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={clsx(
+                  "px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap",
+                  isActive
+                    ? "bg-amber-400 text-black shadow-sm font-extrabold"
+                    : "bg-surface border border-border text-neutral-400 hover:text-white hover:border-amber-400/30"
+                )}
+              >
+                {f}
+              </button>
+            );
+          })}
+        </div>
+        <Button variant="secondary" icon={Calendar} onClick={() => navigate(`/salon-admin/${salonId}/adminSchedule`)}>
+          Staff Schedule
+        </Button>
       </div>
 
       {/* Search & Filter Controls */}
