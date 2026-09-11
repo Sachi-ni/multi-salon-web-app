@@ -1,7 +1,11 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import dns from "dns";
 import connectDB from "./config/db.js";
+
+// Force IPv4 first to prevent ENETUNREACH in cloud containers (Render, Docker, AWS)
+dns.setDefaultResultOrder("ipv4first");
 
 import authRoutes from "./routes/authRoutes.js";
 import staffRoutes from "./routes/staffRoutes.js";
