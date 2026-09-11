@@ -450,7 +450,7 @@ export default function AdminBookings() {
                   <div className="pt-2.5 border-t border-border/50 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-neutral-400 font-medium">Duration:</span>
-                      {a.status === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
+                      {a.status?.toLowerCase() === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
                         <button 
                           onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
                           className="text-amber-400 text-2xs hover:underline font-bold"
@@ -500,7 +500,7 @@ export default function AdminBookings() {
                   </span>
 
                   <div className="flex items-center gap-2">
-                    {a.status === "pending" && user?.role === "super-admin" && (
+                    {a.status?.toLowerCase() === "pending" && (
                       <>
                         <button
                           onClick={() => handleConfirm(a._id)}
@@ -521,7 +521,7 @@ export default function AdminBookings() {
                       </>
                     )}
 
-                    {a.status === "confirmed" && (
+                    {a.status?.toLowerCase() === "confirmed" && (
                       <>
                         <button
                           onClick={() => setEditingStaffAppointment(a)}
@@ -605,7 +605,7 @@ export default function AdminBookings() {
                   </Table.Td>
                   <Table.Td align="right">
                     <div className="flex items-center justify-end gap-2">
-                      {a.status === "pending" && user?.role === "super-admin" && (
+                      {a.status?.toLowerCase() === "pending" && (
                         <>
                           <button
                             onClick={() => handleConfirm(a._id)}
@@ -623,7 +623,7 @@ export default function AdminBookings() {
                           </button>
                         </>
                       )}
-                      {a.status === "confirmed" && (
+                      {a.status?.toLowerCase() === "confirmed" && (
                         <>
                           <button
                             onClick={() => setEditingStaffAppointment(a)}
