@@ -21,12 +21,12 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     if (/^\d{1,2}:\d{2}/.test(t)) { const [h, m] = t.split(":").map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d; }
     return new Date(t);
   };
-  const timeToMinutes = (time) => {
+  const toHHMM = useCallback((t) => { if (!t) return ""; const s = String(t).trim(); const d = /^(\d{1,2}):(\d{2})/.exec(s); if (d) return `${String(Number(d[1])).padStart(2, "0")}:${d[2]}`; const e = /[T\s](\d{1,2}):(\d{2})/.exec(s); if (e) return `${String(Number(e[1])).padStart(2, "0")}:${e[2]}`; return s; }, []);
+  const timeToMinutes = useCallback((time) => {
     const [hours, minutes] = toHHMM(time).split(":").map(Number);
     return (hours || 0) * 60 + (minutes || 0);
-  };
+  }, [toHHMM]);
   const computeEndTime = useCallback((start, dur) => { const d = parseTimeToDate(start); if (isNaN(d.getTime())) return ""; d.setMinutes(d.getMinutes() + (dur || 30)); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }, []);
-  const toHHMM = (t) => { if (!t) return ""; const s = String(t).trim(); const d = /^(\d{1,2}):(\d{2})/.exec(s); if (d) return `${String(Number(d[1])).padStart(2, "0")}:${d[2]}`; const e = /[T\s](\d{1,2}):(\d{2})/.exec(s); if (e) return `${String(Number(e[1])).padStart(2, "0")}:${e[2]}`; return s; };
   const formatTime = (t) => { if (!t) return ""; const m = /^(\d{1,2}):(\d{2})/.exec(t); if (m) { let h = Number(m[1]); const m2 = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return `${h}:${m[2]} ${m2}`; } const d = new Date(t); if (isNaN(d.getTime())) return t; return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 
   const isStaffDoubleBooked = useCallback((staffId, startTime, endTime, excludeIndex) => {
@@ -62,7 +62,7 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     });
     setServices(initialServices);
     setLoading(false);
-  }, [appointment]);
+  }, [appointment, toHHMM]);
 
   const fetchAvailableStaff = useCallback(async (index, startTime, endTimeOverride) => {
     const svc = services[index];
@@ -88,7 +88,7 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     } finally {
       setLoadingStaff((prev) => ({ ...prev, [index]: false }));
     }
-  }, [services, appointment.appointment_date, appointment._id, salonId, computeEndTime]);
+  }, [services, appointment.appointment_date, appointment._id, salonId, computeEndTime, toHHMM]);
 
   const fetchAlternateTimeSlots = useCallback(async (index) => {
     const svc = services[index];
@@ -114,7 +114,7 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     } finally {
       setLoadingSlots((prev) => ({ ...prev, [index]: false }));
     }
-  }, [services, appointment.appointment_date, appointment._id, salonId]);
+  }, [services, appointment.appointment_date, appointment._id, salonId, timeToMinutes]);
 
   useEffect(() => {
     services.forEach((svc, index) => {
