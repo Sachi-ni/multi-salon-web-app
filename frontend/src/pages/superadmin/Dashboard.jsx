@@ -272,9 +272,9 @@ export default function Dashboard() {
         <div className="space-y-6">
           {/* Quick Actions Card */}
           <Card>
-            <Card.Header>
-              <Card.Title>Quick Management Actions</Card.Title>
-              <Card.Subtitle>Direct shortcuts to perform common admin operations</Card.Subtitle>
+            <Card.Header className="flex flex-col items-start gap-1 mb-4">
+              <Card.Title className="text-base font-extrabold text-white">Quick Management Actions</Card.Title>
+              <Card.Subtitle className="text-xs text-muted-2">Direct shortcuts to perform common admin operations</Card.Subtitle>
             </Card.Header>
             <div className="flex flex-col gap-2.5">
               {quickActions.map((action, i) => (
