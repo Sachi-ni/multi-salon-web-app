@@ -6,6 +6,7 @@ import ChatWidget from "./components/chatbot/ChatWidget";
 
 import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
+import { AlertProvider } from "./context/AlertContext";
 
 // General Pages
 import Login from "./pages/auth/Login.jsx";
@@ -87,6 +88,7 @@ const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
 function App() {
   return (
     <AuthProvider>
+    <AlertProvider>
     <ToastProvider>
     <BrowserRouter>
       {/* All Routes MUST be inside this container */}
@@ -367,6 +369,7 @@ function App() {
       <ChatWidget />
     </BrowserRouter>
     </ToastProvider>
+    </AlertProvider>
     </AuthProvider>
   );
 }
