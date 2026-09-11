@@ -24,8 +24,9 @@ import {
 
 import { motion } from "framer-motion";
 import {
-  AreaChart,
+  ComposedChart,
   Area,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -133,7 +134,7 @@ const AdminDashboard = () => {
     return last7Days.map((dateStr) => {
       const dayAppts = appointments.filter((a) => a.appointment_date === dateStr);
       const dayRevenue = dayAppts
-        .filter((a) => ["completed", "confirmed"].includes(a.status?.toLowerCase()))
+        .filter((a) => ["completed"].includes(a.status?.toLowerCase()))
         .reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
 
       const label = new Date(dateStr).toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
@@ -340,7 +341,7 @@ const AdminDashboard = () => {
 
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
@@ -359,8 +360,8 @@ const AdminDashboard = () => {
                 contentStyle={{ backgroundColor: "#171717", borderColor: "#404040", borderRadius: "12px", color: "#fff", fontSize: "12px" }}
               />
               <Area yAxisId="left" type="monotone" dataKey="revenue" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#revenueGradient)" name="Revenue (LKR)" />
-              <Area yAxisId="right" type="monotone" dataKey="bookings" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#bookingsGradient)" name="Bookings" />
-            </AreaChart>
+              <Bar yAxisId="right" dataKey="bookings" fill="url(#bookingsGradient)" radius={[4, 4, 0, 0]} maxBarSize={40} name="Bookings" />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
