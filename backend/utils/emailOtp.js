@@ -36,30 +36,15 @@ export const maskEmail = (email) => {
 
 /**
  * Sends the 6-digit OTP code to the SuperAdmin's email address.
+ * Supports both HTTP-based email (Resend API) and standard SMTP (Nodemailer).
+ * If cloud hosting (like Render Free Tier) blocks outbound SMTP ports, the code is
+ * prominently logged in the server console so login is never broken.
  */
 export const sendSuperAdminOtpEmail = async ({ email, code }) => {
-  // In test/development without email credentials configured, log and avoid throwing if running tests
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    if (process.env.NODE_ENV === "test") {
-      console.log(`[TEST MODE] SuperAdmin OTP for ${email}: ${code}`);
-      return;
-    }
-    throw new Error("Email service is not configured. Please set EMAIL_USER and EMAIL_PASS in backend/.env");
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    family: 4, // Force IPv4 (fixes ENETUNREACH on Render/cloud containers)
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  });
+  // Always log the OTP code in the server logs so developers / admins can always access it
+  console.log("============================================================");
+  console.log(`🔑 [SUPERADMIN OTP CODE]: ${code} (For: ${email})`);
+  console.log("============================================================");
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -104,13 +89,67 @@ export const sendSuperAdminOtpEmail = async ({ email, code }) => {
     </html>
   `;
 
-  await transporter.sendMail({
-    from: `"SalonHub Security" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: `SalonHub Verification Code: ${code}`,
-    text: `Your SalonHub SuperAdmin verification code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this login, please secure your account immediately.`,
-    html: htmlContent,
-  });
+  // 1. If RESEND_API_KEY is configured, use HTTP REST API (never blocked by cloud firewalls on port 443)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const resendRes = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "SalonHub Security <onboarding@resend.dev>",
+          to: [email],
+          subject: `SalonHub Verification Code: ${code}`,
+          html: htmlContent,
+        }),
+      });
 
-  console.log(`[SuperAdmin OTP] Verification code successfully emailed to: ${email}`);
+      if (resendRes.ok) {
+        console.log(`[SuperAdmin OTP] Verification code emailed via Resend HTTP API to: ${email}`);
+        return { delivered: true, provider: "resend" };
+      }
+      const resendErr = await resendRes.text();
+      console.warn(`[SuperAdmin OTP] Resend HTTP API error: ${resendErr}`);
+    } catch (httpErr) {
+      console.warn(`[SuperAdmin OTP] Resend HTTP fetch failed: ${httpErr.message}`);
+    }
+  }
+
+  // 2. If SMTP credentials exist, attempt SMTP with a fast 4s timeout
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        family: 4,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+        connectionTimeout: 4000,
+        greetingTimeout: 4000,
+        socketTimeout: 5000,
+      });
+
+      await transporter.sendMail({
+        from: `"SalonHub Security" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: `SalonHub Verification Code: ${code}`,
+        text: `Your SalonHub SuperAdmin verification code is: ${code}\n\nThis code expires in 10 minutes.`,
+        html: htmlContent,
+      });
+
+      console.log(`[SuperAdmin OTP] Verification code successfully emailed to: ${email}`);
+      return { delivered: true, provider: "smtp" };
+    } catch (smtpErr) {
+      console.warn(`[SuperAdmin OTP] SMTP delivery blocked or failed (${smtpErr.message}). Code is available in server logs above.`);
+      // Return gracefully so cloud host port blocking does not break the login flow
+      return { delivered: false, inLogs: true, error: smtpErr.message };
+    }
+  }
+
+  return { delivered: false, inLogs: true };
 };
