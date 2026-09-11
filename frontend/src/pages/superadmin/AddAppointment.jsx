@@ -421,15 +421,22 @@ export default function AddAppointment() {
                     value={booking.customerPhone}
                     onChange={(e) => setBooking(prev => ({ ...prev, customerPhone: e.target.value }))}
                     placeholder="Enter guest phone (optional)"
-                    className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-accent transition-all"
+                    className={`w-full bg-surface-2 border ${booking.customerPhone.trim() !== "" && !/^(?:\+94|0)\d{9}$/.test(booking.customerPhone.trim()) ? "border-danger focus:border-danger" : "border-border focus:border-accent"} rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all`}
                   />
+                  {booking.customerPhone.trim() !== "" && !/^(?:\+94|0)\d{9}$/.test(booking.customerPhone.trim()) && (
+                    <p className="text-danger text-xs mt-1.5">Please enter a valid Sri Lankan phone number (e.g., 0771234567).</p>
+                  )}
                 </div>
               </div>
             )}
 
             <div className="flex justify-end mt-6">
               <button
-                disabled={customerType === "registered" ? !booking.customerId || booking.customerId === "guest" : !booking.customerName.trim()}
+                disabled={
+                  customerType === "registered"
+                    ? !booking.customerId || booking.customerId === "guest"
+                    : !booking.customerName.trim() || (booking.customerPhone.trim() !== "" && !/^(?:\+94|0)\d{9}$/.test(booking.customerPhone.trim()))
+                }
                 onClick={() => setStep(1)}
                 className="px-6 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-glow"
               >
