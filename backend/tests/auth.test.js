@@ -26,20 +26,81 @@ test("valid registration creates a customer without a server error", async () =>
   expect(await Customer.exists({ email: "valid@example.com", role: "customer" })).toBeTruthy();
 });
 
-test("SuperAdmin hardening blocks full login", async () => {
-  await Admin.create({ full_name: "Seeded", username: "seeded", email: "seeded@example.com", password: await bcrypt.hash("Strong!Pass1", 12), role: "super-admin", mustChangePassword: true, mfaEnrolled: false });
+test("SuperAdmin login returns 2FA OTP challenge", async () => {
+  await Admin.create({
+    full_name: "Seeded",
+    username: "seeded",
+    email: "seeded@example.com",
+    password: await bcrypt.hash("Strong!Pass1", 12),
+    role: "super-admin",
+    mustChangePassword: true,
+    mfaEnrolled: false
+  });
+
   const response = await request(app).post("/api/auth/login").send({ email: "seeded@example.com", password: "Strong!Pass1" });
   expect(response.status).toBe(200);
-  expect(response.body.requiresHardening).toBe(true);
-  expect(response.body.hardeningStep).toBe("change-password");
-  expect(response.body.token).toBeDefined();
+  expect(response.body.requires2FA).toBe(true);
+  expect(response.body.tempToken).toBeDefined();
+  expect(response.body.emailMasked).toBeDefined();
+
+  // Test invalid OTP fails
+  const badOtpRes = await request(app)
+    .post("/api/auth/verify-superadmin-otp")
+    .send({ tempToken: response.body.tempToken, otpCode: "000000" });
+  expect(badOtpRes.status).toBe(400);
+
+  // Retrieve stored OTP hash and verify with actual code
+  const seededAdmin = await Admin.findOne({ email: "seeded@example.com" });
+  expect(seededAdmin.otpCodeHash).toBeDefined();
+  expect(seededAdmin.otpAttempts).toBe(1);
 });
 
-test("legacy SuperAdmin without hardening fields receives a full session", async () => {
-  await Admin.collection.insertOne({ full_name: "Legacy", username: "legacy", email: "legacy@example.com", password: await bcrypt.hash("Strong!Pass1", 12), role: "super-admin" });
-  const response = await request(app).post("/api/auth/login").send({ email: "legacy@example.com", password: "Strong!Pass1" });
-  expect(response.status).toBe(200);
-  expect(response.body.role).toBe("super-admin");
-  expect(response.body.token).toBeDefined();
-  expect(response.body.requiresHardening).toBeUndefined();
+test("SuperAdmin OTP verification triggers password change when mustChangePassword is true", async () => {
+  const admin = await Admin.findOne({ email: "seeded@example.com" });
+  // Manually set known OTP
+  const { hashOtpCode } = await import("../utils/emailOtp.js");
+  admin.otpCodeHash = hashOtpCode("123456");
+  admin.otpExpires = new Date(Date.now() + 600000);
+  admin.otpAttempts = 0;
+  await admin.save();
+
+  const { generatePending2FaToken } = await import("../utils/generateToken.js");
+  const tempToken = generatePending2FaToken(admin);
+
+  const verifyRes = await request(app)
+    .post("/api/auth/verify-superadmin-otp")
+    .send({ tempToken, otpCode: "123456" });
+
+  expect(verifyRes.status).toBe(200);
+  expect(verifyRes.body.requiresPasswordChange).toBe(true);
+  expect(verifyRes.body.token).toBeDefined();
+});
+
+test("SuperAdmin OTP verification issues full session when mustChangePassword is false", async () => {
+  const admin = await Admin.create({
+    full_name: "Normal SuperAdmin",
+    username: "normalsuper",
+    email: "normalsuper@example.com",
+    password: await bcrypt.hash("Strong!Pass1", 12),
+    role: "super-admin",
+    mustChangePassword: false,
+    mfaEnrolled: true,
+  });
+
+  const { hashOtpCode } = await import("../utils/emailOtp.js");
+  admin.otpCodeHash = hashOtpCode("654321");
+  admin.otpExpires = new Date(Date.now() + 600000);
+  admin.otpAttempts = 0;
+  await admin.save();
+
+  const { generatePending2FaToken } = await import("../utils/generateToken.js");
+  const tempToken = generatePending2FaToken(admin);
+
+  const verifyRes = await request(app)
+    .post("/api/auth/verify-superadmin-otp")
+    .send({ tempToken, otpCode: "654321" });
+
+  expect(verifyRes.status).toBe(200);
+  expect(verifyRes.body.role).toBe("super-admin");
+  expect(verifyRes.body.token).toBeDefined();
 });

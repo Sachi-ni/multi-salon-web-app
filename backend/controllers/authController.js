@@ -3,7 +3,8 @@ import Staff from "../models/Staff.js";
 import Customer from "../models/Customer.js";
 import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
-import generateToken, { generateHardeningToken } from "../utils/generateToken.js";
+import jwt from "jsonwebtoken";
+import generateToken, { generateHardeningToken, generatePending2FaToken } from "../utils/generateToken.js";
 import { storeMedia } from "../utils/mediaStorage.js";
 import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
 import {
@@ -11,6 +12,15 @@ import {
   hashPasswordResetToken,
   sendPasswordResetEmail,
 } from "../utils/passwordReset.js";
+import {
+  generateOtpCode,
+  hashOtpCode,
+  maskEmail,
+  sendSuperAdminOtpEmail,
+  OTP_EXPIRATION_MS,
+  OTP_RESEND_COOLDOWN_MS,
+  MAX_OTP_ATTEMPTS,
+} from "../utils/emailOtp.js";
 
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/;
@@ -135,20 +145,33 @@ export const loginAdmin = async (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    // Do not issue a full session until the seeded SuperAdmin changes the password and enrolls MFA.
-    const requiresPasswordChange = admin.mustChangePassword === true;
-    const requiresMfa = admin.mfaEnrolled === false;
-    // Older SuperAdmin documents predate these fields; only explicit hardening flags block them.
-    if (admin.role === "super-admin" && (requiresPasswordChange || requiresMfa)) {
-      const purpose = requiresPasswordChange ? "change-password" : "mfa-setup";
+    // SuperAdmin requires 2FA via Email OTP
+    if (admin.role === "super-admin") {
+      const otpCode = generateOtpCode();
+      admin.otpCodeHash = hashOtpCode(otpCode);
+      admin.otpExpires = new Date(Date.now() + OTP_EXPIRATION_MS);
+      admin.otpAttempts = 0;
+      admin.otpLastSentAt = new Date();
+      await admin.save();
+
+      try {
+        await sendSuperAdminOtpEmail({ email: admin.email, code: otpCode });
+      } catch (emailError) {
+        console.error("SuperAdmin OTP email delivery failed:", emailError.message);
+        if (process.env.NODE_ENV !== "test") {
+          return res.status(500).json({ message: "Failed to send verification code. Please check email configuration." });
+        }
+      }
+
       return res.status(200).json({
-        requiresHardening: true,
-        hardeningStep: purpose,
-        token: generateHardeningToken(admin, purpose),
+        requires2FA: true,
+        tempToken: generatePending2FaToken(admin),
+        emailMasked: maskEmail(admin.email),
+        message: "Authentication code sent to your email address",
       });
     }
 
-res.json({
+    res.json({
       id: admin._id,
       name: admin.full_name,
       email: admin.email,
@@ -164,6 +187,136 @@ res.json({
   }
 };
 
+export const verifySuperAdminOtp = async (req, res) => {
+  try {
+    const { tempToken, otpCode } = req.body;
+    if (!tempToken || !otpCode) {
+      return res.status(400).json({ message: "Verification token and 6-digit code are required" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ message: "Verification session expired or invalid. Please sign in again." });
+    }
+
+    if (decoded.purpose !== "superadmin-2fa") {
+      return res.status(403).json({ message: "Invalid verification purpose" });
+    }
+
+    const admin = await Admin.findById(decoded.id);
+    if (!admin || admin.role !== "super-admin") {
+      return res.status(404).json({ message: "SuperAdmin account not found" });
+    }
+
+    if (!admin.otpExpires || admin.otpExpires <= new Date()) {
+      return res.status(400).json({ message: "Verification code has expired. Please request a new one." });
+    }
+
+    if ((admin.otpAttempts || 0) >= MAX_OTP_ATTEMPTS) {
+      return res.status(429).json({ message: "Too many incorrect attempts. Please sign in again to request a new code." });
+    }
+
+    const providedHash = hashOtpCode(otpCode);
+    if (admin.otpCodeHash !== providedHash) {
+      admin.otpAttempts = (admin.otpAttempts || 0) + 1;
+      await admin.save();
+      const remaining = MAX_OTP_ATTEMPTS - admin.otpAttempts;
+      return res.status(400).json({
+        message: remaining > 0
+          ? `Invalid verification code. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`
+          : "Too many incorrect attempts. Please sign in again to request a new code."
+      });
+    }
+
+    // OTP is valid! Clear OTP fields and enroll MFA
+    admin.otpCodeHash = null;
+    admin.otpExpires = null;
+    admin.otpAttempts = 0;
+    admin.otpLastSentAt = null;
+    admin.mfaEnrolled = true;
+    await admin.save();
+
+    // If initial password must be changed (e.g. client handover), enforce change password
+    if (admin.mustChangePassword === true) {
+      return res.status(200).json({
+        requiresPasswordChange: true,
+        message: "Code verified. Please set your new password before proceeding.",
+        token: generateHardeningToken(admin, "change-password"),
+      });
+    }
+
+    return res.status(200).json({
+      id: admin._id,
+      name: admin.full_name,
+      email: admin.email,
+      phone: admin.phone,
+      image: admin.image,
+      role: admin.role,
+      salon_id: admin.salon_id,
+      token: generateToken(admin)
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message || "Failed to verify authentication code" });
+  }
+};
+
+export const resendSuperAdminOtp = async (req, res) => {
+  try {
+    const { tempToken } = req.body;
+    if (!tempToken) {
+      return res.status(400).json({ message: "Verification token is required" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ message: "Verification session expired. Please sign in again." });
+    }
+
+    if (decoded.purpose !== "superadmin-2fa") {
+      return res.status(403).json({ message: "Invalid verification purpose" });
+    }
+
+    const admin = await Admin.findById(decoded.id);
+    if (!admin || admin.role !== "super-admin") {
+      return res.status(404).json({ message: "SuperAdmin account not found" });
+    }
+
+    // Rate limiting: 60s cooldown
+    const now = Date.now();
+    if (admin.otpLastSentAt && (now - new Date(admin.otpLastSentAt).getTime() < OTP_RESEND_COOLDOWN_MS)) {
+      const waitSeconds = Math.ceil((OTP_RESEND_COOLDOWN_MS - (now - new Date(admin.otpLastSentAt).getTime())) / 1000);
+      return res.status(429).json({ message: `Please wait ${waitSeconds}s before requesting another code.` });
+    }
+
+    const newCode = generateOtpCode();
+    admin.otpCodeHash = hashOtpCode(newCode);
+    admin.otpExpires = new Date(now + OTP_EXPIRATION_MS);
+    admin.otpAttempts = 0;
+    admin.otpLastSentAt = new Date(now);
+    await admin.save();
+
+    try {
+      await sendSuperAdminOtpEmail({ email: admin.email, code: newCode });
+    } catch (emailError) {
+      console.error("SuperAdmin OTP resend email failed:", emailError.message);
+      if (process.env.NODE_ENV !== "test") {
+        return res.status(500).json({ message: "Failed to send verification code. Please check email configuration." });
+      }
+    }
+
+    return res.status(200).json({
+      message: "A new authentication code has been sent to your email.",
+      emailMasked: maskEmail(admin.email),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message || "Failed to resend code" });
+  }
+};
+
 export const changePassword = async (req, res) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ message: "Password is required" });
@@ -173,8 +326,19 @@ export const changePassword = async (req, res) => {
   if (!admin) return res.status(404).json({ message: "User not found" });
   admin.password = await bcrypt.hash(password, 12);
   admin.mustChangePassword = false;
+  admin.mfaEnrolled = true;
   await admin.save();
-  res.json({ message: "Password changed; MFA setup is required", token: generateHardeningToken(admin, "mfa-setup") });
+  res.json({
+    message: "Password changed successfully",
+    token: generateToken(admin),
+    id: admin._id,
+    name: admin.full_name,
+    email: admin.email,
+    phone: admin.phone,
+    image: admin.image,
+    role: admin.role,
+    salon_id: admin.salon_id,
+  });
 };
 
 export const setupMfa = async (req, res) => {
