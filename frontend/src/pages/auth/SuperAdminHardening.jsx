@@ -31,6 +31,12 @@ const SuperAdminHardening = () => {
       if (!response.ok) throw new Error(data.message || "Security setup failed");
 
       if (step === "change-password") {
+        if (data.token && data.role === "super-admin") {
+          const { token: sessionToken, ...userData } = data;
+          login(userData, sessionToken);
+          navigate("/superAdminDashboard", { replace: true });
+          return;
+        }
         setPassword("");
         setToken(data.token);
         setStep("mfa-setup");

@@ -22,4 +22,14 @@ export const generateHardeningToken = (user, purpose) => jwt.sign(
   { expiresIn: "15m" }
 );
 
+export const generatePending2FaToken = (user) => jwt.sign(
+  {
+    id: user._id,
+    role: user.role,
+    purpose: "superadmin-2fa",
+  },
+  process.env.JWT_SECRET,
+  { expiresIn: "10m" }
+);
+
 export default generateToken;
