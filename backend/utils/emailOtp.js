@@ -51,6 +51,7 @@ export const sendSuperAdminOtpEmail = async ({ email, code }) => {
     host: "smtp.gmail.com",
     port: 465,
     secure: true,
+    family: 4, // Force IPv4 (fixes ENETUNREACH on Render/cloud containers)
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
