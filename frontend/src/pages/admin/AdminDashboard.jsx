@@ -67,8 +67,16 @@ const AdminDashboard = () => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(today.getDate() - 30);
 
-      const startStr = thirtyDaysAgo.toISOString().split("T")[0];
-      const endStr = today.toISOString().split("T")[0];
+      const startStr = [
+        thirtyDaysAgo.getFullYear(),
+        String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0'),
+        String(thirtyDaysAgo.getDate()).padStart(2, '0')
+      ].join('-');
+      const endStr = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0')
+      ].join('-');
 
       const [salonRes, apptRes, staffRes, feedbackRes, reportRes] = await Promise.allSettled([
         getSalon(salonId),
@@ -106,7 +114,7 @@ const AdminDashboard = () => {
   // Total Projected Revenue (Completed + Confirmed)
   const totalRevenue = useMemo(() => {
     if (reportData?.totalProjectedRevenue) return reportData.totalProjectedRevenue;
-    const valid = appointments.filter(a => ["completed", "confirmed"].includes(a.status));
+    const valid = appointments.filter(a => ["completed", "confirmed"].includes(a.status?.toLowerCase()));
     return valid.reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
   }, [appointments, reportData]);
 
@@ -115,13 +123,17 @@ const AdminDashboard = () => {
     const last7Days = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split("T")[0];
+      return [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, '0'),
+        String(d.getDate()).padStart(2, '0')
+      ].join('-');
     });
 
     return last7Days.map((dateStr) => {
       const dayAppts = appointments.filter((a) => a.appointment_date === dateStr);
       const dayRevenue = dayAppts
-        .filter((a) => ["completed", "confirmed"].includes(a.status))
+        .filter((a) => ["completed", "confirmed"].includes(a.status?.toLowerCase()))
         .reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
 
       const label = new Date(dateStr).toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
@@ -339,18 +351,20 @@ const AdminDashboard = () => {
                   <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+              <CartesianGrid strokeDasharray="4 4" stroke="#525252" vertical={false} />
               <XAxis dataKey="date" stroke="#737373" fontSize={11} tickLine={false} />
-              <YAxis stroke="#737373" fontSize={11} tickLine={false} />
+              <YAxis yAxisId="left" stroke="#737373" fontSize={11} tickLine={false} />
+              <YAxis yAxisId="right" orientation="right" stroke="#737373" fontSize={11} tickLine={false} />
               <Tooltip
                 contentStyle={{ backgroundColor: "#171717", borderColor: "#404040", borderRadius: "12px", color: "#fff", fontSize: "12px" }}
               />
-              <Area type="monotone" dataKey="revenue" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#revenueGradient)" name="Revenue (LKR)" />
-              <Area type="monotone" dataKey="bookings" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#bookingsGradient)" name="Bookings" />
+              <Area yAxisId="left" type="monotone" dataKey="revenue" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#revenueGradient)" name="Revenue (LKR)" />
+              <Area yAxisId="right" type="monotone" dataKey="bookings" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#bookingsGradient)" name="Bookings" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
+
 
       {/* Quick Actions & Recent Appointments Split */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
