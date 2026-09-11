@@ -103,8 +103,30 @@ export default function ChatWidget() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [hasGreeted, setHasGreeted] = useState(false);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth <= 640 : false
+  );
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 640);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Prevent background scrolling on mobile when chat is open
+  useEffect(() => {
+    if (isOpen && isMobile) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen, isMobile]);
 
   // Auto-scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -117,12 +139,12 @@ export default function ChatWidget() {
     scrollToBottom();
   }, [messages, isTyping, scrollToBottom]);
 
-  // Focus input when chat opens
+  // Focus input when chat opens only on non-mobile devices to prevent mobile auto-zoom
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !isMobile) {
       setTimeout(() => inputRef.current?.focus(), 300);
     }
-  }, [isOpen]);
+  }, [isOpen, isMobile]);
 
   // Send welcome message on first open
   useEffect(() => {
@@ -225,10 +247,26 @@ export default function ChatWidget() {
         {isOpen && (
           <motion.div
             className="chat-window"
-            initial={{ opacity: 0, scale: 0.85, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.85, y: 30 }}
-            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            initial={
+              isMobile
+                ? { opacity: 0, y: "100%" }
+                : { opacity: 0, scale: 0.85, y: 30 }
+            }
+            animate={
+              isMobile
+                ? { opacity: 1, y: 0 }
+                : { opacity: 1, scale: 1, y: 0 }
+            }
+            exit={
+              isMobile
+                ? { opacity: 0, y: "100%" }
+                : { opacity: 0, scale: 0.85, y: 30 }
+            }
+            transition={
+              isMobile
+                ? { type: "spring", damping: 28, stiffness: 300 }
+                : { type: "spring", stiffness: 350, damping: 25 }
+            }
           >
             {/* Header */}
             <div className="chat-header">
