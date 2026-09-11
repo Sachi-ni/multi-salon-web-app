@@ -11,6 +11,7 @@ import AddApointmnet from "./AddApointmnet";
 import Billing from "./Billing";
 import AdminReviews from "./AdminReviews";
 import AdminAnalytics from "./AdminAnalytics";
+import AdminSchedule from "./AdminSchedule";
 import SalonPhotos from "./SalonPhotos";
 
 
@@ -23,6 +24,7 @@ export default function SalonAdminShell() {
       {/* Sidebar button "Dashboard" points to /adminDashboard */}
       <Route path="adminDashboard" element={<AdminDashboard />} />
       <Route path="adminAppointments" element={<AdminBookings />} />
+      <Route path="adminSchedule" element={<AdminSchedule />} />
       <Route path="adminStaff" element={<Staff />} />
       <Route path="adminServices" element={<Services />} />
 
