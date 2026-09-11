@@ -135,6 +135,7 @@ export default function ChatWidget() {
             from: "bot",
             text: "Hello! 👋 Welcome to **SalonHub**! I'm your virtual assistant. How can I help you today?",
             quickReplies: [
+              "✨ Style Consultant",
               "Our Services",
               "Pricing",
               "Salon Locations",
