@@ -7,7 +7,8 @@ import {
   PieChart as PieChartIcon, LineChart as LineChartIcon, Sparkles, Award, Repeat
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { ComposedChart, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+import {
+  ComposedChart, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
@@ -95,6 +96,7 @@ export default function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dateRange, setDateRange] = useState("30days");
+  const [staffFilter, setStaffFilter] = useState("all");
 
   const [appointments, setAppointments] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -236,17 +238,37 @@ export default function AdminAnalytics() {
 
     // 2. Staff Performance
     const staffMap = {};
-    staff.forEach(s => staffMap[s._id] = { name: s.user_id?.name || s.name || "Unknown", completed: 0, revenue: 0 });
+    staff.forEach(s => staffMap[s._id] = { _id: s._id, name: s.user_id?.name || s.name || "Unknown", completed: 0, revenue: 0 });
     filteredAppointments.forEach(a => {
-      if (a.status === "completed" && a.staff_id) {
-        const sid = typeof a.staff_id === 'object' ? a.staff_id._id : a.staff_id;
-        if (staffMap[sid]) {
-          staffMap[sid].completed += 1;
-          staffMap[sid].revenue += (a.total_price || 0);
+      if (a.status === "completed") {
+        if (a.appointment_services && a.appointment_services.length > 0) {
+          const staffSeenInThisBooking = new Set();
+          a.appointment_services.forEach(asv => {
+            const sid = typeof asv.staff_id === 'object' ? asv.staff_id._id : asv.staff_id;
+            if (staffMap[sid]) {
+              if (!staffSeenInThisBooking.has(sid)) {
+                staffMap[sid].completed += 1;
+                staffSeenInThisBooking.add(sid);
+              }
+              const rev = asv.sub_price !== undefined ? asv.sub_price : (a.total_price / a.appointment_services.length);
+              staffMap[sid].revenue += rev;
+            }
+          });
+        } else if (a.staff_id) {
+          const sid = typeof a.staff_id === 'object' ? a.staff_id._id : a.staff_id;
+          if (staffMap[sid]) {
+            staffMap[sid].completed += 1;
+            staffMap[sid].revenue += (a.total_price || 0);
+          }
         }
       }
     });
-    const staffData = Object.values(staffMap).filter(s => s.completed > 0 || s.revenue > 0);
+    
+    // Apply local staff filter
+    const staffData = Object.values(staffMap).filter(s => {
+      if (staffFilter !== "all") return s._id === staffFilter;
+      return s.completed > 0 || s.revenue > 0;
+    });
 
     // 3. Top Services
     const serviceMap = {};
@@ -285,7 +307,7 @@ export default function AdminAnalytics() {
     const customerGrowthData = Object.keys(custMap).sort().map(date => ({ date, newCustomers: custMap[date] }));
 
     return { trendData, staffData, topServicesData, statusData, customerGrowthData };
-  }, [filteredData, kpis, staff, services]);
+  }, [filteredData, services, staff, staffFilter]);
 
   /* ── Recent Activity ── */
   const recentActivity = useMemo(() => {
@@ -329,21 +351,23 @@ export default function AdminAnalytics() {
           backTo={`/salon-admin/${salonId}/adminDashboard`}
         />
 
-        {/* Pill-style date range selector */}
-        <div className="flex items-center bg-surface-2 border border-border rounded-xl p-1 gap-0.5 flex-shrink-0">
-          {dateRangeOptions.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setDateRange(opt.value)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
-                dateRange === opt.value
-                  ? "bg-accent text-primary shadow-glow-sm"
-                  : "text-muted-2 hover:text-white hover:bg-surface-3"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        {/* Filters Container */}
+        <div className="flex items-center gap-4 flex-wrap justify-end">
+          {/* Pill-style date range selector */}
+          <div className="flex items-center bg-surface-2 border border-border rounded-xl p-1 gap-0.5 flex-shrink-0">
+            {dateRangeOptions.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setDateRange(opt.value)}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${dateRange === opt.value
+                    ? "bg-accent text-primary shadow-glow-sm"
+                    : "text-muted-2 hover:text-white hover:bg-surface-3"
+                  }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -483,13 +507,13 @@ export default function AdminAnalytics() {
                       dot={{ r: 3, fill: "#a855f7", stroke: "#0a0a0a", strokeWidth: 2 }}
                       activeDot={{ r: 5, stroke: "#a855f7", strokeWidth: 2, fill: "#0a0a0a" }}
                     />
-                    <Bar 
-                      yAxisId="right" 
-                      dataKey="completed" 
-                      name="Bookings" 
-                      fill="url(#bookingsGrad)" 
-                      radius={[4, 4, 0, 0]} 
-                      maxBarSize={40} 
+                    <Bar
+                      yAxisId="right"
+                      dataKey="completed"
+                      name="Bookings"
+                      fill="url(#bookingsGrad)"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={40}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -561,7 +585,21 @@ export default function AdminAnalytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <motion.div variants={fadeUp}>
               <Card className="h-full">
-                <SectionHeader icon={Users} title="Staff Performance" subtitle="Completed bookings and revenue per staff member" />
+                <div className="flex items-center justify-between mb-4">
+                  <SectionHeader icon={Users} title="Staff Performance" subtitle="Completed bookings and revenue per staff member" />
+                  <select
+                    value={staffFilter}
+                    onChange={(e) => setStaffFilter(e.target.value)}
+                    className="px-2 py-1 text-xs font-semibold rounded-lg bg-surface-2 border border-border text-white focus:outline-none focus:border-accent transition-colors cursor-pointer"
+                  >
+                    <option value="all">All Staff</option>
+                    {staff.map(s => (
+                      <option key={s._id} value={s._id}>
+                        {s.user_id?.name || s.name || "Unknown Staff"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 {chartsData.staffData.length === 0 ? (
                   <div className="py-16 text-center text-muted-2 text-xs">No staff performance data available.</div>
                 ) : (
