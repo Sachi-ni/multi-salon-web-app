@@ -48,11 +48,16 @@ export const sendSuperAdminOtpEmail = async ({ email, code }) => {
   }
 
   const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 
   const htmlContent = `
@@ -105,4 +110,6 @@ export const sendSuperAdminOtpEmail = async ({ email, code }) => {
     text: `Your SalonHub SuperAdmin verification code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this login, please secure your account immediately.`,
     html: htmlContent,
   });
+
+  console.log(`[SuperAdmin OTP] Verification code successfully emailed to: ${email}`);
 };
