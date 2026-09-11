@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const ToastContext = createContext(null);
@@ -22,19 +22,6 @@ export const ToastProvider = ({ children }) => {
     }
   }, [removeToast]);
 
-  // Intercept window.alert so any residual alerts render with website styling
-  useEffect(() => {
-    const originalAlert = window.alert;
-    window.alert = (msg) => {
-      const text = String(msg || "");
-      const isSuccess = /success|confirmed|saved|updated/i.test(text);
-      addToast(text, isSuccess ? "success" : "error");
-    };
-
-    return () => {
-      window.alert = originalAlert;
-    };
-  }, [addToast]);
 
   const toast = {
     error: (msg, duration) => addToast(msg, "error", duration),

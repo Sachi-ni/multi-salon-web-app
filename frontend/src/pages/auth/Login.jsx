@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useAlert } from "../../context/AlertContext";
 import { motion } from "framer-motion";
 import { API_URL } from "../../config";
 
@@ -20,6 +21,7 @@ const readResponse = async (response) => {
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { showAlert } = useAlert();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -60,7 +62,9 @@ const Login = () => {
       }
 
       if (!res.ok) {
-        setError(data.message || "Login failed");
+        const msg = data.message || "Login failed";
+        setError(msg);
+        showAlert(msg);
         setLoading(false);
         return;
       }
@@ -94,7 +98,9 @@ const Login = () => {
       }
     } catch (err) {
       console.error("Login error:", err);
-      setError(err.message || "Unable to reach the server. Please try again.");
+      const msg = err.message || "Unable to reach the server. Please try again.";
+      setError(msg);
+      showAlert(msg);
       setLoading(false);
     }
   };

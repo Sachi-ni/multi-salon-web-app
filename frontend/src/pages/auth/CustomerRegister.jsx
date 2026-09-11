@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useAlert } from "../../context/AlertContext";
 import { motion } from "framer-motion";
 import { API_URL } from "../../config";
 
 const CustomerRegister = () => {
+  const { showAlert } = useAlert();
   const [name, setName]                   = useState("");
   const [email, setEmail]                 = useState("");
   const [phone, setPhone]                 = useState("");
@@ -34,17 +36,23 @@ const CustomerRegister = () => {
 
     const normalizedPhone = phone.replace(/[\s()-]/g, "");
     if (!/^\+?[0-9]{10}$/.test(normalizedPhone)) {
-      setPhoneError("Phone number must contain exactly 10 digits and may start with +");
+      const msg = "Phone number must contain exactly 10 digits and may start with +";
+      setPhoneError(msg);
+      showAlert(msg);
       return;
     }
 
     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password)) {
-      setFormError("Password must be at least 6 characters and include uppercase, lowercase, and number");
+      const msg = "Password must be at least 6 characters and include uppercase, lowercase, and number";
+      setFormError(msg);
+      showAlert(msg);
       return;
     }
 
     if (password !== confirmPassword) {
-      setFormError("Passwords do not match!");
+      const msg = "Passwords do not match!";
+      setFormError(msg);
+      showAlert(msg);
       return;
     }
     setLoading(true);
@@ -58,7 +66,9 @@ const CustomerRegister = () => {
       setFormSuccess("Registration successful! Redirecting to login...");
       setTimeout(() => navigate("/login"), 1200);
     } catch (err) {
-      setFormError(err.response?.data?.message || "Registration failed. Please try again.");
+      const msg = err.response?.data?.message || "Registration failed. Please try again.";
+      setFormError(msg);
+      showAlert(msg);
     } finally {
       setLoading(false);
     }
