@@ -777,7 +777,7 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
 
     // If the date does not exist, create it.
     if (!dailyRecord) {
-      dailyRecord = {
+      salaryRecord.dailyRecords.push({
         date: normalizedAppointmentDate,
         workingAmount: 0,
 
@@ -790,9 +790,8 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
         status: "Not Paid",
         isAbsent: false,
         absentMarkedAt: null,
-      };
-
-      salaryRecord.dailyRecords.push(dailyRecord);
+      });
+      dailyRecord = salaryRecord.dailyRecords[salaryRecord.dailyRecords.length - 1];
     }
 
     // Add only the new completed appointment amount.
