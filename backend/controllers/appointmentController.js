@@ -86,10 +86,10 @@ export const getAvailableStaff = async (req, res) => {
     const salon = await Salon.findOne({ _id: salonId, status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).select("_id");
     if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
 
-    // Admin users (super-admin / manager) may assign salon
-    // managers & admins as service providers even when those users don't have
-    // the service assigned to their profile. Customers keep seeing only staff
-    // who actually perform the selected services.
+    // Admin users (super-admin / manager) may assign salon managers as service
+    // providers even when they do not have the service assigned to their
+    // profile. Public customer bookings must also show the active salon
+    // manager, so registered and guest customers can select the manager.
     const userRole = req.user?.role || "";
     const isAdminUser = ["super-admin", "manager"].includes(userRole);
 
@@ -103,12 +103,15 @@ export const getAvailableStaff = async (req, res) => {
         ? {
             $or: [
               { services: { $in: serviceIdList } },
-              { role: { $in: [/^manager$/i] } },
+              { role: { $regex: /^manager$/i } },
             ],
           }
         : {
-            services: { $in: serviceIdList },
-            role: { $not: /^(manager|super-admin)$/i },
+            $or: [
+              { services: { $in: serviceIdList } },
+              { role: { $regex: /^manager$/i } },
+            ],
+            role: { $not: /^(super-admin)$/i },
           }),
     })
       .populate("salon_id", "name")
