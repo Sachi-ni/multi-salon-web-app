@@ -8,6 +8,8 @@ import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import { useParams } from "react-router-dom";
+import useFormValidation from "../../hooks/useFormValidation";
+import { normalizePhone, validateEmail, validatePassword, validatePhoneSriLankan } from "../../utils/validation";
 
 const AddStaff = () => {
   const navigate = useNavigate();
@@ -16,6 +18,8 @@ const AddStaff = () => {
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [emailSubmitError, setEmailSubmitError] = useState("");
   const [picturePreview, setPicturePreview] = useState("");
 
   const [formData, setFormData] = useState({
@@ -29,6 +33,11 @@ const AddStaff = () => {
     picture: null,
     salaryPaymentFrequency: "monthly",
     salaryPaymentCountPerDay: 1,
+  });
+  const { errors, handleBlur, validateAll, isValid, fieldMessages } = useFormValidation(formData, {
+    email: validateEmail,
+    phone: validatePhoneSriLankan,
+    password: validatePassword,
   });
 
   useEffect(() => {
@@ -101,12 +110,15 @@ const AddStaff = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateAll()) return;
     setLoading(true);
+    setError("");
+    setEmailSubmitError("");
     try {
       const data = new FormData();
       data.append("name", `${formData.firstName} ${formData.lastName}`);
       data.append("email", formData.email);
-      data.append("phone", formData.phone.replace(/[\s()-]/g, ""));
+      data.append("phone", normalizePhone(formData.phone));
       data.append("password", formData.password);
       data.append("salonId", formData.salon);
       data.append("salaryPaymentFrequency", formData.salaryPaymentFrequency);
@@ -117,7 +129,9 @@ const AddStaff = () => {
       await createStaff(data);
       navigate(`/salon-admin/${formData.salon}/adminStaff`);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to add staff");
+      const message = err.response?.data?.message || "Failed to add staff";
+      if (/email/i.test(message)) setEmailSubmitError(message);
+      else setError(message);
     } finally {
       setLoading(false);
     }
@@ -149,12 +163,18 @@ const AddStaff = () => {
           <Card.Subtitle>Fill all required fields</Card.Subtitle>
         </Card.Header>
 
+        {error && (
+          <div className="px-4 py-3 mb-4 rounded-lg bg-danger-dim border border-danger-border text-sm text-danger font-semibold">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} autoComplete="off">
           <Input label="First Name" name="firstName" placeholder="Enter first name" required value={formData.firstName} onChange={handleChange} autoComplete="new-name" />
           <Input label="Last Name" name="lastName" placeholder="Enter last name" required value={formData.lastName} onChange={handleChange} autoComplete="new-name" />
-          <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={handleChange} autoComplete="new-email" />
-          <Input label="Phone" name="phone" type="tel" placeholder="0771234567 or +94771234567" required value={formData.phone} onChange={handleChange} autoComplete="tel" pattern="(?:\\+94|0)[0-9]{9}" />
-          <Input label="Password" name="password" type="password" placeholder="Enter password" required value={formData.password} onChange={handleChange} autoComplete="new-password" />
+          <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={(event) => { setEmailSubmitError(""); handleChange(event); }} onBlur={() => handleBlur("email")} error={errors.email || emailSubmitError} helper={fieldMessages.email} autoComplete="new-email" />
+          <Input label="Phone" name="phone" type="tel" placeholder="0771234567 or +94771234567" required value={formData.phone} onChange={handleChange} onBlur={() => handleBlur("phone")} error={errors.phone} autoComplete="tel" pattern="(?:\\+94|0)[0-9]{9}" />
+          <Input label="Password" name="password" type="password" placeholder="Enter password" required value={formData.password} onChange={handleChange} onBlur={() => handleBlur("password")} error={errors.password} autoComplete="new-password" />
 
           <div className="mb-3.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -270,7 +290,7 @@ const AddStaff = () => {
               Cancel
             </Button>
 
-            <Button variant="primary" type="submit" loading={loading}>{loading ? "Saving..." : "Save Staff"}</Button>
+            <Button variant="primary" type="submit" loading={loading} disabled={loading || !isValid}>{loading ? "Saving..." : "Save Staff"}</Button>
           </div>
         </form>
       </Card>

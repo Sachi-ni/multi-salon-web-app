@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { API_URL } from "../../config";
 import { useAuth } from "../../context/AuthContext";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validatePassword } from "../../utils/validation";
 
 const SuperAdminHardening = () => {
   const location = useLocation();
@@ -12,11 +14,16 @@ const SuperAdminHardening = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { errors, handleBlur, validateAll, isValid } = useFormValidation({ password }, { password: validatePassword });
 
   const submit = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError("");
+    if (step === "change-password" && !validateAll()) {
+      setLoading(false);
+      return;
+    }
     try {
       const endpoint = step === "change-password" ? "/auth/change-password" : "/auth/mfa/setup";
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -65,19 +72,23 @@ const SuperAdminHardening = () => {
           {step === "change-password" ? "Choose a new password before continuing." : "Complete MFA setup before opening the dashboard."}
         </p>
         {step === "change-password" && (
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="New strong password"
-            className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none focus:border-accent"
-          />
+          <>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              onBlur={() => handleBlur("password")}
+              placeholder="New strong password"
+              className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none focus:border-accent ${errors.password ? "border-red-500/50 focus:border-red-500" : ""}`}
+            />
+            {errors.password && <p className="mt-1 text-xs text-danger">{errors.password}</p>}
+          </>
         )}
         {step === "mfa-setup" && <p className="text-sm text-white mb-5">Click continue to enroll MFA for this account.</p>}
         {error && <p className="text-sm text-danger mt-4">{error}</p>}
-        <button type="submit" disabled={loading} className="w-full mt-6 bg-accent text-primary rounded-lg py-3 font-bold disabled:opacity-60">
+        <button type="submit" disabled={loading || (step === "change-password" && !isValid)} className="w-full mt-6 bg-accent text-primary rounded-lg py-3 font-bold disabled:opacity-60">
           {loading ? "Please wait..." : step === "change-password" ? "Continue to MFA setup" : "Finish and open dashboard"}
         </button>
       </form>

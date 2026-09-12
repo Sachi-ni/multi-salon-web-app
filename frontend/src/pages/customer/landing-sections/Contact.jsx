@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
 import api from "../../../services/api";
+import useFormValidation from "../../../hooks/useFormValidation";
+import { validateEmail, validatePhoneGeneric } from "../../../utils/validation";
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -13,6 +15,10 @@ const Contact = () => {
   });
   const [status, setStatus] = useState("idle"); // 'idle', 'loading', 'success', 'error'
   const [statusMessage, setStatusMessage] = useState("");
+  const { errors, handleBlur, validateAll, isValid, fieldMessages } = useFormValidation(formData, {
+    email: validateEmail,
+    contactNumber: validatePhoneGeneric,
+  });
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -20,6 +26,7 @@ const Contact = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateAll()) return;
     setStatus("loading");
     try {
       const res = await api.post("/contact", formData);
@@ -154,10 +161,14 @@ const Contact = () => {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
+                  onBlur={() => handleBlur("email")}
+                  aria-invalid={Boolean(errors.email)}
                   required
                   className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
                   placeholder="Your email"
                 />
+                {errors.email && <p className="text-xs text-red-400">{errors.email}</p>}
+                {!errors.email && fieldMessages.email && <p className="text-xs text-muted-2 font-medium">{fieldMessages.email}</p>}
               </div>
 
               <div className="grid sm:grid-cols-2 gap-5">
@@ -168,10 +179,13 @@ const Contact = () => {
                     name="contactNumber"
                     value={formData.contactNumber}
                     onChange={handleChange}
+                    onBlur={() => handleBlur("contactNumber")}
+                    aria-invalid={Boolean(errors.contactNumber)}
                     required
                     className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
                     placeholder="Your contact number"
                   />
+                  {errors.contactNumber && <p className="text-xs text-red-400">{errors.contactNumber}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-white/80">Subject</label>
@@ -202,7 +216,7 @@ const Contact = () => {
 
               <button 
                 type="submit"
-                disabled={status === "loading"}
+                disabled={status === "loading" || !isValid}
                 className="w-full py-4 bg-white text-primary rounded-xl font-bold hover:bg-accent transition-colors disabled:opacity-70"
               >
                 {status === "loading" ? "Sending..." : "Send Message"}

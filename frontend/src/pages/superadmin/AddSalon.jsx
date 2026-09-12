@@ -5,6 +5,8 @@ import PageHeader from "../../components/ui/PageHeader";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail, validatePassword, validatePhoneSriLankan } from "../../utils/validation";
 
 const TIME_SLOTS = [];
 for (let i = 0; i < 24; i++) {
@@ -32,8 +34,16 @@ const AddSalon = () => {
   const [logoPreview, setLogoPreview] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [emailSubmitError, setEmailSubmitError] = useState("");
+  const { errors, handleBlur, validateAll, isValid, fieldMessages } = useFormValidation(formData, {
+    phone: validatePhoneSriLankan,
+    managerEmail: validateEmail,
+    managerPhone: validatePhoneSriLankan,
+    managerPassword: validatePassword,
+  });
 
   const handleChange = (e) => {
+    if (e.target.name === "managerEmail") setEmailSubmitError("");
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -48,6 +58,12 @@ const AddSalon = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setEmailSubmitError("");
+
+    if (!validateAll()) {
+      setLoading(false);
+      return;
+    }
 
     if (formData.open_time && formData.close_time && formData.open_time >= formData.close_time) {
       setError("Opening time must be earlier than closing time.");
@@ -65,7 +81,9 @@ const AddSalon = () => {
       navigate("/Salons", { state: { refreshData: true } });
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || "Failed to create salon");
+      const message = err.response?.data?.message || "Failed to create salon";
+      if (/email/i.test(message)) setEmailSubmitError(message);
+      else setError(message);
       setLoading(false);
     }
   };
@@ -88,7 +106,7 @@ const AddSalon = () => {
 
         <form onSubmit={handleSubmit} autoComplete="off">
           <Input label="Salon Name" name="name" placeholder="Enter salon name" required value={formData.name} onChange={handleChange} />
-          <Input label="Phone" name="phone" placeholder="Enter phone number" required value={formData.phone} onChange={handleChange} />
+          <Input label="Phone" name="phone" placeholder="0771234567 or +94771234567" required value={formData.phone} onChange={handleChange} onBlur={() => handleBlur("phone")} error={errors.phone} />
           <Input label="Address" name="location" placeholder="Enter address" required value={formData.location} onChange={handleChange} />
 <Input label="About" name="about" placeholder="Enter about the salon" value={formData.about} onChange={handleChange} />
 
@@ -156,14 +174,14 @@ const AddSalon = () => {
           <div className="mt-8 mb-3.5 border-t border-border pt-6">
             <h2 className="text-lg font-bold text-white mb-3">Salon Manager Details</h2>
             <Input label="Manager Name" name="managerName" placeholder="Enter manager full name" required value={formData.managerName} onChange={handleChange} />
-            <Input label="Manager Email" name="managerEmail" type="email" placeholder="Enter manager email" required value={formData.managerEmail} onChange={handleChange} />
-            <Input label="Manager Phone" name="managerPhone" placeholder="Enter manager phone" required value={formData.managerPhone} onChange={handleChange} />
-            <Input label="Manager Password" name="managerPassword" type="password" placeholder="Enter manager password" required value={formData.managerPassword} onChange={handleChange} />
+            <Input label="Manager Email" name="managerEmail" type="email" placeholder="Enter manager email" required value={formData.managerEmail} onChange={handleChange} onBlur={() => handleBlur("managerEmail")} error={errors.managerEmail || emailSubmitError} helper={fieldMessages.managerEmail} />
+            <Input label="Manager Phone" name="managerPhone" placeholder="0771234567 or +94771234567" required value={formData.managerPhone} onChange={handleChange} onBlur={() => handleBlur("managerPhone")} error={errors.managerPhone} />
+            <Input label="Manager Password" name="managerPassword" type="password" placeholder="Enter manager password" required value={formData.managerPassword} onChange={handleChange} onBlur={() => handleBlur("managerPassword")} error={errors.managerPassword} />
           </div>
 
           <div className="flex gap-2.5 justify-end mt-5 pt-4 border-t border-border">
             <Button variant="ghost" type="button" onClick={() => navigate("/Salons")} disabled={loading}>Cancel</Button>
-            <Button variant="primary" type="submit" loading={loading}>{loading ? "Adding..." : "Add Salon"}</Button>
+            <Button variant="primary" type="submit" loading={loading} disabled={loading || !isValid}>{loading ? "Adding..." : "Add Salon"}</Button>
           </div>
         </form>
       </Card>

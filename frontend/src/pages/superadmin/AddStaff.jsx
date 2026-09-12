@@ -8,43 +8,8 @@ import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import { useParams } from "react-router-dom";
-
-const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
-const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
-const PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
-const COMMON_PASSWORDS = new Set(["123456", "12345678", "password", "password123", "qwerty"]);
-
-const normalizePhone = (phone) => phone.trim().replace(/[\s()-]/g, "");
-
-const validateStaffForm = (formData) => {
-  const email = formData.email.trim().toLowerCase();
-  const phone = normalizePhone(formData.phone);
-
-  if (!EMAIL_PATTERN.test(email)) {
-    return "Enter a valid email address.";
-  }
-
-  if (!EMAIL_DOMAINS.has(email.split("@")[1])) {
-    return "Email must use Gmail, Yahoo, Outlook, or Hotmail (for example, staff@gmail.com).";
-  }
-
-  if (!PHONE_PATTERN.test(phone)) {
-    return "Enter a valid Sri Lankan phone number (for example, 0771234567 or +94771234567).";
-  }
-
-  const password = formData.password;
-  const isStrongPassword =
-    password.length >= 6 &&
-    /[A-Z]/.test(password) &&
-    /[a-z]/.test(password) &&
-    /\d/.test(password);
-
-  if (!isStrongPassword || COMMON_PASSWORDS.has(password.toLowerCase())) {
-    return "Password must be at least 6 characters and include uppercase, lowercase, and number.";
-  }
-
-  return "";
-};
+import useFormValidation from "../../hooks/useFormValidation";
+import { normalizePhone, validateEmail, validatePassword, validatePhoneSriLankan } from "../../utils/validation";
 
 const AddStaff = () => {
   const navigate = useNavigate();
@@ -54,6 +19,7 @@ const AddStaff = () => {
   const [servicesLoading, setServicesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [emailSubmitError, setEmailSubmitError] = useState("");
 
   const [formData, setFormData] = useState({
     firstName: "", lastName: "", email: "", password: "",
@@ -61,6 +27,11 @@ const AddStaff = () => {
     salon: salonId || "", services: [], picture: null,
     salaryPaymentFrequency: "monthly",
     salaryPaymentCountPerDay: 1,
+  });
+  const { errors, handleBlur, validateAll, isValid, fieldMessages } = useFormValidation(formData, {
+    email: validateEmail,
+    phone: validatePhoneSriLankan,
+    password: validatePassword,
   });
 
   useEffect(() => {
@@ -120,14 +91,11 @@ const AddStaff = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const validationError = validateStaffForm(formData);
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
+    if (!validateAll()) return;
 
     setLoading(true);
     setError("");
+    setEmailSubmitError("");
     try {
       const data = new FormData();
       data.append("firstName", formData.firstName.trim());
@@ -144,7 +112,9 @@ const AddStaff = () => {
       // Navigate back to Salons page to show updated staffCount
       navigate("/Salons", { state: { refreshData: true } });
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to add staff");
+      const message = err.response?.data?.message || "Failed to add staff";
+      if (/email/i.test(message)) setEmailSubmitError(message);
+      else setError(message);
     } finally {
       setLoading(false);
     }
@@ -169,7 +139,7 @@ const AddStaff = () => {
         <form onSubmit={handleSubmit} autoComplete="off">
           <Input label="First Name" name="firstName" placeholder="Enter first name" required value={formData.firstName} onChange={handleChange} />
           <Input label="Last Name" name="lastName" placeholder="Enter last name" required value={formData.lastName} onChange={handleChange} />
-          <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={handleChange} />
+          <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={(event) => { setEmailSubmitError(""); handleChange(event); }} onBlur={() => handleBlur("email")} error={errors.email || emailSubmitError} helper={fieldMessages.email} />
           <Input
             label="Phone"
             name="phone"
@@ -177,10 +147,12 @@ const AddStaff = () => {
             required
             value={formData.phone}
             onChange={handleChange}
+            onBlur={() => handleBlur("phone")}
+            error={errors.phone}
             pattern="(?:\\+94|0)[0-9]{9}"
             title="Use 0771234567 or +94771234567"
           />
-          <Input label="Password" name="password" type="password" placeholder="Enter password" required minLength={8} value={formData.password} onChange={handleChange} />
+          <Input label="Password" name="password" type="password" placeholder="Enter password" required minLength={8} value={formData.password} onChange={handleChange} onBlur={() => handleBlur("password")} error={errors.password} />
 
           <div className="mb-3.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -282,7 +254,7 @@ const AddStaff = () => {
 
           <div className="flex gap-2.5 justify-end mt-5 pt-4 border-t border-border">
             <Button variant="ghost" type="button" onClick={() => navigate("/Staff")}>Cancel</Button>
-            <Button variant="primary" type="submit" loading={loading}>{loading ? "Saving..." : "Save Staff"}</Button>
+            <Button variant="primary" type="submit" loading={loading} disabled={loading || !isValid}>{loading ? "Saving..." : "Save Staff"}</Button>
           </div>
         </form>
       </Card>

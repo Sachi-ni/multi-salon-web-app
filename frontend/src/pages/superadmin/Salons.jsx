@@ -16,6 +16,8 @@ import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import clsx from "clsx";
 import { API_BASE } from "../../config";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail, validatePassword, validatePhoneSriLankan } from "../../utils/validation";
 
 const TIME_SLOTS = [];
 for (let i = 0; i < 24; i++) {
@@ -284,8 +286,16 @@ const Salons = () => {
 
   const [editSalon, setEditSalon] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const optional = (validator) => (value) => value ? validator(value) : { valid: true, message: "" };
+  const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateEdit, isValid: editIsValid, fieldMessages } = useFormValidation(editForm, {
+    phone: optional(validatePhoneSriLankan),
+    managerEmail: optional(validateEmail),
+    managerPhone: optional(validatePhoneSriLankan),
+    managerPassword: optional(validatePassword),
+  });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
+  const [editEmailSubmitError, setEditEmailSubmitError] = useState("");
   const [editLogo, setEditLogo] = useState(null);
   const [editLogoPreview, setEditLogoPreview] = useState("");
 
@@ -344,6 +354,7 @@ const handleEditOpen = async (id) => {
     setEditLogo(null);
     setEditLogoPreview("");
     setEditError("");
+    setEditEmailSubmitError("");
   } catch (err) {
     console.error(err);
     setError("Failed to load salon details for editing");
@@ -352,6 +363,7 @@ const handleEditOpen = async (id) => {
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
+    if (name === "managerEmail") setEditEmailSubmitError("");
     setEditForm((prev) => {
       const nextForm = { ...prev, [name]: value };
       if (name === "managerFirstName" || name === "managerLastName") {
@@ -378,6 +390,7 @@ const handleEditOpen = async (id) => {
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
+    if (!validateEdit()) return;
 
     const validationError = validateManagerDetails({
       email: editForm.managerEmail || "",
@@ -386,13 +399,8 @@ const handleEditOpen = async (id) => {
     });
 
     if (validationError) {
-      setEditError(validationError);
-      return;
-    }
-
-    const salonPhoneError = validatePhone(editForm.phone || "", "salon");
-    if (salonPhoneError) {
-      setEditError(salonPhoneError);
+      if (/email/i.test(validationError)) setEditEmailSubmitError(validationError);
+      else setEditError(validationError);
       return;
     }
 
@@ -442,10 +450,9 @@ const handleEditOpen = async (id) => {
     } catch (err) {
       console.error(err);
 
-      setEditError(
-        err.response?.data?.message ||
-        "Failed to update salon"
-      );
+      const message = err.response?.data?.message || "Failed to update salon";
+      if (/email/i.test(message)) setEditEmailSubmitError(message);
+      else setEditError(message);
     } finally {
       setEditLoading(false);
     }
@@ -766,9 +773,11 @@ const handleEditOpen = async (id) => {
 
           <Input
             label="Phone Number"
-            name="phone"
+                  name="phone"
             value={editForm.phone || ""}
             onChange={handleEditChange}
+                  onBlur={() => handleEditBlur("phone")}
+                  error={editErrors.phone}
                 pattern="(?:\\+94|0)[0-9]{9}"
                 title="Use 0771234567 or +94771234567"
           />
@@ -876,6 +885,8 @@ const handleEditOpen = async (id) => {
                 name="managerPhone"
                 value={editForm.managerPhone || ""}
                 onChange={handleEditChange}
+                  onBlur={() => handleEditBlur("managerPhone")}
+                  error={editErrors.managerPhone}
                 placeholder="Enter manager phone number"
                 pattern="(?:\\+94|0)[0-9]{9}"
                 title="Use 0771234567 or +94771234567"
@@ -887,6 +898,9 @@ const handleEditOpen = async (id) => {
                 type="email"
                 value={editForm.managerEmail || ""}
                 onChange={handleEditChange}
+                  onBlur={() => handleEditBlur("managerEmail")}
+                  error={editErrors.managerEmail || editEmailSubmitError}
+                helper={fieldMessages.managerEmail}
                 placeholder="Enter manager email"
               />
 
@@ -897,6 +911,8 @@ const handleEditOpen = async (id) => {
                 placeholder="Leave blank to keep current password"
                 value={editForm.managerPassword || ""}
                 onChange={handleEditChange}
+                  onBlur={() => handleEditBlur("managerPassword")}
+                  error={editErrors.managerPassword}
                 minLength={8}
               />
             </div>
@@ -904,7 +920,7 @@ const handleEditOpen = async (id) => {
 
           <Modal.Actions>
             <Button variant="ghost" type="button" onClick={() => setEditSalon(null)} disabled={editLoading}>Cancel</Button>
-            <Button variant="primary" type="submit" loading={editLoading}>Save Changes</Button>
+            <Button variant="primary" type="submit" loading={editLoading} disabled={editLoading || !editIsValid}>Save Changes</Button>
           </Modal.Actions>
         </form>
       </Modal>
