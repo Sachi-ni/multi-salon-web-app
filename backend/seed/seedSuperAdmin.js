@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import Admin from "../models/Admin.js";
+import { validateNewPassword } from "../utils/passwordPolicy.js";
 
 // Ensure .env is loaded from backend directory regardless of where script is called
 const __filename = fileURLToPath(import.meta.url);
@@ -32,9 +33,8 @@ export const seedSuperAdmin = async () => {
   }
 
   const initialPassword = process.env.SUPERADMIN_INITIAL_PASSWORD;
-  if (initialPassword.length < 6) {
-    throw new Error("SUPERADMIN_INITIAL_PASSWORD must be at least 6 characters long.");
-  }
+  const passwordError = validateNewPassword(initialPassword);
+  if (passwordError) throw new Error(`Invalid SUPERADMIN_INITIAL_PASSWORD: ${passwordError}`);
 
   // 2. Connect to MongoDB
   try {

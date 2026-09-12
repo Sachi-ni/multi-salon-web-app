@@ -4,6 +4,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useAlert } from "../../context/AlertContext";
 import { motion } from "framer-motion";
 import { API_URL } from "../../config";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail } from "../../utils/validation";
 
 const readResponse = async (response) => {
   const body = await response.text();
@@ -35,6 +37,13 @@ const Login = () => {
   const [resendTimer, setResendTimer] = useState(0);
   const [resending, setResending] = useState(false);
   const [otpInfoMsg, setOtpInfoMsg] = useState("");
+  const loginValues = { email, password };
+  const { errors: loginErrors, handleBlur: handleLoginBlur, isValid: loginIsValid, fieldMessages } = useFormValidation(loginValues, {
+    email: (value) => validateEmail(value, { enforceProviderRules: false }),
+    password: (value) => value
+      ? { valid: true, message: "" }
+      : { valid: false, message: "Password is required." },
+  });
 
   useEffect(() => {
     let interval = null;
@@ -382,9 +391,12 @@ const Login = () => {
                   setEmail(e.target.value);
                   if (error) setError("");
                 }}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+                onBlur={() => handleLoginBlur("email")}
+                className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30 ${loginErrors.email ? "border-red-500/50 focus:border-red-500" : ""}`}
                 autoComplete="new-email"
               />
+              {loginErrors.email && <span className="text-xs text-red-400 mt-1 block font-medium">{loginErrors.email}</span>}
+              {!loginErrors.email && fieldMessages.email && <span className="text-xs text-muted-2 mt-1 block font-medium">{fieldMessages.email}</span>}
             </div>
 
             {/* Password */}
@@ -400,15 +412,17 @@ const Login = () => {
                   setPassword(e.target.value);
                   if (error) setError("");
                 }}
-                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+                onBlur={() => handleLoginBlur("password")}
+                className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30 ${loginErrors.password ? "border-red-500/50 focus:border-red-500" : ""}`}
                 autoComplete="new-password"
               />
+              {loginErrors.password && <span className="text-xs text-red-400 mt-1 block font-medium">{loginErrors.password}</span>}
             </div>
 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !loginIsValid}
               className="w-full mt-1.5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase cursor-pointer transition-all duration-200 hover:bg-accent-hover hover:shadow-glow hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (

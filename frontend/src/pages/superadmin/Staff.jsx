@@ -17,6 +17,8 @@ import Table from "../../components/ui/Table";
 import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
 import { mediaUrl } from "../../utils/mediaUrl";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail, validatePassword, validatePhoneSriLankan } from "../../utils/validation";
 
 /* ── Skeleton Card ── */
 const SkeletonStaffCard = () => (
@@ -268,9 +270,18 @@ const Staff = () => {
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
+  const [editError, setEditError] = useState("");
+  const [editEmailSubmitError, setEditEmailSubmitError] = useState("");
+  const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(editingStaff || {}, {
+    email: validateEmail,
+    phone: validatePhoneSriLankan,
+    password: (value) => value ? validatePassword(value) : { valid: true, message: "" },
+  });
 
   const handleEdit = (staff) => {
     const names = (staff.name || "").split(" ");
+    setEditError("");
+  setEditEmailSubmitError("");
 
     const assignedServices = (staff.services || []).map((service) => {
       if (!service) return null;
@@ -377,6 +388,7 @@ const Staff = () => {
   };
 
   const handleUpdateStaff = async () => {
+    if (!validateStaffEdit()) return;
     try {
       const data = {
         firstName: editingStaff.firstName,
@@ -403,7 +415,10 @@ const Staff = () => {
       fetchData();
     } catch (err) {
       console.error("UPDATE ERROR:", err);
-      alert(err.response?.data?.message || "Failed to update staff");
+      setEditError(err.response?.data?.message || "Failed to update staff");
+      const message = err.response?.data?.message || "Failed to update staff";
+      if (/email/i.test(message)) setEditEmailSubmitError(message);
+      else setEditError(message);
     }
   };
 
@@ -630,6 +645,12 @@ const Staff = () => {
       >
         {editingStaff && (
           <div className="space-y-4 pt-1">
+            {editError && (
+              <div className="px-4 py-3 rounded-lg bg-danger-dim border border-danger-border text-sm text-danger font-semibold">
+                {editError}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">First Name</label>
@@ -658,8 +679,12 @@ const Staff = () => {
                   type="email"
                   className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
                   value={editingStaff.email}
-                  onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
+                  onChange={(e) => { setEditEmailSubmitError(""); setEditingStaff({ ...editingStaff, email: e.target.value }); }}
+                  onBlur={() => handleEditBlur("email")}
+                  aria-invalid={Boolean(editErrors.email || editEmailSubmitError)}
                 />
+                  {(editErrors.email || editEmailSubmitError) && <p className="mt-1 text-xs text-danger">{editErrors.email || editEmailSubmitError}</p>}
+                  {!editErrors.email && !editEmailSubmitError && fieldMessages.email && <p className="mt-1 text-xs text-muted-2 font-medium">{fieldMessages.email}</p>}
               </div>
               <div>
                 <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Phone Number</label>
@@ -668,8 +693,11 @@ const Staff = () => {
                   className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
                   value={editingStaff.phone || ""}
                   onChange={(e) => setEditingStaff({ ...editingStaff, phone: e.target.value })}
+                  onBlur={() => handleEditBlur("phone")}
+                  aria-invalid={Boolean(editErrors.phone)}
                   placeholder="Enter phone number"
                 />
+                {editErrors.phone && <p className="mt-1 text-xs text-danger">{editErrors.phone}</p>}
               </div>
             </div>
 
@@ -682,9 +710,12 @@ const Staff = () => {
                 className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
                 value={editingStaff.password || ""}
                 onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
+                onBlur={() => handleEditBlur("password")}
+                aria-invalid={Boolean(editErrors.password)}
                 placeholder="Enter new password"
                 autoComplete="new-password"
               />
+              {editErrors.password && <p className="mt-1 text-xs text-danger">{editErrors.password}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -779,7 +810,7 @@ const Staff = () => {
           <Button variant="ghost" size="sm" onClick={() => setEditModalOpen(false)}>
             Cancel
           </Button>
-          <Button variant="primary" size="sm" onClick={handleUpdateStaff}>
+          <Button variant="primary" size="sm" onClick={handleUpdateStaff} disabled={!staffEditIsValid}>
             Save Changes
           </Button>
         </Modal.Actions>

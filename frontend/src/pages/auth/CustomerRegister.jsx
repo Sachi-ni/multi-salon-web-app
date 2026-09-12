@@ -1,16 +1,21 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { useAlert } from "../../context/AlertContext";
 import { motion } from "framer-motion";
 import { API_URL } from "../../config";
+import useFormValidation from "../../hooks/useFormValidation";
+import {
+  normalizePhone,
+  validateConfirmPassword,
+  validateEmail,
+  validatePassword,
+  validatePhoneGeneric,
+} from "../../utils/validation";
 
 const CustomerRegister = () => {
-  const { showAlert } = useAlert();
   const [name, setName]                   = useState("");
   const [email, setEmail]                 = useState("");
   const [phone, setPhone]                 = useState("");
-  const [phoneError, setPhoneError]       = useState("");
   const [password, setPassword]           = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading]             = useState(false);
@@ -18,43 +23,29 @@ const CustomerRegister = () => {
   const [formSuccess, setFormSuccess]     = useState("");
   const navigate = useNavigate();
 
+  const values = { email, phone, password, confirmPassword };
+  const { errors, validateAll, handleBlur, isValid, fieldMessages } = useFormValidation(values, {
+    email: validateEmail,
+    phone: validatePhoneGeneric,
+    password: validatePassword,
+    confirmPassword: (value, currentValues) =>
+      validateConfirmPassword(currentValues.password, value),
+  });
+
   const handlePhoneChange = (e) => {
     const val = e.target.value.replace(/[^0-9+\s()-]/g, "");
     if (val.replace(/[\s()-]/g, "").replace(/^\+/, "").length <= 10) {
       setPhone(val);
-      if (/^\+?[0-9]{10}$/.test(val.replace(/[\s()-]/g, ""))) {
-        setPhoneError("");
-      }
     }
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setPhoneError("");
     setFormError("");
     setFormSuccess("");
 
-    const normalizedPhone = phone.replace(/[\s()-]/g, "");
-    if (!/^\+?[0-9]{10}$/.test(normalizedPhone)) {
-      const msg = "Phone number must contain exactly 10 digits and may start with +";
-      setPhoneError(msg);
-      showAlert(msg);
-      return;
-    }
-
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password)) {
-      const msg = "Password must be at least 6 characters and include uppercase, lowercase, and number";
-      setFormError(msg);
-      showAlert(msg);
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      const msg = "Passwords do not match!";
-      setFormError(msg);
-      showAlert(msg);
-      return;
-    }
+    if (!validateAll()) return;
+    const normalizedPhone = normalizePhone(phone);
     setLoading(true);
     try {
       await axios.post(`${API_URL}/auth/register`, {
@@ -68,7 +59,6 @@ const CustomerRegister = () => {
     } catch (err) {
       const msg = err.response?.data?.message || "Registration failed. Please try again.";
       setFormError(msg);
-      showAlert(msg);
     } finally {
       setLoading(false);
     }
@@ -162,10 +152,15 @@ const CustomerRegister = () => {
               placeholder="your@email.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className={inputClass}
+              onBlur={() => handleBlur("email")}
+              className={`${inputClass} ${errors.email ? "border-red-500/50 focus:border-red-500" : ""}`}
               autoComplete="new-email"
               required
             />
+            {errors.email && <span className="text-xs text-red-400 mt-1 block font-medium">{errors.email}</span>}
+            {!errors.email && fieldMessages.email && (
+              <span className="text-xs text-muted-2 mt-1 block font-medium">{fieldMessages.email}</span>
+            )}
           </div>
 
           {/* Phone */}
@@ -178,14 +173,15 @@ const CustomerRegister = () => {
               placeholder="+947XXXXXXXX"
               value={phone}
               onChange={handlePhoneChange}
-              className={`${inputClass} ${phoneError ? "border-red-500/50 focus:border-red-500" : ""}`}
+              onBlur={() => handleBlur("phone")}
+              className={`${inputClass} ${errors.phone ? "border-red-500/50 focus:border-red-500" : ""}`}
               autoComplete="new-phone"
               pattern="\\+?[0-9\\s()\-]{10,20}"
               required
             />
-            {phoneError && (
+            {errors.phone && (
               <span className="text-xs text-red-400 mt-1 block font-medium">
-                {phoneError}
+                {errors.phone}
               </span>
             )}
           </div>
@@ -201,10 +197,12 @@ const CustomerRegister = () => {
                 placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className={inputClass}
+                onBlur={() => handleBlur("password")}
+                className={`${inputClass} ${errors.password ? "border-red-500/50 focus:border-red-500" : ""}`}
                 autoComplete="new-password"
                 required
               />
+              {errors.password && <span className="text-xs text-red-400 mt-1 block font-medium">{errors.password}</span>}
             </div>
             <div>
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
@@ -215,16 +213,18 @@ const CustomerRegister = () => {
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
-                className={inputClass}
+                onBlur={() => handleBlur("confirmPassword")}
+                className={`${inputClass} ${errors.confirmPassword ? "border-red-500/50 focus:border-red-500" : ""}`}
                 autoComplete="new-password"
                 required
               />
+              {errors.confirmPassword && <span className="text-xs text-red-400 mt-1 block font-medium">{errors.confirmPassword}</span>}
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !isValid}
             className="w-full mt-1.5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase cursor-pointer transition-all duration-200 hover:bg-accent-hover hover:shadow-glow hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Registering..." : "Create Account"}

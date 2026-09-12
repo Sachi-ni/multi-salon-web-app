@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { createAppointment } from "../../../services/appointmentService";
+import useFormValidation from "../../../hooks/useFormValidation";
+import { validatePhoneGeneric } from "../../../utils/validation";
 
 export default function StepBookingConfirm({ booking, onBack }) {
   const navigate = useNavigate();
@@ -12,6 +14,9 @@ export default function StepBookingConfirm({ booking, onBack }) {
   // Guest details state
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
+  const { errors, handleBlur, validateAll, isValid } = useFormValidation({ guestPhone }, {
+    guestPhone: (value) => user ? { valid: true, message: "" } : validatePhoneGeneric(value),
+  });
 
   // Convert 24h time to 12h format
   const formatTime = (time) => {
@@ -23,6 +28,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
   };
 
   const handleSubmit = async () => {
+    if (!user && !validateAll()) return;
     if (!user && (!guestName || !guestPhone)) {
       setError("Please provide your Name and Phone Number to complete the booking.");
       return;
@@ -151,11 +157,13 @@ export default function StepBookingConfirm({ booking, onBack }) {
                 type="tel"
                 value={guestPhone}
                 onChange={(e) => setGuestPhone(e.target.value)}
+                onBlur={() => handleBlur("guestPhone")}
                 placeholder="Enter your phone number"
                 inputMode="tel"
                 className="w-full bg-surface-3 border border-border rounded-lg px-4 py-2.5 text-white text-sm focus:border-accent focus:outline-none transition-colors"
                 required
               />
+              {errors.guestPhone && <p className="text-xs text-red-400 mt-1">{errors.guestPhone}</p>}
             </div>
           </div>
         </div>
@@ -183,7 +191,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
         </button>
         <button
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={loading || !isValid}
           className="px-6 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-glow"
         >
           {loading ? (

@@ -24,6 +24,7 @@ import contactRoutes from "./routes/contactRoutes.js";
 import salaryRoutes from "./routes/salaryRoutes.js";
 import revenueRoutes from "./routes/revenueRoutes.js";
 import chatbotRoutes from "./routes/chatbotRoutes.js";
+import utilsRoutes from "./routes/utilsRoutes.js";
 
 
 dotenv.config();
@@ -72,6 +73,7 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/revenue", revenueRoutes);
 app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/utils", utilsRoutes);
 
 // Test Route
 app.get("/", (req, res) => {

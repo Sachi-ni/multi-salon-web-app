@@ -6,11 +6,11 @@ import Appointment from "../models/Appointment.js";
 import Feedback from "../models/Feedback.js";
 import { storeMedia } from "../utils/mediaStorage.js";
 import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
+import { validateNewPassword } from "../utils/passwordPolicy.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
 const PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
-const COMMON_PASSWORDS = new Set(["123456", "12345678", "password", "password123", "qwerty"]);
 const normalizePhone = (phone) => String(phone || "").trim().replace(/[\s()-]/g, "");
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -74,11 +74,7 @@ export const createStaff = async (req, res) => {
 
     const email = String(req.body.email || "").trim().toLowerCase();
     const phone = normalizePhone(req.body.phone);
-    const isStrongPassword =
-      password.length >= 6 &&
-      /[A-Z]/.test(password) &&
-      /[a-z]/.test(password) &&
-      /\d/.test(password);
+    const passwordError = validateNewPassword(password);
 
     if (!EMAIL_PATTERN.test(email) || !EMAIL_DOMAINS.has(email.split("@")[1])) {
       return res.status(400).json({
@@ -92,11 +88,7 @@ export const createStaff = async (req, res) => {
       });
     }
 
-    if (!isStrongPassword || COMMON_PASSWORDS.has(password.toLowerCase())) {
-      return res.status(400).json({
-        message: "Password must be at least 6 characters and include uppercase, lowercase, and number.",
-      });
-    }
+    if (passwordError) return res.status(400).json({ message: passwordError });
 
     const duplicateStaff = await Staff.findOne({
       email: { $regex: `^${escapeRegex(email)}$`, $options: "i" },
@@ -434,13 +426,29 @@ export const updateStaff = async (req, res) => {
         `${firstName} ${lastName}`.trim();
     }
 
-    if (req.body.email !== undefined)
-      updateData.email = req.body.email;
+    if (req.body.email !== undefined) {
+      const email = String(req.body.email).trim().toLowerCase();
+      if (!EMAIL_PATTERN.test(email) || !EMAIL_DOMAINS.has(email.split("@")[1])) {
+        return res.status(400).json({
+          message: "Email must be valid and use Gmail, Yahoo, Outlook, or Hotmail.",
+        });
+      }
+      updateData.email = email;
+    }
 
-    if (req.body.phone !== undefined)
-      updateData.phone = req.body.phone;
+    if (req.body.phone !== undefined) {
+      const phone = normalizePhone(req.body.phone);
+      if (!PHONE_PATTERN.test(phone)) {
+        return res.status(400).json({
+          message: "Enter a valid Sri Lankan phone number (for example, 0771234567 or +94771234567).",
+        });
+      }
+      updateData.phone = phone;
+    }
 
     if (req.body.password) {
+      const passwordError = validateNewPassword(req.body.password);
+      if (passwordError) return res.status(400).json({ message: passwordError });
       const salt = await bcrypt.genSalt(10);
       updateData.password_hash = await bcrypt.hash(req.body.password, salt);
     }
