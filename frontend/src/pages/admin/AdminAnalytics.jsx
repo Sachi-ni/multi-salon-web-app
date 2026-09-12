@@ -7,7 +7,8 @@ import {
   PieChart as PieChartIcon, LineChart as LineChartIcon, Sparkles, Award, Repeat
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+import {
+  ComposedChart, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
@@ -95,6 +96,7 @@ export default function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dateRange, setDateRange] = useState("30days");
+  const [staffFilter, setStaffFilter] = useState("all");
 
   const [appointments, setAppointments] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -220,21 +222,53 @@ export default function AdminAnalytics() {
         trendMap[date].pending += 1;
       }
     });
-    const trendData = Object.values(trendMap).sort((a, b) => a.date.localeCompare(b.date));
+    let trendData = Object.values(trendMap).sort((a, b) => a.date.localeCompare(b.date));
+    if (trendData.length === 1) {
+      const d = new Date(trendData[0].date);
+      const prev = new Date(d); prev.setDate(prev.getDate() - 1);
+      const prevStr = [prev.getFullYear(), String(prev.getMonth() + 1).padStart(2, '0'), String(prev.getDate()).padStart(2, '0')].join('-');
+      const next = new Date(d); next.setDate(next.getDate() + 1);
+      const nextStr = [next.getFullYear(), String(next.getMonth() + 1).padStart(2, '0'), String(next.getDate()).padStart(2, '0')].join('-');
+      trendData = [
+        { date: prevStr, revenue: 0, completed: 0, cancelled: 0, pending: 0 },
+        trendData[0],
+        { date: nextStr, revenue: 0, completed: 0, cancelled: 0, pending: 0 }
+      ];
+    }
 
     // 2. Staff Performance
     const staffMap = {};
-    staff.forEach(s => staffMap[s._id] = { name: s.user_id?.name || s.name || "Unknown", completed: 0, revenue: 0 });
+    staff.forEach(s => staffMap[s._id] = { _id: s._id, name: s.user_id?.name || s.name || "Unknown", completed: 0, revenue: 0 });
     filteredAppointments.forEach(a => {
-      if (a.status === "completed" && a.staff_id) {
-        const sid = typeof a.staff_id === 'object' ? a.staff_id._id : a.staff_id;
-        if (staffMap[sid]) {
-          staffMap[sid].completed += 1;
-          staffMap[sid].revenue += (a.total_price || 0);
+      if (a.status === "completed") {
+        if (a.appointment_services && a.appointment_services.length > 0) {
+          const staffSeenInThisBooking = new Set();
+          a.appointment_services.forEach(asv => {
+            const sid = typeof asv.staff_id === 'object' ? asv.staff_id._id : asv.staff_id;
+            if (staffMap[sid]) {
+              if (!staffSeenInThisBooking.has(sid)) {
+                staffMap[sid].completed += 1;
+                staffSeenInThisBooking.add(sid);
+              }
+              const rev = asv.sub_price !== undefined ? asv.sub_price : (a.total_price / a.appointment_services.length);
+              staffMap[sid].revenue += rev;
+            }
+          });
+        } else if (a.staff_id) {
+          const sid = typeof a.staff_id === 'object' ? a.staff_id._id : a.staff_id;
+          if (staffMap[sid]) {
+            staffMap[sid].completed += 1;
+            staffMap[sid].revenue += (a.total_price || 0);
+          }
         }
       }
     });
-    const staffData = Object.values(staffMap).filter(s => s.completed > 0 || s.revenue > 0);
+    
+    // Apply local staff filter
+    const staffData = Object.values(staffMap).filter(s => {
+      if (staffFilter !== "all") return s._id === staffFilter;
+      return s.completed > 0 || s.revenue > 0;
+    });
 
     // 3. Top Services
     const serviceMap = {};
@@ -273,7 +307,7 @@ export default function AdminAnalytics() {
     const customerGrowthData = Object.keys(custMap).sort().map(date => ({ date, newCustomers: custMap[date] }));
 
     return { trendData, staffData, topServicesData, statusData, customerGrowthData };
-  }, [filteredData, kpis, staff, services]);
+  }, [filteredData, services, staff, staffFilter]);
 
   /* ── Recent Activity ── */
   const recentActivity = useMemo(() => {
@@ -317,21 +351,23 @@ export default function AdminAnalytics() {
           backTo={`/salon-admin/${salonId}/adminDashboard`}
         />
 
-        {/* Pill-style date range selector */}
-        <div className="flex items-center bg-surface-2 border border-border rounded-xl p-1 gap-0.5 flex-shrink-0">
-          {dateRangeOptions.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setDateRange(opt.value)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
-                dateRange === opt.value
-                  ? "bg-accent text-primary shadow-glow-sm"
-                  : "text-muted-2 hover:text-white hover:bg-surface-3"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        {/* Filters Container */}
+        <div className="flex items-center gap-4 flex-wrap justify-end">
+          {/* Pill-style date range selector */}
+          <div className="flex items-center bg-surface-2 border border-border rounded-xl p-1 gap-0.5 flex-shrink-0">
+            {dateRangeOptions.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setDateRange(opt.value)}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${dateRange === opt.value
+                    ? "bg-accent text-primary shadow-glow-sm"
+                    : "text-muted-2 hover:text-white hover:bg-surface-3"
+                  }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -436,32 +472,50 @@ export default function AdminAnalytics() {
                   <div className="flex items-center gap-1.5 text-[0.65rem] text-muted-2">
                     <span className="w-2 h-2 rounded-full bg-[#a855f7]"></span> Revenue
                   </div>
+                  <div className="flex items-center gap-1.5 text-[0.65rem] text-muted-2">
+                    <span className="w-2 h-2 rounded-full bg-[#3b82f6]"></span> Bookings
+                  </div>
                 </div>
               </div>
               <div className="h-[280px] w-full -mx-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartsData.trendData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                  <ComposedChart data={chartsData.trendData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="adminRevGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#a855f7" stopOpacity={0.35} />
+                        <stop offset="0%" stopColor="#a855f7" stopOpacity={0.8} />
                         <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
                       </linearGradient>
+                      <linearGradient id="bookingsGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
+                    <CartesianGrid strokeDasharray="4 4" stroke="#525252" vertical={true} horizontal={true} />
                     <XAxis dataKey="date" stroke="#ffffff30" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                    <YAxis stroke="#ffffff30" fontSize={10} tickFormatter={v => `Rs.${v / 1000}k`} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="left" stroke="#ffffff30" fontSize={10} tickFormatter={v => `Rs.${v / 1000}k`} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="right" orientation="right" stroke="#ffffff30" fontSize={10} axisLine={false} tickLine={false} />
                     <Tooltip content={<CustomTooltip isCurrency />} />
                     <Area
+                      yAxisId="left"
                       type="monotone"
                       dataKey="revenue"
                       name="Revenue"
                       stroke="#a855f7"
                       strokeWidth={2.5}
+                      fillOpacity={1}
                       fill="url(#adminRevGrad)"
                       dot={{ r: 3, fill: "#a855f7", stroke: "#0a0a0a", strokeWidth: 2 }}
                       activeDot={{ r: 5, stroke: "#a855f7", strokeWidth: 2, fill: "#0a0a0a" }}
                     />
-                  </AreaChart>
+                    <Bar
+                      yAxisId="right"
+                      dataKey="completed"
+                      name="Bookings"
+                      fill="url(#bookingsGrad)"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={40}
+                    />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             </Card>
@@ -531,7 +585,21 @@ export default function AdminAnalytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <motion.div variants={fadeUp}>
               <Card className="h-full">
-                <SectionHeader icon={Users} title="Staff Performance" subtitle="Completed bookings and revenue per staff member" />
+                <div className="flex items-center justify-between mb-4">
+                  <SectionHeader icon={Users} title="Staff Performance" subtitle="Completed bookings and revenue per staff member" />
+                  <select
+                    value={staffFilter}
+                    onChange={(e) => setStaffFilter(e.target.value)}
+                    className="px-2 py-1 text-xs font-semibold rounded-lg bg-surface-2 border border-border text-white focus:outline-none focus:border-accent transition-colors cursor-pointer"
+                  >
+                    <option value="all">All Staff</option>
+                    {staff.map(s => (
+                      <option key={s._id} value={s._id}>
+                        {s.user_id?.name || s.name || "Unknown Staff"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 {chartsData.staffData.length === 0 ? (
                   <div className="py-16 text-center text-muted-2 text-xs">No staff performance data available.</div>
                 ) : (

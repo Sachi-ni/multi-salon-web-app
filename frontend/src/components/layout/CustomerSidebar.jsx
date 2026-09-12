@@ -98,10 +98,6 @@ const CustomerSidebar = ({ isOpen, onClose }) => {
         </nav>
 
         <div className="p-3 mt-auto">
-          <div className="bg-surface-2 border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-xs mb-2">
-            <span className="w-2 h-2 rounded-full bg-success flex-shrink-0 animate-pulse-dot" />
-            <span className="text-muted-2">System Online</span>
-          </div>
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[0.82rem] font-semibold text-danger border border-danger/20 hover:bg-danger-dim transition-all duration-150"

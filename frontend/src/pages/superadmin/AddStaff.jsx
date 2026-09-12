@@ -34,14 +34,13 @@ const validateStaffForm = (formData) => {
 
   const password = formData.password;
   const isStrongPassword =
-    password.length >= 8 &&
+    password.length >= 6 &&
     /[A-Z]/.test(password) &&
     /[a-z]/.test(password) &&
-    /\d/.test(password) &&
-    /[!@#$%^&*]/.test(password);
+    /\d/.test(password);
 
   if (!isStrongPassword || COMMON_PASSWORDS.has(password.toLowerCase())) {
-    return "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
+    return "Password must be at least 6 characters and include uppercase, lowercase, and number.";
   }
 
   return "";

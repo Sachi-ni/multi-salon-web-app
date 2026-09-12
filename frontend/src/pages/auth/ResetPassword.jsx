@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { API_URL } from "../../config";
 
-const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/;
+const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ const ResetPassword = () => {
     setError("");
     if (!token) return setError("This reset link is missing its token.");
     if (!passwordPattern.test(newPassword)) {
-      return setError("Password must be at least 8 characters and include uppercase, lowercase, number, and special character");
+      return setError("Password must be at least 6 characters and include uppercase, lowercase, and number");
     }
     if (newPassword !== confirmPassword) return setError("Passwords do not match");
 

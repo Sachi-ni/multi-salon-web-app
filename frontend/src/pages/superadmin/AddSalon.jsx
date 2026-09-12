@@ -92,7 +92,7 @@ const AddSalon = () => {
           <Input label="Address" name="location" placeholder="Enter address" required value={formData.location} onChange={handleChange} />
 <Input label="About" name="about" placeholder="Enter about the salon" value={formData.about} onChange={handleChange} />
 
-          <div className="grid grid-cols-2 gap-4 mb-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3.5">
             <div>
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
                 Opening Time

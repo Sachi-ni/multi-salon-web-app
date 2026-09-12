@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { getSalons } from "../../services/salonService";
 import StepSelectService from "./steps/StepSelectService";
@@ -11,6 +11,7 @@ const STEPS = ["Salon", "Date", "Services", "Staff & Time", "Confirm"];
 export default function BookAppointment() {
   const [step, setStep] = useState(0);
   const [salons, setSalons] = useState([]);
+  const [salonError, setSalonError] = useState("");
   const [booking, setBooking] = useState({
     salonId: "", salonName: "",
     date: "",
@@ -23,8 +24,15 @@ export default function BookAppointment() {
 
   const location = useLocation();
 
+  const loadSalons = useCallback(() => {
+    setSalonError("");
+    getSalons()
+      .then(res => setSalons(res.data || []))
+      .catch(err => setSalonError(err?.response?.data?.message || "Failed to load salons. Please try again."));
+  }, []);
+
   useEffect(() => {
-    getSalons().then(res => setSalons(res.data));
+    loadSalons();
 
     if (location.state?.staff) {
       const staff = location.state.staff;
@@ -44,7 +52,7 @@ export default function BookAppointment() {
         salonName: salon.name || ""
       }));
     }
-  }, [location.state]);
+  }, [location.state, loadSalons]);
 
   const next = (data) => {
     setBooking(prev => ({ ...prev, ...data }));
@@ -78,36 +86,36 @@ export default function BookAppointment() {
       {/* Premium Salon-Themed Background */}
       <CustomerDashboardBackground />
 
-      <div className="max-w-2xl mx-auto relative z-10">
+      <div className="max-w-2xl mx-auto relative z-10 px-4 sm:px-0">
 
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-black text-white">Book an Appointment</h1>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl font-black text-white">Book an Appointment</h1>
           <p className="text-muted-2 text-sm mt-1">Follow the steps to complete your booking</p>
         </div>
 
         {/* Step Indicator */}
-        <div className="flex items-center mb-8">
+        <div className="flex items-center mb-6 sm:mb-8">
           {STEPS.map((label, i) => (
             <div key={i} className="flex items-center flex-1 last:flex-none">
               <div className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-200
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-200
                   ${i < step ? "bg-accent text-primary" : ""}
                   ${i === step ? "bg-accent text-primary shadow-glow" : ""}
                   ${i > step ? "bg-surface-2 text-muted-2 border border-border" : ""}
                 `}>
                   {i < step ? (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : i + 1}
                 </div>
-                <span className={`text-2xs mt-1 font-bold tracking-wide
+                <span className={`text-2xs mt-1 font-bold tracking-wide hidden sm:block
                   ${i === step ? "text-accent" : "text-muted-2"}
                 `}>{label}</span>
               </div>
               {i < STEPS.length - 1 && (
-                <div className={`flex-1 h-px mx-2 mb-4 transition-all duration-300
+                <div className={`flex-1 h-px mx-1.5 sm:mx-2 mb-0 sm:mb-4 transition-all duration-300
                   ${i < step ? "bg-accent" : "bg-border"}
                 `} />
               )}
@@ -116,13 +124,24 @@ export default function BookAppointment() {
         </div>
 
         {/* Step Content */}
-        <div className="bg-surface border border-border rounded-2xl p-6 shadow-card animate-fade-up">
+        <div className="bg-surface border border-border rounded-2xl p-4 sm:p-6 shadow-card animate-fade-up">
 
           {/* Step 0 — Salon */}
           {step === 0 && (
             <div>
               <h2 className="text-lg font-extrabold text-white mb-1">Select a Salon</h2>
               <p className="text-muted-2 text-sm mb-5">Choose the salon you'd like to visit</p>
+              {salonError && (
+                <div className="p-3 bg-danger-dim border border-danger-border rounded-xl mb-4">
+                  <p className="text-danger text-xs font-bold">{salonError}</p>
+                  <button
+                    onClick={loadSalons}
+                    className="mt-2 px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-accent text-xs font-bold hover:border-accent transition-all duration-200"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
               <div className="space-y-3">
                 {salons.map(s => (
                   <div

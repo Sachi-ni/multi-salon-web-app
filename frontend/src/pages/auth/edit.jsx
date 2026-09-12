@@ -36,7 +36,7 @@ const Edit = () => {
     e.preventDefault();
 
     const normalizedPhone = phone.replace(/[\s()-]/g, "");
-    const passwordIsStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[\S]{8,}$/.test(password);
+    const passwordIsStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password);
     const emailIsValid = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/.test(email.trim());
     const phoneIsValid = !normalizedPhone || /^\+?[0-9]{10}$/.test(normalizedPhone);
 
@@ -49,7 +49,7 @@ const Edit = () => {
       return;
     }
     if (password && !passwordIsStrong) {
-      alert("Password must be at least 8 characters and include uppercase, lowercase, number, and special character");
+      alert("Password must be at least 6 characters and include uppercase, lowercase, and number");
       return;
     }
     if (password && password !== confirmPassword) {
