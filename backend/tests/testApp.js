@@ -7,6 +7,7 @@ import appointmentRoutes from "../routes/appointmentRoutes.js";
 import billRoutes from "../routes/billRoutes.js";
 import serviceRoutes from "../routes/serviceRoutes.js";
 import reviewRoutes from "../routes/reviewRoutes.js";
+import salaryRoutes from "../routes/salaryRoutes.js";
 
 const app = express();
 app.use(express.json());
@@ -18,4 +19,5 @@ app.use("/api/appointments", appointmentRoutes);
 app.use("/api/bills", billRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/salary", salaryRoutes);
 export default app;

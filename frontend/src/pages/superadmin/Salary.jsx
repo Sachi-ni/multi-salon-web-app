@@ -1293,7 +1293,7 @@ const Salary = () => {
                          salonNameById.get(String(row.salon_id || staff.salon_id || "")) ||
                          "—"}
                       </td>
-                      <td className="text-right">{formatMoney(workingAmt)}</td>
+                      <td className="text-right whitespace-nowrap">{formatMoney(workingAmt)}</td>
                       <td className="text-center">
                         <div className="flex items-center gap-1 justify-center">
                           <input
@@ -1315,9 +1315,9 @@ const Salary = () => {
                           )}
                         </div>
                       </td>
-                      <td className="text-right">{formatMoney(workRate)}</td>
+                      <td className="text-right whitespace-nowrap">{formatMoney(workRate)}</td>
                       {frequency !== "daily" && (
-                        <td className="text-right">
+                        <td className="text-right whitespace-nowrap">
                           {formatMoney(daySalary)}
                           {isDayAbsent && (
                             <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500/20 text-red-400 border border-red-500/30 uppercase">
@@ -1326,7 +1326,7 @@ const Salary = () => {
                           )}
                         </td>
                       )}
-                      <td className="text-right font-bold">{formatMoney(totalSal)}</td>
+                      <td className="text-right font-bold whitespace-nowrap">{formatMoney(totalSal)}</td>
                       <td>
                         <Badge variant={statusVariant(status)}>
                           {isPaid ? "Paid" : "Not Paid"}
@@ -1334,25 +1334,27 @@ const Salary = () => {
                       </td>
                       <td>
                         <div className="flex items-center gap-2">
+                          {(!isPaid || isDayAbsent) && (
+                            <button
+                              onClick={() => handleToggleAbsent(row)}
+                              disabled={!canToggleAbsent}
+                              className={`px-2 py-1 text-[11px] font-bold rounded-md border transition-all uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed ${
+                                isDayAbsent
+                                  ? "bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30"
+                                  : "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30"
+                              }`}
+                              title={
+                                absentDisabledReason ||
+                                (isDayAbsent
+                                  ? "Remove absence - salary for this date is recalculated"
+                                  : "Mark absent - salary for this date becomes 0")
+                              }
+                            >
+                              {isDayAbsent ? "Present" : "Absent"}
+                            </button>
+                          )}
                           {!isPaid ? (
                             <>
-                              <button
-                                onClick={() => handleToggleAbsent(row)}
-                                disabled={!canToggleAbsent}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed ${
-                                  isDayAbsent
-                                    ? "bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30"
-                                    : "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30"
-                                }`}
-                                title={
-                                  absentDisabledReason ||
-                                  (isDayAbsent
-                                    ? "Remove absence - salary for this date is recalculated"
-                                    : "Mark absent - salary for this date becomes 0")
-                                }
-                              >
-                                {isDayAbsent ? "Present" : "Absent"}
-                              </button>
                               <button
                                 onClick={() => handlePay(row)}
                                 disabled={!canPay}

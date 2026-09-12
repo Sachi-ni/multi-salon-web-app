@@ -930,6 +930,8 @@ export const getSalaries = async (req, res) => {
       status: s.status,
       paidTotal: s.paidTotal,
       paidAt: s.paidAt,
+      isAbsent: Boolean(s.isAbsent),
+      absentMarkedAt: s.absentMarkedAt,
       workingAmount: s.workingAmount,
       rate: s.rate,
       workRate: s.workRate,
@@ -1248,22 +1250,20 @@ const applyAbsenceToRecord = (salaryRecord, dateKey, isAbsent) => {
     throw new Error("A valid date is required to mark an absent day");
   }
 
-  // Normalize stored dates before searching.
-  salaryRecord.dailyRecords = salaryRecord.dailyRecords.map((record) => ({
-    ...record,
-    date: normalizeSalaryDate(record.date),
-    isAbsent: Boolean(record.isAbsent),
-    absentMarkedAt: record.absentMarkedAt || null,
-  }));
+  // Normalize stored dates in place so the update targets the persisted
+  // Mongoose subdocument rather than a detached object from map().
+  salaryRecord.dailyRecords.forEach((record) => {
+    record.date = normalizeSalaryDate(record.date);
+    record.isAbsent = Boolean(record.isAbsent);
+    record.absentMarkedAt = record.absentMarkedAt || null;
+  });
 
-  let dailyRecord = salaryRecord.dailyRecords.find(
-    (record) => record.date === normalizedDate
-  );
+  let dailyRecord = salaryRecord.dailyRecords.find((record) => record.date === normalizedDate);
 
   // Create the day record when missing so absences can be recorded even for
   // days without completed appointments.
   if (!dailyRecord) {
-    dailyRecord = {
+    salaryRecord.dailyRecords.push({
       date: normalizedDate,
       workingAmount: 0,
       rate: effectiveRate,
@@ -1273,8 +1273,8 @@ const applyAbsenceToRecord = (salaryRecord, dateKey, isAbsent) => {
       status: "Not Paid",
       isAbsent: false,
       absentMarkedAt: null,
-    };
-    salaryRecord.dailyRecords.push(dailyRecord);
+    });
+    dailyRecord = salaryRecord.dailyRecords[salaryRecord.dailyRecords.length - 1];
   }
 
   dailyRecord.isAbsent = isAbsent;
