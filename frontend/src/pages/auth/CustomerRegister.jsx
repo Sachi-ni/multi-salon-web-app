@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
+import { Eye, EyeOff } from "lucide-react";
 import { API_URL } from "../../config";
 import useFormValidation from "../../hooks/useFormValidation";
 import {
@@ -18,6 +19,8 @@ const CustomerRegister = () => {
   const [phone, setPhone]                 = useState("");
   const [password, setPassword]           = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading]             = useState(false);
   const [formError, setFormError]         = useState("");
   const [formSuccess, setFormSuccess]     = useState("");
@@ -192,32 +195,52 @@ const CustomerRegister = () => {
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
                 Password <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
               </label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                onBlur={() => handleBlur("password")}
-                className={`${inputClass} ${errors.password ? "border-red-500/50 focus:border-red-500" : ""}`}
-                autoComplete="new-password"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  onBlur={() => handleBlur("password")}
+                  className={`${inputClass} pr-10 ${errors.password ? "border-red-500/50 focus:border-red-500" : ""}`}
+                  autoComplete="new-password"
+                  required
+                />
+                {password && <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>}
+              </div>
               {errors.password && <span className="text-xs text-red-400 mt-1 block font-medium">{errors.password}</span>}
             </div>
             <div>
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
                 Confirm <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
               </label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                onBlur={() => handleBlur("confirmPassword")}
-                className={`${inputClass} ${errors.confirmPassword ? "border-red-500/50 focus:border-red-500" : ""}`}
-                autoComplete="new-password"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  onBlur={() => handleBlur("confirmPassword")}
+                  className={`${inputClass} pr-10 ${errors.confirmPassword ? "border-red-500/50 focus:border-red-500" : ""}`}
+                  autoComplete="new-password"
+                  required
+                />
+                {confirmPassword && <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((visible) => !visible)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors"
+                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>}
+              </div>
               {errors.confirmPassword && <span className="text-xs text-red-400 mt-1 block font-medium">{errors.confirmPassword}</span>}
             </div>
           </div>

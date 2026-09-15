@@ -1280,7 +1280,7 @@ const Salary = () => {
                               <button
                                 onClick={() => handleToggleAbsent(row)}
                                 disabled={!canToggleAbsent}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed ${
+                                className={`px-2 py-1 text-[11px] font-bold rounded-md border transition-all uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed ${
                                   isDayAbsent
                                     ? "bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30"
                                     : "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30"

@@ -6,7 +6,7 @@ import { getServices } from "../../services/serviceService";
 import { 
   Plus, Search, Users, Star, MapPin, 
   MoreVertical, Power, Pencil, Trash2, 
-  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins
+  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins, Eye, EyeOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
@@ -270,6 +270,7 @@ const Staff = () => {
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
+  const [showEditPassword, setShowEditPassword] = useState(false);
   const [editError, setEditError] = useState("");
   const [editEmailSubmitError, setEditEmailSubmitError] = useState("");
   const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(editingStaff || {}, {
@@ -279,6 +280,7 @@ const Staff = () => {
   });
 
   const handleEdit = (staff) => {
+    setShowEditPassword(false);
     const names = (staff.name || "").split(" ");
     setEditError("");
   setEditEmailSubmitError("");
@@ -705,16 +707,26 @@ const Staff = () => {
               <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
                 Change Password <span className="text-neutral-500 font-normal lowercase">(leave blank to keep current)</span>
               </label>
-              <input
-                type="password"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
-                value={editingStaff.password || ""}
-                onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
-                onBlur={() => handleEditBlur("password")}
-                aria-invalid={Boolean(editErrors.password)}
-                placeholder="Enter new password"
-                autoComplete="new-password"
-              />
+              <div className="relative">
+                <input
+                  type={showEditPassword ? "text" : "password"}
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 pr-11 text-sm text-white outline-none focus:border-amber-400"
+                  value={editingStaff.password || ""}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
+                  onBlur={() => handleEditBlur("password")}
+                  aria-invalid={Boolean(editErrors.password)}
+                  placeholder="Enter new password"
+                  autoComplete="new-password"
+                />
+                {editingStaff.password && <button
+                  type="button"
+                  onClick={() => setShowEditPassword((visible) => !visible)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-white transition-colors"
+                  aria-label={showEditPassword ? "Hide password" : "Show password"}
+                >
+                  {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>}
+              </div>
               {editErrors.password && <p className="mt-1 text-xs text-danger">{editErrors.password}</p>}
             </div>
 
