@@ -657,6 +657,8 @@ export const deleteStaff = async (req, res) => {
       message: error.message,
     });
   }
+};
+
 export const getStaffDashboard = async (req, res) => {
   try {
     const staffId = req.user.id;
