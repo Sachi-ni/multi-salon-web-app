@@ -39,7 +39,7 @@ const Input = ({
             autoComplete={props.autoComplete || "new-password"}
             {...props}
           />
-          {type === "password" && Boolean(props.value) && (
+          {type === "password" && (
             <button
               type="button"
               onClick={() => setShowPassword((visible) => !visible)}
