@@ -80,7 +80,11 @@ const StaffDashboard = () => {
       
       const appDayStart = new Date(appDate.getFullYear(), appDate.getMonth(), appDate.getDate());
 
-      if (filter === "Today") {
+      if (filter === "Upcoming") {
+        return appDayStart >= todayStart && app.status !== "completed" && app.status !== "cancelled";
+      } else if (filter === "Past") {
+        return appDayStart < todayStart || app.status === "completed" || app.status === "cancelled";
+      } else if (filter === "Today") {
         return appDayStart.getTime() === todayStart.getTime();
       } else if (filter === "This Week") {
         const startOfWeek = new Date(todayStart);
@@ -222,13 +226,13 @@ const StaffDashboard = () => {
               </p>
             </div>
             
-            <div className="flex bg-surface rounded-xl p-1 border border-border w-full sm:w-auto">
-              {["All", "Today", "This Week", "This Month"].map(f => (
+            <div className="flex flex-wrap bg-surface rounded-xl p-1 border border-border w-full sm:w-auto gap-1">
+              {["All", "Upcoming", "Today", "This Week", "This Month", "Past"].map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
                   className={clsx(
-                    "flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200",
+                    "flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200",
                     filter === f 
                       ? "bg-accent text-primary shadow-glow-sm" 
                       : "text-muted-2 hover:text-white hover:bg-surface-2"
@@ -266,9 +270,10 @@ const StaffDashboard = () => {
                 <Table.Body>
                   {filteredAppointments.map((app) => {
                     const servicesList = app.service_ids?.length 
-                      ? app.service_ids.map(s => s.service_name).join(", ")
+                      ? app.service_ids.map(s => typeof s === "object" ? (s.service_name || "Service") : s).join(", ")
                       : (app.service_id?.service_name || "N/A");
                     const customerName = app.customer_id?.name || app.guest_name || "Guest";
+                    const displayDate = app.appointment_date || "N/A";
 
                     return (
                       <Table.Tr key={app._id} className="hover:bg-surface-2/60 transition-colors">
@@ -279,15 +284,15 @@ const StaffDashboard = () => {
                             </div>
                             <div>
                               <span className="font-bold text-white block">{customerName}</span>
-                              {app.customer_id?.phone && (
-                                <span className="text-[0.7rem] text-muted-2">{app.customer_id.phone}</span>
+                              {(app.customer_id?.phone || app.guest_phone) && (
+                                <span className="text-[0.7rem] text-muted-2">{app.customer_id?.phone || app.guest_phone}</span>
                               )}
                             </div>
                           </div>
                         </Table.Td>
                         <Table.Td className="text-muted-2 text-xs font-medium max-w-[220px] truncate">{servicesList}</Table.Td>
                         <Table.Td>
-                          <div className="font-extrabold text-white text-xs">{new Date(app.appointment_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                          <div className="font-extrabold text-white text-xs">{displayDate}</div>
                           <div className="text-[0.7rem] text-accent font-semibold mt-0.5">{app.start_time} - {app.end_time}</div>
                         </Table.Td>
                         <Table.Td>{getStatusBadge(app.status)}</Table.Td>
