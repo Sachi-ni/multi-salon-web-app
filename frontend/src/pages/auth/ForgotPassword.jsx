@@ -9,6 +9,7 @@ const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [emailSubmitError, setEmailSubmitError] = useState("");
   const [loading, setLoading] = useState(false);
   const { errors, handleBlur, validateAll, isValid, fieldMessages } = useFormValidation({ email }, { email: validateEmail });
 
@@ -16,6 +17,7 @@ const ForgotPassword = () => {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setEmailSubmitError("");
     setMessage("");
     if (!validateAll()) {
       setLoading(false);
@@ -32,7 +34,8 @@ const ForgotPassword = () => {
       if (!response.ok) throw new Error(data.message || "Please enter a valid email address");
       setMessage(data.message);
     } catch (requestError) {
-      setError(requestError.message);
+      if (/email/i.test(requestError.message)) setEmailSubmitError(requestError.message);
+      else setError(requestError.message);
     } finally {
       setLoading(false);
     }
@@ -72,13 +75,17 @@ const ForgotPassword = () => {
               type="email"
               required
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmailSubmitError("");
+                setEmail(event.target.value);
+              }}
               onBlur={() => handleBlur("email")}
-              className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none placeholder:text-muted focus:border-accent ${errors.email ? "border-red-500/50 focus:border-red-500" : ""}`}
+              aria-invalid={Boolean(errors.email || emailSubmitError)}
+              className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none placeholder:text-muted focus:border-accent ${errors.email || emailSubmitError ? "border-red-500/50 focus:border-red-500" : ""}`}
               autoComplete="email"
             />
-            {errors.email && <p className="mt-1 text-xs text-red-300">{errors.email}</p>}
-            {!errors.email && fieldMessages.email && <p className="mt-1 text-xs text-muted-2 font-medium">{fieldMessages.email}</p>}
+            {(errors.email || emailSubmitError) && <p className="mt-1 text-xs text-red-300">{errors.email || emailSubmitError}</p>}
+            {!errors.email && !emailSubmitError && fieldMessages.email && <p className="mt-1 text-xs text-muted-2 font-medium">{fieldMessages.email}</p>}
             {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
             <button
               type="submit"

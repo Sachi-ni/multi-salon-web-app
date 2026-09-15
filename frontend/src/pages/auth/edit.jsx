@@ -25,6 +25,7 @@ const Edit = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [image, setImage] = useState(null);
   const [formError, setFormError] = useState("");
+  const [emailSubmitError, setEmailSubmitError] = useState("");
   const [preview, setPreview] = useState(
     user?.image
       ? user.image.startsWith("http")
@@ -53,6 +54,7 @@ const Edit = () => {
   const handleUpdate = async (e) => {
     e.preventDefault();
     setFormError("");
+    setEmailSubmitError("");
 
     if (!validateAll()) return;
     const normalizedPhone = normalizePhone(phone);
@@ -102,7 +104,9 @@ const Edit = () => {
       }
     } catch (error) {
       console.error("Update error:", error);
-      setFormError(error.response?.data?.message || "Failed to update profile");
+      const message = error.response?.data?.message || "Failed to update profile";
+      if (/email/i.test(message)) setEmailSubmitError(message);
+      else setFormError(message);
     } finally {
       setUploading(false);
     }
@@ -201,12 +205,16 @@ const Edit = () => {
               type="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmailSubmitError("");
+                setEmail(e.target.value);
+              }}
               onBlur={() => handleBlur("email")}
-              className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30 ${errors.email ? "border-red-500/50 focus:border-red-500" : ""}`}
+              aria-invalid={Boolean(errors.email || emailSubmitError)}
+              className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30 ${errors.email || emailSubmitError ? "border-red-500/50 focus:border-red-500" : ""}`}
             />
-            {errors.email && <p className="mt-1 text-xs text-red-300">{errors.email}</p>}
-            {!errors.email && fieldMessages.email && <p className="mt-1 text-xs text-muted-2 font-medium">{fieldMessages.email}</p>}
+            {(errors.email || emailSubmitError) && <p className="mt-1 text-xs text-red-300">{errors.email || emailSubmitError}</p>}
+            {!errors.email && !emailSubmitError && fieldMessages.email && <p className="mt-1 text-xs text-muted-2 font-medium">{fieldMessages.email}</p>}
           </div>
 
           <div className="mb-3.5">

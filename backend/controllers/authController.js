@@ -29,9 +29,13 @@ const PHONE_PATTERN = /^\+?[0-9]{10}$/;
 const GENERIC_RESET_MESSAGE = "If an account exists, a reset link has been sent.";
 
 const validateProfileFields = ({ email, phone, password, username }) => {
-  const normalizedEmail = email?.trim().toLowerCase();
+  const enteredEmail = email?.trim();
+  const normalizedEmail = enteredEmail?.toLowerCase();
   const normalizedPhone = phone?.replace(/[\s()-]/g, "");
 
+  if (enteredEmail && enteredEmail !== normalizedEmail) {
+    return { message: "Email address must use lowercase letters only" };
+  }
   if (normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)) {
     return { message: "Please enter a valid email address" };
   }
@@ -81,7 +85,6 @@ export const getProfile = async (req, res) => {
 export const registerCustomer = async (req, res) => {
   try {
     const { fullName, email, phone, password, preferredSalonId, role } = req.body;
-    const normalizedEmail = email?.trim().toLowerCase();
     const normalizedPhone = phone?.replace(/[\s()-]/g, "");
 
     // This public route can only create customers; privileged roles must never be self-registered.
@@ -90,10 +93,10 @@ export const registerCustomer = async (req, res) => {
     }
     assertNotPrivilegedRole(role);
 
-    const validation = validateProfileFields({ email: normalizedEmail, phone: normalizedPhone, password });
+    const validation = validateProfileFields({ email, phone: normalizedPhone, password });
     if (validation.message) return res.status(400).json(validation);
 
-    const existingCustomer = await Customer.findOne({ email: normalizedEmail });
+    const existingCustomer = await Customer.findOne({ email: validation.normalizedEmail });
     // A generic response prevents attackers from discovering registered email addresses.
     if (existingCustomer) {
       return res.status(202).json({ message: "If this email is not already registered, your account will be created." });
@@ -102,7 +105,7 @@ export const registerCustomer = async (req, res) => {
     const password_hash = await bcrypt.hash(password, 12);
     const customer = await Customer.create({
       name: fullName,
-      email: normalizedEmail,
+      email: validation.normalizedEmail,
       phone: normalizedPhone,
       preferredSalonId: preferredSalonId || null,
       password_hash,

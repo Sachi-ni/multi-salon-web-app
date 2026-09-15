@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Eye, EyeOff } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { API_URL } from "../../config";
 import useFormValidation from "../../hooks/useFormValidation";
 import {
@@ -23,6 +23,7 @@ const CustomerRegister = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading]             = useState(false);
   const [formError, setFormError]         = useState("");
+  const [emailSubmitError, setEmailSubmitError] = useState("");
   const [formSuccess, setFormSuccess]     = useState("");
   const navigate = useNavigate();
 
@@ -45,6 +46,7 @@ const CustomerRegister = () => {
   const handleRegister = async (e) => {
     e.preventDefault();
     setFormError("");
+    setEmailSubmitError("");
     setFormSuccess("");
 
     if (!validateAll()) return;
@@ -57,11 +59,12 @@ const CustomerRegister = () => {
         phone: normalizedPhone,
         password,
       });
-      setFormSuccess("Registration successful! Redirecting to login...");
-      setTimeout(() => navigate("/login"), 1200);
+      setFormSuccess("success");
+      setTimeout(() => navigate("/login"), 1800);
     } catch (err) {
       const msg = err.response?.data?.message || "Registration failed. Please try again.";
-      setFormError(msg);
+      if (/email/i.test(msg)) setEmailSubmitError(msg);
+      else setFormError(msg);
     } finally {
       setLoading(false);
     }
@@ -115,19 +118,6 @@ const CustomerRegister = () => {
           </motion.div>
         )}
 
-        {formSuccess && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-4 px-3.5 py-2.5 rounded-xl bg-success-dim border border-success-border text-xs text-success font-semibold flex items-center gap-2"
-          >
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>{formSuccess}</span>
-          </motion.div>
-        )}
-
         <form onSubmit={handleRegister} autoComplete="off">
           {/* Name */}
           <div className="mb-3.5">
@@ -154,14 +144,18 @@ const CustomerRegister = () => {
               type="email"
               placeholder="your@email.com"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={e => {
+                setEmailSubmitError("");
+                setEmail(e.target.value);
+              }}
               onBlur={() => handleBlur("email")}
-              className={`${inputClass} ${errors.email ? "border-red-500/50 focus:border-red-500" : ""}`}
+              aria-invalid={Boolean(errors.email || emailSubmitError)}
+              className={`${inputClass} ${errors.email || emailSubmitError ? "border-red-500/50 focus:border-red-500" : ""}`}
               autoComplete="new-email"
               required
             />
-            {errors.email && <span className="text-xs text-red-400 mt-1 block font-medium">{errors.email}</span>}
-            {!errors.email && fieldMessages.email && (
+            {(errors.email || emailSubmitError) && <span className="text-xs text-red-400 mt-1 block font-medium">{errors.email || emailSubmitError}</span>}
+            {!errors.email && !emailSubmitError && fieldMessages.email && (
               <span className="text-xs text-muted-2 mt-1 block font-medium">{fieldMessages.email}</span>
             )}
           </div>
@@ -264,6 +258,36 @@ const CustomerRegister = () => {
           </span>
         </div>
       </motion.div>
+
+      {formSuccess && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-20 flex items-center justify-center bg-primary/75 backdrop-blur-sm px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="registration-success-title"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.88, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 280, damping: 20 }}
+            className="w-full max-w-sm overflow-hidden rounded-3xl border border-accent/40 bg-surface shadow-modal text-center"
+          >
+            <div className="h-2 bg-gradient-to-r from-accent via-accent-hover to-accent" />
+            <div className="px-8 py-10">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-accent-dim border border-accent/40 shadow-glow">
+                <CheckCircle2 className="h-11 w-11 text-accent" strokeWidth={2.5} />
+              </div>
+              <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.2em] text-accent">Welcome to SalonHub</p>
+              <h2 id="registration-success-title" className="text-2xl font-black text-white">
+                Registration successful!
+              </h2>
+              <p className="mt-6 text-xs font-semibold text-muted-2">Taking you to sign in...</p>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 };
