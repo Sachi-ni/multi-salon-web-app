@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { API_URL } from "../../config";
 import { useAuth } from "../../context/AuthContext";
 import useFormValidation from "../../hooks/useFormValidation";
@@ -12,6 +13,7 @@ const SuperAdminHardening = () => {
   const [step, setStep] = useState(location.state?.hardeningStep || "change-password");
   const [token, setToken] = useState(location.state?.token || "");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { errors, handleBlur, validateAll, isValid } = useFormValidation({ password }, { password: validatePassword });
@@ -73,16 +75,26 @@ const SuperAdminHardening = () => {
         </p>
         {step === "change-password" && (
           <>
-            <input
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              onBlur={() => handleBlur("password")}
-              placeholder="New strong password"
-              className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none focus:border-accent ${errors.password ? "border-red-500/50 focus:border-red-500" : ""}`}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                minLength={8}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                onBlur={() => handleBlur("password")}
+                placeholder="New strong password"
+                className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 pr-10 text-sm text-white outline-none focus:border-accent ${errors.password ? "border-red-500/50 focus:border-red-500" : ""}`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {errors.password && <p className="mt-1 text-xs text-danger">{errors.password}</p>}
           </>
         )}
