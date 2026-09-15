@@ -544,7 +544,7 @@ export const createAppointment = async (req, res) => {
       });
     }
 
-    const salon = await Salon.findById(salon_id).select("status");
+    const salon = await Salon.findById(salon_id).select("status isPaused");
     if (!salon || salon.status === "deactivated") {
       return res.status(400).json({ message: "This salon is unavailable for bookings" });
     }
@@ -1440,6 +1440,13 @@ export const updateAppointmentDetails = async (req, res) => {
 
     const service = await Service.findOne({ _id: service_id, salon_id: salonId }).lean();
     const staff = await Staff.findOne({ _id: staff_id, salon_id: salonId, status: "Active" }).lean();
+
+    if (!service) return res.status(400).json({ message: "Selected service is not available at this salon." });
+    if (!staff) return res.status(400).json({ message: "Selected staff member is not available at this salon." });
+    if (!staff.services?.some((id) => id.toString() === service_id.toString()) && !/^manager$/i.test(staff.role || "")) {
+      return res.status(400).json({ message: "Selected staff member cannot perform this service." });
+    }
+
     const numericDuration = Number(duration);
     console.debug("Appointment details update duration received:", duration, "normalized:", numericDuration);
     const submittedAmount = Number(total_price);
@@ -1449,11 +1456,6 @@ export const updateAppointmentDetails = async (req, res) => {
     const normalizedDate = String(appointment_date);
     const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
-    if (!service) return res.status(400).json({ message: "Selected service is not available at this salon." });
-    if (!staff) return res.status(400).json({ message: "Selected staff member is not available at this salon." });
-    if (!staff.services?.some((id) => id.toString() === service_id.toString()) && !/^manager$/i.test(staff.role || "")) {
-      return res.status(400).json({ message: "Selected staff member cannot perform this service." });
-    }
     if (!datePattern.test(normalizedDate) || !/^\d{2}:\d{2}$/.test(normalizedStart)) {
       return res.status(400).json({ message: "A valid date and start time are required." });
     }
