@@ -1,24 +1,26 @@
-const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,63}$/;
+const EMAIL_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,63}$/;
 const GENERIC_PHONE_PATTERN = /^\+?[0-9]{10}$/;
 const SRI_LANKAN_PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
 const COMMON_PASSWORDS = new Set(["123456", "12345678", "password", "password123", "qwerty", "qwerty123", "letmein"]);
-const GMAIL_DOMAINS = new Set(["gmail.com"]);
-const GMAIL_LOCAL_PART_PATTERN = /^[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*$/;
+const SUPPORTED_EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
 
 export const normalizePhone = (value = "") => String(value).trim().replace(/[\s()-]/g, "");
 
 export const validateEmail = (value = "", { enforceProviderRules = true } = {}) => {
-  const email = String(value).trim().toLowerCase();
-  if (!email) return { valid: false, message: "Email is required." };
+  const enteredEmail = String(value).trim();
+  if (!enteredEmail) return { valid: false, message: "Email is required." };
+  if (enteredEmail !== enteredEmail.toLowerCase()) {
+    return { valid: false, message: "Email address must use lowercase letters only." };
+  }
+
+  const email = enteredEmail;
   if (!EMAIL_PATTERN.test(email)) {
     return { valid: false, message: "Please enter a valid email address." };
   }
 
-  const [localPart, domain] = email.split("@");
-  if (enforceProviderRules && GMAIL_DOMAINS.has(domain)) {
-    if (!GMAIL_LOCAL_PART_PATTERN.test(localPart)) {
-      return { valid: false, message: "Gmail addresses may use only letters, numbers, and single periods." };
-    }
+  const [, domain] = email.split("@");
+  if (enforceProviderRules && !SUPPORTED_EMAIL_DOMAINS.has(domain)) {
+    return { valid: false, message: "Use a Gmail, Yahoo, Outlook, or Hotmail email address." };
   }
 
   return { valid: true, message: "" };
