@@ -442,8 +442,17 @@ export const loginStaff = async (req, res) => {
       return res.status(404).json({ message: "Staff not found" });
     }
 
-    const isMatch = await bcrypt.compare(password, staff.password_hash);
-    if (!isMatch) {
+    // Allow staff to log in using either their account password OR their registered phone number
+    const isPasswordMatch = await bcrypt.compare(password, staff.password_hash);
+    const cleanedEnteredPassword = password?.trim().replace(/[\s()-]/g, "");
+    const cleanedStaffPhone = staff.phone?.trim().replace(/[\s()-]/g, "");
+    const isPhoneMatch = Boolean(
+      cleanedEnteredPassword &&
+      cleanedStaffPhone &&
+      cleanedEnteredPassword === cleanedStaffPhone
+    );
+
+    if (!isPasswordMatch && !isPhoneMatch) {
       return res.status(401).json({ message: "Invalid password" });
     }
 
@@ -454,7 +463,7 @@ export const loginStaff = async (req, res) => {
       }
     }
 
-res.json({
+    res.json({
       id: staff._id,
       name: staff.full_name,
       email: staff.email,
