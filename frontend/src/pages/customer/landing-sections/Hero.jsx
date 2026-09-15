@@ -1,10 +1,37 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, Star } from "lucide-react";
+import api from "../../../services/api";
+
+const initialStats = {
+  happyClients: 0,
+  expertStylists: 0,
+  salonBranches: 0,
+  yearsExperience: 0,
+};
+
+const formatCount = (count, suffix = "+") =>
+  `${new Intl.NumberFormat("en").format(count)}${count > 0 ? suffix : ""}`;
 
 const Hero = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState(initialStats);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    api.get("/utils/platform-stats")
+      .then(({ data }) => {
+        if (isMounted) setStats({ ...initialStats, ...data });
+      })
+      .catch((error) => {
+        // Keep the landing page usable if statistics are temporarily unavailable.
+        console.error("Unable to load platform statistics:", error);
+      });
+
+    return () => { isMounted = false; };
+  }, []);
 
   return (
     <section id="home" className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
@@ -71,10 +98,10 @@ const Hero = () => {
         >
           <div className="grid grid-cols-2 gap-4 w-full max-w-md">
             {[
-              { label: "Happy Clients", value: "10K+" },
-              { label: "Expert Stylists", value: "50+" },
-              { label: "Salon Branches", value: "5" },
-              { label: "Years Experience", value: "15+" },
+              { label: "Happy Clients", value: formatCount(stats.happyClients) },
+              { label: "Expert Stylists", value: formatCount(stats.expertStylists) },
+              { label: "Salon Branches", value: formatCount(stats.salonBranches, "") },
+              { label: "Years Experience", value: formatCount(stats.yearsExperience, "+") },
             ].map((stat, i) => (
               <div key={i} className="glass-card p-6 flex flex-col items-center justify-center text-center hover-glow group">
                 <div className="text-3xl font-black text-white group-hover:text-accent transition-colors duration-300">
