@@ -13,7 +13,7 @@ export default function StaffUnavailableModal({ staff, onClose, onSuccess }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (requestInFlight.current) return;
+    if (requestInFlight.current || !staff) return;
     requestInFlight.current = true;
     setSaving(true);
     setError("");
@@ -34,8 +34,12 @@ export default function StaffUnavailableModal({ staff, onClose, onSuccess }) {
     }
   };
 
+  if (!staff) return null;
+
+  const staffName = staff?.full_name || staff?.name || "Staff";
+
   return (
-    <Modal isOpen={Boolean(staff)} onClose={onClose} title={`Mark ${staff.full_name || staff.name} Unavailable`} maxWidth="max-w-md">
+    <Modal isOpen={Boolean(staff)} onClose={onClose} title={`Mark ${staffName} Unavailable`} maxWidth="max-w-md">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <p className="text-xs text-danger">{error}</p>}
         <label className="block text-xs text-muted-2 font-semibold">Starts
