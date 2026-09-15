@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { createAppointment } from "../../../services/appointmentService";
+import useFormValidation from "../../../hooks/useFormValidation";
+import { validatePhoneGeneric } from "../../../utils/validation";
 
 export default function StepBookingConfirm({ booking, onBack }) {
   const navigate = useNavigate();
@@ -12,6 +14,9 @@ export default function StepBookingConfirm({ booking, onBack }) {
   // Guest details state
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
+  const { errors, handleBlur, validateAll, isValid } = useFormValidation({ guestPhone }, {
+    guestPhone: (value) => user ? { valid: true, message: "" } : validatePhoneGeneric(value),
+  });
 
   // Convert 24h time to 12h format
   const formatTime = (time) => {
@@ -23,6 +28,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
   };
 
   const handleSubmit = async () => {
+    if (!user && !validateAll()) return;
     if (!user && (!guestName || !guestPhone)) {
       setError("Please provide your Name and Phone Number to complete the booking.");
       return;
@@ -74,7 +80,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
       {/* Summary card */}
       <div className="bg-surface-2 border border-border rounded-xl p-4 space-y-4">
         {/* Salon + Date */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="bg-surface-3 rounded-lg p-3">
             <p className="text-muted-2 text-2xs font-bold uppercase tracking-wider mb-1">Salon</p>
             <p className="text-white font-bold text-sm">{booking.salonName}</p>
@@ -99,7 +105,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
                     <p className="text-white font-bold text-sm">{svc.serviceName}</p>
                     <p className="text-accent font-extrabold text-sm">LKR {svc.servicePrice}</p>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-muted-2">
                     <span className="flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -151,11 +157,13 @@ export default function StepBookingConfirm({ booking, onBack }) {
                 type="tel"
                 value={guestPhone}
                 onChange={(e) => setGuestPhone(e.target.value)}
+                onBlur={() => handleBlur("guestPhone")}
                 placeholder="Enter your phone number"
                 inputMode="tel"
                 className="w-full bg-surface-3 border border-border rounded-lg px-4 py-2.5 text-white text-sm focus:border-accent focus:outline-none transition-colors"
                 required
               />
+              {errors.guestPhone && <p className="text-xs text-red-400 mt-1">{errors.guestPhone}</p>}
             </div>
           </div>
         </div>
@@ -183,7 +191,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
         </button>
         <button
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={loading || !isValid}
           className="px-6 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-glow"
         >
           {loading ? (

@@ -113,12 +113,6 @@ const Sidebar = ({ isOpen = true, onClose }) => {
 
         {/* Bottom Section */}
         <div className="p-3 mt-auto">
-          {/* System Status */}
-          <div className="bg-surface-2 border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-xs mb-2">
-            <span className="w-2 h-2 rounded-full bg-success flex-shrink-0 animate-pulse-dot" />
-            <span className="text-muted-2">System Online</span>
-          </div>
-
           {/* Logout */}
           <button
             onClick={handleLogout}

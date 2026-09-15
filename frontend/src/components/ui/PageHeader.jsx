@@ -13,8 +13,8 @@ const PageHeader = ({
   const navigate = useNavigate();
 
   return (
-    <div className={clsx("flex items-start gap-3 mb-6", className)}>
-      <div className="flex items-center gap-2.5 flex-1">
+    <div className={clsx("flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6", className)}>
+      <div className="flex items-center gap-2.5 flex-1 min-w-0">
         {backTo && (
           <button
             onClick={() => navigate(backTo)}
@@ -23,19 +23,19 @@ const PageHeader = ({
             <ArrowLeft className="w-4 h-4" />
           </button>
         )}
-        <div>
-          <h1 className="text-xl font-extrabold text-white leading-none">
+        <div className="min-w-0">
+          <h1 className="text-xl font-extrabold text-white leading-tight truncate">
             {title}
           </h1>
           {subtitle && (
-            <p className="text-xs text-muted-2 mt-1">{subtitle}</p>
+            <p className="text-xs text-muted-2 mt-1 truncate">{subtitle}</p>
           )}
         </div>
       </div>
 
       {/* Action buttons */}
       {children && (
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0 w-full sm:w-auto">
           {children}
         </div>
       )}

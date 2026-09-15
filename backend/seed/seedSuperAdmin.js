@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import Admin from "../models/Admin.js";
+import { validateNewPassword } from "../utils/passwordPolicy.js";
 
 // Ensure .env is loaded from backend directory regardless of where script is called
 const __filename = fileURLToPath(import.meta.url);
@@ -32,9 +33,8 @@ export const seedSuperAdmin = async () => {
   }
 
   const initialPassword = process.env.SUPERADMIN_INITIAL_PASSWORD;
-  if (initialPassword.length < 6) {
-    throw new Error("SUPERADMIN_INITIAL_PASSWORD must be at least 6 characters long.");
-  }
+  const passwordError = validateNewPassword(initialPassword);
+  if (passwordError) throw new Error(`Invalid SUPERADMIN_INITIAL_PASSWORD: ${passwordError}`);
 
   // 2. Connect to MongoDB
   try {
@@ -54,6 +54,15 @@ export const seedSuperAdmin = async () => {
 
   if (existingSuperAdmin) {
     const hardeningUpdates = {};
+    if (existingSuperAdmin.email !== email) {
+      hardeningUpdates.email = email;
+      hardeningUpdates.username = email.split("@")[0];
+      const salt = await bcrypt.genSalt(10);
+      hardeningUpdates.password = await bcrypt.hash(initialPassword, salt);
+      hardeningUpdates.mustChangePassword = true;
+      hardeningUpdates.mfaEnrolled = false;
+      console.log(`Updating Super Admin account to handover email: ${email}`);
+    }
     if (existingSuperAdmin.mustChangePassword === undefined) {
       hardeningUpdates.mustChangePassword = true;
     }
@@ -62,9 +71,9 @@ export const seedSuperAdmin = async () => {
     }
     if (Object.keys(hardeningUpdates).length > 0) {
       await Admin.updateOne({ _id: existingSuperAdmin._id }, { $set: hardeningUpdates });
-      console.log("Existing Super Admin marked for account hardening");
+      console.log("Existing Super Admin updated and marked for account hardening");
     }
-    console.log("Super Admin already exists");
+    console.log("Super Admin is ready");
     return;
   }
 

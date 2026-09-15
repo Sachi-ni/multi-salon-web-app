@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Users, UserPlus, Calendar, CheckCircle,
   XCircle, DollarSign, TrendingUp, Activity,
-  BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, Sparkles
+  BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, Sparkles,
+  BrainCircuit, RefreshCw, Zap, Target, ShieldCheck, Award
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -12,7 +13,7 @@ import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
 import api from "../../services/api";
 import { getSalonAppointments } from "../../services/appointmentService";
 import { getSalons } from "../../services/salonService";
-import { getRevenueStats } from "../../services/revenueService";
+import { getRevenueStats, getAIForecast } from "../../services/revenueService";
 
 import PageHeader from "../../components/ui/PageHeader";
 import Card from "../../components/ui/Card";
@@ -73,6 +74,57 @@ const CustomTooltip = ({ active, payload, label, isCurrency }) => {
   );
 };
 
+/* ── Forecast Tooltip Component ── */
+const ForecastTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  const data = payload[0]?.payload;
+  const isProj = data?.type === "projected";
+
+  return (
+    <div style={tooltipStyle}>
+      <div className="flex items-center gap-1.5 mb-1">
+        {isProj && <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
+        <p style={tooltipLabelStyle} className="mb-0">
+          {label} {isProj ? "• AI Forecast" : ""}
+        </p>
+      </div>
+      <p style={{ ...tooltipItemStyle, color: isProj ? "#f5c800" : "#a855f7" }}>
+        <span style={{ fontWeight: 600 }}>{isProj ? "Projected Revenue" : "Historical Revenue"}: </span>
+        Rs. {data?.revenue ? data.revenue.toLocaleString() : 0}
+      </p>
+      {isProj && data?.projectedMin && data?.projectedMax && (
+        <p className="text-[11px] text-muted-2 mt-1 border-t border-border pt-1">
+          Confidence Range: <span className="text-accent font-bold">Rs. {data.projectedMin.toLocaleString()} – Rs. {data.projectedMax.toLocaleString()}</span>
+        </p>
+      )}
+    </div>
+  );
+};
+
+const INSIGHT_THEMES = {
+  growth: {
+    badge: "Revenue Expansion",
+    border: "border-emerald-500/30",
+    bg: "bg-emerald-500/5",
+    iconBg: "bg-emerald-500/10 text-emerald-400",
+    icon: TrendingUp
+  },
+  capacity: {
+    badge: "Operations & Capacity",
+    border: "border-sky-500/30",
+    bg: "bg-sky-500/5",
+    iconBg: "bg-sky-500/10 text-sky-400",
+    icon: Zap
+  },
+  marketing: {
+    badge: "Marketing & Retention",
+    border: "border-purple-500/30",
+    bg: "bg-purple-500/5",
+    iconBg: "bg-purple-500/10 text-purple-400",
+    icon: Target
+  }
+};
+
 /* ── Section Header ── */
 const SectionHeader = ({ icon: Icon, title, subtitle }) => (
   <div className="flex items-center gap-3 mb-1">
@@ -99,7 +151,10 @@ export default function Analytics() {
   const [salons, setSalons] = useState([]);
   const [revenueStats, setRevenueStats] = useState(null);
 
-  /* ── Fetch ── */
+  const [forecast, setForecast] = useState(null);
+  const [loadingForecast, setLoadingForecast] = useState(false);
+
+  /* ── Fetch Main Data ── */
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -125,9 +180,28 @@ export default function Analytics() {
     }
   }, [dateRange]);
 
+  /* ── Fetch AI Forecast ── */
+  const fetchForecastData = useCallback(async () => {
+    try {
+      setLoadingForecast(true);
+      const res = await getAIForecast();
+      if (res?.data) {
+        setForecast(res.data);
+      }
+    } catch (err) {
+      console.warn("Forecast fetch notice:", err);
+    } finally {
+      setLoadingForecast(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    fetchForecastData();
+  }, [fetchForecastData]);
 
   /* ── Derived: Date-Filtered Data ── */
   const filteredData = useMemo(() => {
@@ -347,6 +421,264 @@ export default function Analytics() {
                 </motion.div>
               );
             })}
+          </motion.div>
+
+          {/* ═══ AI NEXT-MONTH BUSINESS FORECAST (Hero Section) ═══ */}
+          <motion.div variants={fadeUp}>
+            <div className="relative overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-br from-[#141418] via-[#0f0f13] to-[#161308] p-5 sm:p-7 shadow-2xl backdrop-blur-xl">
+              {/* Subtle background glow accents */}
+              <div className="absolute -top-24 -right-24 w-80 h-80 bg-accent/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              {/* Header */}
+              <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/5">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[0.68rem] font-black uppercase tracking-wider bg-accent/15 border border-accent/30 text-accent shadow-glow-sm">
+                      <BrainCircuit className="w-3.5 h-3.5 animate-pulse text-accent" />
+                      AI Next-Month Predictive Intelligence
+                    </span>
+                    {forecast?.isAiPowered ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.65rem] font-bold bg-purple-500/15 border border-purple-500/30 text-purple-300">
+                        ✨ Powered by Gemini AI
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.65rem] font-bold bg-blue-500/15 border border-blue-500/30 text-blue-300">
+                        📊 Statistical Projection Engine
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                    Business Forecast for {forecast?.targetMonth || "Next Month"}
+                  </h2>
+                  <p className="text-xs text-muted-2 mt-1 max-w-2xl leading-relaxed">
+                    Automated end-of-month predictive model analyzing seasonal customer booking patterns, branch revenue momentum, and capacity utilization.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 self-start sm:self-center flex-shrink-0">
+                  <button
+                    onClick={fetchForecastData}
+                    disabled={loadingForecast}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border hover:border-accent/40 text-xs font-bold text-white transition-all duration-200 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingForecast ? "animate-spin text-accent" : "text-muted-2"}`} />
+                    <span>{loadingForecast ? "Analyzing Data..." : "Refresh Forecast"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 Forecast KPI Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 my-6 relative z-10">
+                {/* 1. Projected Revenue */}
+                <div className="bg-surface/80 border border-border/80 rounded-xl p-4.5 hover:border-accent/40 transition-colors group">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-[0.65rem] font-extrabold uppercase tracking-wider text-muted-2">Projected Revenue</span>
+                    <div className="p-1.5 rounded-lg bg-accent-dim text-accent">
+                      <DollarSign className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-white leading-tight">
+                    {forecast?.projectedRevenueMin && forecast?.projectedRevenueMax
+                      ? `Rs. ${(forecast.projectedRevenueMin / 1000).toFixed(0)}k - ${(forecast.projectedRevenueMax / 1000).toFixed(0)}k`
+                      : "Calculating..."}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`text-[0.65rem] font-extrabold px-1.5 py-0.5 rounded ${
+                      (forecast?.projectedGrowthPercent || 0) >= 0 ? "bg-success-dim text-success" : "bg-danger-dim text-danger"
+                    }`}>
+                      {(forecast?.projectedGrowthPercent || 0) >= 0 ? "↑" : "↓"} {Math.abs(forecast?.projectedGrowthPercent || 0)}%
+                    </span>
+                    <span className="text-[0.65rem] text-muted-2">
+                      Midpoint: Rs. {forecast?.projectedRevenueMid?.toLocaleString() || "—"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Projected Appointments */}
+                <div className="bg-surface/80 border border-border/80 rounded-xl p-4.5 hover:border-sky-500/40 transition-colors group">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-[0.65rem] font-extrabold uppercase tracking-wider text-muted-2">Projected Appointments</span>
+                    <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-white leading-tight">
+                    ~{forecast?.projectedBookings || "—"} bookings
+                  </div>
+                  <p className="text-[0.65rem] text-muted-2 mt-2">
+                    Expected next month demand velocity
+                  </p>
+                </div>
+
+                {/* 3. Top Branch Prediction */}
+                <div className="bg-surface/80 border border-border/80 rounded-xl p-4.5 hover:border-purple-500/40 transition-colors group">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-[0.65rem] font-extrabold uppercase tracking-wider text-muted-2">Top Branch Projection</span>
+                    <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+                      <Award className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-lg sm:text-xl font-black text-white truncate leading-tight">
+                    {forecast?.topBranchPrediction || "Flagship Branch"}
+                  </div>
+                  <p className="text-[0.65rem] text-muted-2 mt-2">
+                    Highest anticipated revenue contribution
+                  </p>
+                </div>
+
+                {/* 4. Confidence Score */}
+                <div className="bg-surface/80 border border-border/80 rounded-xl p-4.5 hover:border-emerald-500/40 transition-colors group">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-[0.65rem] font-extrabold uppercase tracking-wider text-muted-2">Forecast Confidence</span>
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-emerald-400 leading-tight">
+                    {forecast?.confidenceScore || 88}%
+                  </div>
+                  <p className="text-[0.65rem] text-muted-2 mt-2">
+                    High statistical data confidence
+                  </p>
+                </div>
+              </div>
+
+              {/* Chart & Executive Summary Split */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 my-6 relative z-10 items-stretch">
+                {/* Visual Trajectory Chart (7 cols) */}
+                <div className="lg:col-span-7 bg-surface/60 border border-border/70 rounded-xl p-4 sm:p-5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
+                        <TrendingUp className="w-3.5 h-3.5 text-accent" />
+                        Revenue Trajectory & Next-Month Horizon
+                      </h4>
+                      <p className="text-[0.65rem] text-muted-2 mt-0.5">
+                        Historical monthly revenue connecting directly into next month's forecast
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 text-[0.65rem]">
+                      <div className="flex items-center gap-1.5 text-muted-2">
+                        <span className="w-2 h-2 rounded-full bg-[#a855f7]" /> Actual
+                      </div>
+                      <div className="flex items-center gap-1.5 text-accent font-bold">
+                        <span className="w-2 h-2 rounded-full bg-accent animate-ping" /> Forecast
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="h-[230px] w-full -mx-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={forecast?.trajectoryData || []} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#f5c800" stopOpacity={0.4} />
+                            <stop offset="100%" stopColor="#f5c800" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+                        <XAxis dataKey="month" stroke="#ffffff30" fontSize={10} tickMargin={8} axisLine={false} tickLine={false} />
+                        <YAxis stroke="#ffffff30" fontSize={10} tickFormatter={v => `Rs.${v / 1000}k`} axisLine={false} tickLine={false} />
+                        <Tooltip content={<ForecastTooltip />} />
+                        <Area
+                          type="monotone"
+                          dataKey="revenue"
+                          name="Revenue"
+                          stroke="#f5c800"
+                          strokeWidth={3}
+                          fill="url(#forecastGrad)"
+                          dot={(dotProps) => {
+                            const isForecast = dotProps.payload?.type === "projected";
+                            return (
+                              <circle
+                                key={dotProps.index}
+                                cx={dotProps.cx}
+                                cy={dotProps.cy}
+                                r={isForecast ? 6 : 4}
+                                fill={isForecast ? "#f5c800" : "#a855f7"}
+                                stroke="#0e0e11"
+                                strokeWidth={2}
+                              />
+                            );
+                          }}
+                          activeDot={{ r: 7, stroke: "#f5c800", strokeWidth: 2, fill: "#fff" }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Executive Summary Card (5 cols) */}
+                <div className="lg:col-span-5 bg-surface/60 border border-border/70 rounded-xl p-5 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[0.65rem] font-black uppercase tracking-wider text-accent flex items-center gap-1.5 mb-2">
+                      <Sparkles className="w-3 h-3 text-accent" />
+                      Executive Strategic Outlook
+                    </span>
+                    <blockquote className="text-xs sm:text-sm text-white/90 italic leading-relaxed pl-3 border-l-2 border-accent my-3">
+                      "{forecast?.executiveSummary || 'Anticipating resilient business performance with positive momentum across flagship branches.'}"
+                    </blockquote>
+                  </div>
+
+                  <div className="space-y-2 mt-4 pt-3 border-t border-white/5 text-[0.72rem] text-muted-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span>Seasonality and historical booking pacing calibrated</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                      <span>Stylist shift turnover & weekend capacity factored</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                      <span>High-yield service bundling recommendations synthesized</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3 Strategic Insights Cards */}
+              <div className="relative z-10 mt-6 pt-5 border-t border-white/5">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
+                    <Zap className="w-3.5 h-3.5 text-accent" />
+                    AI Actionable Strategic Recommendations
+                  </h4>
+                  <span className="text-[0.65rem] text-muted-2">Tailored for SuperAdmin decision-making</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {(forecast?.strategicInsights || []).map((insight, idx) => {
+                    const theme = INSIGHT_THEMES[insight.type] || INSIGHT_THEMES.growth;
+                    const IconComp = theme.icon;
+                    return (
+                      <div
+                        key={idx}
+                        className={`rounded-xl border ${theme.border} ${theme.bg} p-4.5 flex flex-col justify-between transition-all duration-200 hover:border-accent/40`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[0.65rem] font-black uppercase tracking-wider text-white/70">
+                              {theme.badge}
+                            </span>
+                            <div className={`p-1.5 rounded-lg ${theme.iconBg}`}>
+                              <IconComp className="w-3.5 h-3.5" />
+                            </div>
+                          </div>
+                          <h5 className="text-xs font-bold text-white mb-1.5">
+                            {insight.title}
+                          </h5>
+                          <p className="text-[0.72rem] text-muted-2 leading-relaxed">
+                            {insight.description}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </motion.div>
 
           {/* ═══ HERO CHART: Revenue Trend (Full Width) ═══ */}

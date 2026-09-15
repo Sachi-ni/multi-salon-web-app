@@ -1,7 +1,11 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import dns from "dns";
 import connectDB from "./config/db.js";
+
+// Force IPv4 first to prevent ENETUNREACH in cloud containers (Render, Docker, AWS)
+dns.setDefaultResultOrder("ipv4first");
 
 import authRoutes from "./routes/authRoutes.js";
 import staffRoutes from "./routes/staffRoutes.js";
@@ -20,6 +24,7 @@ import contactRoutes from "./routes/contactRoutes.js";
 import salaryRoutes from "./routes/salaryRoutes.js";
 import revenueRoutes from "./routes/revenueRoutes.js";
 import chatbotRoutes from "./routes/chatbotRoutes.js";
+import utilsRoutes from "./routes/utilsRoutes.js";
 
 
 dotenv.config();
@@ -68,6 +73,7 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/revenue", revenueRoutes);
 app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/utils", utilsRoutes);
 
 // Test Route
 app.get("/", (req, res) => {

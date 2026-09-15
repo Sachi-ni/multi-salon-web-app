@@ -8,6 +8,7 @@ import Feedback from "../models/Feedback.js";
 import Appointment from "../models/Appointment.js";
 import Notification from "../models/Notification.js";
 import { storeMedia, isRemoteMedia } from "../utils/mediaStorage.js";
+import { validateNewPassword } from "../utils/passwordPolicy.js";
 
 // __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -21,13 +22,6 @@ const COMMON_EMAIL_DOMAINS = new Set([
   "hotmail.com",
 ]);
 const SRI_LANKAN_PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
-const COMMON_PASSWORDS = new Set([
-  "123456",
-  "12345678",
-  "password",
-  "password123",
-  "qwerty",
-]);
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const normalizePhone = (phone) => phone?.trim().replace(/[\s()\-]/g, "");
 
@@ -53,18 +47,8 @@ const validateManagerContact = ({ email, phone, password }) => {
   }
 
   if (password) {
-    const isComplex =
-      password.length >= 8 &&
-      /[A-Z]/.test(password) &&
-      /[a-z]/.test(password) &&
-      /\d/.test(password) &&
-      /[!@#$%^&*]/.test(password);
-
-    if (!isComplex || COMMON_PASSWORDS.has(password.toLowerCase())) {
-      return {
-        message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
-      };
-    }
+    const passwordError = validateNewPassword(password);
+    if (passwordError) return { message: passwordError };
   }
 
   return { normalizedEmail, normalizedPhone };
@@ -245,7 +229,11 @@ export const createSalon = async (req, res) => {
 export const getSalons = async (req, res) => {
   try {
     const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
-    const publicFilter = { status: "active", isPaused: false };
+    // Public list: everything that is not explicitly deactivated/paused.
+    // Tolerates legacy documents whose status/isPaused fields are missing or
+    // stored with different casing (e.g. "Active") — the strict equality filter
+    // previously hid EVERY salon from customers and broke the booking wizard.
+    const publicFilter = { status: { $not: /^deactivated$/i }, isPaused: { $ne: true } };
     const salons = await Salon.find(isAdmin ? {} : publicFilter);
 
     const salonsWithManagers = await Promise.all(
@@ -303,7 +291,8 @@ export const getSalonById = async (req, res) => {
     }
 
     const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
-    if (!isAdmin && (salon.status !== "active" || salon.isPaused)) {
+    const isSalonPublic = (salon.status || "active").toLowerCase() !== "deactivated" && salon.isPaused !== true;
+    if (!isAdmin && !isSalonPublic) {
       return res.status(404).json({ message: "Salon not found" });
     }
 
