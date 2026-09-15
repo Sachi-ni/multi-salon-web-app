@@ -74,7 +74,7 @@ const Hero = () => {
             <button
               type="button"
               onClick={() => navigate("/book")}
-              className="w-full sm:w-auto px-8 py-4 bg-accent text-primary rounded-xl text-base font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-glow transition-all duration-300 hover:-translate-y-1 flex items-center justify-center gap-2 group"
+              className="w-full sm:w-auto px-8 py-4 bg-accent text-primary rounded-xl text-base font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-[0_0_25px_rgba(245,200,0,0.6)] transition-all duration-300 hover:-translate-y-1 flex items-center justify-center gap-2 group"
             >
               Book Appointment
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -82,7 +82,7 @@ const Hero = () => {
             <button
               type="button"
               onClick={() => navigate("/our-services")}
-              className="w-full sm:w-auto px-8 py-4 bg-surface/50 backdrop-blur-md border border-border text-white rounded-xl text-base font-bold hover:bg-surface-2 transition-all duration-300 hover:-translate-y-1 text-center"
+              className="w-full sm:w-auto px-8 py-4 bg-surface/50 backdrop-blur-md border border-border text-white rounded-xl text-base font-bold hover:bg-surface-2 hover:border-accent/50 hover:shadow-[0_0_25px_rgba(245,200,0,0.35)] transition-all duration-300 hover:-translate-y-1 text-center"
             >
               Explore Services
             </button>
