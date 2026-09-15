@@ -1,2 +1,7 @@
 node_modules
 .env
+fullsuiteverification.txt
+forgetpasswrd.txt
+"backend/mongod.log" 
+"backend/mongod-local.log" 
+
