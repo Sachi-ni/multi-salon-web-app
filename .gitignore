@@ -6,3 +6,7 @@ saloncheck.txt
 check.txt
 fullsuiteverification.txt
 forgetpasswrd.txt
+"backend/mongod.log" 
+"backend/mongod-local.log" 
+"node_modules/" 
+".env" 
