@@ -65,10 +65,10 @@ const validateManagerDetails = ({ email, phone, password }) => {
       password.length >= 6 &&
       /[A-Z]/.test(password) &&
       /[a-z]/.test(password) &&
-      /\d/.test(password);
+      /[^A-Za-z]/.test(password);
 
     if (!isComplex || COMMON_PASSWORDS.has(password.toLowerCase())) {
-      return "Password must be at least 6 characters and include uppercase, lowercase, and number.";
+      return "Password must be at least 6 characters and include uppercase, lowercase, and a number or special character.";
     }
   }
 
