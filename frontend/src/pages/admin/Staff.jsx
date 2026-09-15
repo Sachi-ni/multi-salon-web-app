@@ -31,8 +31,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { API_BASE } from "../../config";
-import useFormValidation from "../../hooks/useFormValidation";
-import { validateEmail } from "../../utils/validation";
 
 const buildImageUrl = (image) => {
   if (!image) return null;

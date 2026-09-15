@@ -20,8 +20,6 @@ import Table from "../../components/ui/Table";
 import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
 import { mediaUrl } from "../../utils/mediaUrl";
-import useFormValidation from "../../hooks/useFormValidation";
-import { validateEmail, validatePassword, validatePhoneSriLankan } from "../../utils/validation";
 
 /* ── Skeleton Card ── */
 const SkeletonStaffCard = () => (

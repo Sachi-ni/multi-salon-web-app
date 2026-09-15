@@ -258,7 +258,6 @@ export default function AdminBookings() {
           Staff Schedule
         </Button>
       </div>
-      </div>
 
       {/* Search & Filter Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">

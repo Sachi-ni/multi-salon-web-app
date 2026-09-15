@@ -621,9 +621,6 @@ export default function Appointments() {
                           onClick={() => handleComplete(a._id)}
                           disabled={isActionLoading}
                           className="h-10 px-5 rounded-full bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
-                          onClick={() => handleComplete(a._id)}
-                          disabled={isActionLoading}
-                          className="h-10 px-5 rounded-full bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
                         >
                           <CheckCircle2 className="w-4 h-4" />
                           {isActionLoading ? "..." : "Mark Complete"}
