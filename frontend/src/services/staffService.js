@@ -74,3 +74,12 @@ export const updateStaff = async (id, data) => {
 
 export const deleteStaff = (id) =>
   API.delete(`/staff/${id}`);
+
+export const createStaffUnavailability = (data) =>
+  API.post("/unavailability", data);
+
+export const getStaffUnavailability = (params = {}) =>
+  API.get("/unavailability", { params });
+
+export const deleteStaffUnavailability = (id) =>
+  API.delete(`/unavailability/${id}`);

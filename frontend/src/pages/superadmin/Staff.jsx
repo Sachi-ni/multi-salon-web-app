@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getSalons } from "../../services/salonService";
 import { getServices } from "../../services/serviceService";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail, validatePassword, validatePhoneSriLankan } from "../../utils/validation";
+import StaffUnavailableModal from "../../components/booking/StaffUnavailableModal";
 import { 
   Plus, Search, Users, Star, MapPin, 
   MoreVertical, Power, Pencil, Trash2, 
@@ -38,7 +41,7 @@ const SkeletonStaffCard = () => (
 );
 
 /* ── Staff Card Actions Menu ── */
-const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
+const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete, onMarkUnavailable }) => {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -83,6 +86,13 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
               <Pencil className="w-3.5 h-3.5 text-info" />
               Edit Details
             </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onMarkUnavailable(staff); setOpen(false); }}
+              className="w-full px-3.5 py-2 text-left text-xs font-bold flex items-center gap-2.5 transition-colors duration-150 hover:bg-danger-dim text-danger"
+            >
+              <Power className="w-3.5 h-3.5" />
+              Mark Unavailable
+            </button>
             <div className="my-1 border-t border-border" />
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(staff._id); setOpen(false); }}
@@ -99,7 +109,7 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
 };
 
 /* ── Staff Card Component ── */
-const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
+const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete, onMarkUnavailable }) => {
   const initials = staff.name
     ? staff.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
     : "S";
@@ -174,6 +184,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
               onEdit={onEdit}
               onToggleStatus={onToggleStatus}
               onDelete={onDelete}
+              onMarkUnavailable={onMarkUnavailable}
             />
           </div>
 
@@ -270,14 +281,24 @@ const Staff = () => {
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
-  const [showEditPassword, setShowEditPassword] = useState(false);
   const [editError, setEditError] = useState("");
   const [editEmailSubmitError, setEditEmailSubmitError] = useState("");
-  const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(editingStaff || {}, {
-    email: validateEmail,
-    phone: validatePhoneSriLankan,
-    password: (value) => value ? validatePassword(value) : { valid: true, message: "" },
-  });
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [unavailableStaff, setUnavailableStaff] = useState(null);
+
+  const optionalValidator = (validator) => (value = "") => (value ? validator(value) : { valid: true, message: "" });
+  const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(
+    editingStaff ? {
+      email: editingStaff.email || "",
+      phone: editingStaff.phone || "",
+      password: editingStaff.password || "",
+    } : { email: "", phone: "", password: "" },
+    {
+      email: optionalValidator(validateEmail),
+      phone: optionalValidator(validatePhoneSriLankan),
+      password: optionalValidator(validatePassword),
+    }
+  );
 
   const handleEdit = (staff) => {
     setShowEditPassword(false);
@@ -390,7 +411,9 @@ const Staff = () => {
   };
 
   const handleUpdateStaff = async () => {
-    if (!validateStaffEdit()) return;
+    if (!validateStaffEdit()) {
+      return;
+    }
     try {
       const data = {
         firstName: editingStaff.firstName,
@@ -574,6 +597,7 @@ const Staff = () => {
               onEdit={() => handleEdit(s)}
               onToggleStatus={handleToggleStatus}
               onDelete={handleDelete}
+              onMarkUnavailable={setUnavailableStaff}
             />
           ))}
         </div>
@@ -827,6 +851,15 @@ const Staff = () => {
           </Button>
         </Modal.Actions>
       </Modal>
+
+      <StaffUnavailableModal
+        staff={unavailableStaff}
+        onClose={() => setUnavailableStaff(null)}
+        onSuccess={() => {
+          setUnavailableStaff(null);
+          fetchData();
+        }}
+      />
     </div>
   );
 };

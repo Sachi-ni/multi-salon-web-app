@@ -14,6 +14,7 @@ import {
   getStaffAppointments,
   getDailySchedule,
   updateAppointmentDuration,
+  updateAppointmentDetails,
   updateStaffAssignment,
   deleteAppointment
 } from "../controllers/appointmentController.js";
@@ -31,11 +32,12 @@ router.get("/:id", protect, getAppointment);
 router.patch("/:id/cancel", protect, cancelAppointment);
 
 // ── Admin routes ────────────────────────────────────────────────────────────
-router.get("/daily-schedule", protect, authorizeRoles("super-admin", "manager"), getDailySchedule);
-router.get("/staff/:staffId", protect, authorizeRoles("super-admin", "manager"), getStaffAppointments);
-router.get("/", protect, authorizeRoles("super-admin", "manager"), getSalonAppointments);
-router.patch("/:id/duration", protect, authorizeRoles("super-admin", "manager"), updateAppointmentDuration);
-router.patch("/:id/confirm", protect, authorizeRoles("super-admin", "manager"), confirmAppointment);
+router.get("/daily-schedule", protect, authorizeRoles("super-admin", "manager", "staff-admin"), getDailySchedule);
+router.get("/staff/:staffId", protect, authorizeRoles("super-admin", "manager", "staff-admin"), getStaffAppointments);
+router.get("/", protect, authorizeRoles("super-admin", "manager", "staff-admin"), getSalonAppointments);
+router.patch("/:id/duration", protect, authorizeRoles("super-admin", "manager", "staff-admin"), updateAppointmentDuration);
+router.patch("/:id/details", protect, authorizeRoles("super-admin", "staff-admin", "manager"), updateAppointmentDetails);
+router.patch("/:id/confirm", protect, authorizeRoles("super-admin"), confirmAppointment);
 router.patch("/:id/reject", protect, authorizeRoles("super-admin", "manager"), rejectAppointment);
 router.patch("/:id/complete", protect, authorizeRoles("super-admin", "manager"), completeAppointment);
 router.patch("/:id/admin-cancel", protect, authorizeRoles("super-admin", "manager"), adminCancelAppointment);

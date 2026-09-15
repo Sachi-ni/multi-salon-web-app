@@ -307,7 +307,7 @@ export default function AdminAnalytics() {
     const customerGrowthData = Object.keys(custMap).sort().map(date => ({ date, newCustomers: custMap[date] }));
 
     return { trendData, staffData, topServicesData, statusData, customerGrowthData };
-  }, [filteredData, services, staff, staffFilter]);
+  }, [filteredData, services, staff, staffFilter, kpis, kpis.cancelledBookings, kpis.completedBookings, kpis.totalBookings]);
 
   /* ── Recent Activity ── */
   const recentActivity = useMemo(() => {
