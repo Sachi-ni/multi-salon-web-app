@@ -782,6 +782,13 @@ export const getSalaryDetails = async (req, res) => {
       });
     }
 
+    // Recompute the period totals for unpaid records so the PDF/details view
+    // always matches the current date / staff config, including days with no
+    // completed appointments yet.
+    if ((salary.status || "") !== "Paid") {
+      refreshSalaryRecord(salary);
+    }
+
     const servicesData = Array.isArray(salary.staff_id?.services)
       ? salary.staff_id.services.map((service) => ({
           _id: service._id,

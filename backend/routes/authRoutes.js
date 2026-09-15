@@ -1,6 +1,17 @@
 import express from "express";
 import multer from "multer";
-import { loginAdmin, registerCustomer, getProfile, updateProfile, changePassword, setupMfa, forgotPassword, resetPassword } from "../controllers/authController.js";
+import {
+  loginAdmin,
+  registerCustomer,
+  getProfile,
+  updateProfile,
+  changePassword,
+  setupMfa,
+  forgotPassword,
+  resetPassword,
+  verifySuperAdminOtp,
+  resendSuperAdminOtp,
+} from "../controllers/authController.js";
 import { protect, protectHardening } from "../middleware/authMiddleware.js";
 import rateLimit from "express-rate-limit";
 
@@ -17,6 +28,8 @@ router.post("/register", registrationLimiter, registerCustomer);
 router.post("/forgot-password", passwordResetLimiter, forgotPassword);
 router.post("/reset-password", resetPassword);
 router.post("/login", loginAdmin);
+router.post("/verify-superadmin-otp", verifySuperAdminOtp);
+router.post("/resend-superadmin-otp", resendSuperAdminOtp);
 router.get("/profile", protect, getProfile);
 router.put("/user/:id", protect, upload.single("image"), updateProfile);
 router.post("/change-password", protectHardening("change-password"), changePassword);

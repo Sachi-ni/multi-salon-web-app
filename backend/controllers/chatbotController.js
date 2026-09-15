@@ -1,5 +1,6 @@
 import Salon from "../models/Salon.js";
 import Service from "../models/Service.js";
+import mongoose from "mongoose";
 
 /* ── Intent Detection ── */
 const INTENTS = [
@@ -40,6 +41,16 @@ const INTENTS = [
     keywords: ["contact", "phone", "email", "call", "reach", "number", "mail", "talk to someone", "support", "help"],
   },
   {
+    name: "consultant",
+    keywords: [
+      "style consultant", "consultant", "hairstyle", "hair style", "haircut", "hair cut",
+      "hair care", "haircare", "routine", "shampoo", "conditioner", "curly", "straight",
+      "wavy", "frizzy", "thin hair", "thick hair", "scalp", "dandruff", "split ends",
+      "wedding hair", "keratin", "recommend a style", "what style", "which haircut",
+      "face shape", "hair advice", "style advice", "treatment recommendation", "recommend"
+    ],
+  },
+  {
     name: "thanks",
     keywords: ["thank", "thanks", "thank you", "thx", "appreciate", "great", "awesome", "perfect", "nice"],
   },
@@ -61,8 +72,9 @@ function detectIntent(message) {
 /* ── Intent Handlers ── */
 async function handleGreeting() {
   return {
-    text: "Hello! 👋 Welcome to **SalonHub**! I'm your virtual assistant. How can I help you today?",
+    text: "Hello! 👋 Welcome to **SalonHub**! I'm your virtual assistant & AI style consultant. How can I help you today?",
     quickReplies: [
+      "✨ Style Consultant",
       "Our Services",
       "Pricing",
       "Salon Locations",
@@ -279,7 +291,7 @@ async function handleContact() {
 function handleThanks() {
   return {
     text: "You're welcome! 😊 Is there anything else I can help you with?",
-    quickReplies: ["Our Services", "Book Appointment", "Salon Locations", "No, thanks!"],
+    quickReplies: ["✨ Style Consultant", "Our Services", "Book Appointment", "Salon Locations", "No, thanks!"],
   };
 }
 
@@ -287,12 +299,289 @@ function handleFallback() {
   return {
     text: "I'm sorry, I didn't quite understand that. 🤔 Here are some things I can help you with:",
     quickReplies: [
+      "✨ Style Consultant",
       "Our Services",
       "Pricing",
       "Book Appointment",
       "Salon Locations",
       "Working Hours",
       "Contact Us",
+    ],
+  };
+}
+
+/* ── AI Style Consultant Data & Handler ── */
+const HAIR_PROFILES = {
+  straight: {
+    name: "Straight Hair",
+    keywords: ["straight"],
+    hairstyles: [
+      "✂️ **Sleek French Bob**: Sharp jaw-length cut that gives fine or straight strands instant thickness and modern chic.",
+      "✂️ **Long Fluid Layers with Curtain Bangs**: Adds dynamic movement and body without sacrificing length.",
+      "✂️ **Glass Hair Blunt Cut**: Sleek, mirror-shine cut designed to turn heads at any event."
+    ],
+    routine: [
+      "🧴 **Wash**: Use a lightweight volumizing shampoo 2-3 times per week.",
+      "🧴 **Hydrate**: Apply weightless conditioner strictly from mid-lengths to ends to keep roots fresh and buoyant.",
+      "🧴 **Styling**: Blow dry upside down with a round ceramic brush for all-day natural volume."
+    ],
+    recommendedCategory: ["haircut", "blowdry", "cut", "styling"]
+  },
+  wavy: {
+    name: "Wavy Hair",
+    keywords: ["wavy", "wave", "waves"],
+    hairstyles: [
+      "✂️ **Cascading Butterfly Layers**: Gorgeous, flowing layers that effortlessly enhance natural wave texture and bounce.",
+      "✂️ **Textured Collarbone Lob**: A versatile length framing the collarbone, ideal for effortless beach waves.",
+      "✂️ **Soft Shag with Wispy Fringe**: Rock-and-roll chic with light crown layering."
+    ],
+    routine: [
+      "🧴 **Wash**: Sulfate-free moisture shampoo to prevent dryness and preserve natural wave curls.",
+      "🧴 **Hydrate**: Scrunch in leave-in curl enhancer or mousse while hair is towel-damp.",
+      "🧴 **Styling**: Air-dry or diffuse on medium heat; seal ends with lightweight argan oil."
+    ],
+    recommendedCategory: ["layer", "cut", "haircut", "styling", "spa"]
+  },
+  curly: {
+    name: "Curly / Coily Hair",
+    keywords: ["curly", "curl", "curls", "coily", "coil", "coils", "afro"],
+    hairstyles: [
+      "✂️ **Round Layered Cut with Curly Bangs**: Balances weight, avoids triangle shape, and lets ringlets frame the face beautifully.",
+      "✂️ **Defined Bouncy Curly Bob**: Statement jaw-to-shoulder cut celebrating vibrant natural volume.",
+      "✂️ **Half-Up Goddess Crown**: Romantic pinning on top with defined cascading ringlets."
+    ],
+    routine: [
+      "🧴 **Wash**: Gentle sulfate-free co-wash or moisturizing shampoo once or twice a week.",
+      "🧴 **Hydrate**: Apply rich leave-in conditioner using 'praying hands' method onto soaking wet hair.",
+      "🧴 **Styling**: Apply curl-defining gel and gently plop with a microfiber towel; never brush dry curls."
+    ],
+    recommendedCategory: ["keratin", "conditioning", "spa", "treatment", "curl"]
+  },
+  thin: {
+    name: "Thin / Fine Hair",
+    keywords: ["thin", "fine", "flat", "volume", "limp", "loss", "scanty"],
+    hairstyles: [
+      "✂️ **Blunt Parisian Cut**: Clean blunt ends instantly create the optical illusion of double the hair density.",
+      "✂️ **Feathered Textured Pixie**: Lightweight crown layers provide permanent lift without needing tons of product.",
+      "✂️ **Internal Invisible Layers**: Adds air and separation inside the hair without thinning the perimeter."
+    ],
+    routine: [
+      "🧴 **Wash**: Clarifying & volumizing caffeine/biotin shampoo to keep roots grease-free and energized.",
+      "🧴 **Hydrate**: Ultra-lightweight rinse-out conditioner; avoid heavy oils on the scalp.",
+      "🧴 **Styling**: Dry texturizing spray at the roots for instant non-sticky grit and hold."
+    ],
+    recommendedCategory: ["scalp", "cut", "blowdry", "treatment"]
+  },
+  frizzy: {
+    name: "Frizzy / Dry / Damaged Hair",
+    keywords: ["frizzy", "frizz", "dry", "rough", "coarse", "damaged", "bleached", "color", "split"],
+    hairstyles: [
+      "✂️ **Face-Framing Smooth Layers**: Softly blended layers that remove damaged split weight and promote smooth styling.",
+      "✂️ **Silky Shoulder-Length Cut with Beveled Ends**: Polished silhouette that minimizes flyaways.",
+      "✂️ **Protective Braided Updo / Chignon**: Elegant styling that keeps fragile ends tucked and protected."
+    ],
+    routine: [
+      "🧴 **Wash**: Deep moisture repair shampoo rich in keratin, argan, or shea butter.",
+      "🧴 **Hydrate**: Weekly restorative protein hair mask with a warm towel wrap.",
+      "🧴 **Protection**: Always spray thermal heat protectant before heat styling; sleep on a satin or silk pillowcase."
+    ],
+    recommendedCategory: ["keratin", "spa", "conditioning", "treatment", "therapy"]
+  }
+};
+
+const OCCASIONS = {
+  wedding: {
+    name: "Wedding / Special Event",
+    keywords: ["wedding", "bride", "bridal", "groom", "party", "event", "ceremony", "formal", "prom", "ball", "function"],
+    tip: "Focus on all-day long-lasting hold, romantic tendrils, and radiant mirror-like shine."
+  },
+  everyday: {
+    name: "Everyday Chic",
+    keywords: ["everyday", "daily", "casual", "low maintenance", "simple", "quick", "easy", "effortless"],
+    tip: "Focus on wash-and-go simplicity that looks effortlessly polished in under 5 minutes."
+  },
+  work: {
+    name: "Professional / Office",
+    keywords: ["work", "office", "professional", "meeting", "interview", "corporate", "formal"],
+    tip: "Focus on clean symmetry, sleek low buns, or sophisticated blowouts that convey poise and elegance."
+  },
+  repair: {
+    name: "Intense Repair & Care",
+    keywords: ["repair", "grow", "growth", "health", "hydrate", "moisture", "dandruff", "fall", "care"],
+    tip: "Focus on restorative scalp therapy, salon bond-repair treatments, and sealing damaged cuticles."
+  }
+};
+
+async function callGeminiAI(userMessage, servicesContext) {
+  if (!process.env.GEMINI_API_KEY || !process.env.GEMINI_API_KEY.trim()) {
+    return null;
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY.trim();
+  const systemPrompt = `You are the expert Senior AI Stylist & Hair Care Consultant at SalonHub (a premium multi-salon management platform).
+A client is asking: "${userMessage}".
+
+Available SalonHub Services in our Database:
+${servicesContext || "Haircuts, Keratin Smoothing Treatment, Deep Conditioning Hair Spa, Scalp Revitalizer, Hair Coloring"}
+
+Please provide a personalized, chic, and practical response:
+1. ✂️ **Recommended Hairstyles**: Suggest 1-2 cuts/styles that will flatter their hair profile or occasion, explaining why.
+2. 🧴 **Custom Hair Care Routine**: Give 2-3 specific morning/evening/wash steps.
+3. 🌟 **SalonHub Service Match**: Pick 1-2 matching services from our actual database above with prices.
+4. Keep the tone warm, welcoming, and high-end with markdown headings and emojis. Keep length concise (around 150-250 words).
+5. Conclude with: "👉 [Book This Service Now](/book)"`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: systemPrompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 550,
+          },
+        }),
+      }
+    );
+
+    const data = await res.json();
+    if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      return data.candidates[0].content.parts[0].text;
+    }
+    return null;
+  } catch (err) {
+    console.warn("Gemini API call skipped, falling back to smart rules:", err.message);
+    return null;
+  }
+}
+
+async function handleConsultant(message) {
+  const lower = message.toLowerCase();
+
+  // If user just initiated the consultant flow
+  if (
+    lower.includes("style consultant") ||
+    lower.includes("consultant") ||
+    lower === "✨ style consultant" ||
+    lower === "hair advice"
+  ) {
+    return {
+      text: "✨ **Welcome to the SalonHub AI Style & Hair Care Consultant!** 💇‍♀️💇‍♂️\n\nI can help you find your most flattering hairstyle, treatments, and a custom daily hair care routine.\n\n**Step 1 of 2: What is your hair type or primary concern?**",
+      quickReplies: [
+        "Straight Hair",
+        "Wavy Hair",
+        "Curly / Coily",
+        "Thin / Fine Hair",
+        "Frizzy / Dry Hair",
+        "Back to Menu",
+      ],
+    };
+  }
+
+  // Detect hair type
+  let detectedType = null;
+  for (const profile of Object.values(HAIR_PROFILES)) {
+    if (profile.keywords.some((k) => lower.includes(k))) {
+      detectedType = profile;
+      break;
+    }
+  }
+
+  // Detect occasion
+  let detectedOccasion = null;
+  for (const occ of Object.values(OCCASIONS)) {
+    if (occ.keywords.some((k) => lower.includes(k))) {
+      detectedOccasion = occ;
+      break;
+    }
+  }
+
+  // If only hair type was chosen and no occasion yet, ask Step 2
+  if (detectedType && !detectedOccasion) {
+    return {
+      text: `Got it! **${detectedType.name}** ✨\n\n**Step 2 of 2: What is your primary occasion or styling goal?**`,
+      quickReplies: [
+        `${detectedType.name} for Wedding / Special Event`,
+        `${detectedType.name} for Everyday Chic`,
+        `${detectedType.name} for Professional / Work`,
+        `${detectedType.name} for Intense Repair & Care`,
+        "Back to Menu",
+      ],
+    };
+  }
+
+  // Fallback to Wavy / Everyday if neither detected
+  const profile = detectedType || HAIR_PROFILES.wavy;
+  const occasion = detectedOccasion || OCCASIONS.everyday;
+
+  // Retrieve salon services from database for context matching (with connection check & timeout)
+  let matchingServicesText = "";
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const services = await Service.find({}).populate("salon_id", "name").lean().maxTimeMS(2500);
+      if (services && services.length > 0) {
+        // Find services matching category keywords
+        const matchedSvcs = services.filter((s) => {
+          const name = (s.service_name || "").toLowerCase();
+          return profile.recommendedCategory.some((cat) => name.includes(cat));
+        }).slice(0, 3);
+
+        const targetList = matchedSvcs.length > 0 ? matchedSvcs : services.slice(0, 3);
+        matchingServicesText = targetList
+          .map((s) => `• **${s.service_name}** — LKR ${s.base_price.toLocaleString()} (${s.duration} min)${s.salon_id?.name ? ` at _${s.salon_id.name}_` : ""}`)
+          .join("\n");
+      }
+    }
+  } catch (err) {
+    console.warn("Consultant service query skipped:", err.message);
+  }
+
+  // Try Gemini AI first
+  const geminiReply = await callGeminiAI(message, matchingServicesText);
+  if (geminiReply) {
+    return {
+      text: geminiReply,
+      quickReplies: [
+        "Book Appointment",
+        "✨ Style Consultant",
+        "Our Services",
+        "Back to Menu",
+      ],
+    };
+  }
+
+  // Smart Rule-Based Engine (100% offline & free)
+  let reply = `✨ **Your Personalized SalonHub Style Profile** ✨\n\n`;
+  reply += `👤 **Hair Profile:** ${profile.name}\n`;
+  reply += `🎯 **Focus:** ${occasion.name} — _${occasion.tip}_\n\n`;
+
+  reply += `### ✂️ Flattering Hairstyles for You:\n`;
+  profile.hairstyles.forEach((style) => {
+    reply += `${style}\n`;
+  });
+
+  reply += `\n### 🧴 Recommended Hair Care Routine:\n`;
+  profile.routine.forEach((step) => {
+    reply += `${step}\n`;
+  });
+
+  if (matchingServicesText) {
+    reply += `\n### 🌟 Recommended SalonHub Treatments:\n${matchingServicesText}\n`;
+  }
+
+  reply += `\nReady for your salon transformation?\n👉 [Click here to Book an Appointment](/book)`;
+
+  return {
+    text: reply,
+    quickReplies: [
+      "Book Appointment",
+      "✨ Style Consultant",
+      "Our Services",
+      "Pricing",
+      "Back to Menu",
     ],
   };
 }
@@ -312,6 +601,9 @@ export const handleChatMessage = async (req, res) => {
     switch (intent) {
       case "greeting":
         response = await handleGreeting();
+        break;
+      case "consultant":
+        response = await handleConsultant(message);
         break;
       case "services":
         response = await handleServices();
@@ -351,7 +643,7 @@ export const handleChatMessage = async (req, res) => {
     if (message.toLowerCase().includes("no, thanks")) {
       response = {
         text: "Alright! Have a wonderful day! ✨ Feel free to chat anytime you need help.",
-        quickReplies: ["Back to Menu"],
+        quickReplies: ["✨ Style Consultant", "Back to Menu"],
       };
     }
 
@@ -364,7 +656,7 @@ export const handleChatMessage = async (req, res) => {
     console.error("Chatbot error:", err);
     return res.status(500).json({
       reply: "Oops! Something went wrong on our end. Please try again in a moment.",
-      quickReplies: ["Try Again"],
+      quickReplies: ["✨ Style Consultant", "Try Again"],
       intent: "error",
     });
   }

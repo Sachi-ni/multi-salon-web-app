@@ -44,7 +44,6 @@ const timesOverlap = (s1, e1, s2, e2) => {
 const normalizePhone = (phone) => phone?.replace(/[\s()-]/g, "") || "";
 const PHONE_PATTERN = /^\+?[0-9]{10}$/;
 
-
 // ─── Helper: normalize any time string to a zero-padded "HH:MM" ──────────────
 // Used by the appointment-edit flow (available-staff window filter, available-slots
 // ignore-appointment logic and staff reassignment). Handles "9:00", "09:00",
@@ -77,7 +76,6 @@ const overlapsUnavailability = (records, date, start, end) => records.some((reco
   dateTimeForSlot(date, end) > new Date(record.start_date_time)
 );
 
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // CUSTOMER ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -86,9 +84,11 @@ const overlapsUnavailability = (records, date, start, end) => records.some((reco
 // Returns staff who can perform at least one of the selected services AND have free slots on that date
 // Query: ?date=2026-07-01&serviceIds=id1,id2,id3&salonId=xxx
 //        (also supports legacy ?serviceId=xxx)
+// Optional: ?startTime=HH:MM&endTime=HH:MM  → only staff available during that window
+//           ?ignoreAppointmentId=xxx        → exclude this appointment from conflict checks (reassignment)
 export const getAvailableStaff = async (req, res) => {
   try {
-    const { date, serviceId, serviceIds, salonId } = req.query;
+    const { date, serviceId, serviceIds, salonId, startTime, endTime, ignoreAppointmentId } = req.query;
 
     // Support both legacy single serviceId and new comma-separated serviceIds
     let serviceIdList = [];
@@ -104,13 +104,15 @@ export const getAvailableStaff = async (req, res) => {
       });
     }
 
-    const salon = await Salon.findOne({ _id: salonId, status: "active", isPaused: false }).select("_id");
+    // Public booking filter: exclude only explicitly deactivated/paused salons
+    // (tolerates legacy documents with missing or differently-cased status).
+    const salon = await Salon.findOne({ _id: salonId, status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).select("_id");
     if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
 
-    // Admin users (super-admin / manager) may assign salon
-    // managers & admins as service providers even when those users don't have
-    // the service assigned to their profile. Customers keep seeing only staff
-    // who actually perform the selected services.
+    // Admin users (super-admin / manager) may assign salon managers as service
+    // providers even when they do not have the service assigned to their
+    // profile. Public customer bookings must also show the active salon
+    // manager, so registered and guest customers can select the manager.
     const userRole = req.user?.role || "";
     const isAdminUser = ["super-admin", "manager"].includes(userRole);
 
@@ -124,18 +126,21 @@ export const getAvailableStaff = async (req, res) => {
         ? {
             $or: [
               { services: { $in: serviceIdList } },
-              { role: { $in: [/^manager$/i] } },
+              { role: { $regex: /^manager$/i } },
             ],
           }
         : {
-            services: { $in: serviceIdList },
-            role: { $not: /^(manager|super-admin)$/i },
+            $or: [
+              { services: { $in: serviceIdList } },
+              { role: { $regex: /^manager$/i } },
+            ],
+            role: { $not: /^(super-admin)$/i },
           }),
     })
       .populate("salon_id", "name")
       .populate("services", "service_name");
 
-    const result = staffList.map(staff => ({
+    let result = staffList.map(staff => ({
       staff_id: staff._id,
       full_name: staff.full_name,
       role: staff.role,
@@ -144,7 +149,6 @@ export const getAvailableStaff = async (req, res) => {
       salon: staff.salon_id,
       services: staff.services
     }));
-
 
     // ── Optional time-window filter ──────────────────────────────────────────
     // When startTime & endTime are given, keep only staff who are actually free
@@ -263,7 +267,7 @@ export const getAvailableStaff = async (req, res) => {
 //        (also supports legacy ?serviceId=xxx)
 export const getAvailableSlots = async (req, res) => {
   try {
-    const { staffId, date, serviceId, serviceIds, salonId } = req.query;
+    const { staffId, date, serviceId, serviceIds, salonId, ignoreAppointmentId } = req.query;
     console.log("getAvailableSlots query:", req.query);
 
     // Support both legacy single serviceId and new comma-separated serviceIds
@@ -278,7 +282,8 @@ export const getAvailableSlots = async (req, res) => {
       return res.status(400).json({ message: "staffId, date, serviceId(s), and salonId are required" });
     }
 
-    const salon = await Salon.findOne({ _id: salonId, status: "active", isPaused: false }).select("_id");
+    // Public booking filter: exclude only explicitly deactivated/paused salons.
+    const salon = await Salon.findOne({ _id: salonId, status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).select("_id");
     if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
 
     // 1. Get total duration from all selected services
@@ -349,11 +354,26 @@ export const getAvailableSlots = async (req, res) => {
       end_date_time: { $gt: queryDate }
     }).lean();
 
+    let ignoredAppointment = null;
+    let staffHasIgnoredAppointment = false;
+    if (ignoreAppointmentId) {
+      ignoredAppointment = await Appointment.findById(ignoreAppointmentId).lean();
+      staffHasIgnoredAppointment = ignoredAppointment?.staff_id?.toString() === staffId;
+      if (!staffHasIgnoredAppointment) {
+        staffHasIgnoredAppointment = await AppointmentService.exists({
+          appointment_id: ignoreAppointmentId,
+          staff_id: staffId
+        });
+      }
+    }
+
     // 4.5 Build list of occupied time ranges from confirmed appointments and services
     const occupiedRanges = [];
 
     // Add from parent appointments if this staff is the primary staff
+    // (skip the appointment being edited, since this slot query is for reassignment)
     for (const appt of validAppointments) {
+      if (ignoreAppointmentId && appt._id.toString() === ignoreAppointmentId) continue;
       if (appt.staff_id && appt.staff_id.toString() === staffId) {
         occupiedRanges.push({ start: appt.start_time, end: appt.end_time });
       }
@@ -361,6 +381,7 @@ export const getAvailableSlots = async (req, res) => {
 
     // Add from specific AppointmentService entries for this staff
     for (const svc of staffServices) {
+      if (ignoreAppointmentId && svc.appointment_id && svc.appointment_id.toString() === ignoreAppointmentId) continue;
       if (svc.service_start_time && svc.service_end_time) {
         occupiedRanges.push({ start: svc.service_start_time, end: svc.service_end_time });
       }
@@ -368,7 +389,11 @@ export const getAvailableSlots = async (req, res) => {
 
     // 5. Filter available slots — not booked and not overlapping with confirmed appointments
     const freeSlots = availability.slots.filter(slot => {
-      if (slot.is_booked) return false;
+      const isCurrentAppointmentSlot = ignoredAppointment &&
+        staffHasIgnoredAppointment &&
+        toHHMM(slot.start_time) >= toHHMM(ignoredAppointment.start_time) &&
+        toHHMM(slot.end_time) <= toHHMM(ignoredAppointment.end_time);
+      if (slot.is_booked && !isCurrentAppointmentSlot) return false;
 
       // Check if this slot overlaps with any confirmed appointment
       for (const range of occupiedRanges) {
@@ -1175,7 +1200,7 @@ export const completeAppointment = async (req, res) => {
 
     // SALARY: Process salary calculation for completed appointment
     try {
-      await processSalaryOnCompletion(appointment);
+      await processSalaryOnCompletion(appointment._id);
       console.log(`Salary processed for appointment ${appointment._id}`);
     } catch (salaryErr) {
       console.error("Failed to process salary:", salaryErr);

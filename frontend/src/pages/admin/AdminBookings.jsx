@@ -18,7 +18,7 @@ import EmptyState from "../../components/ui/EmptyState";
 import { 
   Calendar, Clock, User, Search, LayoutGrid, 
   List, CheckCircle2, AlertCircle, Trash2, 
-  Check, X, Plus, Hash
+  Check, X, Plus, Hash, Edit2
 } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
@@ -53,6 +53,7 @@ export default function AdminBookings() {
 
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
+  const [editingStaffAppointment, setEditingStaffAppointment] = useState(null);
 
   const fetchAppointments = useCallback(() => {
     setLoading(true);
@@ -465,7 +466,7 @@ export default function AdminBookings() {
                   <div className="pt-2.5 border-t border-border/50 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-neutral-400 font-medium">Duration:</span>
-                      {a.status === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
+                      {a.status?.toLowerCase() === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
                         <button 
                           onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
                           className="text-amber-400 text-2xs hover:underline font-bold"
@@ -515,7 +516,7 @@ export default function AdminBookings() {
                   </span>
 
                   <div className="flex items-center gap-2">
-                    {a.status === "pending" && user?.role === "super-admin" && (
+                    {a.status?.toLowerCase() === "pending" && (
                       <>
                         <button
                           onClick={() => handleConfirm(a._id)}
@@ -536,36 +537,18 @@ export default function AdminBookings() {
                       </>
                     )}
 
-                    {a.status === "confirmed" && (
+                    {a.status?.toLowerCase() === "confirmed" && (
                       <>
                         <button
-                    {a.status?.toLowerCase() === "confirmed" && (
-                        <>
-                          <button
-                            onClick={() => setEditingStaffAppointment(a)}
-                            disabled={isActionLoading}
-                            className="h-10 px-5 rounded-full bg-transparent text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
-                            title="Reassign Staff"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleComplete(a._id)}
-                            disabled={isActionLoading}
-                            className="h-10 px-5 rounded-full bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
-                          >
-                            Complete
-                          </button>
-                          <button
-                            onClick={() => handleAdminCancel(a._id)}
-                            disabled={isActionLoading}
-                            className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition-all disabled:opacity-40"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                    )}
+                          onClick={() => setEditingStaffAppointment(a)}
+                          disabled={isActionLoading}
+                          className="px-4 py-2 rounded-xl bg-surface-2 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
+                          title="Reassign Staff"
+                        >
+                        <Edit2 className="w-4 h-4" />
+                          Edit
+                        </button>
+                        <button
                           onClick={() => handleComplete(a._id)}
                           disabled={isActionLoading}
                           className="h-10 px-5 rounded-full bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
@@ -638,7 +621,7 @@ export default function AdminBookings() {
                   </Table.Td>
                   <Table.Td align="right">
                     <div className="flex items-center justify-end gap-2">
-                      {a.status === "pending" && user?.role === "super-admin" && (
+                      {a.status?.toLowerCase() === "pending" && (
                         <>
                           <button
                             onClick={() => handleConfirm(a._id)}

@@ -1,9 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Clock, BriefcaseBusiness, AlertCircle, CheckCircle2 } from "lucide-react";
-import { getAvailableStaff, updateAppointmentDetails, getAvailableSlots } from "../../services/appointmentService";
-import { getServices } from "../../services/serviceService";
-import { getStaff } from "../../services/staffService";
+import { getAvailableStaff, updateStaffAssignment, getAvailableSlots } from "../../services/appointmentService";
 import { getUploadUrl } from "../../config";
 import { formatDuration } from "../../utils/formatDuration";
 
@@ -18,11 +16,6 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [serviceOptions, setServiceOptions] = useState([]);
-  const [staffOptions, setStaffOptions] = useState([]);
-  const [editDetails, setEditDetails] = useState({
-    serviceId: "", staffId: "", appointmentDate: "", startTime: "", duration: 60, amount: 0, isManualOverride: false
-  });
 
   const parseTimeToDate = (t) => {
     if (!t) return new Date(NaN);
@@ -69,44 +62,8 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
       };
     });
     setServices(initialServices);
-    const firstService = initialServices[0];
-    setEditDetails({
-      serviceId: firstService?.serviceId || "",
-      staffId: firstService?.staffId || appointment.staff_id?._id || appointment.staff_id || "",
-      appointmentDate: appointment.appointment_date || "",
-      startTime: toHHMM(appointment.start_time || firstService?.startTime),
-      duration: appointment.duration || firstService?.duration || 60,
-      amount: appointment.total_price ?? firstService?.subPrice ?? 0,
-      isManualOverride: false,
-    });
-    Promise.all([getServices(salonId), getStaff(salonId)])
-      .then(([serviceRes, staffRes]) => {
-        setServiceOptions(serviceRes.data || []);
-        setStaffOptions(staffRes.data || []);
-      })
-      .catch(() => setError("Failed to load services and staff."));
     setLoading(false);
-  }, [appointment, salonId, toHHMM]);
-
-  const selectedService = serviceOptions.find((service) => service._id === editDetails.serviceId);
-  const filteredStaff = staffOptions.filter((staff) =>
-    staff.status === "Active" && (staff.services?.some((service) => (service._id || service).toString() === editDetails.serviceId) || /^manager$/i.test(staff.role || ""))
-  );
-  const updateEditDetail = (field, value) => setEditDetails((previous) => ({ ...previous, [field]: value }));
-  const handleServiceChange = (serviceId) => {
-    const service = serviceOptions.find((item) => item._id === serviceId);
-    const serviceStaff = staffOptions.filter((staff) =>
-      staff.status === "Active" && (staff.services?.some((item) => (item._id || item).toString() === serviceId) || /^manager$/i.test(staff.role || ""))
-    );
-    setEditDetails((previous) => ({
-      ...previous,
-      serviceId,
-      duration: service?.duration || previous.duration,
-      amount: service?.base_price ?? previous.amount,
-      isManualOverride: false,
-      staffId: serviceStaff.some((staff) => staff._id === previous.staffId) ? previous.staffId : ""
-    }));
-  };
+  }, [appointment, toHHMM]);
 
   const fetchAvailableStaff = useCallback(async (index, startTime, endTimeOverride) => {
     const svc = services[index];
@@ -187,30 +144,20 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
   }, []);
 
   const handleSave = async () => {
-    if (!editDetails.serviceId || !editDetails.staffId || !editDetails.appointmentDate || !editDetails.startTime) {
-      setError("Service, staff, date, and time are required.");
-      return;
+    const unassigned = services.filter((s) => !s.staffId || !s.startTime || !s.endTime);
+    if (unassigned.length > 0) { setError("Please assign staff and time for all services."); return; }
+    for (let i = 0; i < services.length; i++) {
+      const s = services[i];
+      if (isStaffDoubleBooked(s.staffId, s.startTime, s.endTime, i)) { setError(`Staff ${s.staffName} cannot serve two services at the same time`); return; }
     }
     setSaving(true);
     setError("");
     try {
-      const payload = {
-        service_id: editDetails.serviceId,
-        staff_id: editDetails.staffId,
-        appointment_date: editDetails.appointmentDate,
-        start_time: editDetails.startTime,
-        duration: Number(editDetails.duration),
-        total_price: Number(editDetails.amount),
-        isManualOverride: editDetails.isManualOverride === true
-      };
-      console.debug("Appointment edit save duration:", editDetails.duration);
-      console.debug("Appointment edit API payload:", payload);
-      const response = await updateAppointmentDetails(appointment._id, payload);
-      const updatedAppointment = response.data?.appointment || response.data;
-      console.debug("Appointment updated response:", updatedAppointment);
-      setSuccess("Appointment updated successfully!");
+      const payload = services.map((s) => ({ service_id: s.serviceId, staff_id: s.staffId, service_start_time: s.startTime, service_end_time: s.endTime, sub_price: s.subPrice || 0 }));
+      await updateStaffAssignment(appointment._id, payload);
+      setSuccess("Staff assignment updated successfully!");
       setError("");
-      setTimeout(() => { setSaving(false); onSuccess?.(updatedAppointment); onClose?.(); }, 600);
+      setTimeout(() => { setSaving(false); onSuccess?.(appointment); onClose?.(); }, 600);
     } catch (err) {
       setSaving(false);
       setError(err.response?.data?.message || err.message || "Failed to save.");
@@ -254,45 +201,6 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
             </div>
           </div>
           <div className="px-5 py-4 space-y-5">
-            <div className="rounded-xl bg-surface-2/30 border border-border p-4 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="text-2xs text-muted-2 font-medium">Service
-                  <select value={editDetails.serviceId} onChange={(event) => handleServiceChange(event.target.value)} className="mt-1 w-full bg-surface border border-border text-white text-xs rounded-lg px-3 py-2">
-                    <option value="">Select service</option>
-                    {serviceOptions.map((service) => <option key={service._id} value={service._id}>{service.service_name}</option>)}
-                  </select>
-                </label>
-                <label className="text-2xs text-muted-2 font-medium">Staff
-                  <select value={editDetails.staffId} onChange={(event) => updateEditDetail("staffId", event.target.value)} className="mt-1 w-full bg-surface border border-border text-white text-xs rounded-lg px-3 py-2">
-                    <option value="">Select staff</option>
-                    {filteredStaff.map((staff) => <option key={staff._id} value={staff._id}>{staff.full_name}</option>)}
-                  </select>
-                </label>
-                <label className="text-2xs text-muted-2 font-medium">Date
-                  <input type="date" value={editDetails.appointmentDate} onChange={(event) => updateEditDetail("appointmentDate", event.target.value)} className="mt-1 w-full bg-surface border border-border text-white text-xs rounded-lg px-3 py-2" />
-                </label>
-                <label className="text-2xs text-muted-2 font-medium">Start time
-                  <input type="time" value={editDetails.startTime} onChange={(event) => updateEditDetail("startTime", event.target.value)} className="mt-1 w-full bg-surface border border-border text-white text-xs rounded-lg px-3 py-2" />
-                </label>
-                <label className="text-2xs text-muted-2 font-medium">Duration
-                  <select value={editDetails.duration} onChange={(event) => {
-                    const duration = Number(event.target.value);
-                    console.debug("Appointment duration selected:", duration);
-                    updateEditDetail("duration", duration);
-                  }} className="mt-1 w-full bg-surface border border-border text-white text-xs rounded-lg px-3 py-2">
-                    {[30, 60, 90, 120, 180, 240].map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}
-                  </select>
-                </label>
-                <label className="text-2xs text-muted-2 font-medium">Amount
-                  <input type="number" min="0" value={editDetails.amount} disabled={!editDetails.isManualOverride} onChange={(event) => updateEditDetail("amount", event.target.value)} className="mt-1 w-full bg-surface border border-border text-white text-xs rounded-lg px-3 py-2 disabled:opacity-50" />
-                </label>
-                <label className="flex items-center gap-2 text-2xs text-muted-2 font-medium sm:col-span-2">
-                  <input type="checkbox" checked={editDetails.isManualOverride} onChange={(event) => updateEditDetail("isManualOverride", event.target.checked)} />
-                  Manual price override
-                </label>
-              </div>
-              <p className="text-2xs text-muted-2">End time: <span className="text-white font-bold">{editDetails.startTime ? formatTime(computeEndTime(editDetails.startTime, editDetails.duration)) : "Select a start time"}</span>{selectedService ? ` · Default: ${selectedService.duration} min / LKR ${selectedService.base_price}` : ""}</p>
-            </div>
             {services.map((svc, index) => {
               const staffList = availableStaffMap[index] || [];
               const slots = availableSlotsMap[index] || [];

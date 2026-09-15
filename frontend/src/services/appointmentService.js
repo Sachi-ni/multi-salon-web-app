@@ -2,22 +2,26 @@ import api from "./api";
 
 // ── Customer endpoints ──────────────────────────────────────────────────────
 
-export const getAvailableStaff = (date, serviceIds, salonId) =>
+export const getAvailableStaff = (date, serviceIds, salonId, options = {}) =>
   api.get("/appointments/available-staff", {
     params: {
       date,
       serviceIds: Array.isArray(serviceIds) ? serviceIds.join(",") : serviceIds,
-      salonId
+      salonId,
+      ...(options.startTime ? { startTime: options.startTime } : {}),
+      ...(options.endTime ? { endTime: options.endTime } : {}),
+      ...(options.ignoreAppointmentId ? { ignoreAppointmentId: options.ignoreAppointmentId } : {})
     }
   });
 
-export const getAvailableSlots = (staffId, date, serviceIds, salonId) =>
+export const getAvailableSlots = (staffId, date, serviceIds, salonId, options = {}) =>
   api.get("/appointments/available-slots", {
     params: {
       staffId,
       date,
       serviceIds: Array.isArray(serviceIds) ? serviceIds.join(",") : serviceIds,
-      salonId
+      salonId,
+      ...(options.ignoreAppointmentId ? { ignoreAppointmentId: options.ignoreAppointmentId } : {})
     }
   });
 
@@ -49,9 +53,6 @@ export const completeAppointment = (id) =>
 
 export const adminCancelAppointment = (id) =>
   api.patch(`/appointments/${id}/admin-cancel`);
-
-export const updateAppointmentDuration = (id, duration) =>
-  api.patch(`/appointments/${id}/duration`, { duration });
 
 export const updateAppointmentDuration = (id, duration) =>
   api.patch(`/appointments/${id}/duration`, { duration });

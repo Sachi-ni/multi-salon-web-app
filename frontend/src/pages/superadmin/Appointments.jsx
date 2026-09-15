@@ -19,7 +19,7 @@ import { getSalons } from "../../services/salonService";
 import { 
   Calendar, Clock, User, Store, Search, LayoutGrid, 
   List, CheckCircle2, AlertCircle, Trash2, 
-  Check, X, Phone, Mail, ChevronDown, Plus, Hash
+  Check, X, Phone, Mail, ChevronDown, Plus, Hash, Edit2
 } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
@@ -55,6 +55,9 @@ export default function Appointments() {
   // Duration edit state
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
+
+  // Staff reassignment edit state
+  const [editingStaffAppointment, setEditingStaffAppointment] = useState(null);
 
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
@@ -521,7 +524,7 @@ export default function Appointments() {
                   <div className="pt-2.5 border-t border-border/50 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-neutral-400 font-medium">Duration:</span>
-                      {a.status === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
+                      {a.status?.toLowerCase() === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
                         <button 
                           onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
                           className="text-amber-400 text-2xs hover:underline font-bold"
@@ -571,7 +574,7 @@ export default function Appointments() {
                   </span>
 
                   <div className="flex items-center gap-2">
-                    {a.status === "pending" && (
+                    {a.status?.toLowerCase() === "pending" && (
                       <>
                         {editingDuration !== a._id && (
                           <button
@@ -603,7 +606,7 @@ export default function Appointments() {
                       </>
                     )}
 
-                    {a.status === "confirmed" && (
+                    {a.status?.toLowerCase() === "confirmed" && (
                       <>
                         <button
                           onClick={() => setEditingStaffAppointment(a)}
@@ -693,7 +696,7 @@ export default function Appointments() {
                   </Table.Td>
                   <Table.Td align="right">
                     <div className="flex items-center justify-end gap-2">
-                      {a.status === "pending" && (
+                      {a.status?.toLowerCase() === "pending" && (
                         <>
                           <button
                             onClick={() => handleConfirm(a._id)}
@@ -711,14 +714,24 @@ export default function Appointments() {
                           </button>
                         </>
                       )}
-                      {a.status === "confirmed" && (
-                        <button
-                          onClick={() => handleComplete(a._id)}
-                          disabled={isActionLoading}
-                          className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-2xs font-extrabold hover:bg-blue-400 transition-colors"
-                        >
-                          Complete
-                        </button>
+                      {a.status?.toLowerCase() === "confirmed" && (
+                        <>
+                          <button
+                            onClick={() => setEditingStaffAppointment(a)}
+                            disabled={isActionLoading}
+                            className="px-4 py-2 rounded-xl bg-surface-2 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
+                            title="Reassign Staff"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleComplete(a._id)}
+                            disabled={isActionLoading}
+                            className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-2xs font-extrabold hover:bg-blue-400 transition-colors"
+                          >
+                            Complete
+                          </button>
+                        </>
                       )}
                       {["completed", "rejected", "cancelled"].includes(a.status) && (
                         <button

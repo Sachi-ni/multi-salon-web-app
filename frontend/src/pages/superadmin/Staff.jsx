@@ -9,7 +9,7 @@ import StaffUnavailableModal from "../../components/booking/StaffUnavailableModa
 import { 
   Plus, Search, Users, Star, MapPin, 
   MoreVertical, Power, Pencil, Trash2, 
-  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins
+  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins, Eye, EyeOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
@@ -20,6 +20,8 @@ import Table from "../../components/ui/Table";
 import Modal from "../../components/ui/Modal";
 import clsx from "clsx";
 import { mediaUrl } from "../../utils/mediaUrl";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail, validatePassword, validatePhoneSriLankan } from "../../utils/validation";
 
 /* ── Skeleton Card ── */
 const SkeletonStaffCard = () => (
@@ -299,7 +301,10 @@ const Staff = () => {
   );
 
   const handleEdit = (staff) => {
+    setShowEditPassword(false);
     const names = (staff.name || "").split(" ");
+    setEditError("");
+  setEditEmailSubmitError("");
 
     const assignedServices = (staff.services || []).map((service) => {
       if (!service) return null;
@@ -435,7 +440,10 @@ const Staff = () => {
       fetchData();
     } catch (err) {
       console.error("UPDATE ERROR:", err);
-      alert(err.response?.data?.message || "Failed to update staff");
+      setEditError(err.response?.data?.message || "Failed to update staff");
+      const message = err.response?.data?.message || "Failed to update staff";
+      if (/email/i.test(message)) setEditEmailSubmitError(message);
+      else setEditError(message);
     }
   };
 
@@ -663,6 +671,12 @@ const Staff = () => {
       >
         {editingStaff && (
           <div className="space-y-4 pt-1">
+            {editError && (
+              <div className="px-4 py-3 rounded-lg bg-danger-dim border border-danger-border text-sm text-danger font-semibold">
+                {editError}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">First Name</label>
@@ -691,8 +705,12 @@ const Staff = () => {
                   type="email"
                   className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
                   value={editingStaff.email}
-                  onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
+                  onChange={(e) => { setEditEmailSubmitError(""); setEditingStaff({ ...editingStaff, email: e.target.value }); }}
+                  onBlur={() => handleEditBlur("email")}
+                  aria-invalid={Boolean(editErrors.email || editEmailSubmitError)}
                 />
+                  {(editErrors.email || editEmailSubmitError) && <p className="mt-1 text-xs text-danger">{editErrors.email || editEmailSubmitError}</p>}
+                  {!editErrors.email && !editEmailSubmitError && fieldMessages.email && <p className="mt-1 text-xs text-muted-2 font-medium">{fieldMessages.email}</p>}
               </div>
               <div>
                 <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Phone Number</label>
@@ -701,8 +719,11 @@ const Staff = () => {
                   className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
                   value={editingStaff.phone || ""}
                   onChange={(e) => setEditingStaff({ ...editingStaff, phone: e.target.value })}
+                  onBlur={() => handleEditBlur("phone")}
+                  aria-invalid={Boolean(editErrors.phone)}
                   placeholder="Enter phone number"
                 />
+                {editErrors.phone && <p className="mt-1 text-xs text-danger">{editErrors.phone}</p>}
               </div>
             </div>
 
@@ -710,14 +731,27 @@ const Staff = () => {
               <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
                 Change Password <span className="text-neutral-500 font-normal lowercase">(leave blank to keep current)</span>
               </label>
-              <input
-                type="password"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
-                value={editingStaff.password || ""}
-                onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
-                placeholder="Enter new password"
-                autoComplete="new-password"
-              />
+              <div className="relative">
+                <input
+                  type={showEditPassword ? "text" : "password"}
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 pr-11 text-sm text-white outline-none focus:border-amber-400"
+                  value={editingStaff.password || ""}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
+                  onBlur={() => handleEditBlur("password")}
+                  aria-invalid={Boolean(editErrors.password)}
+                  placeholder="Enter new password"
+                  autoComplete="new-password"
+                />
+                {editingStaff.password && <button
+                  type="button"
+                  onClick={() => setShowEditPassword((visible) => !visible)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-white transition-colors"
+                  aria-label={showEditPassword ? "Hide password" : "Show password"}
+                >
+                  {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>}
+              </div>
+              {editErrors.password && <p className="mt-1 text-xs text-danger">{editErrors.password}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -812,7 +846,7 @@ const Staff = () => {
           <Button variant="ghost" size="sm" onClick={() => setEditModalOpen(false)}>
             Cancel
           </Button>
-          <Button variant="primary" size="sm" onClick={handleUpdateStaff}>
+          <Button variant="primary" size="sm" onClick={handleUpdateStaff} disabled={!staffEditIsValid}>
             Save Changes
           </Button>
         </Modal.Actions>

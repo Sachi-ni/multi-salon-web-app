@@ -20,7 +20,11 @@ phone:     { type: String },
   mustChangePassword: { type: Boolean, default: undefined },
   mfaEnrolled: { type: Boolean, default: undefined },
   resetPasswordTokenHash: { type: String, default: null },
-  resetPasswordExpires: { type: Date, default: null }
+  resetPasswordExpires: { type: Date, default: null },
+  otpCodeHash: { type: String, default: null },
+  otpExpires: { type: Date, default: null },
+  otpAttempts: { type: Number, default: 0 },
+  otpLastSentAt: { type: Date, default: null }
 }, { timestamps: true });
 
 export default mongoose.model("Admin", adminSchema);

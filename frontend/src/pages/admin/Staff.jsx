@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { API_BASE } from "../../config";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail } from "../../utils/validation";
 
 const buildImageUrl = (image) => {
   if (!image) return null;
@@ -392,6 +394,8 @@ export default function AdminStaffPage() {
 
   const [editStaff, setEditStaff] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [editEmailSubmitError, setEditEmailSubmitError] = useState("");
+  const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(editForm, { email: validateEmail });
   const [editPicture, setEditPicture] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
   const editSubmitInFlight = useRef(false);
@@ -499,9 +503,7 @@ export default function AdminStaffPage() {
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
-    if (!validateStaffEdit()) {
-      return;
-    }
+    if (!validateStaffEdit()) return;
 
     setEditLoading(true);
     setError("");
@@ -552,10 +554,9 @@ export default function AdminStaffPage() {
         err.response?.data
       );
 
-      setError(
-        err.response?.data?.message ||
-          "Failed to update staff"
-      );
+      const message = err.response?.data?.message || "Failed to update staff";
+      if (/email/i.test(message)) setEditEmailSubmitError(message);
+      else setError(message);
     } finally {
       setEditLoading(false);
       editSubmitInFlight.current = false;
@@ -870,6 +871,8 @@ export default function AdminStaffPage() {
                 firstName: e.target.value,
               })
             }
+            onBlur={() => handleEditBlur("email")}
+            error={editErrors.email}
             required
           />
 
@@ -891,12 +894,16 @@ export default function AdminStaffPage() {
             label="Email"
             type="email"
             value={editForm.email || ""}
-            onChange={(e) =>
+            onChange={(e) => {
+              setEditEmailSubmitError("");
               setEditForm({
                 ...editForm,
                 email: e.target.value,
-              })
-            }
+              });
+            }}
+            onBlur={() => handleEditBlur("email")}
+            error={editErrors.email || editEmailSubmitError}
+            helper={fieldMessages.email}
             required
           />
 
@@ -1069,7 +1076,7 @@ export default function AdminStaffPage() {
               variant="ghost"
               type="button"
               onClick={() => setEditStaff(null)}
-              disabled={editLoading}
+              disabled={editLoading || !staffEditIsValid}
             >
               Cancel
             </Button>

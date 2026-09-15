@@ -74,6 +74,11 @@ items: [
     navigate("/");
   };
 
+  const handleNav = (path) => {
+    navigate(path);
+    if (onClose) onClose();
+  };
+
   return (
     <>
       {isOpen && (
@@ -107,7 +112,7 @@ items: [
                 return (
                   <button
                     key={item.path}
-                    onClick={() => navigate(basePath ? `${basePath}${item.path}` : item.path)}
+                    onClick={() => handleNav(basePath ? `${basePath}${item.path}` : item.path)}
                     className={clsx(
                       "w-[calc(100%-16px)] mx-2 flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[0.82rem] font-medium transition-all duration-150 text-left",
                       active
@@ -128,19 +133,13 @@ items: [
         <div className="p-3 mt-auto">
           {user?.role === "super-admin" && (
             <button
-              onClick={() => navigate("/superAdminDashboard")}
+              onClick={() => handleNav("/superAdminDashboard")}
               className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-[0.82rem] font-bold text-black bg-amber-400 hover:bg-amber-500 transition-all duration-150 mb-2 shadow-sm"
             >
               <LayoutDashboard className="w-4 h-4" />
               Back to Hub
             </button>
           )}
-
-          {/* System Status */}
-          <div className="bg-surface-2 border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-xs mb-2">
-            <span className="w-2 h-2 rounded-full bg-success flex-shrink-0 animate-pulse-dot" />
-            <span className="text-muted-2">System Online</span>
-          </div>
 
           {/* Logout */}
           <button
