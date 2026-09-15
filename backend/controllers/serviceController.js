@@ -36,7 +36,7 @@ export const getServices = async (req, res) => {
   try {
     const { salonId } = req.query;
 
-    const isAdmin = ["super-admin", "manager"].includes(req.user?.role?.toLowerCase());
+    const isAdmin = ["super-admin", "manager", "staff-admin"].includes(req.user?.role?.toLowerCase());
     const activeSalonIds = isAdmin
       ? null
       : await Salon.find({ status: "active", isPaused: false }).distinct("_id");

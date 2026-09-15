@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
+import EditStaffAssignmentModal from "../../components/booking/EditStaffAssignmentModal";
+import { formatDuration } from "../../utils/formatDuration";
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";
 
@@ -40,6 +42,7 @@ export default function AdminBookings() {
 
   const [appointments, setAppointments] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [needsReassignmentOnly, setNeedsReassignmentOnly] = useState(false);
   const [dateFilter, setDateFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
@@ -162,10 +165,13 @@ export default function AdminBookings() {
   };
 
   const filteredAppointments = useMemo(() => {
-    if (!searchTerm) return appointments;
+    const source = needsReassignmentOnly
+      ? appointments.filter((appointment) => appointment.needsReassignment)
+      : appointments;
+    if (!searchTerm) return source;
     const term = searchTerm.toLowerCase();
 
-    return appointments.filter(a => {
+    return source.filter(a => {
       const custName = (a.customer_id?.name || a.guest_name || "").toLowerCase();
       const phone = (a.customer_id?.phone || a.guest_phone || "").toLowerCase();
       const email = (a.customer_id?.email || "").toLowerCase();
@@ -173,7 +179,7 @@ export default function AdminBookings() {
 
       return custName.includes(term) || phone.includes(term) || email.includes(term) || idStr.includes(term);
     });
-  }, [appointments, searchTerm]);
+  }, [appointments, searchTerm, needsReassignmentOnly]);
 
   const getStatusBadge = (status) => {
     switch (status?.toLowerCase()) {
@@ -223,25 +229,34 @@ export default function AdminBookings() {
         </div>
       )}
 
-      {/* Status Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {STATUS_FILTERS.map((f) => {
-          const isActive = filter === f;
-          return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={clsx(
-                "px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap",
-                isActive
-                  ? "bg-amber-400 text-black shadow-sm font-extrabold"
-                  : "bg-surface border border-border text-neutral-400 hover:text-white hover:border-amber-400/30"
-              )}
-            >
-              {f}
-            </button>
-          );
-        })}
+      {/* Status Filter Tabs & Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {STATUS_FILTERS.map((f) => {
+            const isActive = filter === f;
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={clsx(
+                  "px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap",
+                  isActive
+                    ? "bg-amber-400 text-black shadow-sm font-extrabold"
+                    : "bg-surface border border-border text-neutral-400 hover:text-white hover:border-amber-400/30"
+                )}
+              >
+                {f}
+              </button>
+            );
+          })}
+        </div>
+        <Button variant={needsReassignmentOnly ? "primary" : "secondary"} onClick={() => setNeedsReassignmentOnly((value) => !value)}>
+          Needs Reassignment
+        </Button>
+        <Button variant="secondary" icon={Calendar} onClick={() => navigate(`/salon-admin/${salonId}/adminSchedule`)}>
+          Staff Schedule
+        </Button>
+      </div>
       </div>
 
       {/* Search & Filter Controls */}
@@ -336,17 +351,14 @@ export default function AdminBookings() {
             const isActionLoading = actionLoading === a._id;
             const appointmentError = getActionError(a._id);
 
-            const totalDurationMins = a.appointment_services && a.appointment_services.length > 0
-              ? a.appointment_services.reduce((sum, s) => sum + (s.service_id?.duration || 0), 0)
-              : (a.duration || 60);
-            const durationHours = Math.ceil(totalDurationMins / 60);
+            const totalDurationMins = Number(a.duration) || 60;
 
             const customerName = a.customer_id?.name || a.guest_name || "Guest Customer";
             const isGuest = !a.customer_id && a.guest_name;
             const totalPrice = a.total_price || a.service_id?.base_price || 0;
             const refCode = `#APT-${a._id.slice(-6).toUpperCase()}`;
 
-            return (
+              return (
               <motion.div
                 key={a._id}
                 initial={{ opacity: 0, y: 12 }}
@@ -357,6 +369,11 @@ export default function AdminBookings() {
                   getCardBorderStyle(a.status)
                 )}
               >
+                  {a.needsReassignment && (
+                    <div className="mb-3 rounded-lg border border-danger-border bg-danger-dim px-3 py-2 text-xs font-bold text-danger">
+                      Staff Unavailable - Needs Reassignment{a.staffUnavailableReason ? `: ${a.staffUnavailableReason}` : ""}
+                    </div>
+                  )}
                 {/* Top Reference Banner */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/60 text-xs">
                   <div className="flex items-center gap-2">
@@ -468,11 +485,11 @@ export default function AdminBookings() {
                             <option value={180}>3 Hours</option>
                             <option value={240}>4 Hours</option>
                           </select>
-                          <button onClick={() => handleSaveDuration(a._id)} className="text-emerald-400 text-2xs font-bold hover:underline">Save</button>
-                          <button onClick={() => setEditingDuration("")} className="text-neutral-400 text-2xs font-bold hover:underline">Cancel</button>
+                          <button onClick={() => handleSaveDuration(a._id)} className="h-8 px-3 rounded-full bg-blue-500 text-white text-2xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all">Save</button>
+                          <button onClick={() => setEditingDuration("")} className="h-8 px-3 rounded-full bg-transparent text-rose-400 border border-rose-500/30 text-2xs font-bold hover:bg-rose-500 hover:text-white transition-all">Cancel</button>
                         </div>
                       ) : (
-                        <span className="text-white font-extrabold">{durationHours} {durationHours === 1 ? "Hour" : "Hours"}</span>
+                        <span className="text-white font-extrabold">{formatDuration(totalDurationMins)}</span>
                       )}
                     </div>
 
@@ -522,9 +539,36 @@ export default function AdminBookings() {
                     {a.status === "confirmed" && (
                       <>
                         <button
+                    {a.status?.toLowerCase() === "confirmed" && (
+                        <>
+                          <button
+                            onClick={() => setEditingStaffAppointment(a)}
+                            disabled={isActionLoading}
+                            className="h-10 px-5 rounded-full bg-transparent text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
+                            title="Reassign Staff"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleComplete(a._id)}
+                            disabled={isActionLoading}
+                            className="h-10 px-5 rounded-full bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
+                          >
+                            Complete
+                          </button>
+                          <button
+                            onClick={() => handleAdminCancel(a._id)}
+                            disabled={isActionLoading}
+                            className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition-all disabled:opacity-40"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                    )}
                           onClick={() => handleComplete(a._id)}
                           disabled={isActionLoading}
-                          className="px-5 py-2 rounded-xl bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
+                          className="h-10 px-5 rounded-full bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
                         >
                           <CheckCircle2 className="w-4 h-4" />
                           {isActionLoading ? "..." : "Mark Complete"}
@@ -532,7 +576,7 @@ export default function AdminBookings() {
                         <button
                           onClick={() => handleAdminCancel(a._id)}
                           disabled={isActionLoading}
-                          className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition-all disabled:opacity-40"
+                          className="h-10 px-5 rounded-full bg-transparent text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition-all disabled:opacity-40"
                         >
                           Cancel
                         </button>
@@ -612,14 +656,34 @@ export default function AdminBookings() {
                           </button>
                         </>
                       )}
-                      {a.status === "confirmed" && (
-                        <button
-                          onClick={() => handleComplete(a._id)}
-                          disabled={isActionLoading}
-                          className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-2xs font-extrabold hover:bg-blue-400 transition-colors"
-                        >
-                          Complete
-                        </button>
+                      {a.status?.toLowerCase() === "confirmed" && (
+                        <>
+                          <button
+                            onClick={() => setEditingStaffAppointment(a)}
+                            disabled={isActionLoading}
+                            className="px-4 py-2 rounded-xl bg-surface-2 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
+                            title="Reassign Staff"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleComplete(a._id)}
+                            disabled={isActionLoading}
+                            className="px-5 py-2 rounded-xl bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            Complete
+                          </button>
+                          <button
+                            onClick={() => handleAdminCancel(a._id)}
+                            disabled={isActionLoading}
+                            className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition-all disabled:opacity-40"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
                       )}
                       {["completed", "rejected", "cancelled"].includes(a.status) && (
                         <button
@@ -638,6 +702,20 @@ export default function AdminBookings() {
             })}
           </Table.Body>
         </Table>
+      )}
+      {editingStaffAppointment && (
+        <EditStaffAssignmentModal
+          appointment={editingStaffAppointment}
+          salonId={salonId}
+          onClose={() => setEditingStaffAppointment(null)}
+          onSuccess={(updatedAppointment) => {
+            if (updatedAppointment?._id) {
+              setAppointments((previous) => previous.map((item) => item._id === updatedAppointment._id ? { ...item, ...updatedAppointment } : item));
+            }
+            setEditingStaffAppointment(null);
+            fetchAppointments();
+          }}
+        />
       )}
     </div>
   );

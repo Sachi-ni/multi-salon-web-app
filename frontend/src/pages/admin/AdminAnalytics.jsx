@@ -7,7 +7,9 @@ import {
   PieChart as PieChartIcon, LineChart as LineChartIcon, Sparkles, Award, Repeat
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+import {
+  ComposedChart, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
@@ -273,7 +275,7 @@ export default function AdminAnalytics() {
     const customerGrowthData = Object.keys(custMap).sort().map(date => ({ date, newCustomers: custMap[date] }));
 
     return { trendData, staffData, topServicesData, statusData, customerGrowthData };
-  }, [filteredData, kpis, staff, services]);
+  }, [filteredData, services, staff, staffFilter, kpis, kpis.cancelledBookings, kpis.completedBookings, kpis.totalBookings]);
 
   /* ── Recent Activity ── */
   const recentActivity = useMemo(() => {

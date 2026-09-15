@@ -269,11 +269,11 @@ export const createStaff = async (req, res) => {
 export const getStaff = async (req, res) => {
   try {
     const userRole = req.user?.role?.toLowerCase();
-    const isSalonScopedAdmin = userRole === "manager";
+    const isSalonScopedAdmin = ["manager", "staff-admin"].includes(userRole);
     const isSuperAdmin = userRole === "super-admin";
 
     let filter = {};
-    const isCustomer = !["super-admin", "manager"].includes(userRole);
+    const isCustomer = !["super-admin", "manager", "staff-admin"].includes(userRole);
 
     if (isCustomer) {
       filter.salon_id = { $in: await Salon.find({ status: "active", isPaused: false }).distinct("_id") };

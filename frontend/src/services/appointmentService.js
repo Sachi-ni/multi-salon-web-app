@@ -53,6 +53,14 @@ export const adminCancelAppointment = (id) =>
 export const updateAppointmentDuration = (id, duration) =>
   api.patch(`/appointments/${id}/duration`, { duration });
 
+export const updateAppointmentDuration = (id, duration) =>
+  api.patch(`/appointments/${id}/duration`, { duration });
+
+export const updateAppointmentDetails = (id, data) =>
+  api.patch(`/appointments/${id}/details`, data);
+
+export const updateStaffAssignment = (id, services) =>
+  api.patch(`/appointments/${id}/assign-staff`, { services });
 export const getStaffAppointments = (staffId, status = "", date = "") =>
   api.get(`/appointments/staff/${staffId}`, { params: { status, date } });
 
