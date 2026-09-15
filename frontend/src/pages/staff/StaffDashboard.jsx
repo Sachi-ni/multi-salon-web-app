@@ -21,7 +21,7 @@ const StaffDashboard = () => {
   const [profile, setProfile] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("Today");
+  const [filter, setFilter] = useState("All");
 
   useEffect(() => {
     let isMounted = true;
@@ -56,22 +56,38 @@ const StaffDashboard = () => {
     return () => { isMounted = false; };
   }, [token]);
 
+  const parseAppDate = (dateStr) => {
+    if (!dateStr) return null;
+    const dateOnly = String(dateStr).split("T")[0];
+    const parts = dateOnly.split("-");
+    if (parts.length === 3) {
+      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    }
+    return new Date(dateStr);
+  };
+
   const filteredAppointments = useMemo(() => {
     if (!Array.isArray(appointments)) return [];
+    if (filter === "All") return appointments;
+    
     const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
     return appointments.filter(app => {
       if (!app?.appointment_date) return false;
-      const appDate = new Date(`${app.appointment_date}T12:00:00`); 
+      const appDate = parseAppDate(app.appointment_date);
+      if (!appDate || isNaN(appDate.getTime())) return false;
       
+      const appDayStart = new Date(appDate.getFullYear(), appDate.getMonth(), appDate.getDate());
+
       if (filter === "Today") {
-        return appDate.toDateString() === now.toDateString();
+        return appDayStart.getTime() === todayStart.getTime();
       } else if (filter === "This Week") {
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay()); 
-        const endOfWeek = new Date(now);
-        endOfWeek.setDate(now.getDate() + (6 - now.getDay())); 
-        return appDate >= startOfWeek && appDate <= endOfWeek;
+        const startOfWeek = new Date(todayStart);
+        startOfWeek.setDate(todayStart.getDate() - todayStart.getDay()); 
+        const endOfWeek = new Date(todayStart);
+        endOfWeek.setDate(todayStart.getDate() + (6 - todayStart.getDay())); 
+        return appDayStart >= startOfWeek && appDayStart <= endOfWeek;
       } else if (filter === "This Month") {
         return appDate.getMonth() === now.getMonth() && appDate.getFullYear() === now.getFullYear();
       }
@@ -207,7 +223,7 @@ const StaffDashboard = () => {
             </div>
             
             <div className="flex bg-surface rounded-xl p-1 border border-border w-full sm:w-auto">
-              {["Today", "This Week", "This Month"].map(f => (
+              {["All", "Today", "This Week", "This Month"].map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
