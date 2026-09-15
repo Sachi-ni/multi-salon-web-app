@@ -436,20 +436,30 @@ export const resetPassword = async (req, res) => {
 export const loginStaff = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const identifier = String(email || "").trim();
+    const cleanIdentifierPhone = identifier.replace(/[\s()-]/g, "");
 
-    const staff = await Staff.findOne({ email });
+    // Search staff by email, full_name, OR phone number
+    const staff = await Staff.findOne({
+      $or: [
+        { email: { $regex: `^${identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } },
+        { full_name: { $regex: `^${identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } },
+        ...(cleanIdentifierPhone ? [{ phone: { $regex: `${cleanIdentifierPhone}$` } }] : [])
+      ]
+    });
+
     if (!staff) {
       return res.status(404).json({ message: "Staff not found" });
     }
 
-    // Allow staff to log in using either their account password OR their registered phone number
+    // Verify password match OR phone number match
     const isPasswordMatch = await bcrypt.compare(password, staff.password_hash);
     const cleanedEnteredPassword = password?.trim().replace(/[\s()-]/g, "");
     const cleanedStaffPhone = staff.phone?.trim().replace(/[\s()-]/g, "");
     const isPhoneMatch = Boolean(
       cleanedEnteredPassword &&
       cleanedStaffPhone &&
-      cleanedEnteredPassword === cleanedStaffPhone
+      (cleanedEnteredPassword === cleanedStaffPhone || cleanedStaffPhone.endsWith(cleanedEnteredPassword))
     );
 
     if (!isPasswordMatch && !isPhoneMatch) {

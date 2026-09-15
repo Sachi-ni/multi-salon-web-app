@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { motion } from "framer-motion";
-import PageHeader from "../../components/ui/PageHeader";
 import StatCard from "../../components/ui/StatCard";
 import Card from "../../components/ui/Card";
 import Table from "../../components/ui/Table";
 import Badge from "../../components/ui/Badge";
-import Button from "../../components/ui/Button";
 import EmptyState from "../../components/ui/EmptyState";
 import Skeleton from "../../components/ui/Skeleton";
 import { 
-  Store, UserCheck, Phone, Calendar, Clock, Loader2, 
-  CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, Sparkles, User
+  Store, UserCheck, Calendar, Clock, 
+  CheckCircle2, ShieldCheck, Sparkles
 } from "lucide-react";
 import clsx from "clsx";
 import { API_URL } from "../../config";
