@@ -86,7 +86,7 @@ const About = () => {
           </ul>
 
           <div className="pt-4">
-            <button type="button" onClick={() => navigate("/about")} className="px-8 py-4 bg-surface backdrop-blur-md border border-accent/30 text-white rounded-xl text-base font-bold hover:bg-accent hover:text-primary transition-all duration-300">
+            <button type="button" onClick={() => navigate("/about")} className="px-8 py-4 bg-surface backdrop-blur-md border border-accent/30 text-white rounded-xl text-base font-bold hover:bg-accent hover:text-primary hover:border-accent hover:shadow-[0_0_25px_rgba(245,200,0,0.6)] transition-all duration-300 hover:-translate-y-1">
               Read Full Story
             </button>
           </div>
