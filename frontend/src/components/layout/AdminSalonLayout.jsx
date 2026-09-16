@@ -5,11 +5,31 @@ import clsx from "clsx";
 import { useLocation } from "react-router-dom";
 
 const AdminSalonLayout = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
   const location = useLocation();
 
-  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
-  const closeSidebar = () => setSidebarOpen(false);
+  const toggleSidebar = () => {
+    if (window.innerWidth >= 1024) {
+      setIsCollapsed((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem("sidebar_collapsed", String(next));
+        } catch {}
+        return next;
+      });
+    } else {
+      setMobileOpen((prev) => !prev);
+    }
+  };
+
+  const closeMobileSidebar = () => setMobileOpen(false);
 
   // Extract current salon-admin base: /salon-admin/:salonId
   // Example path: /salon-admin/6a1e.../adminDashboard
@@ -18,13 +38,19 @@ const AdminSalonLayout = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-primary">
-      <AdminHeader onToggleSidebar={toggleSidebar} />
-      <AdminSidebar isOpen={sidebarOpen} onClose={closeSidebar} basePath={base} />
+      <AdminHeader onToggleSidebar={toggleSidebar} isCollapsed={isCollapsed} />
+      <AdminSidebar
+        isOpen={mobileOpen}
+        onClose={closeMobileSidebar}
+        isCollapsed={isCollapsed}
+        onToggleCollapse={toggleSidebar}
+        basePath={base}
+      />
 
       <main
         className={clsx(
-          "pt-header min-h-screen transition-[margin] duration-300 ease-in-out",
-          "lg:ml-sidebar",
+          "pt-header min-h-screen transition-all duration-300 ease-in-out",
+          isCollapsed ? "lg:ml-[72px]" : "lg:ml-sidebar",
           "px-4 sm:px-5 pb-5"
         )}
       >

@@ -7,7 +7,7 @@ import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } 
 import { getSalon } from "../../services/salonService";
 import { API_BASE } from "../../config";
 
-const AdminHeader = ({ onToggleSidebar }) => {
+const AdminHeader = ({ onToggleSidebar, isCollapsed = false }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -147,12 +147,15 @@ const AdminHeader = ({ onToggleSidebar }) => {
   return (
     <header className="h-header bg-surface/90 backdrop-blur-glass border-b border-border flex items-center px-5 gap-3 fixed top-0 left-0 right-0 z-[200]">
 
-      {/* Mobile Menu */}
+      {/* Menu / Collapse Button */}
       <button
+        type="button"
         onClick={onToggleSidebar}
-        className="lg:hidden flex items-center justify-center p-1.5"
+        className="flex items-center justify-center w-9 h-9 rounded-lg text-neutral-300 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer flex-shrink-0"
+        title={isCollapsed ? "Expand sidebar (full menu)" : "Collapse sidebar (icons only)"}
+        aria-label="Toggle navigation menu"
       >
-        <Menu className="w-5 h-5 text-white" />
+        <Menu className="w-5 h-5 text-neutral-200 hover:text-accent transition-colors" />
       </button>
 
       {/* Logo - show salon name & logo for salon users, else SalonHub */}

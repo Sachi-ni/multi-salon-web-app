@@ -6,7 +6,7 @@ import clsx from "clsx";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../services/notificationService";
 import { mediaUrl } from "../../utils/mediaUrl";
 
-const Header = ({ onToggleSidebar }) => {
+const Header = ({ onToggleSidebar, isCollapsed = false }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -89,12 +89,15 @@ const Header = ({ onToggleSidebar }) => {
 
   return (
     <header className="h-header bg-surface/90 backdrop-blur-glass border-b border-border flex items-center px-5 gap-3 fixed top-0 left-0 right-0 z-[200]">
-      {/* Hamburger (mobile) */}
+      {/* Menu / Collapse Button */}
       <button
+        type="button"
         onClick={onToggleSidebar}
-        className="lg:hidden flex flex-col gap-1 p-1.5 cursor-pointer"
+        className="flex items-center justify-center w-9 h-9 rounded-lg text-neutral-300 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer flex-shrink-0"
+        title={isCollapsed ? "Expand sidebar (full menu)" : "Collapse sidebar (icons only)"}
+        aria-label="Toggle navigation menu"
       >
-        <Menu className="w-5 h-5 text-white" />
+        <Menu className="w-5 h-5 text-neutral-200 hover:text-accent transition-colors" />
       </button>
 
       {/* Logo */}
