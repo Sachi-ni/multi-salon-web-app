@@ -3,6 +3,7 @@ import AdminHeader from "./adminHeader";
 import AdminSidebar from "./adminSiderbar";
 import clsx from "clsx";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 const AdminSalonLayout = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -14,6 +15,8 @@ const AdminSalonLayout = ({ children }) => {
     }
   });
   const location = useLocation();
+  const { user } = useAuth();
+  const isStandardStaff = user?.role && !["super-admin", "manager"].includes(user.role);
 
   const toggleSidebar = () => {
     if (window.innerWidth >= 1024) {
@@ -34,23 +37,34 @@ const AdminSalonLayout = ({ children }) => {
   // Extract current salon-admin base: /salon-admin/:salonId
   // Example path: /salon-admin/6a1e.../adminDashboard
   const match = location.pathname.match(/^\/salon-admin\/[^/]+/);
-  const base = match ? match[0].replace(/\/$/, "") : "";
+  // Profile pages live outside `/salon-admin/:salonId`, but managers should
+  // still be able to use the salon navigation from there.
+  const base = match
+    ? match[0].replace(/\/$/, "")
+    : user?.salon_id
+      ? `/salon-admin/${user.salon_id}`
+      : "";
 
   return (
     <div className="min-h-screen bg-primary">
-      <AdminHeader onToggleSidebar={toggleSidebar} isCollapsed={isCollapsed} />
-      <AdminSidebar
-        isOpen={mobileOpen}
-        onClose={closeMobileSidebar}
+      <AdminHeader
+        onToggleSidebar={isStandardStaff ? undefined : toggleSidebar}
         isCollapsed={isCollapsed}
-        onToggleCollapse={toggleSidebar}
-        basePath={base}
       />
+      {!isStandardStaff && (
+        <AdminSidebar
+          isOpen={mobileOpen}
+          onClose={closeMobileSidebar}
+          isCollapsed={isCollapsed}
+          onToggleCollapse={toggleSidebar}
+          basePath={base}
+        />
+      )}
 
       <main
         className={clsx(
           "pt-header min-h-screen transition-all duration-300 ease-in-out",
-          isCollapsed ? "lg:ml-[72px]" : "lg:ml-sidebar",
+          !isStandardStaff && (isCollapsed ? "lg:ml-[72px]" : "lg:ml-sidebar"),
           "px-4 sm:px-5 pb-5"
         )}
       >

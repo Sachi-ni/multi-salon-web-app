@@ -148,15 +148,17 @@ const AdminHeader = ({ onToggleSidebar, isCollapsed = false }) => {
     <header className="h-header bg-surface/90 backdrop-blur-glass border-b border-border flex items-center px-5 gap-3 fixed top-0 left-0 right-0 z-[200]">
 
       {/* Menu / Collapse Button */}
-      <button
-        type="button"
-        onClick={onToggleSidebar}
-        className="flex items-center justify-center w-9 h-9 rounded-lg text-neutral-300 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer flex-shrink-0"
-        title={isCollapsed ? "Expand sidebar (full menu)" : "Collapse sidebar (icons only)"}
-        aria-label="Toggle navigation menu"
-      >
-        <Menu className="w-5 h-5 text-neutral-200 hover:text-accent transition-colors" />
-      </button>
+      {onToggleSidebar && (
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="flex items-center justify-center w-9 h-9 rounded-lg text-neutral-300 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer flex-shrink-0"
+          title={isCollapsed ? "Expand sidebar (full menu)" : "Collapse sidebar (icons only)"}
+          aria-label="Toggle navigation menu"
+        >
+          <Menu className="w-5 h-5 text-neutral-200 hover:text-accent transition-colors" />
+        </button>
+      )}
 
       {/* Logo - show salon name & logo for salon users, else SalonHub */}
       <div className="flex items-center gap-2 text-lg font-black text-accent whitespace-nowrap tracking-tight">
@@ -298,7 +300,7 @@ const AdminHeader = ({ onToggleSidebar, isCollapsed = false }) => {
 
             <button
               onClick={() => {
-                navigate(user?.role === "super-admin" ? "/Profile" : "/editProfile");
+                navigate(user?.role === "super-admin" ? "/Profile" : "/account/profile");
                 setDropdownOpen(false);
               }}
               className="w-full px-4 py-2 text-left text-sm text-muted-2 hover:text-white hover:bg-white/5 flex items-center gap-2"

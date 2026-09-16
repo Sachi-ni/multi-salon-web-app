@@ -101,6 +101,11 @@ const salarySchema = new mongoose.Schema(
 
     paidAt: { type: Date, default: null },
 
+    // A frequency change closes the old period at the transition date while
+    // preserving it as a payable historical record.
+    isTransitioned: { type: Boolean, default: false },
+    transitionedAt: { type: Date, default: null },
+
     // Manually marked absent (daily frequency records represent one day).
     // Absent days earn no salary: daySalary is forced to 0.
     isAbsent: { type: Boolean, default: false },

@@ -154,6 +154,8 @@ const getSalaryPeriodEndDate = (salaryRecord) => {
 // day/week/month is still pending, and once it is over its unpaid salary
 // carries forward until paid.
 export const isSalaryPeriodEnded = (salaryRecord) => {
+  if (salaryRecord?.isTransitioned) return true;
+
   const periodEnd = getSalaryPeriodEndDate(salaryRecord);
   if (!periodEnd) return false;
 
@@ -899,7 +901,7 @@ export const getSalaries = async (req, res) => {
     if (frequency) {
       salaries = salaries.filter(s => {
         if (!s.staff_id) return true; // keep if staff data missing (edge case)
-        return s.staff_id.salary_payment_frequency === frequency;
+        return s.frequency === frequency;
       });
     }
 
@@ -930,6 +932,8 @@ export const getSalaries = async (req, res) => {
       status: s.status,
       paidTotal: s.paidTotal,
       paidAt: s.paidAt,
+      isTransitioned: Boolean(s.isTransitioned),
+      transitionedAt: s.transitionedAt,
       isAbsent: Boolean(s.isAbsent),
       absentMarkedAt: s.absentMarkedAt,
       workingAmount: s.workingAmount,
@@ -964,7 +968,7 @@ export const getSalarySummary = async (req, res) => {
     // (manager records are excluded everywhere else).
     let salaryDocs = await Salary.find(match)
       .populate("staff_id", "role salary_payment_frequency salary_payment_count_per_day")
-      .select("status totalSalary paidTotal workingAmount staff_role period dateRange commission_rate salary_payment_count_per_day workRate daySalary totalSalary dailyRecords")
+      .select("status totalSalary paidTotal workingAmount staff_role period dateRange commission_rate salary_payment_count_per_day workRate daySalary totalSalary dailyRecords isTransitioned transitionedAt")
       .lean();
 
     const roleMode = resolveSalaryRole(roleFilter);
@@ -2247,4 +2251,78 @@ export const updateStaffRate = async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
+};
+
+// Close the old frequency at the moment a staff member changes frequency.
+// The old record remains pending so the caller can ask whether to pay it.
+export const transitionSalaryFrequency = async (
+  staff,
+  previousFrequency,
+  changedAt = new Date()
+) => {
+  if (!staff || !previousFrequency) return null;
+
+  const changedDate = toLocalDateStr(changedAt);
+  const dateObj = new Date(`${changedDate}T00:00:00`);
+  const year = dateObj.getFullYear();
+  const month = dateObj.getMonth() + 1;
+  let period;
+  let periodStart;
+  let periodEnd;
+  let weekNumber = 0;
+
+  if (previousFrequency === "daily") {
+    period = changedDate;
+    periodStart = changedDate;
+    periodEnd = changedDate;
+  } else if (previousFrequency === "weekly") {
+    weekNumber = getISOWeek(changedDate);
+    period = `${year}-W${String(weekNumber).padStart(2, "0")}`;
+    const dates = getWeekDates(year, weekNumber);
+    periodStart = dates[0];
+    periodEnd = changedDate;
+  } else {
+    period = `${year}-${String(month).padStart(2, "0")}`;
+    periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+    periodEnd = changedDate;
+  }
+
+  let salary = await Salary.findOne({
+    salon_id: staff.salon_id,
+    staff_id: staff._id,
+    period,
+    frequency: previousFrequency,
+  });
+
+  if (!salary) {
+    salary = new Salary({
+      salon_id: staff.salon_id,
+      staff_id: staff._id,
+      frequency: previousFrequency,
+      period,
+      staff_name: staff.full_name || "",
+      staff_role: staff.role || "",
+      commission_rate: staff.commission_rate || 0,
+      salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+      year,
+      month,
+      weekNumber,
+      dateRange: { start: periodStart, end: periodEnd },
+      dailyRecords: [],
+    });
+  } else if (salary.status === "Paid") {
+    return salary;
+  }
+
+  salary.dateRange = { start: periodStart, end: periodEnd };
+  if (Array.isArray(salary.dailyRecords)) {
+    salary.dailyRecords = salary.dailyRecords.filter(
+      (record) => normalizeSalaryDate(record.date) <= changedDate
+    );
+  }
+  salary.isTransitioned = true;
+  salary.transitionedAt = changedAt;
+  refreshSalaryRecord(salary);
+  await salary.save();
+  return salary;
 };
