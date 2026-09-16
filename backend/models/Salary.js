@@ -71,6 +71,7 @@ const salarySchema = new mongoose.Schema(
     // Staff snapshot data
     staff_name: { type: String, default: "" },
     staff_role: { type: String, default: "" },
+    staff_join_date: { type: String, default: "" },
     commission_rate: { type: Number, default: 0 },
     salary_payment_count_per_day: { type: Number, default: 1 },
 
@@ -131,7 +132,7 @@ const salarySchema = new mongoose.Schema(
 // One record per staff per period per frequency per salon
 salarySchema.index(
   { salon_id: 1, staff_id: 1, period: 1, frequency: 1 },
-  { unique: true }
+  { unique: true, partialFilterExpression: { period: { $type: "string" } } }
 );
 
 export default mongoose.model("Salary", salarySchema);
