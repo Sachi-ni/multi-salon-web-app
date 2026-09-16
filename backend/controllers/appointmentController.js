@@ -7,6 +7,7 @@ import Service from "../models/Service.js";
 import Notification from "../models/Notification.js";
 import Admin from "../models/Admin.js";
 import Customer from "../models/Customer.js";
+import Bill from "../models/Bill.js";
 import mongoose from "mongoose";
 import { processSalaryOnCompletion } from "./salaryController.js";
 
@@ -1124,15 +1125,41 @@ export const completeAppointment = async (req, res) => {
     }
 
     appointment.status = "completed";
+    appointment.completed_at = new Date();
     await appointment.save();
 
-    // SALARY: Process salary calculation for completed appointment
-    try {
-      await processSalaryOnCompletion(appointment._id);
-      console.log(`Salary processed for appointment ${appointment._id}`);
-    } catch (salaryErr) {
-      console.error("Failed to process salary:", salaryErr);
+    // Resolve the bill total from service rows when the appointment total is
+    // missing, then create exactly one bill for this completed appointment.
+    const appointmentServices = await AppointmentService.find({
+      appointment_id: appointment._id,
+    }).lean();
+    const serviceTotal = appointmentServices.reduce(
+      (sum, service) => sum + Number(service.sub_price || 0),
+      0
+    );
+    if (!appointment.total_price && serviceTotal > 0) {
+      appointment.total_price = serviceTotal;
+      await appointment.save();
     }
+
+    await Bill.findOneAndUpdate(
+      { appointment_id: appointment._id },
+      {
+        appointment_id: appointment._id,
+        total_amount: appointment.total_price || serviceTotal,
+        bill_date: appointment.completed_at,
+        payment_method: "Cash",
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Salary processing must complete with the appointment action. Do not
+    // hide failures, otherwise the UI reports completion while payroll is stale.
+    const salaryResult = await processSalaryOnCompletion(appointment._id);
+    if (!salaryResult?.success) {
+      throw new Error(salaryResult?.message || "Failed to update salary");
+    }
+    console.log(`Salary processed for appointment ${appointment._id}`);
 
     // NOTIFICATION: Notify the customer
     try {

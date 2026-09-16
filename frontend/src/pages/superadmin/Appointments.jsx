@@ -19,11 +19,12 @@ import { getSalons } from "../../services/salonService";
 import { 
   Calendar, Clock, User, Store, Search, LayoutGrid, 
   List, CheckCircle2, AlertCircle, Trash2, 
-  Check, X, Phone, Mail, ChevronDown, Plus, Hash, Edit2
+  Check, X, Phone, Mail, ChevronDown, Plus, Hash, Edit2, Receipt
 } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import EditStaffAssignmentModal from "../../components/booking/EditStaffAssignmentModal";
+import CompletedAppointmentBill from "../../components/booking/CompletedAppointmentBill";
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";
 
@@ -56,6 +57,7 @@ export default function Appointments() {
 
   // Staff reassignment edit state
   const [editingStaffAppointment, setEditingStaffAppointment] = useState(null);
+  const [completedAppointment, setCompletedAppointment] = useState(null);
 
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
@@ -137,8 +139,12 @@ export default function Appointments() {
     setActionLoading(id);
     setActionError("");
     try {
-      await completeAppointment(id);
+      const response = await completeAppointment(id);
       triggerSalaryRefresh();
+      setCompletedAppointment({
+        ...(appointments.find((appointment) => appointment._id === id) || {}),
+        ...(response.data || {}),
+      });
       fetchAppointments();
     } catch {
       setActionError(`${id}:Failed to complete appointment.`);
@@ -614,6 +620,16 @@ export default function Appointments() {
                       </>
                     )}
 
+                    {a.status === "completed" && (
+                      <button
+                        onClick={() => setCompletedAppointment(a)}
+                        disabled={isActionLoading}
+                        className="px-4 py-2 rounded-xl bg-amber-400/10 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-amber-400/30"
+                      >
+                        <Receipt className="w-4 h-4" />
+                        View Bill
+                      </button>
+                    )}
                     {["completed", "rejected", "cancelled"].includes(a.status) && (
                       <button
                         onClick={() => handleDelete(a._id)}
@@ -709,6 +725,16 @@ export default function Appointments() {
                           </button>
                         </>
                       )}
+                      {a.status === "completed" && (
+                        <button
+                          onClick={() => setCompletedAppointment(a)}
+                          disabled={isActionLoading}
+                          className="p-1.5 rounded-lg bg-amber-400/10 text-amber-400 hover:bg-amber-400 hover:text-black transition-colors"
+                          title="View Bill"
+                        >
+                          <Receipt className="w-4 h-4" />
+                        </button>
+                      )}
                       {["completed", "rejected", "cancelled"].includes(a.status) && (
                         <button
                           onClick={() => handleDelete(a._id)}
@@ -740,6 +766,10 @@ export default function Appointments() {
           }}
         />
       )}
+      <CompletedAppointmentBill
+        appointment={completedAppointment}
+        onClose={() => setCompletedAppointment(null)}
+      />
     </div>
   );
 }

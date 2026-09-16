@@ -39,6 +39,7 @@ const appointmentSchema = new mongoose.Schema({
   total_price: { type: Number, default: 0 },
   notes: { type: String, default: "" },
   confirmed_at: { type: Date, default: null },
+  completed_at: { type: Date, default: null },
   rejected_at: { type: Date, default: null },
   cancelled_at: { type: Date, default: null },
   feedback_submitted: { type: Boolean, default: false },
