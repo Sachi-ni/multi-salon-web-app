@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import './App.css';
 
 import ChatWidget from "./components/chatbot/ChatWidget";
+import ScrollToTop from "./components/layout/ScrollToTop";
 
 import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
@@ -91,6 +92,7 @@ function App() {
     <AlertProvider>
     <ToastProvider>
     <BrowserRouter>
+      <ScrollToTop />
       {/* All Routes MUST be inside this container */}
       <Routes>
         <Route path="/" element={<Landing />} />

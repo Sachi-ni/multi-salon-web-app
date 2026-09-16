@@ -3,6 +3,8 @@ import { MapPin, Phone, Clock, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Footer = () => {
+  const scrollToTop = () => window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
   return (
     <footer className="bg-primary pt-20 pb-10 border-t border-border">
       <div className="max-w-7xl mx-auto px-6">
@@ -44,10 +46,10 @@ const Footer = () => {
           <div>
             <h4 className="text-white font-bold text-lg mb-6">Quick Links</h4>
             <ul className="space-y-4">
-              <li><Link to="/about" className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">About Us</Link></li>
-              <li><Link to="/our-services" className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Our Services</Link></li>
-              <li><Link to="/team" className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Our Team</Link></li>
-              <li><Link to="/our-salons" className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Locations</Link></li>
+              <li><Link to="/about" onClick={scrollToTop} className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">About Us</Link></li>
+              <li><Link to="/our-services" onClick={scrollToTop} className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Our Services</Link></li>
+              <li><Link to="/team" onClick={scrollToTop} className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Our Team</Link></li>
+              <li><Link to="/our-salons" onClick={scrollToTop} className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Locations</Link></li>
             </ul>
           </div>
 
@@ -55,10 +57,10 @@ const Footer = () => {
           <div>
             <h4 className="text-white font-bold text-lg mb-6">Services</h4>
             <ul className="space-y-4">
-              <li><a href="/our-services" className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Hair Styling</a></li>
-              <li><a href="/our-services" className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Color & Highlights</a></li>
-              <li><a href="/our-services" className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Facial Treatments</a></li>
-              <li><a href="/our-services" className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Bridal Makeup</a></li>
+              <li><Link to="/our-services" onClick={scrollToTop} className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Hair Styling</Link></li>
+              <li><Link to="/our-services" onClick={scrollToTop} className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Color & Highlights</Link></li>
+              <li><Link to="/our-services" onClick={scrollToTop} className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Facial Treatments</Link></li>
+              <li><Link to="/our-services" onClick={scrollToTop} className="text-white/60 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 text-sm inline-block">Bridal Makeup</Link></li>
             </ul>
           </div>
 
