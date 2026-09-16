@@ -8,6 +8,7 @@ import Service from "../models/Service.js";
 import Notification from "../models/Notification.js";
 import Admin from "../models/Admin.js";
 import Customer from "../models/Customer.js";
+import Bill from "../models/Bill.js";
 import mongoose from "mongoose";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
@@ -919,6 +920,17 @@ export const getSalonAppointments = async (req, res) => {
       appt.staffUnavailable = Boolean(affected);
       appt.staffUnavailableReason = affected?.reason || "";
       appt.needsReassignment = Boolean(affected) && ["pending", "confirmed"].includes(appt.status);
+    }
+
+    // Attach bill for each appointment if one exists
+    const bills = await Bill.find({ appointment_id: { $in: appointmentIds } }).lean();
+    const billMap = {};
+    bills.forEach(b => {
+      billMap[b.appointment_id.toString()] = b;
+    });
+
+    for (const appt of rawAppointments) {
+      appt.bill = billMap[appt._id.toString()] || null;
     }
 
     res.status(200).json(rawAppointments);

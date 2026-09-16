@@ -431,31 +431,35 @@ Please provide a personalized, chic, and practical response:
 4. Keep the tone warm, welcoming, and high-end with markdown headings and emojis. Keep length concise (around 150-250 words).
 5. Conclude with: "👉 [Book This Service Now](/book)"`;
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: systemPrompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 550,
-          },
-        }),
-      }
-    );
+  const modelsToTry = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"];
+  for (const model of modelsToTry) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: systemPrompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1500,
+            },
+          }),
+        }
+      );
 
-    const data = await res.json();
-    if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      return data.candidates[0].content.parts[0].text;
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          return data.candidates[0].content.parts[0].text;
+        }
+      }
+    } catch (err) {
+      // Try next model
     }
-    return null;
-  } catch (err) {
-    console.warn("Gemini API call skipped, falling back to smart rules:", err.message);
-    return null;
   }
+  return null;
 }
 
 async function handleConsultant(message) {

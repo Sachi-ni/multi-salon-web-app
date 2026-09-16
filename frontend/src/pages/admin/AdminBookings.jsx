@@ -18,11 +18,14 @@ import EmptyState from "../../components/ui/EmptyState";
 import { 
   Calendar, Clock, User, Search, LayoutGrid, 
   List, CheckCircle2, AlertCircle, Trash2, 
-  Check, X, Plus, Hash, Edit2
+  Check, X, Plus, Hash, Edit2,
+  Receipt, FileText
 } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import EditStaffAssignmentModal from "../../components/booking/EditStaffAssignmentModal";
+import GenerateBillModal from "../../components/billing/GenerateBillModal";
+import InvoiceModal from "../../components/billing/InvoiceModal";
 import { formatDuration } from "../../utils/formatDuration";
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";
@@ -54,6 +57,16 @@ export default function AdminBookings() {
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
   const [editingStaffAppointment, setEditingStaffAppointment] = useState(null);
+
+  // Billing state
+  const [billingAppointment, setBillingAppointment] = useState(null);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [invoiceAppointment, setInvoiceAppointment] = useState(null);
+
+  const handleViewInvoice = (appt) => {
+    setInvoiceAppointment(appt);
+    setSelectedInvoice(appt.bill || null);
+  };
 
   const fetchAppointments = useCallback(() => {
     setLoading(true);
@@ -565,6 +578,28 @@ export default function AdminBookings() {
                       </>
                     )}
 
+                    {a.status === "completed" && (
+                      <>
+                        {a.bill ? (
+                          <button
+                            onClick={() => handleViewInvoice(a)}
+                            className="h-10 px-4 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                          >
+                            <Receipt className="w-4 h-4" />
+                            View Bill
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setBillingAppointment(a)}
+                            className="h-10 px-5 rounded-full bg-emerald-500 text-black hover:bg-emerald-400 shadow-md shadow-emerald-500/20 transition-all text-xs font-black flex items-center gap-1.5"
+                          >
+                            <FileText className="w-4 h-4" />
+                            Generate Bill
+                          </button>
+                        )}
+                      </>
+                    )}
+
                     {["completed", "rejected", "cancelled"].includes(a.status) && (
                       <button
                         onClick={() => handleDelete(a._id)}
@@ -666,6 +701,28 @@ export default function AdminBookings() {
                           </button>
                         </>
                       )}
+                      {a.status === "completed" && (
+                        <>
+                          {a.bill ? (
+                            <button
+                              onClick={() => handleViewInvoice(a)}
+                              className="px-3 py-1.5 rounded-lg bg-amber-400/10 text-amber-400 border border-amber-400/30 hover:bg-amber-400 hover:text-black transition-colors text-2xs font-extrabold flex items-center gap-1"
+                              title="View Official Bill"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                              View Bill
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setBillingAppointment(a)}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-extrabold text-2xs hover:bg-emerald-400 transition-colors flex items-center gap-1"
+                              title="Generate Customer Bill"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Generate Bill
+                            </button>
+                          )}
+                        </>
                       )}
                       {["completed", "rejected", "cancelled"].includes(a.status) && (
                         <button
@@ -699,6 +756,29 @@ export default function AdminBookings() {
           }}
         />
       )}
+
+      {/* Bill Generation Modal */}
+      <GenerateBillModal
+        isOpen={Boolean(billingAppointment)}
+        onClose={() => setBillingAppointment(null)}
+        appointment={billingAppointment}
+        onBillGenerated={(newBill) => {
+          fetchAppointments();
+          setInvoiceAppointment(billingAppointment);
+          setSelectedInvoice(newBill);
+        }}
+      />
+
+      {/* Official Invoice Modal */}
+      <InvoiceModal
+        isOpen={Boolean(selectedInvoice || invoiceAppointment)}
+        onClose={() => {
+          setSelectedInvoice(null);
+          setInvoiceAppointment(null);
+        }}
+        bill={selectedInvoice}
+        appointment={invoiceAppointment}
+      />
     </div>
   );
 }

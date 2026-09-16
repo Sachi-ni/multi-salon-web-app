@@ -141,28 +141,50 @@ export const getMonthlyRevenue = async (req, res) => {
   }
 };
 
-/* ── Fallback Forecast Generator (Rule-based & Statistical) ── */
-function generateFallbackForecast(targetMonthName, currentMonthName, monthsData = [], topSalon = 'Main Flagship', topServices = [], totalCompleted = 0, totalCancelled = 0) {
+/* ── Fallback Forecast Generator (Rule-based & Statistical from Real DB Data) ── */
+function generateFallbackForecast(targetMonthName, currentMonthName, monthsData = [], topSalon = 'All Branches', topServices = [], totalCompleted = 0, totalCancelled = 0) {
   const currentRevenue = monthsData.length > 0 ? (monthsData[monthsData.length - 1]?.revenue || 0) : 0;
   const prevRevenue = monthsData.length > 1 ? (monthsData[monthsData.length - 2]?.revenue || 0) : 0;
 
-  const baseline = currentRevenue > 0 ? currentRevenue : (prevRevenue > 0 ? prevRevenue : 320000);
+  // Calculate baseline from actual past revenue or actual bookings
+  const avgBookings = monthsData.reduce((acc, m) => acc + (m.bookings || 0), 0) / (monthsData.length || 1);
+  const avgHistoricalRev = monthsData.reduce((acc, m) => acc + (m.revenue || 0), 0) / (monthsData.length || 1);
 
-  let growthRate = 0.12;
+  const baseline = currentRevenue > 0
+    ? currentRevenue
+    : (prevRevenue > 0 ? prevRevenue : (avgHistoricalRev > 0 ? avgHistoricalRev : (avgBookings > 0 ? Math.round(avgBookings * 1500) : 15000)));
+
+  let growthRate = 0.08;
   if (prevRevenue > 0 && currentRevenue > 0) {
     const historicalGrowth = (currentRevenue - prevRevenue) / prevRevenue;
-    growthRate = Math.min(Math.max(historicalGrowth, -0.15), 0.25);
+    growthRate = Math.min(Math.max(historicalGrowth, -0.20), 0.30);
   }
 
   const projectedGrowthPercent = Number((growthRate * 100).toFixed(1));
   const projectedRevenueMid = Math.round(baseline * (1 + (projectedGrowthPercent / 100)));
-  const projectedRevenueMin = Math.round(projectedRevenueMid * 0.92);
-  const projectedRevenueMax = Math.round(projectedRevenueMid * 1.10);
+  const projectedRevenueMin = Math.round(projectedRevenueMid * 0.90);
+  const projectedRevenueMax = Math.round(projectedRevenueMid * 1.12);
 
-  const avgBookings = monthsData.reduce((acc, m) => acc + (m.bookings || 0), 0) / (monthsData.length || 1);
-  const projectedBookings = Math.max(Math.round((avgBookings || 40) * (1 + (projectedGrowthPercent / 100))), 18);
+  const projectedBookings = Math.max(Math.round((avgBookings || 10) * (1 + (projectedGrowthPercent / 100))), 1);
+  const topSvcStr = topServices.length > 0 ? topServices.slice(0, 2).join(' & ') : 'Salon Services';
+  const salonName = topSalon && topSalon !== 'Flagship Branch' && topSalon !== 'Main Flagship' ? topSalon : 'All Branches';
 
-  const topSvcStr = topServices.length > 0 ? topServices.slice(0, 2).join(' & ') : 'Styling & Spa Packages';
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const now = new Date();
+
+  // If monthsData is empty, build real last 4 months with 0 revenue instead of fake mock values
+  let trajectoryBase = monthsData;
+  if (!trajectoryBase || trajectoryBase.length === 0) {
+    trajectoryBase = [];
+    for (let i = 3; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      trajectoryBase.push({
+        month: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
+        revenue: 0,
+        type: 'actual'
+      });
+    }
+  }
 
   return {
     targetMonth: targetMonthName,
@@ -171,28 +193,28 @@ function generateFallbackForecast(targetMonthName, currentMonthName, monthsData 
     projectedRevenueMid,
     projectedGrowthPercent,
     projectedBookings,
-    confidenceScore: 89,
-    topBranchPrediction: topSalon || 'Colombo Flagship',
-    executiveSummary: `Projecting ${projectedGrowthPercent >= 0 ? 'a steady growth of ' + projectedGrowthPercent + '%' : 'a mild consolidation'} for ${targetMonthName}. Momentum is anchored by consistent repeat clients at ${topSalon || 'top branches'} and strong traction in ${topSvcStr}.`,
+    confidenceScore: 88,
+    topBranchPrediction: salonName,
+    executiveSummary: `Projecting ${projectedGrowthPercent >= 0 ? 'a growth trajectory of ' + projectedGrowthPercent + '%' : 'a consolidation period'} for ${targetMonthName}. Momentum is driven by client demand at ${salonName} and popular services including ${topSvcStr}.`,
     strategicInsights: [
       {
         type: "growth",
-        title: "High-Margin Service Bundling",
-        description: `Expand premium service combinations featuring ${topSvcStr}. Introducing bundled add-on promotions during booking can lift overall average ticket size by 14-18%.`
+        title: "High-Yield Service Optimization",
+        description: `Expand premium service combinations featuring ${topSvcStr}. Introducing bundled promotions can lift overall appointment ticket size.`
       },
       {
         type: "capacity",
-        title: "Peak Weekend Staff Optimization",
-        description: `Anticipating heightened weekend demand at ${topSalon || 'top branches'}. Adjust stylist shift allocations to maximize station turnover during peak 11:00 AM - 4:00 PM appointment windows.`
+        title: "Peak Hour Staff Allocation",
+        description: `Anticipating higher customer volume at ${salonName}. Optimize stylist shift schedules during peak afternoon windows.`
       },
       {
         type: "marketing",
-        title: "Mid-Week Loyalty Re-Engagement",
-        description: "Deploy automated SMS or email reminders for clients overdue for maintenance cuts and treatments to elevate Tuesday-Thursday slot occupancy."
+        title: "Client Retention & Follow-up",
+        description: "Engage clients with personalized reminders for follow-up appointments to elevate mid-week slot occupancy."
       }
     ],
-    trajectoryData: monthsData.length > 0 ? [
-      ...monthsData.map(m => ({ month: m.month, revenue: m.revenue, type: 'actual' })),
+    trajectoryData: [
+      ...trajectoryBase.map(m => ({ month: m.month, revenue: m.revenue || 0, type: 'actual' })),
       {
         month: `${targetMonthName.split(' ')[0]} (Forecast)`,
         revenue: projectedRevenueMid,
@@ -200,11 +222,6 @@ function generateFallbackForecast(targetMonthName, currentMonthName, monthsData 
         projectedMax: projectedRevenueMax,
         type: 'projected'
       }
-    ] : [
-      { month: 'Jul 2026', revenue: 240000, type: 'actual' },
-      { month: 'Aug 2026', revenue: 275000, type: 'actual' },
-      { month: 'Sep 2026', revenue: 310000, type: 'actual' },
-      { month: `${targetMonthName.split(' ')[0]} (Forecast)`, revenue: projectedRevenueMid, projectedMin: projectedRevenueMin, projectedMax: projectedRevenueMax, type: 'projected' }
     ]
   };
 }
@@ -217,16 +234,16 @@ async function callGeminiForecast(data) {
 
   try {
     const apiKey = process.env.GEMINI_API_KEY.trim();
-    const prompt = `You are a Senior Salon Business Intelligence Director & Financial Analyst for SalonHub, a luxury multi-salon chain.
-Analyze the following performance metrics and forecast business results for the next month: "${data.targetMonthName}".
+    const prompt = `You are a Senior Salon Business Intelligence Director & Financial Analyst for SalonHub.
+Analyze the following REAL performance metrics from our database and forecast business results for the next month: "${data.targetMonthName}".
 
-Current Business Performance:
+Current Real Business Performance:
 - Target Forecast Month: ${data.targetMonthName}
 - Current Month (${data.currentMonthName}) Revenue: LKR ${data.currentMonthRevenue.toLocaleString()}
 - Previous Month Revenue: LKR ${data.prevMonthRevenue.toLocaleString()}
 - Historical Monthly Trajectory: ${JSON.stringify(data.monthsData.map(m => `${m.month}: LKR ${m.revenue} (${m.bookings} bookings)`))}
 - Top Performing Salon Branch: ${data.topSalon}
-- Top Performing Services: ${data.topServices.join(', ') || 'Haircuts, Treatments, Styling'}
+- Top Performing Services: ${data.topServices.join(', ') || 'Haircuts & Styling'}
 - Total Completed Bookings: ${data.totalCompleted}
 - Total Cancellations: ${data.totalCancelled}
 
@@ -241,43 +258,58 @@ Return ONLY a valid JSON object (no markdown, no backticks, no preamble) in this
   "projectedBookings": <number, estimated integer count of bookings>,
   "confidenceScore": <number between 80 and 96>,
   "topBranchPrediction": "${data.topSalon}",
-  "executiveSummary": "<2-3 sentences concise strategic summary of the next month trajectory>",
+  "executiveSummary": "<2-3 sentences concise strategic summary of the next month trajectory based on ${data.topSalon}>",
   "strategicInsights": [
     {
       "type": "growth",
-      "title": "<Concise insight title e.g. High-Yield Service Optimization>",
-      "description": "<Actionable 2-sentence business recommendation for revenue growth>"
+      "title": "<Concise insight title>",
+      "description": "<Actionable 2-sentence recommendation>"
     },
     {
       "type": "capacity",
-      "title": "<Concise insight title e.g. Peak Shift & Staffing Allocation>",
-      "description": "<Actionable 2-sentence recommendation for managing staff and slot utilization>"
+      "title": "<Concise insight title>",
+      "description": "<Actionable 2-sentence recommendation>"
     },
     {
       "type": "marketing",
-      "title": "<Concise insight title e.g. Mid-Week Demand Stimulation>",
-      "description": "<Actionable 2-sentence recommendation for customer retention and campaigns>"
+      "title": "<Concise insight title>",
+      "description": "<Actionable 2-sentence recommendation>"
     }
   ]
 }`;
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 650,
-          },
-        }),
-      }
-    );
+    // Try gemini-3.6-flash first, fallback to gemini-flash-latest
+    const modelsToTry = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"];
+    let rawText = null;
 
-    const resJson = await res.json();
-    const rawText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+    for (const model of modelsToTry) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 2500,
+                responseMimeType: "application/json"
+              },
+            }),
+          }
+        );
+
+        if (res.ok) {
+          const resJson = await res.json();
+          rawText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) break;
+        }
+      } catch (e) {
+        // Try next model
+      }
+    }
+
     if (!rawText) return null;
 
     const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -287,6 +319,8 @@ Return ONLY a valid JSON object (no markdown, no backticks, no preamble) in this
       if (!parsed.projectedRevenueMid) {
         parsed.projectedRevenueMid = Math.round((parsed.projectedRevenueMin + parsed.projectedRevenueMax) / 2);
       }
+      // Ensure real salon name is preserved
+      parsed.topBranchPrediction = data.topSalon;
       return parsed;
     }
     return null;
@@ -298,42 +332,58 @@ Return ONLY a valid JSON object (no markdown, no backticks, no preamble) in this
 
 /* ── Exported AI Forecast Controller ── */
 export const getAIForecast = async (req, res) => {
+  const now = new Date();
+  const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const targetMonthName = nextMonthDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const currentMonthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
   try {
-    const now = new Date();
-    const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const targetMonthName = nextMonthDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-    const currentMonthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+    // 1. Fetch registered salons from database
+    const registeredSalons = await Salon.find({ status: { $ne: 'inactive' } }).select('name').lean().catch(() => []);
+    const defaultSalonName = registeredSalons[0]?.name || "All Branches";
+
+    // 2. Fetch registered services from database
+    const registeredServices = await Service.find().select('service_name').lean().catch(() => []);
+    const defaultServices = registeredServices.slice(0, 3).map(s => s.service_name);
 
     if (mongoose.connection.readyState !== 1) {
-      return res.json(generateFallbackForecast(targetMonthName, currentMonthName, [], 'Flagship Branch', []));
+      return res.json(generateFallbackForecast(targetMonthName, currentMonthName, [], defaultSalonName, defaultServices));
     }
 
-    // Historical monthly revenue
-    const monthlyBills = await Bill.aggregate([
-      {
-        $group: {
-          _id: {
-            year: { $year: '$bill_date' },
-            month: { $month: '$bill_date' }
-          },
-          totalRevenue: { $sum: '$total_amount' },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { '_id.year': 1, '_id.month': 1 } },
-      { $limit: 12 }
-    ]).maxTimeMS(3000).catch(() => []);
+    // 3. Historical monthly revenue from bills
+    let monthlyBills = [];
+    try {
+      monthlyBills = await Bill.aggregate([
+        {
+          $group: {
+            _id: {
+              year: { $year: '$bill_date' },
+              month: { $month: '$bill_date' }
+            },
+            totalRevenue: { $sum: '$total_amount' },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+        { $limit: 12 }
+      ]);
+    } catch (bErr) {
+      console.warn("Bill aggregation query skipped:", bErr.message);
+    }
 
-    // Recent appointments
-    const recentAppointments = await Appointment.find({
-      status: { $in: ['completed', 'cancelled', 'rejected', 'confirmed', 'pending'] }
-    })
-      .select('appointment_date status total_price salon_id service_ids createdAt')
-      .populate('salon_id', 'name')
-      .populate('service_ids', 'service_name')
-      .lean()
-      .maxTimeMS(3000)
-      .catch(() => []);
+    // 4. Recent appointments from database
+    let recentAppointments = [];
+    try {
+      recentAppointments = await Appointment.find({
+        status: { $in: ['completed', 'cancelled', 'rejected', 'confirmed', 'pending'] }
+      })
+        .select('appointment_date status total_price salon_id service_ids createdAt')
+        .populate('salon_id', 'name')
+        .populate('service_ids', 'service_name')
+        .lean();
+    } catch (aErr) {
+      console.warn("Appointment query skipped:", aErr.message);
+    }
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const monthsData = [];
@@ -373,7 +423,7 @@ export const getAIForecast = async (req, res) => {
       });
     }
 
-    // Identify top salons & services
+    // 5. Identify real top performing salons & services from database
     const salonCounts = {};
     const serviceCounts = {};
     let totalCompleted = 0;
@@ -382,7 +432,7 @@ export const getAIForecast = async (req, res) => {
     recentAppointments.forEach(a => {
       if (a.status === 'completed') {
         totalCompleted++;
-        const sName = a.salon_id?.name || 'Main Branch';
+        const sName = a.salon_id?.name || defaultSalonName;
         salonCounts[sName] = (salonCounts[sName] || 0) + (a.total_price || 1);
 
         if (Array.isArray(a.service_ids)) {
@@ -396,8 +446,9 @@ export const getAIForecast = async (req, res) => {
       }
     });
 
-    const topSalon = Object.entries(salonCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Flagship Salon';
-    const topServices = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
+    const topSalon = Object.entries(salonCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || defaultSalonName;
+    const topServicesFromDb = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
+    const topServices = topServicesFromDb.length > 0 ? topServicesFromDb : defaultServices;
 
     const currentMonthRevenue = monthsData[monthsData.length - 1]?.revenue || 0;
     const prevMonthRevenue = monthsData[monthsData.length - 2]?.revenue || 0;
@@ -450,11 +501,12 @@ export const getAIForecast = async (req, res) => {
     });
   } catch (error) {
     console.error("AI Forecast error:", error);
-    const now = new Date();
-    const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const targetMonthName = nextMonthDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-    const currentMonthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
-    return res.json(generateFallbackForecast(targetMonthName, currentMonthName, [], 'Flagship Branch', []));
+    let fallbackSalon = "All Branches";
+    try {
+      const s = await Salon.findOne({ status: { $ne: 'inactive' } }).select('name').lean();
+      if (s?.name) fallbackSalon = s.name;
+    } catch (_) {}
+    return res.json(generateFallbackForecast(targetMonthName, currentMonthName, [], fallbackSalon, []));
   }
 };
 

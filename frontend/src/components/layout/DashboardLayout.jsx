@@ -4,21 +4,46 @@ import Sidebar from "./Sidebar";
 import clsx from "clsx";
 
 const DashboardLayout = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
 
-  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
-  const closeSidebar = () => setSidebarOpen(false);
+  const toggleSidebar = () => {
+    if (window.innerWidth >= 1024) {
+      setIsCollapsed((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem("sidebar_collapsed", String(next));
+        } catch {}
+        return next;
+      });
+    } else {
+      setMobileOpen((prev) => !prev);
+    }
+  };
+
+  const closeMobileSidebar = () => setMobileOpen(false);
 
   return (
     <div className="min-h-screen bg-primary">
-      <Header onToggleSidebar={toggleSidebar} />
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
+      <Header onToggleSidebar={toggleSidebar} isCollapsed={isCollapsed} />
+      <Sidebar
+        isOpen={mobileOpen}
+        onClose={closeMobileSidebar}
+        isCollapsed={isCollapsed}
+        onToggleCollapse={toggleSidebar}
+      />
 
       {/* Main Content */}
       <main
         className={clsx(
-          "pt-header min-h-screen transition-[margin] duration-300 ease-in-out",
-          "lg:ml-sidebar",
+          "pt-header min-h-screen transition-all duration-300 ease-in-out",
+          isCollapsed ? "lg:ml-[72px]" : "lg:ml-sidebar",
           "px-4 sm:px-5 pb-5"
         )}
       >
