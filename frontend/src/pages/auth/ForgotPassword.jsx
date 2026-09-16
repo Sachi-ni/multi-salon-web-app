@@ -2,18 +2,27 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { API_URL } from "../../config";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail } from "../../utils/validation";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [emailSubmitError, setEmailSubmitError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { errors, handleBlur, validateAll, isValid, fieldMessages } = useFormValidation({ email }, { email: validateEmail });
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setEmailSubmitError("");
     setMessage("");
+    if (!validateAll()) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch(`${API_URL}/auth/forgot-password`, {
@@ -25,7 +34,8 @@ const ForgotPassword = () => {
       if (!response.ok) throw new Error(data.message || "Please enter a valid email address");
       setMessage(data.message);
     } catch (requestError) {
-      setError(requestError.message);
+      if (/email/i.test(requestError.message)) setEmailSubmitError(requestError.message);
+      else setError(requestError.message);
     } finally {
       setLoading(false);
     }
@@ -59,20 +69,27 @@ const ForgotPassword = () => {
         {message ? (
           <div className="rounded-lg border border-accent/40 bg-accent-dim/30 px-4 py-3 text-sm text-accent">{message}</div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Email</label>
             <input
               type="email"
               required
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none placeholder:text-muted focus:border-accent"
+              onChange={(event) => {
+                setEmailSubmitError("");
+                setEmail(event.target.value);
+              }}
+              onBlur={() => handleBlur("email")}
+              aria-invalid={Boolean(errors.email || emailSubmitError)}
+              className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none placeholder:text-muted focus:border-accent ${errors.email || emailSubmitError ? "border-red-500/50 focus:border-red-500" : ""}`}
               autoComplete="email"
             />
+            {(errors.email || emailSubmitError) && <p className="mt-1 text-xs text-red-300">{errors.email || emailSubmitError}</p>}
+            {!errors.email && !emailSubmitError && fieldMessages.email && <p className="mt-1 text-xs text-muted-2 font-medium">{fieldMessages.email}</p>}
             {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isValid}
               className="w-full mt-5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase disabled:opacity-50"
             >
               {loading ? "Sending..." : "Send Reset Link"}

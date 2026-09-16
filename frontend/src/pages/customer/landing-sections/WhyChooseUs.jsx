@@ -41,7 +41,7 @@ const WhyChooseUs = () => {
           transition={{ duration: 0.8 }}
         >
           <div className="text-accent font-bold tracking-widest uppercase text-sm mb-3">Why Choose Us</div>
-          <h2 className="text-4xl md:text-5xl font-display font-black text-white mb-6">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-black text-white mb-6">
             The standard of <br/><span className="text-gradient">excellence.</span>
           </h2>
           <p className="text-white/70 text-lg mb-8 leading-relaxed">

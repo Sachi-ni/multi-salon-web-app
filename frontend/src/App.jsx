@@ -3,12 +3,16 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import './App.css';
 
 import ChatWidget from "./components/chatbot/ChatWidget";
+import ScrollToTop from "./components/layout/ScrollToTop";
 
 import { AuthProvider } from "./context/AuthContext";
+import { ToastProvider } from "./context/ToastContext";
+import { AlertProvider } from "./context/AlertContext";
 
 // General Pages
 import Login from "./pages/auth/Login.jsx";
 import Edit from "./pages/auth/edit.jsx";
+import ProfileDetails from "./pages/auth/ProfileDetails.jsx";
 import Unauthorized from "./pages/Unauthorized.jsx";
 
 //customer pages
@@ -86,7 +90,10 @@ const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
 function App() {
   return (
     <AuthProvider>
+    <AlertProvider>
+    <ToastProvider>
     <BrowserRouter>
+      <ScrollToTop />
       {/* All Routes MUST be inside this container */}
       <Routes>
         <Route path="/" element={<Landing />} />
@@ -102,7 +109,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/editProfile" element={<Edit />} />
+        <Route path="/editProfile" element={
+          <ProtectedRoute>
+            <Edit />
+          </ProtectedRoute>
+        } />
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/register" element={<CustomerRegister />} />
         <Route path="/super-admin-hardening" element={<SuperAdminHardening />} />
@@ -293,7 +304,13 @@ function App() {
 
         <Route path="/customer/profile" element={
           <ProtectedRoute allowedRoles={["customer", "user"]}>
-            <Edit />
+            <CustomerLayout><ProfileDetails /></CustomerLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/account/profile" element={
+          <ProtectedRoute>
+            <AdminSalonLayout><ProfileDetails /></AdminSalonLayout>
           </ProtectedRoute>
         } />
 
@@ -364,6 +381,8 @@ function App() {
       </Routes>
       <ChatWidget />
     </BrowserRouter>
+    </ToastProvider>
+    </AlertProvider>
     </AuthProvider>
   );
 }

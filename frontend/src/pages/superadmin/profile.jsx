@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { LogOut, Edit } from "lucide-react";
+import { ArrowLeft, LogOut, Edit } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
@@ -33,9 +33,20 @@ const Profile = () => {
 
   return (
     <div className="max-w-[600px] mx-auto">
-      <h2 className="text-lg font-extrabold text-white mb-5 flex items-center gap-2">
+      <div className="flex items-center gap-2 mb-5">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="p-1.5 rounded-lg text-muted-2 hover:text-white hover:bg-surface-2 transition-colors"
+          aria-label="Go back"
+          title="Go back"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+      <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
         👤 Admin Profile
       </h2>
+      </div>
 
       {/* Profile Card */}
       <Card className="mb-5">

@@ -2,47 +2,55 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
+import { CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { API_URL } from "../../config";
+import useFormValidation from "../../hooks/useFormValidation";
+import {
+  normalizePhone,
+  validateConfirmPassword,
+  validateEmail,
+  validatePassword,
+  validatePhoneGeneric,
+} from "../../utils/validation";
 
 const CustomerRegister = () => {
   const [name, setName]                   = useState("");
   const [email, setEmail]                 = useState("");
   const [phone, setPhone]                 = useState("");
-  const [phoneError, setPhoneError]       = useState("");
   const [password, setPassword]           = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading]             = useState(false);
+  const [formError, setFormError]         = useState("");
+  const [emailSubmitError, setEmailSubmitError] = useState("");
+  const [formSuccess, setFormSuccess]     = useState("");
   const navigate = useNavigate();
+
+  const values = { email, phone, password, confirmPassword };
+  const { errors, validateAll, handleBlur, isValid, fieldMessages } = useFormValidation(values, {
+    email: validateEmail,
+    phone: validatePhoneGeneric,
+    password: validatePassword,
+    confirmPassword: (value, currentValues) =>
+      validateConfirmPassword(currentValues.password, value),
+  });
 
   const handlePhoneChange = (e) => {
     const val = e.target.value.replace(/[^0-9+\s()-]/g, "");
     if (val.replace(/[\s()-]/g, "").replace(/^\+/, "").length <= 10) {
       setPhone(val);
-      if (/^\+?[0-9]{10}$/.test(val.replace(/[\s()-]/g, ""))) {
-        setPhoneError("");
-      }
     }
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setPhoneError("");
+    setFormError("");
+    setEmailSubmitError("");
+    setFormSuccess("");
 
-    const normalizedPhone = phone.replace(/[\s()-]/g, "");
-    if (!/^\+?[0-9]{10}$/.test(normalizedPhone)) {
-      setPhoneError("Phone number must contain exactly 10 digits and may start with +");
-      return;
-    }
-
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password)) {
-      alert("Password must be at least 6 characters and include uppercase, lowercase, and number");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      alert("Passwords do not match!");
-      return;
-    }
+    if (!validateAll()) return;
+    const normalizedPhone = normalizePhone(phone);
     setLoading(true);
     try {
       await axios.post(`${API_URL}/auth/register`, {
@@ -51,10 +59,12 @@ const CustomerRegister = () => {
         phone: normalizedPhone,
         password,
       });
-      alert("Registration successful! Please login.");
-      navigate("/login");
-    } catch (error) {
-      alert(error.response?.data?.message || "Registration failed. Please try again.");
+      setFormSuccess("success");
+      setTimeout(() => navigate("/login"), 1800);
+    } catch (err) {
+      const msg = err.response?.data?.message || "Registration failed. Please try again.";
+      if (/email/i.test(msg)) setEmailSubmitError(msg);
+      else setFormError(msg);
     } finally {
       setLoading(false);
     }
@@ -64,8 +74,8 @@ const CustomerRegister = () => {
     "w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30";
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[1000] overflow-hidden">
-      {/* Background Image with Overlay - Similar to Landing Page */}
+    <div className="fixed inset-0 flex items-center justify-center z-[1000] overflow-y-auto py-6 px-4">
+      {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/70 via-primary/60 to-primary/80 z-10" />
         <img
@@ -79,7 +89,7 @@ const CustomerRegister = () => {
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="relative z-10 w-[460px] max-w-[96vw] bg-surface/80 backdrop-blur-sm border border-border rounded-2xl p-10 shadow-modal max-h-[95vh] overflow-y-auto"
+        className="relative z-10 w-[460px] max-w-full bg-surface/80 backdrop-blur-sm border border-border rounded-2xl p-6 sm:p-10 shadow-modal max-h-[95vh] overflow-y-auto my-auto"
       >
         {/* Top accent bar */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />
@@ -95,7 +105,20 @@ const CustomerRegister = () => {
         <h1 className="text-2xl font-extrabold text-white mb-1">Create Account</h1>
         <p className="text-muted-2 text-sm mb-6">Book appointments at your favourite salon</p>
 
-        <form onSubmit={handleRegister} autoComplete="off">
+        {formError && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 px-3.5 py-2.5 rounded-xl bg-danger-dim border border-danger-border text-xs text-danger font-semibold flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{formError}</span>
+          </motion.div>
+        )}
+
+        <form onSubmit={handleRegister} autoComplete="off" noValidate>
           {/* Name */}
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
@@ -121,11 +144,20 @@ const CustomerRegister = () => {
               type="email"
               placeholder="your@email.com"
               value={email}
-              onChange={e => setEmail(e.target.value)}
-              className={inputClass}
+              onChange={e => {
+                setEmailSubmitError("");
+                setEmail(e.target.value);
+              }}
+              onBlur={() => handleBlur("email")}
+              aria-invalid={Boolean(errors.email || emailSubmitError)}
+              className={`${inputClass} ${errors.email || emailSubmitError ? "border-red-500/50 focus:border-red-500" : ""}`}
               autoComplete="new-email"
               required
             />
+            {(errors.email || emailSubmitError) && <span className="text-xs text-red-400 mt-1 block font-medium">{errors.email || emailSubmitError}</span>}
+            {!errors.email && !emailSubmitError && fieldMessages.email && (
+              <span className="text-xs text-muted-2 mt-1 block font-medium">{fieldMessages.email}</span>
+            )}
           </div>
 
           {/* Phone */}
@@ -138,14 +170,15 @@ const CustomerRegister = () => {
               placeholder="+947XXXXXXXX"
               value={phone}
               onChange={handlePhoneChange}
-              className={`${inputClass} ${phoneError ? "border-red-500/50 focus:border-red-500" : ""}`}
+              onBlur={() => handleBlur("phone")}
+              className={`${inputClass} ${errors.phone ? "border-red-500/50 focus:border-red-500" : ""}`}
               autoComplete="new-phone"
               pattern="\\+?[0-9\\s()\-]{10,20}"
               required
             />
-            {phoneError && (
+            {errors.phone && (
               <span className="text-xs text-red-400 mt-1 block font-medium">
-                {phoneError}
+                {errors.phone}
               </span>
             )}
           </div>
@@ -156,35 +189,59 @@ const CustomerRegister = () => {
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
                 Password <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
               </label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className={inputClass}
-                autoComplete="new-password"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  onBlur={() => handleBlur("password")}
+                  className={`${inputClass} pr-10 ${errors.password ? "border-red-500/50 focus:border-red-500" : ""}`}
+                  autoComplete="new-password"
+                  required
+                />
+                {password && <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>}
+              </div>
+              {errors.password && <span className="text-xs text-red-400 mt-1 block font-medium">{errors.password}</span>}
             </div>
             <div>
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
                 Confirm <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span>
               </label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                className={inputClass}
-                autoComplete="new-password"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  onBlur={() => handleBlur("confirmPassword")}
+                  className={`${inputClass} pr-10 ${errors.confirmPassword ? "border-red-500/50 focus:border-red-500" : ""}`}
+                  autoComplete="new-password"
+                  required
+                />
+                {confirmPassword && <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((visible) => !visible)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors"
+                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>}
+              </div>
+              {errors.confirmPassword && <span className="text-xs text-red-400 mt-1 block font-medium">{errors.confirmPassword}</span>}
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !isValid}
             className="w-full mt-1.5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase cursor-pointer transition-all duration-200 hover:bg-accent-hover hover:shadow-glow hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Registering..." : "Create Account"}
@@ -201,6 +258,36 @@ const CustomerRegister = () => {
           </span>
         </div>
       </motion.div>
+
+      {formSuccess && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-20 flex items-center justify-center bg-primary/75 backdrop-blur-sm px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="registration-success-title"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.88, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 280, damping: 20 }}
+            className="w-full max-w-sm overflow-hidden rounded-3xl border border-accent/40 bg-surface shadow-modal text-center"
+          >
+            <div className="h-2 bg-gradient-to-r from-accent via-accent-hover to-accent" />
+            <div className="px-8 py-10">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-accent-dim border border-accent/40 shadow-glow">
+                <CheckCircle2 className="h-11 w-11 text-accent" strokeWidth={2.5} />
+              </div>
+              <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.2em] text-accent">Welcome to SalonHub</p>
+              <h2 id="registration-success-title" className="text-2xl font-black text-white">
+                Registration successful!
+              </h2>
+              <p className="mt-6 text-xs font-semibold text-muted-2">Taking you to sign in...</p>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 };

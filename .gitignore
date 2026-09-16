@@ -1,8 +1,8 @@
 node_modules
 .env
-review.txt
-register.txt
-saloncheck.txt
-check.txt
 fullsuiteverification.txt
 forgetpasswrd.txt
+"backend/mongod.log" 
+"backend/mongod-local.log" 
+
+check.txt

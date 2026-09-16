@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { CalendarDays } from "lucide-react";
 import { getSalons } from "../../services/salonService";
 import StepSelectService from "./steps/StepSelectService";
 import StepAssignStaffAndTime from "./steps/StepAssignStaffAndTime";
@@ -23,6 +24,22 @@ export default function BookAppointment() {
   });
 
   const location = useLocation();
+  const dateInputRef = useRef(null);
+
+  const openDatePicker = () => {
+    const dateInput = dateInputRef.current;
+    if (!dateInput) return;
+
+    dateInput.focus();
+    // Chrome/Edge expose showPicker; other browsers still open it via focus/click.
+    if (typeof dateInput.showPicker === "function") {
+      try {
+        dateInput.showPicker();
+      } catch {
+        // The focused native input remains usable in browsers that reject showPicker.
+      }
+    }
+  };
 
   const loadSalons = useCallback(() => {
     setSalonError("");
@@ -86,36 +103,36 @@ export default function BookAppointment() {
       {/* Premium Salon-Themed Background */}
       <CustomerDashboardBackground />
 
-      <div className="max-w-2xl mx-auto relative z-10">
+      <div className="max-w-2xl mx-auto relative z-10 px-4 sm:px-0">
 
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-black text-white">Book an Appointment</h1>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl font-black text-white">Book an Appointment</h1>
           <p className="text-muted-2 text-sm mt-1">Follow the steps to complete your booking</p>
         </div>
 
         {/* Step Indicator */}
-        <div className="flex items-center mb-8">
+        <div className="flex items-center mb-6 sm:mb-8">
           {STEPS.map((label, i) => (
             <div key={i} className="flex items-center flex-1 last:flex-none">
               <div className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-200
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-200
                   ${i < step ? "bg-accent text-primary" : ""}
                   ${i === step ? "bg-accent text-primary shadow-glow" : ""}
                   ${i > step ? "bg-surface-2 text-muted-2 border border-border" : ""}
                 `}>
                   {i < step ? (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : i + 1}
                 </div>
-                <span className={`text-2xs mt-1 font-bold tracking-wide
+                <span className={`text-2xs mt-1 font-bold tracking-wide hidden sm:block
                   ${i === step ? "text-accent" : "text-muted-2"}
                 `}>{label}</span>
               </div>
               {i < STEPS.length - 1 && (
-                <div className={`flex-1 h-px mx-2 mb-4 transition-all duration-300
+                <div className={`flex-1 h-px mx-1.5 sm:mx-2 mb-0 sm:mb-4 transition-all duration-300
                   ${i < step ? "bg-accent" : "bg-border"}
                 `} />
               )}
@@ -124,7 +141,7 @@ export default function BookAppointment() {
         </div>
 
         {/* Step Content */}
-        <div className="bg-surface border border-border rounded-2xl p-6 shadow-card animate-fade-up">
+        <div className="bg-surface border border-border rounded-2xl p-4 sm:p-6 shadow-card animate-fade-up">
 
           {/* Step 0 — Salon */}
           {step === 0 && (
@@ -187,13 +204,27 @@ export default function BookAppointment() {
             <div>
               <h2 className="text-lg font-extrabold text-white mb-1">Select a Date</h2>
               <p className="text-muted-2 text-sm mb-5">Choose the date for your appointment</p>
-              <input
-                type="date"
-                value={booking.date}
-                min={new Date().toLocaleDateString('en-CA')}
-                onChange={e => setBooking(prev => ({ ...prev, date: e.target.value }))}
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-accent focus:bg-accent-dim/20 transition-all duration-200 cursor-pointer"
-              />
+              <div className="relative">
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  value={booking.date}
+                  min={new Date().toLocaleDateString('en-CA')}
+                  onChange={e => setBooking(prev => ({ ...prev, date: e.target.value }))}
+                  onClick={openDatePicker}
+                  style={{ colorScheme: "dark" }}
+                  className="appointment-date-input w-full bg-surface-2 border border-border rounded-xl px-4 py-3 pr-14 text-white text-sm outline-none focus:border-accent focus:bg-accent-dim/20 transition-all duration-200 cursor-pointer"
+                  aria-label="Appointment date"
+                />
+                <button
+                  type="button"
+                  onClick={openDatePicker}
+                  aria-label="Open date picker"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-accent hover:bg-accent-dim focus:outline-none focus:ring-2 focus:ring-accent/50 transition-colors"
+                >
+                  <CalendarDays className="h-5 w-5" />
+                </button>
+              </div>
               <div className="flex justify-between mt-6">
                 <button onClick={back} className="px-6 py-2.5 bg-surface-2 text-muted-2 text-sm font-bold rounded-lg border border-border hover:border-border-hover transition-all duration-200">
                   ← Back

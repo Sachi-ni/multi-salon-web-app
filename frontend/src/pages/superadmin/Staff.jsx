@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
+import { markAsPaid } from "../../services/salaryService";
 import { getSalons } from "../../services/salonService";
 import { getServices } from "../../services/serviceService";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail, validatePassword, validatePhoneSriLankan } from "../../utils/validation";
+import StaffUnavailableModal from "../../components/booking/StaffUnavailableModal";
 import { 
   Plus, Search, Users, Star, MapPin, 
   MoreVertical, Power, Pencil, Trash2, 
-  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins
+  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins, Eye, EyeOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
@@ -36,7 +40,7 @@ const SkeletonStaffCard = () => (
 );
 
 /* ── Staff Card Actions Menu ── */
-const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
+const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete, onMarkUnavailable }) => {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -81,6 +85,13 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
               <Pencil className="w-3.5 h-3.5 text-info" />
               Edit Details
             </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onMarkUnavailable(staff); setOpen(false); }}
+              className="w-full px-3.5 py-2 text-left text-xs font-bold flex items-center gap-2.5 transition-colors duration-150 hover:bg-danger-dim text-danger"
+            >
+              <Power className="w-3.5 h-3.5" />
+              Mark Unavailable
+            </button>
             <div className="my-1 border-t border-border" />
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(staff._id); setOpen(false); }}
@@ -97,7 +108,7 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete }) => {
 };
 
 /* ── Staff Card Component ── */
-const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
+const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete, onMarkUnavailable }) => {
   const initials = staff.name
     ? staff.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
     : "S";
@@ -172,6 +183,7 @@ const StaffCard = ({ staff, index, onEdit, onToggleStatus, onDelete }) => {
               onEdit={onEdit}
               onToggleStatus={onToggleStatus}
               onDelete={onDelete}
+              onMarkUnavailable={onMarkUnavailable}
             />
           </div>
 
@@ -268,9 +280,33 @@ const Staff = () => {
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
+  const [editError, setEditError] = useState("");
+  const [editEmailSubmitError, setEditEmailSubmitError] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [unavailableStaff, setUnavailableStaff] = useState(null);
+  const [pendingPayment, setPendingPayment] = useState(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+
+  const optionalValidator = (validator) => (value = "") => (value ? validator(value) : { valid: true, message: "" });
+  const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(
+    editingStaff ? {
+      email: editingStaff.email || "",
+      phone: editingStaff.phone || "",
+      password: editingStaff.password || "",
+    } : { email: "", phone: "", password: "" },
+    {
+      email: optionalValidator(validateEmail),
+      phone: optionalValidator(validatePhoneSriLankan),
+      password: optionalValidator(validatePassword),
+    }
+  );
 
   const handleEdit = (staff) => {
+    setShowEditPassword(false);
     const names = (staff.name || "").split(" ");
+    setEditError("");
+  setEditEmailSubmitError("");
 
     const assignedServices = (staff.services || []).map((service) => {
       if (!service) return null;
@@ -377,6 +413,9 @@ const Staff = () => {
   };
 
   const handleUpdateStaff = async () => {
+    if (!validateStaffEdit()) {
+      return;
+    }
     try {
       const data = {
         firstName: editingStaff.firstName,
@@ -397,13 +436,21 @@ const Staff = () => {
         data.image = editingStaff.picture;
       }
 
-      await updateStaff(editingStaff.id, data);
+      const response = await updateStaff(editingStaff.id, data);
+      const transition = response.data?.salaryTransition;
+      if (transition && transition.status !== "Paid" && Number(transition.totalSalary) > 0) {
+        setPaymentError("");
+        setPendingPayment(transition);
+      }
       setEditModalOpen(false);
       setEditingStaff(null);
       fetchData();
     } catch (err) {
       console.error("UPDATE ERROR:", err);
-      alert(err.response?.data?.message || "Failed to update staff");
+      setEditError(err.response?.data?.message || "Failed to update staff");
+      const message = err.response?.data?.message || "Failed to update staff";
+      if (/email/i.test(message)) setEditEmailSubmitError(message);
+      else setEditError(message);
     }
   };
 
@@ -557,6 +604,7 @@ const Staff = () => {
               onEdit={() => handleEdit(s)}
               onToggleStatus={handleToggleStatus}
               onDelete={handleDelete}
+              onMarkUnavailable={setUnavailableStaff}
             />
           ))}
         </div>
@@ -630,6 +678,12 @@ const Staff = () => {
       >
         {editingStaff && (
           <div className="space-y-4 pt-1">
+            {editError && (
+              <div className="px-4 py-3 rounded-lg bg-danger-dim border border-danger-border text-sm text-danger font-semibold">
+                {editError}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">First Name</label>
@@ -658,8 +712,12 @@ const Staff = () => {
                   type="email"
                   className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
                   value={editingStaff.email}
-                  onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
+                  onChange={(e) => { setEditEmailSubmitError(""); setEditingStaff({ ...editingStaff, email: e.target.value }); }}
+                  onBlur={() => handleEditBlur("email")}
+                  aria-invalid={Boolean(editErrors.email || editEmailSubmitError)}
                 />
+                  {(editErrors.email || editEmailSubmitError) && <p className="mt-1 text-xs text-danger">{editErrors.email || editEmailSubmitError}</p>}
+                  {!editErrors.email && !editEmailSubmitError && fieldMessages.email && <p className="mt-1 text-xs text-muted-2 font-medium">{fieldMessages.email}</p>}
               </div>
               <div>
                 <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Phone Number</label>
@@ -668,8 +726,11 @@ const Staff = () => {
                   className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
                   value={editingStaff.phone || ""}
                   onChange={(e) => setEditingStaff({ ...editingStaff, phone: e.target.value })}
+                  onBlur={() => handleEditBlur("phone")}
+                  aria-invalid={Boolean(editErrors.phone)}
                   placeholder="Enter phone number"
                 />
+                {editErrors.phone && <p className="mt-1 text-xs text-danger">{editErrors.phone}</p>}
               </div>
             </div>
 
@@ -677,14 +738,27 @@ const Staff = () => {
               <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
                 Change Password <span className="text-neutral-500 font-normal lowercase">(leave blank to keep current)</span>
               </label>
-              <input
-                type="password"
-                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-amber-400"
-                value={editingStaff.password || ""}
-                onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
-                placeholder="Enter new password"
-                autoComplete="new-password"
-              />
+              <div className="relative">
+                <input
+                  type={showEditPassword ? "text" : "password"}
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 pr-11 text-sm text-white outline-none focus:border-amber-400"
+                  value={editingStaff.password || ""}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
+                  onBlur={() => handleEditBlur("password")}
+                  aria-invalid={Boolean(editErrors.password)}
+                  placeholder="Enter new password"
+                  autoComplete="new-password"
+                />
+                {editingStaff.password && <button
+                  type="button"
+                  onClick={() => setShowEditPassword((visible) => !visible)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-white transition-colors"
+                  aria-label={showEditPassword ? "Hide password" : "Show password"}
+                >
+                  {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>}
+              </div>
+              {editErrors.password && <p className="mt-1 text-xs text-danger">{editErrors.password}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -779,11 +853,75 @@ const Staff = () => {
           <Button variant="ghost" size="sm" onClick={() => setEditModalOpen(false)}>
             Cancel
           </Button>
-          <Button variant="primary" size="sm" onClick={handleUpdateStaff}>
+          <Button variant="primary" size="sm" onClick={handleUpdateStaff} disabled={!staffEditIsValid}>
             Save Changes
           </Button>
         </Modal.Actions>
       </Modal>
+
+      <Modal
+        isOpen={Boolean(pendingPayment)}
+        onClose={() => setPendingPayment(null)}
+        title="Pending salary payment"
+        maxWidth="max-w-md"
+      >
+        {pendingPayment && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
+              <div className="flex items-start gap-3">
+                <Coins className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-400" />
+                <div>
+                  <p className="text-sm font-bold text-white">Previous salary is still pending</p>
+                  <p className="mt-1 text-xs leading-5 text-neutral-300">
+                    The previous {pendingPayment.frequency} salary period has an unpaid balance of{" "}
+                    <strong className="text-amber-300">
+                      LKR {Number(pendingPayment.totalSalary).toLocaleString()}
+                    </strong>.
+                  </p>
+                  <p className="mt-2 text-xs text-amber-200/80">
+                    The new payment frequency starts separately from the change date.
+                  </p>
+                </div>
+              </div>
+            </div>
+            {paymentError && <p className="text-sm font-semibold text-danger">{paymentError}</p>}
+            <Modal.Actions className="justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setPendingPayment(null)} disabled={paymentLoading}>
+                Pay Later
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={paymentLoading}
+                onClick={async () => {
+                  try {
+                    setPaymentLoading(true);
+                    setPaymentError("");
+                    await markAsPaid(pendingPayment.salaryId);
+                    setPendingPayment(null);
+                    fetchData();
+                  } catch (err) {
+                    setPaymentError(err.response?.data?.message || "Failed to mark salary as paid");
+                  } finally {
+                    setPaymentLoading(false);
+                  }
+                }}
+              >
+                {paymentLoading ? "Processing..." : "Pay Now"}
+              </Button>
+            </Modal.Actions>
+          </div>
+        )}
+      </Modal>
+
+      <StaffUnavailableModal
+        staff={unavailableStaff}
+        onClose={() => setUnavailableStaff(null)}
+        onSuccess={() => {
+          setUnavailableStaff(null);
+          fetchData();
+        }}
+      />
     </div>
   );
 };

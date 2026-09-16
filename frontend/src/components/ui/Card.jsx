@@ -32,22 +32,25 @@ const Card = ({
   );
 };
 
-const CardHeader = ({ children, className = "" }) => (
-  <div className={clsx("flex items-center justify-between mb-4", className)}>
-    {children}
-  </div>
-);
+const CardHeader = ({ children, className = "" }) => {
+  const hasRowLayout = className.includes("justify-between") || className.includes("flex-row");
+  return (
+    <div className={clsx(hasRowLayout ? "flex mb-4" : "flex flex-col gap-1 mb-4", className)}>
+      {children}
+    </div>
+  );
+};
 
 const CardTitle = ({ children, className = "" }) => (
-  <h3 className={clsx("text-sm font-bold text-white", className)}>
+  <h3 className={clsx("text-sm font-bold text-white tracking-tight", className)}>
     {children}
   </h3>
 );
 
 const CardSubtitle = ({ children, className = "" }) => (
-  <span className={clsx("text-xs text-muted-2", className)}>
+  <p className={clsx("text-xs text-muted-2 leading-relaxed block", className)}>
     {children}
-  </span>
+  </p>
 );
 
 Card.Header = CardHeader;

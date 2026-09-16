@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Clock, BriefcaseBusiness, AlertCircle, CheckCircle2 } from "lucide-react";
 import { getAvailableStaff, updateStaffAssignment, getAvailableSlots } from "../../services/appointmentService";
 import { getUploadUrl } from "../../config";
+import { formatDuration } from "../../utils/formatDuration";
 
 export default function EditStaffAssignmentModal({ appointment, salonId, onClose, onSuccess }) {
   const [services, setServices] = useState([]);
@@ -21,12 +22,12 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     if (/^\d{1,2}:\d{2}/.test(t)) { const [h, m] = t.split(":").map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d; }
     return new Date(t);
   };
-  const timeToMinutes = (time) => {
+  const toHHMM = useCallback((t) => { if (!t) return ""; const s = String(t).trim(); const d = /^(\d{1,2}):(\d{2})/.exec(s); if (d) return `${String(Number(d[1])).padStart(2, "0")}:${d[2]}`; const e = /[T\s](\d{1,2}):(\d{2})/.exec(s); if (e) return `${String(Number(e[1])).padStart(2, "0")}:${e[2]}`; return s; }, []);
+  const timeToMinutes = useCallback((time) => {
     const [hours, minutes] = toHHMM(time).split(":").map(Number);
     return (hours || 0) * 60 + (minutes || 0);
-  };
+  }, [toHHMM]);
   const computeEndTime = useCallback((start, dur) => { const d = parseTimeToDate(start); if (isNaN(d.getTime())) return ""; d.setMinutes(d.getMinutes() + (dur || 30)); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }, []);
-  const toHHMM = (t) => { if (!t) return ""; const s = String(t).trim(); const d = /^(\d{1,2}):(\d{2})/.exec(s); if (d) return `${String(Number(d[1])).padStart(2, "0")}:${d[2]}`; const e = /[T\s](\d{1,2}):(\d{2})/.exec(s); if (e) return `${String(Number(e[1])).padStart(2, "0")}:${e[2]}`; return s; };
   const formatTime = (t) => { if (!t) return ""; const m = /^(\d{1,2}):(\d{2})/.exec(t); if (m) { let h = Number(m[1]); const m2 = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return `${h}:${m[2]} ${m2}`; } const d = new Date(t); if (isNaN(d.getTime())) return t; return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 
   const isStaffDoubleBooked = useCallback((staffId, startTime, endTime, excludeIndex) => {
@@ -62,7 +63,7 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     });
     setServices(initialServices);
     setLoading(false);
-  }, [appointment]);
+  }, [appointment, toHHMM]);
 
   const fetchAvailableStaff = useCallback(async (index, startTime, endTimeOverride) => {
     const svc = services[index];
@@ -88,7 +89,7 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     } finally {
       setLoadingStaff((prev) => ({ ...prev, [index]: false }));
     }
-  }, [services, appointment.appointment_date, appointment._id, salonId, computeEndTime]);
+  }, [services, appointment.appointment_date, appointment._id, salonId, computeEndTime, toHHMM]);
 
   const fetchAlternateTimeSlots = useCallback(async (index) => {
     const svc = services[index];
@@ -114,7 +115,7 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
     } finally {
       setLoadingSlots((prev) => ({ ...prev, [index]: false }));
     }
-  }, [services, appointment.appointment_date, appointment._id, salonId]);
+  }, [services, appointment.appointment_date, appointment._id, salonId, timeToMinutes]);
 
   useEffect(() => {
     services.forEach((svc, index) => {
@@ -264,7 +265,7 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
                               <div className="flex items-center gap-1.5">
                                 <Clock className="w-3.5 h-3.5 text-accent" />
                                 <span className="text-muted-2">Duration:</span>
-                                <span className="text-white font-bold">{Math.ceil(svc.duration / 60)} {Math.ceil(svc.duration / 60) === 1 ? "Hour" : "Hours"}</span>
+                                <span className="text-white font-bold">{formatDuration(svc.duration)}</span>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <BriefcaseBusiness className="w-3.5 h-3.5 text-accent" />
@@ -337,8 +338,8 @@ export default function EditStaffAssignmentModal({ appointment, salonId, onClose
           {error && <div className="mx-5 mb-3 p-3 bg-rose/10 border border-rose/30 rounded-lg text-2xs text-rose font-medium"><AlertCircle className="w-3.5 h-3.5 inline mr-1.5" />{error}</div>}
           {success && <div className="mx-5 mb-3 p-3 bg-emerald/10 border border-emerald/30 rounded-lg text-2xs text-emerald font-medium"><CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />{success}</div>}
           <div className="flex gap-3 px-5 py-4 border-t border-border">
-            <button onClick={onClose} className="flex-1 px-4 py-2 bg-surface-3 hover:bg-surface-3/80 border border-border rounded-lg text-sm font-medium text-muted-2 transition-colors">Cancel</button>
-            <button onClick={handleSave} disabled={saving || !services.every((s) => s.staffId && s.startTime && s.endTime)} className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${saving || !services.every((s) => s.staffId && s.startTime && s.endTime) ? "bg-surface-3 cursor-not-allowed text-muted-2" : "bg-accent hover:bg-accent-hover text-primary"}`}>
+            <button onClick={onClose} className="flex-1 px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 text-sm font-bold hover:bg-rose-500 hover:text-white transition-all">Cancel</button>
+            <button onClick={handleSave} disabled={saving || !services.every((s) => s.staffId && s.startTime && s.endTime)} className={`flex-1 px-4 py-2 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 ${saving || !services.every((s) => s.staffId && s.startTime && s.endTime) ? "bg-surface-3 cursor-not-allowed text-muted-2" : "bg-blue-500 hover:bg-blue-400 text-white shadow-md shadow-blue-500/20"}`}>
               {saving ? (<><div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />Saving...</>) : (<><CheckCircle2 className="w-4 h-4" />Save Changes</>)}
             </button>
           </div>

@@ -83,10 +83,10 @@ export default function SalonDetailsPage() {
             <ChevronLeft className="w-5 h-5" /> Back to Salons
           </button>
 
-          <div className="grid md:grid-cols-2 gap-12">
+          <div className="grid md:grid-cols-2 gap-8 md:gap-12">
             {/* Left: Images */}
             <div className="space-y-4">
-              <div className="h-96 rounded-3xl overflow-hidden border border-border">
+              <div className="h-64 sm:h-96 rounded-3xl overflow-hidden border border-border">
                 <img src={imageUrl} alt={salon.name} className="w-full h-full object-cover" />
               </div>
               <div className="grid grid-cols-3 gap-4">
@@ -120,7 +120,7 @@ export default function SalonDetailsPage() {
                  <span className="text-white font-bold text-lg">{salon.rating || 0}</span>
                  <span className="text-muted-2">({salon.ratingCount || 0} reviews)</span>
               </div>
-              <h1 className="text-4xl md:text-5xl font-display font-black text-white mb-6">
+              <h1 className="text-2xl sm:text-4xl md:text-5xl font-display font-black text-white mb-4 sm:mb-6">
                 {salon.name}
               </h1>
               

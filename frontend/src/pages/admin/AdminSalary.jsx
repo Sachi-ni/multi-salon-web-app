@@ -53,11 +53,17 @@ const statusVariant = (status) => {
 };
 
 const toDateKey = (date) => {
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
   const d = new Date(date);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+};
+
+const isSalaryVisibleOnDate = (salary, selectedDate) => {
+  if (!salary?.isTransitioned || !salary.dateRange?.end) return true;
+  return toDateKey(selectedDate) <= toDateKey(salary.dateRange.end);
 };
 
 const getWeekNumber = (date) => {
@@ -288,8 +294,12 @@ const Salary = () => {
       setAllSalaries(allRecords);
 
       // Records of the currently selected day/week/month (what the table shows).
+      const selectedDate =
+        frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate;
       const data = period
-        ? allRecords.filter((s) => s.period === period)
+        ? allRecords.filter(
+            (s) => s.period === period && isSalaryVisibleOnDate(s, selectedDate)
+          )
         : allRecords;
       setSalaries(data);
 
@@ -315,7 +325,7 @@ const Salary = () => {
     } finally {
       setLoading(false);
     }
-  }, [salonId, frequency, getPeriod]);
+  }, [salonId, frequency, getPeriod, dailyDate, weeklyDate, monthlyDate]);
 
   useEffect(() => {
     loadSalaries();
@@ -1211,7 +1221,7 @@ const Salary = () => {
                     ? (selectedDailyRecord?.status || row.status || "Not Paid")
                     : (row.status || "Not Paid");
                   const isPaid = status === "Paid";
-                  const periodEnded = isPeriodEnded(
+                  const periodEnded = Boolean(row.isTransitioned) || isPeriodEnded(
                     frequency,
                     frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate
                   );

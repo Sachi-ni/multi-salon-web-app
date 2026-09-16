@@ -59,5 +59,10 @@ A comprehensive platform designed to manage multiple salons, handle customer boo
     npm start
     ```
 
+
+## 🚀 Production Deployment
+
+For complete, step-by-step instructions on deploying MongoDB Atlas, Render (Backend API), Vercel (Frontend React SPA), and Cloudinary (Persistent media storage), please refer to the detailed [Production Deployment Guide](DEPLOYMENT_GUIDE.md).
+
 ## 🤝 Contributing
 Contributions, issues, and feature requests are welcome! Feel free to check the issues page.

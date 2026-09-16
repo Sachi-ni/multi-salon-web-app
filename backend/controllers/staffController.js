@@ -3,14 +3,16 @@ import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 import Salary from "../models/Salary.js";
 import Appointment from "../models/Appointment.js";
+import AppointmentService from "../models/AppointmentService.js";
 import Feedback from "../models/Feedback.js";
 import { storeMedia } from "../utils/mediaStorage.js";
 import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
+import { validateNewPassword } from "../utils/passwordPolicy.js";
+import { transitionSalaryFrequency } from "./salaryController.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
 const PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
-const COMMON_PASSWORDS = new Set(["123456", "12345678", "password", "password123", "qwerty"]);
 const normalizePhone = (phone) => String(phone || "").trim().replace(/[\s()-]/g, "");
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -74,11 +76,7 @@ export const createStaff = async (req, res) => {
 
     const email = String(req.body.email || "").trim().toLowerCase();
     const phone = normalizePhone(req.body.phone);
-    const isStrongPassword =
-      password.length >= 6 &&
-      /[A-Z]/.test(password) &&
-      /[a-z]/.test(password) &&
-      /\d/.test(password);
+    const passwordError = validateNewPassword(password);
 
     if (!EMAIL_PATTERN.test(email) || !EMAIL_DOMAINS.has(email.split("@")[1])) {
       return res.status(400).json({
@@ -92,11 +90,7 @@ export const createStaff = async (req, res) => {
       });
     }
 
-    if (!isStrongPassword || COMMON_PASSWORDS.has(password.toLowerCase())) {
-      return res.status(400).json({
-        message: "Password must be at least 6 characters and include uppercase, lowercase, and number.",
-      });
-    }
+    if (passwordError) return res.status(400).json({ message: passwordError });
 
     const duplicateStaff = await Staff.findOne({
       email: { $regex: `^${escapeRegex(email)}$`, $options: "i" },
@@ -268,11 +262,11 @@ export const createStaff = async (req, res) => {
 export const getStaff = async (req, res) => {
   try {
     const userRole = req.user?.role?.toLowerCase();
-    const isSalonScopedAdmin = userRole === "manager";
+    const isSalonScopedAdmin = ["manager", "staff-admin"].includes(userRole);
     const isSuperAdmin = userRole === "super-admin";
 
     let filter = {};
-    const isCustomer = !["super-admin", "manager"].includes(userRole);
+    const isCustomer = !["super-admin", "manager", "staff-admin"].includes(userRole);
 
     if (isCustomer) {
       filter.salon_id = { $in: await Salon.find({ status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).distinct("_id") };
@@ -381,6 +375,11 @@ export const updateStaff = async (req, res) => {
     }
 
     const originalStaff = existing;
+    const previousFrequency = originalStaff.salary_payment_frequency || "monthly";
+    const requestedFrequency = req.body.salaryPaymentFrequency;
+    const frequencyChanged =
+      requestedFrequency !== undefined && requestedFrequency !== previousFrequency;
+    const frequencyChangedAt = new Date();
 
     const updateData = {};
 
@@ -434,13 +433,29 @@ export const updateStaff = async (req, res) => {
         `${firstName} ${lastName}`.trim();
     }
 
-    if (req.body.email !== undefined)
-      updateData.email = req.body.email;
+    if (req.body.email !== undefined) {
+      const email = String(req.body.email).trim().toLowerCase();
+      if (!EMAIL_PATTERN.test(email) || !EMAIL_DOMAINS.has(email.split("@")[1])) {
+        return res.status(400).json({
+          message: "Email must be valid and use Gmail, Yahoo, Outlook, or Hotmail.",
+        });
+      }
+      updateData.email = email;
+    }
 
-    if (req.body.phone !== undefined)
-      updateData.phone = req.body.phone;
+    if (req.body.phone !== undefined) {
+      const phone = normalizePhone(req.body.phone);
+      if (!PHONE_PATTERN.test(phone)) {
+        return res.status(400).json({
+          message: "Enter a valid Sri Lankan phone number (for example, 0771234567 or +94771234567).",
+        });
+      }
+      updateData.phone = phone;
+    }
 
     if (req.body.password) {
+      const passwordError = validateNewPassword(req.body.password);
+      if (passwordError) return res.status(400).json({ message: passwordError });
       const salt = await bcrypt.genSalt(10);
       updateData.password_hash = await bcrypt.hash(req.body.password, salt);
     }
@@ -512,16 +527,27 @@ export const updateStaff = async (req, res) => {
       .populate("services", "service_name")
       .populate("salon_id", "name");
 
-    // Update staff snapshots in unpaid salary records if name, count per day, or frequency changed
+    // Keep salary records in sync for both staff and managers. Managers have
+    // their own super-admin salary table, so they must follow the same
+    // frequency transition and current-period initialization rules.
     try {
-      const isNonManager = (staff.role || "").toLowerCase() !== "manager";
-      if (isNonManager) {
+      const shouldSyncSalary = Boolean(staff._id);
+      if (shouldSyncSalary) {
         const salonId = staff.salon_id;
         const frequency = staff.salary_payment_frequency || "monthly";
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
         const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+        let previousSalary = null;
+        if (frequencyChanged) {
+          previousSalary = await transitionSalaryFrequency(
+            staff,
+            previousFrequency,
+            frequencyChangedAt
+          );
+        }
 
         let period, periodStart, periodEnd, weekNumber = 0;
         if (frequency === "daily") {
@@ -587,18 +613,49 @@ export const updateStaff = async (req, res) => {
               year,
               month,
               weekNumber,
-              dateRange: { start: periodStart, end: periodEnd },
+              dateRange: {
+                start: frequencyChanged ? yyyymmdd : periodStart,
+                end: periodEnd,
+              },
               dailyRecords: [],
             },
           },
           { upsert: true, new: true }
         );
+
+        if (frequencyChanged) {
+          const currentSalary = await Salary.findOne({
+            salon_id: salonId,
+            staff_id: staff._id,
+            period,
+            frequency,
+          });
+          if (currentSalary && currentSalary.status !== "Paid") {
+            currentSalary.dateRange = { start: yyyymmdd, end: periodEnd };
+            currentSalary.dailyRecords = (currentSalary.dailyRecords || []).filter(
+              (record) => record.date >= yyyymmdd
+            );
+            await currentSalary.save();
+          }
+        }
+
+        res.locals.salaryTransition = previousSalary;
       }
     } catch (e) {
       console.error("Error updating salary snapshot:", e);
     }
 
-    res.json(staff);
+    const response = staff.toObject();
+    if (res.locals.salaryTransition) {
+      response.salaryTransition = {
+        salaryId: res.locals.salaryTransition._id,
+        frequency: res.locals.salaryTransition.frequency,
+        period: res.locals.salaryTransition.period,
+        totalSalary: res.locals.salaryTransition.totalSalary || 0,
+        status: res.locals.salaryTransition.status,
+      };
+    }
+    res.json(response);
   } catch (error) {
     console.error(error);
     res.status(500).json({
@@ -665,7 +722,7 @@ export const getStaffDashboard = async (req, res) => {
       role: {
         $in: [
           /^manager$/i,
-          /^manager$/i
+          /^admin$/i
         ]
       },
     });
@@ -677,10 +734,19 @@ export const getStaffDashboard = async (req, res) => {
       managerPhone: manager ? manager.phone : "N/A",
     };
 
-    // Find all appointments for this staff
-    const appointments = await Appointment.find({ staff_id: staffId })
-      .populate("customer_id", "name")
+    // Find appointment IDs linked to this staff via AppointmentService
+    const apptServiceApptIds = await AppointmentService.find({ staff_id: staffId }).distinct("appointment_id");
+
+    // Find all appointments for this staff (direct staff_id OR via AppointmentService)
+    const appointments = await Appointment.find({
+      $or: [
+        { staff_id: staffId },
+        { _id: { $in: apptServiceApptIds } }
+      ]
+    })
+      .populate("customer_id", "name phone")
       .populate("service_ids", "service_name")
+      .populate("service_id", "service_name")
       .sort({ appointment_date: -1 });
 
     res.json({

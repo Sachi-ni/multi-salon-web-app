@@ -1,10 +1,37 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, Star } from "lucide-react";
+import api from "../../../services/api";
+
+const initialStats = {
+  happyClients: 0,
+  expertStylists: 0,
+  salonBranches: 0,
+  yearsExperience: 0,
+};
+
+const formatCount = (count, suffix = "+") =>
+  `${new Intl.NumberFormat("en").format(count)}${count > 0 ? suffix : ""}`;
 
 const Hero = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState(initialStats);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    api.get("/utils/platform-stats")
+      .then(({ data }) => {
+        if (isMounted) setStats({ ...initialStats, ...data });
+      })
+      .catch((error) => {
+        // Keep the landing page usable if statistics are temporarily unavailable.
+        console.error("Unable to load platform statistics:", error);
+      });
+
+    return () => { isMounted = false; };
+  }, []);
 
   return (
     <section id="home" className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
@@ -33,21 +60,21 @@ const Hero = () => {
             </span>
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-display font-black leading-[1.1] tracking-tight text-white">
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-display font-black leading-[1.1] tracking-tight text-white">
             ELEVATE <br />
             <span className="text-gradient">YOUR STYLE.</span> <br />
             EMBRACE LUXURY.
           </h1>
           
-          <p className="text-lg md:text-xl text-white/70 max-w-xl font-light leading-relaxed">
+          <p className="text-base sm:text-lg md:text-xl text-white/70 max-w-xl font-light leading-relaxed">
             Experience world-class grooming and beauty services in an atmosphere of pure luxury. Our expert stylists are dedicated to crafting your perfect look.
           </p>
 
-          <div className="flex flex-wrap gap-4 mt-4">
+          <div className="flex flex-col sm:flex-row gap-4 mt-4 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => navigate("/book")}
-              className="px-8 py-4 bg-accent text-primary rounded-xl text-base font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-glow transition-all duration-300 hover:-translate-y-1 flex items-center gap-2 group"
+              className="w-full sm:w-auto px-8 py-4 bg-accent text-primary rounded-xl text-base font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-[0_0_25px_rgba(245,200,0,0.6)] transition-all duration-300 hover:-translate-y-1 flex items-center justify-center gap-2 group"
             >
               Book Appointment
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -55,7 +82,7 @@ const Hero = () => {
             <button
               type="button"
               onClick={() => navigate("/our-services")}
-              className="px-8 py-4 bg-surface/50 backdrop-blur-md border border-border text-white rounded-xl text-base font-bold hover:bg-surface-2 transition-all duration-300 hover:-translate-y-1"
+              className="w-full sm:w-auto px-8 py-4 bg-surface/50 backdrop-blur-md border border-border text-white rounded-xl text-base font-bold hover:bg-surface-2 hover:border-accent/50 hover:shadow-[0_0_25px_rgba(245,200,0,0.35)] transition-all duration-300 hover:-translate-y-1 text-center"
             >
               Explore Services
             </button>
@@ -71,10 +98,10 @@ const Hero = () => {
         >
           <div className="grid grid-cols-2 gap-4 w-full max-w-md">
             {[
-              { label: "Happy Clients", value: "10K+" },
-              { label: "Expert Stylists", value: "50+" },
-              { label: "Salon Branches", value: "5" },
-              { label: "Years Experience", value: "15+" },
+              { label: "Happy Clients", value: formatCount(stats.happyClients) },
+              { label: "Expert Stylists", value: formatCount(stats.expertStylists) },
+              { label: "Salon Branches", value: formatCount(stats.salonBranches, "") },
+              { label: "Years Experience", value: formatCount(stats.yearsExperience, "+") },
             ].map((stat, i) => (
               <div key={i} className="glass-card p-6 flex flex-col items-center justify-center text-center hover-glow group">
                 <div className="text-3xl font-black text-white group-hover:text-accent transition-colors duration-300">

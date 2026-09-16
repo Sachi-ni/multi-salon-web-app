@@ -1,9 +1,17 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { X, Camera } from "lucide-react";
+import { X, Camera, Eye, EyeOff } from "lucide-react";
 import axios from "axios";
 import { API_BASE, API_URL } from "../../config";
+import useFormValidation from "../../hooks/useFormValidation";
+import {
+  normalizePhone,
+  validateConfirmPassword,
+  validateEmail,
+  validatePassword,
+  validatePhoneGeneric,
+} from "../../utils/validation";
 
 const Edit = () => {
   const { user, setUser, token, login } = useAuth();
@@ -15,7 +23,11 @@ const Edit = () => {
   const [username, setUsername] = useState(user?.username || "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [image, setImage] = useState(null);
+  const [formError, setFormError] = useState("");
+  const [emailSubmitError, setEmailSubmitError] = useState("");
   const [preview, setPreview] = useState(
     user?.image
       ? user.image.startsWith("http")
@@ -24,6 +36,15 @@ const Edit = () => {
       : ""
   );
   const [uploading, setUploading] = useState(false);
+  const profileValues = { email, phone, password, confirmPassword };
+  const { errors, handleBlur, validateAll, isValid, fieldMessages } = useFormValidation(profileValues, {
+    email: validateEmail,
+    phone: (value) => value ? validatePhoneGeneric(value) : { valid: true, message: "" },
+    password: (value) => value ? validatePassword(value) : { valid: true, message: "" },
+    confirmPassword: (value, values) => values.password
+      ? validateConfirmPassword(values.password, value)
+      : { valid: true, message: "" },
+  });
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -34,28 +55,11 @@ const Edit = () => {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
+    setFormError("");
+    setEmailSubmitError("");
 
-    const normalizedPhone = phone.replace(/[\s()-]/g, "");
-    const passwordIsStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password);
-    const emailIsValid = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/.test(email.trim());
-    const phoneIsValid = !normalizedPhone || /^\+?[0-9]{10}$/.test(normalizedPhone);
-
-    if (!emailIsValid) {
-      alert("Please enter a valid email address");
-      return;
-    }
-    if (!phoneIsValid) {
-      alert("Phone number must contain exactly 10 digits and may start with +");
-      return;
-    }
-    if (password && !passwordIsStrong) {
-      alert("Password must be at least 6 characters and include uppercase, lowercase, and number");
-      return;
-    }
-    if (password && password !== confirmPassword) {
-      alert("Passwords do not match!");
-      return;
-    }
+    if (!validateAll()) return;
+    const normalizedPhone = normalizePhone(phone);
 
     try {
       setUploading(true);
@@ -94,15 +98,17 @@ const Edit = () => {
 
       alert("Profile updated successfully!");
       if (user?.role === "customer" || user?.role === "user") {
-        navigate("/customer/dashboard");
+        navigate("/customer/profile");
       } else if (user?.role === "super-admin") {
         navigate("/Profile");
       } else {
-        navigate(-1);
+        navigate("/account/profile");
       }
     } catch (error) {
       console.error("Update error:", error);
-      alert(error.response?.data?.message || "Failed to update profile");
+      const message = error.response?.data?.message || "Failed to update profile";
+      if (/email/i.test(message)) setEmailSubmitError(message);
+      else setFormError(message);
     } finally {
       setUploading(false);
     }
@@ -129,7 +135,7 @@ const Edit = () => {
 
         <h1 className="text-2xl font-extrabold text-white mb-6">Edit Profile</h1>
 
-<form onSubmit={handleUpdate}>
+<form onSubmit={handleUpdate} noValidate>
           {/* Profile Picture */}
           <div className="mb-5 flex items-center gap-4">
             <div className="relative">
@@ -201,9 +207,16 @@ const Edit = () => {
               type="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+              onChange={(e) => {
+                setEmailSubmitError("");
+                setEmail(e.target.value);
+              }}
+              onBlur={() => handleBlur("email")}
+              aria-invalid={Boolean(errors.email || emailSubmitError)}
+              className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30 ${errors.email || emailSubmitError ? "border-red-500/50 focus:border-red-500" : ""}`}
             />
+            {(errors.email || emailSubmitError) && <p className="mt-1 text-xs text-red-300">{errors.email || emailSubmitError}</p>}
+            {!errors.email && !emailSubmitError && fieldMessages.email && <p className="mt-1 text-xs text-muted-2 font-medium">{fieldMessages.email}</p>}
           </div>
 
           <div className="mb-3.5">
@@ -218,40 +231,72 @@ const Edit = () => {
                 const value = e.target.value.replace(/[^0-9+\s()-]/g, "");
                 if (value.replace(/[\s()-]/g, "").replace(/^\+/, "").length <= 10) setPhone(value);
               }}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+              onBlur={() => handleBlur("phone")}
+              className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30 ${errors.phone ? "border-red-500/50 focus:border-red-500" : ""}`}
             />
+            {errors.phone && <p className="mt-1 text-xs text-red-300">{errors.phone}</p>}
           </div>
 
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
               Password
             </label>
-            <input
-              type="password"
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => handleBlur("password")}
+                className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 pr-10 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30 ${errors.password ? "border-red-500/50 focus:border-red-500" : ""}`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {errors.password && <p className="mt-1 text-xs text-red-300">{errors.password}</p>}
           </div>
 
           <div className="mb-4">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
               Confirm Password
             </label>
-            <input
-              type="password"
-              minLength={8}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
-            />
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                minLength={8}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                onBlur={() => handleBlur("confirmPassword")}
+                className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 pr-10 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30 ${errors.confirmPassword ? "border-red-500/50 focus:border-red-500" : ""}`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors"
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {errors.confirmPassword && <p className="mt-1 text-xs text-red-300">{errors.confirmPassword}</p>}
           </div>
+
+          {formError && (
+            <div className="mb-3.5 px-3.5 py-2.5 rounded-xl bg-danger-dim border border-danger-border text-xs text-danger font-semibold">
+              {formError}
+            </div>
+          )}
 
 <button
             className="w-full mt-1.5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase cursor-pointer transition-all duration-200 hover:bg-accent-hover hover:shadow-glow hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
             type="submit"
-            disabled={uploading}
+            disabled={uploading || !isValid}
           >
             {uploading ? "Saving..." : "Save Changes"}
           </button>

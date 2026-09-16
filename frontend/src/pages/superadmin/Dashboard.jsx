@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { 
-  AreaChart, Area, XAxis, YAxis, 
+  ComposedChart, Area, Bar, XAxis, YAxis, 
   CartesianGrid, Tooltip, ResponsiveContainer 
 } from "recharts";
 
@@ -230,12 +230,8 @@ export default function Dashboard() {
             ) : (
               <div className="h-[220px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
-                      </linearGradient>
                       <linearGradient id="colorBookings" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
                         <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
@@ -243,12 +239,18 @@ export default function Dashboard() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
                     <XAxis dataKey="day" stroke="#a3a3a3" fontSize={11} tickLine={false} />
-                    <YAxis stroke="#a3a3a3" fontSize={11} tickLine={false} />
+                    <YAxis yAxisId="left" stroke="#8b5cf6" fontSize={11} tickLine={false} />
+                    <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={11} tickLine={false} tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val} />
                     <Tooltip 
                       contentStyle={{ backgroundColor: "#171717", borderColor: "#404040", borderRadius: "8px", fontSize: "12px", color: "#ffffff" }}
+                      formatter={(value, name) => [
+                        name === "Est. Income" ? `LKR ${Number(value).toLocaleString()}` : value,
+                        name
+                      ]}
                     />
-                    <Area type="monotone" dataKey="bookings" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#colorBookings)" name="Bookings" />
-                  </AreaChart>
+                    <Bar yAxisId="right" dataKey="revenue" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={24} name="Est. Income" />
+                    <Area yAxisId="left" type="monotone" dataKey="bookings" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#colorBookings)" name="Bookings" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -272,9 +274,9 @@ export default function Dashboard() {
         <div className="space-y-6">
           {/* Quick Actions Card */}
           <Card>
-            <Card.Header>
-              <Card.Title>Quick Management Actions</Card.Title>
-              <Card.Subtitle>Direct shortcuts to perform common admin operations</Card.Subtitle>
+            <Card.Header className="flex flex-col items-start gap-1 mb-4">
+              <Card.Title className="text-base font-extrabold text-white">Quick Management Actions</Card.Title>
+              <Card.Subtitle className="text-xs text-muted-2">Direct shortcuts to perform common admin operations</Card.Subtitle>
             </Card.Header>
             <div className="flex flex-col gap-2.5">
               {quickActions.map((action, i) => (

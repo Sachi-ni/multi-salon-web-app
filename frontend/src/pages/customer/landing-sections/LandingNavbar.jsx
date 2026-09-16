@@ -80,12 +80,12 @@ const LandingNavbar = () => {
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden lg:flex items-center gap-6">
           {navLinks.map((link) => (
             <button
               key={link.name}
               onClick={() => scrollToSection(link.href)}
-              className="text-sm font-medium text-white/80 hover:text-accent transition-colors"
+              className="text-sm font-medium text-white/80 hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300"
             >
               {link.name}
             </button>
@@ -93,18 +93,18 @@ const LandingNavbar = () => {
         </nav>
 
         {/* Action Buttons */}
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden lg:flex items-center gap-4">
           {!user ? (
             <>
               <button
                 onClick={() => navigate("/login")}
-                className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
+                className="text-sm font-bold text-white hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 px-4 py-2"
               >
                 Login
               </button>
               <button
                 onClick={() => navigate("/register")}
-                className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
+                className="text-sm font-bold text-white hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 px-4 py-2"
               >
                 Sign Up
               </button>
@@ -113,7 +113,7 @@ const LandingNavbar = () => {
             <>
               <button
                 onClick={() => navigate("/customer/dashboard")}
-                className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
+                className="text-sm font-bold text-white hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 px-4 py-2"
               >
                 My Appointments
               </button>
@@ -122,7 +122,7 @@ const LandingNavbar = () => {
                   logout();
                   navigate("/");
                 }}
-                className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
+                className="text-sm font-bold text-white hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 px-4 py-2"
               >
                 Logout
               </button>
@@ -133,14 +133,14 @@ const LandingNavbar = () => {
                 logout();
                 navigate("/");
               }}
-              className="text-sm font-bold text-white hover:text-accent transition-colors px-4 py-2"
+              className="text-sm font-bold text-white hover:text-accent hover:drop-shadow-[0_0_10px_rgba(245,200,0,0.7)] transition-all duration-300 px-4 py-2"
             >
               Logout
             </button>
           )}
           <button
             onClick={() => navigate("/book")}
-            className="px-6 py-2.5 bg-accent text-primary rounded-xl text-sm font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-glow transition-all duration-200 hover:-translate-y-0.5"
+            className="px-6 py-2.5 bg-accent text-primary rounded-xl text-sm font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-[0_0_20px_rgba(245,200,0,0.6)] transition-all duration-300 hover:-translate-y-0.5"
           >
             Book Appointment
           </button>
@@ -148,7 +148,7 @@ const LandingNavbar = () => {
 
         {/* Mobile Menu Toggle */}
         <button
-          className="md:hidden text-white"
+          className="lg:hidden text-white"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         >
           {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
@@ -162,7 +162,7 @@ const LandingNavbar = () => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-full left-0 right-0 bg-surface/95 backdrop-blur-xl border-b border-border py-6 px-6 flex flex-col gap-6 md:hidden shadow-modal"
+            className="absolute top-full left-0 right-0 bg-surface/95 backdrop-blur-xl border-b border-border py-6 px-6 flex flex-col gap-6 lg:hidden shadow-modal"
           >
             <nav className="flex flex-col gap-4">
               {navLinks.map((link) => (

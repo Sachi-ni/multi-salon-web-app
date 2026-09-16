@@ -20,11 +20,16 @@ import {
   Calendar, Clock, User, Store, Search, LayoutGrid, 
   List, CheckCircle2, AlertCircle, Trash2, 
   Check, X, Phone, Mail, ChevronDown, Plus, Hash, Edit2, Receipt
+  Check, X, Phone, Mail, ChevronDown, Plus, Hash, Edit2,
+  Receipt, FileText
 } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import EditStaffAssignmentModal from "../../components/booking/EditStaffAssignmentModal";
 import CompletedAppointmentBill from "../../components/booking/CompletedAppointmentBill";
+import GenerateBillModal from "../../components/billing/GenerateBillModal";
+import InvoiceModal from "../../components/billing/InvoiceModal";
+import { formatDuration } from "../../utils/formatDuration";
 
 const SALARY_REFRESH_KEY = "salary-refresh-token";
 
@@ -58,6 +63,16 @@ export default function Appointments() {
   // Staff reassignment edit state
   const [editingStaffAppointment, setEditingStaffAppointment] = useState(null);
   const [completedAppointment, setCompletedAppointment] = useState(null);
+
+  // Billing state
+  const [billingAppointment, setBillingAppointment] = useState(null);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [invoiceAppointment, setInvoiceAppointment] = useState(null);
+
+  const handleViewInvoice = (appt) => {
+    setInvoiceAppointment(appt);
+    setSelectedInvoice(appt.bill || null);
+  };
 
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
@@ -203,10 +218,11 @@ export default function Appointments() {
   };
 
   const filteredAppointments = useMemo(() => {
-    if (!searchTerm) return appointments;
+    const source = appointments;
+    if (!searchTerm) return source;
     const term = searchTerm.toLowerCase();
 
-    return appointments.filter(a => {
+    return source.filter(a => {
       const custName = (a.customer_id?.name || a.guest_name || "").toLowerCase();
       const phone = (a.customer_id?.phone || a.guest_phone || "").toLowerCase();
       const email = (a.customer_id?.email || "").toLowerCase();
@@ -393,10 +409,7 @@ export default function Appointments() {
             const isActionLoading = actionLoading === a._id;
             const appointmentError = getActionError(a._id);
 
-            const totalDurationMins = a.appointment_services && a.appointment_services.length > 0
-              ? a.appointment_services.reduce((sum, s) => sum + (s.service_id?.duration || 0), 0)
-              : (a.duration || 60);
-            const durationHours = Math.ceil(totalDurationMins / 60);
+            const totalDurationMins = Number(a.duration) || 60;
 
             const customerName = a.customer_id?.name || a.guest_name || "Guest Customer";
             const isGuest = !a.customer_id && a.guest_name;
@@ -416,6 +429,11 @@ export default function Appointments() {
                   getCardBorderStyle(a.status)
                 )}
               >
+                {a.needsReassignment && (
+                  <div className="mb-3 rounded-lg border border-danger-border bg-danger-dim px-3 py-2 text-xs font-bold text-danger">
+                    Staff Unavailable - Needs Reassignment{a.staffUnavailableReason ? `: ${a.staffUnavailableReason}` : ""}
+                  </div>
+                )}
                 {/* Top Reference & Branch Banner */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/60 text-xs">
                   <div className="flex items-center gap-2">
@@ -520,7 +538,7 @@ export default function Appointments() {
                   <div className="pt-2.5 border-t border-border/50 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-neutral-400 font-medium">Duration:</span>
-                      {a.status === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
+                      {a.status?.toLowerCase() === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
                         <button 
                           onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
                           className="text-amber-400 text-2xs hover:underline font-bold"
@@ -540,11 +558,11 @@ export default function Appointments() {
                             <option value={180}>3 Hours</option>
                             <option value={240}>4 Hours</option>
                           </select>
-                          <button onClick={() => handleSaveDuration(a._id)} className="text-emerald-400 text-2xs font-bold hover:underline">Save</button>
-                          <button onClick={() => setEditingDuration("")} className="text-neutral-400 text-2xs font-bold hover:underline">Cancel</button>
+                          <button onClick={() => handleSaveDuration(a._id)} className="h-8 px-3 rounded-full bg-blue-500 text-white text-2xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all">Save</button>
+                          <button onClick={() => setEditingDuration("")} className="h-8 px-3 rounded-full bg-transparent text-rose-400 border border-rose-500/30 text-2xs font-bold hover:bg-rose-500 hover:text-white transition-all">Cancel</button>
                         </div>
                       ) : (
-                        <span className="text-white font-extrabold">{durationHours} {durationHours === 1 ? "Hour" : "Hours"}</span>
+                        <span className="text-white font-extrabold">{formatDuration(totalDurationMins)}</span>
                       )}
                     </div>
 
@@ -570,8 +588,19 @@ export default function Appointments() {
                   </span>
 
                   <div className="flex items-center gap-2">
-                    {a.status === "pending" && (
+                    {a.status?.toLowerCase() === "pending" && (
                       <>
+                        {editingDuration !== a._id && (
+                          <button
+                            onClick={() => setEditingStaffAppointment(a)}
+                            disabled={isActionLoading}
+                            className="h-10 px-5 rounded-full bg-transparent text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
+                            title="Edit Appointment"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            Edit
+                          </button>
+                        )}
                         <button
                           onClick={() => handleConfirm(a._id)}
                           disabled={isActionLoading}
@@ -591,12 +620,12 @@ export default function Appointments() {
                       </>
                     )}
 
-                    {a.status === "confirmed" && (
+                    {a.status?.toLowerCase() === "confirmed" && (
                       <>
                         <button
                           onClick={() => setEditingStaffAppointment(a)}
                           disabled={isActionLoading}
-                          className="px-4 py-2 rounded-xl bg-surface-2 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
+                          className="h-10 px-5 rounded-full bg-transparent text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
                           title="Reassign Staff"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -605,7 +634,7 @@ export default function Appointments() {
                         <button
                           onClick={() => handleComplete(a._id)}
                           disabled={isActionLoading}
-                          className="px-5 py-2 rounded-xl bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
+                          className="h-10 px-5 rounded-full bg-blue-500 text-white text-xs font-black hover:bg-blue-400 shadow-md shadow-blue-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5"
                         >
                           <CheckCircle2 className="w-4 h-4" />
                           {isActionLoading ? "..." : "Mark Complete"}
@@ -613,7 +642,7 @@ export default function Appointments() {
                         <button
                           onClick={() => handleAdminCancel(a._id)}
                           disabled={isActionLoading}
-                          className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition-all disabled:opacity-40"
+                          className="h-10 px-5 rounded-full bg-transparent text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition-all disabled:opacity-40"
                         >
                           Cancel
                         </button>
@@ -630,6 +659,27 @@ export default function Appointments() {
                         View Bill
                       </button>
                     )}
+                      <>
+                        {a.bill ? (
+                          <button
+                            onClick={() => handleViewInvoice(a)}
+                            className="h-10 px-4 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                          >
+                            <Receipt className="w-4 h-4" />
+                            View Bill
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setBillingAppointment(a)}
+                            className="h-10 px-5 rounded-full bg-emerald-500 text-black hover:bg-emerald-400 shadow-md shadow-emerald-500/20 transition-all text-xs font-black flex items-center gap-1.5"
+                          >
+                            <FileText className="w-4 h-4" />
+                            Generate Bill
+                          </button>
+                        )}
+                      </>
+                    )}
+
                     {["completed", "rejected", "cancelled"].includes(a.status) && (
                       <button
                         onClick={() => handleDelete(a._id)}
@@ -688,7 +738,7 @@ export default function Appointments() {
                   </Table.Td>
                   <Table.Td align="right">
                     <div className="flex items-center justify-end gap-2">
-                      {a.status === "pending" && (
+                      {a.status?.toLowerCase() === "pending" && (
                         <>
                           <button
                             onClick={() => handleConfirm(a._id)}
@@ -706,7 +756,7 @@ export default function Appointments() {
                           </button>
                         </>
                       )}
-                      {a.status === "confirmed" && (
+                      {a.status?.toLowerCase() === "confirmed" && (
                         <>
                           <button
                             onClick={() => setEditingStaffAppointment(a)}
@@ -734,6 +784,27 @@ export default function Appointments() {
                         >
                           <Receipt className="w-4 h-4" />
                         </button>
+                        <>
+                          {a.bill ? (
+                            <button
+                              onClick={() => handleViewInvoice(a)}
+                              className="px-3 py-1.5 rounded-lg bg-amber-400/10 text-amber-400 border border-amber-400/30 hover:bg-amber-400 hover:text-black transition-colors text-2xs font-extrabold flex items-center gap-1"
+                              title="View Official Bill"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                              View Bill
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setBillingAppointment(a)}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-extrabold text-2xs hover:bg-emerald-400 transition-colors flex items-center gap-1"
+                              title="Generate Customer Bill"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Generate Bill
+                            </button>
+                          )}
+                        </>
                       )}
                       {["completed", "rejected", "cancelled"].includes(a.status) && (
                         <button
@@ -753,14 +824,16 @@ export default function Appointments() {
           </Table.Body>
         </Table>
       )}
-
       {/* Staff Reassignment Modal */}
       {editingStaffAppointment && (
         <EditStaffAssignmentModal
           appointment={editingStaffAppointment}
           salonId={editingStaffAppointment.salon_id?._id || editingStaffAppointment.salon_id}
           onClose={() => setEditingStaffAppointment(null)}
-          onSuccess={() => {
+          onSuccess={(updatedAppointment) => {
+            if (updatedAppointment?._id) {
+              setAppointments((previous) => previous.map((item) => item._id === updatedAppointment._id ? { ...item, ...updatedAppointment } : item));
+            }
             setEditingStaffAppointment(null);
             fetchAppointments();
           }}
@@ -769,6 +842,28 @@ export default function Appointments() {
       <CompletedAppointmentBill
         appointment={completedAppointment}
         onClose={() => setCompletedAppointment(null)}
+
+      {/* Bill Generation Modal */}
+      <GenerateBillModal
+        isOpen={Boolean(billingAppointment)}
+        onClose={() => setBillingAppointment(null)}
+        appointment={billingAppointment}
+        onBillGenerated={(newBill) => {
+          fetchAppointments();
+          setInvoiceAppointment(billingAppointment);
+          setSelectedInvoice(newBill);
+        }}
+      />
+
+      {/* Official Invoice Modal */}
+      <InvoiceModal
+        isOpen={Boolean(selectedInvoice || invoiceAppointment)}
+        onClose={() => {
+          setSelectedInvoice(null);
+          setInvoiceAppointment(null);
+        }}
+        bill={selectedInvoice}
+        appointment={invoiceAppointment}
       />
     </div>
   );

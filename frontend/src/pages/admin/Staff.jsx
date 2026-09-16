@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
+import { markAsPaid } from "../../services/salaryService";
 import { getServices } from "../../services/serviceService";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail } from "../../utils/validation";
+import StaffUnavailableModal from "../../components/booking/StaffUnavailableModal";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
@@ -51,6 +55,7 @@ const ActionsMenu = ({
   onEdit,
   onToggleStatus,
   onDelete,
+  onMarkUnavailable,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -116,6 +121,18 @@ const ActionsMenu = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                onMarkUnavailable(staff);
+                setOpen(false);
+              }}
+              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-danger-dim text-danger"
+            >
+              <Power className="w-3.5 h-3.5" />
+              Mark Unavailable
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
                 onDelete(staff._id);
                 setOpen(false);
               }}
@@ -138,6 +155,7 @@ const StaffCard = ({
   onEdit,
   onToggleStatus,
   onDelete,
+  onMarkUnavailable,
 }) => {
   const isActive = staff.status === "Active";
   const isInactive = !isActive;
@@ -237,6 +255,7 @@ const StaffCard = ({
               onEdit={onEdit}
               onToggleStatus={onToggleStatus}
               onDelete={onDelete}
+              onMarkUnavailable={onMarkUnavailable}
             />
           </div>
 
@@ -374,11 +393,18 @@ export default function AdminStaffPage() {
 
   const [editStaff, setEditStaff] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [editEmailSubmitError, setEditEmailSubmitError] = useState("");
+  const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(editForm, { email: validateEmail });
   const [editPicture, setEditPicture] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
+  const editSubmitInFlight = useRef(false);
+  const [unavailableStaff, setUnavailableStaff] = useState(null);
 
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
   const fetchStaffData = useCallback(async () => {
     try {
@@ -479,6 +505,7 @@ export default function AdminStaffPage() {
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
+    if (!validateStaffEdit()) return;
 
     setEditLoading(true);
     setError("");
@@ -510,6 +537,12 @@ export default function AdminStaffPage() {
         updateData
       );
 
+      const transition = response.data?.salaryTransition;
+      if (transition && transition.status !== "Paid" && Number(transition.totalSalary) > 0) {
+        setPaymentError("");
+        setPendingPayment(transition);
+      }
+
       console.log("UPDATED STAFF RESPONSE:", response.data);
       console.log(
         "UPDATED SERVICES:",
@@ -529,12 +562,12 @@ export default function AdminStaffPage() {
         err.response?.data
       );
 
-      setError(
-        err.response?.data?.message ||
-          "Failed to update staff"
-      );
+      const message = err.response?.data?.message || "Failed to update staff";
+      if (/email/i.test(message)) setEditEmailSubmitError(message);
+      else setError(message);
     } finally {
       setEditLoading(false);
+      editSubmitInFlight.current = false;
     }
   };
 
@@ -709,6 +742,7 @@ export default function AdminStaffPage() {
               onEdit={() => handleEditOpen(staff)}
               onToggleStatus={handleToggleStatus}
               onDelete={setDeleteId}
+              onMarkUnavailable={setUnavailableStaff}
             />
           ))}
         </div>
@@ -845,6 +879,8 @@ export default function AdminStaffPage() {
                 firstName: e.target.value,
               })
             }
+            onBlur={() => handleEditBlur("email")}
+            error={editErrors.email}
             required
           />
 
@@ -866,12 +902,16 @@ export default function AdminStaffPage() {
             label="Email"
             type="email"
             value={editForm.email || ""}
-            onChange={(e) =>
+            onChange={(e) => {
+              setEditEmailSubmitError("");
               setEditForm({
                 ...editForm,
                 email: e.target.value,
-              })
-            }
+              });
+            }}
+            onBlur={() => handleEditBlur("email")}
+            error={editErrors.email || editEmailSubmitError}
+            helper={fieldMessages.email}
             required
           />
 
@@ -1044,7 +1084,7 @@ export default function AdminStaffPage() {
               variant="ghost"
               type="button"
               onClick={() => setEditStaff(null)}
-              disabled={editLoading}
+              disabled={editLoading || !staffEditIsValid}
             >
               Cancel
             </Button>
@@ -1059,6 +1099,70 @@ export default function AdminStaffPage() {
           </Modal.Actions>
         </form>
       </Modal>
+
+      <Modal
+        isOpen={Boolean(pendingPayment)}
+        onClose={() => setPendingPayment(null)}
+        title="Pending salary payment"
+        maxWidth="max-w-md"
+      >
+        {pendingPayment && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
+              <div className="flex items-start gap-3">
+                <Coins className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-400" />
+                <div>
+                  <p className="text-sm font-bold text-white">Previous salary is still pending</p>
+                  <p className="mt-1 text-xs leading-5 text-neutral-300">
+                    The previous {pendingPayment.frequency} salary period has an unpaid balance of{" "}
+                    <strong className="text-amber-300">
+                      LKR {Number(pendingPayment.totalSalary).toLocaleString()}
+                    </strong>.
+                  </p>
+                  <p className="mt-2 text-xs text-amber-200/80">
+                    The new payment frequency starts separately from the change date.
+                  </p>
+                </div>
+              </div>
+            </div>
+            {paymentError && <p className="text-sm font-semibold text-danger">{paymentError}</p>}
+            <Modal.Actions className="justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setPendingPayment(null)} disabled={paymentLoading}>
+                Pay Later
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={paymentLoading}
+                onClick={async () => {
+                  try {
+                    setPaymentLoading(true);
+                    setPaymentError("");
+                    await markAsPaid(pendingPayment.salaryId);
+                    setPendingPayment(null);
+                    await fetchStaffData();
+                  } catch (err) {
+                    setPaymentError(err.response?.data?.message || "Failed to mark salary as paid");
+                  } finally {
+                    setPaymentLoading(false);
+                  }
+                }}
+              >
+                {paymentLoading ? "Processing..." : "Pay Now"}
+              </Button>
+            </Modal.Actions>
+          </div>
+        )}
+      </Modal>
+
+      <StaffUnavailableModal
+        staff={unavailableStaff}
+        onClose={() => setUnavailableStaff(null)}
+        onSuccess={() => {
+          setUnavailableStaff(null);
+          fetchStaffData();
+        }}
+      />
 
       {/* Delete Modal */}
       <Modal

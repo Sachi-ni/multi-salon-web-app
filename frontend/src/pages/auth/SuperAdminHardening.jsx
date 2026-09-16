@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { API_URL } from "../../config";
 import { useAuth } from "../../context/AuthContext";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validatePassword } from "../../utils/validation";
 
 const SuperAdminHardening = () => {
   const location = useLocation();
@@ -10,13 +13,19 @@ const SuperAdminHardening = () => {
   const [step, setStep] = useState(location.state?.hardeningStep || "change-password");
   const [token, setToken] = useState(location.state?.token || "");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { errors, handleBlur, validateAll, isValid } = useFormValidation({ password }, { password: validatePassword });
 
   const submit = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError("");
+    if (step === "change-password" && !validateAll()) {
+      setLoading(false);
+      return;
+    }
     try {
       const endpoint = step === "change-password" ? "/auth/change-password" : "/auth/mfa/setup";
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -31,6 +40,12 @@ const SuperAdminHardening = () => {
       if (!response.ok) throw new Error(data.message || "Security setup failed");
 
       if (step === "change-password") {
+        if (data.token && data.role === "super-admin") {
+          const { token: sessionToken, ...userData } = data;
+          login(userData, sessionToken);
+          navigate("/superAdminDashboard", { replace: true });
+          return;
+        }
         setPassword("");
         setToken(data.token);
         setStep("mfa-setup");
@@ -53,25 +68,39 @@ const SuperAdminHardening = () => {
 
   return (
     <div className="fixed inset-0 bg-primary flex items-center justify-center px-4">
-      <form onSubmit={submit} className="w-full max-w-md bg-surface border border-border rounded-2xl p-8">
+      <form onSubmit={submit} noValidate className="w-full max-w-md bg-surface border border-border rounded-2xl p-8">
         <h1 className="text-2xl font-extrabold text-white mb-2">Secure your account</h1>
         <p className="text-sm text-muted-2 mb-6">
           {step === "change-password" ? "Choose a new password before continuing." : "Complete MFA setup before opening the dashboard."}
         </p>
         {step === "change-password" && (
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="New strong password"
-            className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none focus:border-accent"
-          />
+          <>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                minLength={8}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                onBlur={() => handleBlur("password")}
+                placeholder="New strong password"
+                className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 pr-10 text-sm text-white outline-none focus:border-accent ${errors.password ? "border-red-500/50 focus:border-red-500" : ""}`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {errors.password && <p className="mt-1 text-xs text-danger">{errors.password}</p>}
+          </>
         )}
         {step === "mfa-setup" && <p className="text-sm text-white mb-5">Click continue to enroll MFA for this account.</p>}
         {error && <p className="text-sm text-danger mt-4">{error}</p>}
-        <button type="submit" disabled={loading} className="w-full mt-6 bg-accent text-primary rounded-lg py-3 font-bold disabled:opacity-60">
+        <button type="submit" disabled={loading || (step === "change-password" && !isValid)} className="w-full mt-6 bg-accent text-primary rounded-lg py-3 font-bold disabled:opacity-60">
           {loading ? "Please wait..." : step === "change-password" ? "Continue to MFA setup" : "Finish and open dashboard"}
         </button>
       </form>
