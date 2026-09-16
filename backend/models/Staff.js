@@ -36,6 +36,6 @@ const staffSchema = new mongoose.Schema({
   resetPasswordExpires: { type: Date, default: null },
   image:    { type: String, default: "" },
   services: [{ type: mongoose.Schema.Types.ObjectId, ref: "Service" }] // ← new
-});
+}, { timestamps: true });
 
 export default mongoose.model("Staff", staffSchema);
