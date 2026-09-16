@@ -817,6 +817,55 @@ export const cancelAppointment = async (req, res) => {
 // GET /api/appointments
 // Admin — view appointments for their salon, optionally filter by status
 // Query: ?salonId=xxx&status=pending
+// PATCH /api/appointments/:id/confirm-update
+// Customer confirms an admin-updated appointment
+export const confirmAppointmentUpdate = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return res.status(404).json({ message: "Appointment not found" });
+    if (!appointment.customer_id || appointment.customer_id.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to confirm this appointment update" });
+    }
+    if (appointment.needsCustomerConfirmation !== true) {
+      return res.status(400).json({ message: "No pending update to confirm." });
+    }
+
+    appointment.needsCustomerConfirmation = false;
+    await appointment.save();
+    res.status(200).json(appointment);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PATCH /api/appointments/:id/request-different-time
+// Customer requests a new time after an admin update
+export const requestDifferentTime = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return res.status(404).json({ message: "Appointment not found" });
+    if (!appointment.customer_id || appointment.customer_id.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to respond to this appointment update" });
+    }
+    if (appointment.needsCustomerConfirmation !== true) {
+      return res.status(400).json({ message: "No pending update to respond to." });
+    }
+
+    if (typeof req.body.note === "string") appointment.customer_note = req.body.note;
+    appointment.needsCustomerConfirmation = false;
+    appointment.status = "pending";
+    appointment.edit_history.push({
+      summary: "Customer requested a different time after admin edit",
+      changed_by: req.user.id,
+      changed_by_model: "Customer",
+    });
+    await appointment.save();
+    res.status(200).json(appointment);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 export const getSalonAppointments = async (req, res) => {
   try {
     const { status, date } = req.query;
@@ -1415,7 +1464,7 @@ export const getDailySchedule = async (req, res) => {
 // Super Admin / Staff Admin — edit the customer-facing appointment details.
 export const updateAppointmentDetails = async (req, res) => {
   try {
-    const { service_id, staff_id, appointment_date, start_time, duration, total_price, isManualOverride } = req.body;
+    const { service_id, staff_id, appointment_date, start_time, duration, total_price, isManualOverride, edit_type } = req.body;
     const appointment = await Appointment.findById(req.params.id).populate("customer_id", "name email");
 
     if (!appointment) return res.status(404).json({ message: "Appointment not found" });
@@ -1440,11 +1489,22 @@ export const updateAppointmentDetails = async (req, res) => {
       return res.status(400).json({ message: "Selected staff member cannot perform this service." });
     }
 
-    const numericDuration = Number(duration);
+    const submittedDuration = Number(duration);
+    const serviceDuration = Number(service.duration);
+    const isReschedule = edit_type === "reschedule";
+    const numericDuration = isReschedule
+      ? Number(appointment.duration)
+      : isManualOverride === true
+        ? submittedDuration
+        : serviceDuration;
     console.debug("Appointment details update duration received:", duration, "normalized:", numericDuration);
     const submittedAmount = Number(total_price);
     const servicePrice = Number(service.base_price);
-    const numericAmount = isManualOverride === true ? submittedAmount : servicePrice;
+    const numericAmount = isReschedule
+      ? Number(appointment.total_price)
+      : isManualOverride === true
+        ? submittedAmount
+        : servicePrice;
     const normalizedStart = toHHMM(start_time);
     const normalizedDate = String(appointment_date);
     const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -1453,7 +1513,7 @@ export const updateAppointmentDetails = async (req, res) => {
       return res.status(400).json({ message: "A valid date and start time are required." });
     }
     if (!Number.isFinite(numericDuration) || numericDuration <= 0 || !Number.isFinite(servicePrice) || servicePrice < 0 ||
-      (isManualOverride === true && (!Number.isFinite(submittedAmount) || submittedAmount < 0))) {
+      (isManualOverride === true && (!Number.isFinite(submittedDuration) || submittedDuration <= 0 || !Number.isFinite(submittedAmount) || submittedAmount < 0))) {
       return res.status(400).json({ message: "Duration and amount must be valid positive values." });
     }
 
@@ -1606,7 +1666,10 @@ export const updateStaffAssignment = async (req, res) => {
     const nextAppointmentDate = new Date(appointmentDate);
     nextAppointmentDate.setDate(nextAppointmentDate.getDate() + 1);
 
-    const existingAppointmentServices = await AppointmentService.find({ appointment_id: id }).lean();
+    const existingAppointmentServices = await AppointmentService.find({ appointment_id: id })
+      .populate("service_id", "service_name")
+      .populate("staff_id", "full_name")
+      .lean();
     const previousRanges = existingAppointmentServices.map(svc => ({
       staffId: svc.staff_id?.toString(),
       start: toHHMM(svc.service_start_time),
@@ -1750,6 +1813,8 @@ export const updateStaffAssignment = async (req, res) => {
 
       normalizedServices.push({
         ...svc,
+        service_name: service.service_name,
+        staff_name: staff.full_name,
         sub_price: resolvedPrice,
         service_start_time: serviceStart,
         service_end_time: serviceEnd
@@ -1812,6 +1877,44 @@ export const updateStaffAssignment = async (req, res) => {
     appointment.total_price = normalizedServices.reduce((total, service) => total + service.sub_price, 0);
     appointment.needsCustomerConfirmation = true;
 
+    const changes = {};
+    const summaryParts = [];
+    for (const service of normalizedServices) {
+      const previousService = existingAppointmentServices.find(
+        (existing) => String(existing.service_id?._id || existing.service_id) === String(service.service_id)
+      );
+      if (!previousService) continue;
+
+      const serviceName = service.service_name || previousService.service_id?.service_name || "Service";
+      const oldStaffName = previousService.staff_id?.full_name || "Staff";
+      const oldStart = toHHMM(previousService.service_start_time);
+      const oldEnd = toHHMM(previousService.service_end_time);
+      const oldAmount = Number(previousService.sub_price);
+
+      if (oldStaffName !== service.staff_name) {
+        (changes.staff ||= []).push({ service: serviceName, from: oldStaffName, to: service.staff_name });
+        summaryParts.push(`Staff changed from ${oldStaffName} to ${service.staff_name}`);
+      }
+      if (oldStart !== service.service_start_time || oldEnd !== service.service_end_time) {
+        const from = `${displayTime(oldStart)}-${displayTime(oldEnd)}`;
+        const to = `${displayTime(service.service_start_time)}-${displayTime(service.service_end_time)}`;
+        (changes.time ||= []).push({ service: serviceName, from, to });
+        summaryParts.push(`Time changed from ${from} to ${to}`);
+      }
+      if (oldAmount !== Number(service.sub_price)) {
+        (changes.amount ||= []).push({ service: serviceName, from: oldAmount, to: Number(service.sub_price) });
+        summaryParts.push(`Amount changed from LKR ${oldAmount} to LKR ${service.sub_price}`);
+      }
+    }
+    const summary = summaryParts.join("; ");
+
+    if (summary) {
+      appointment.last_update_summary = summary;
+      appointment.last_updated_by = req.user.id;
+      appointment.last_updated_by_model = req.user.role === "staff-admin" ? "Staff" : "Admin";
+      appointment.last_updated_at = new Date();
+    }
+
     if (priceOverrides.length > 0) {
       console.warn("[appointment-price-override] staff assignment", {
         appointmentId: appointment._id.toString(),
@@ -1821,6 +1924,18 @@ export const updateStaffAssignment = async (req, res) => {
         overriddenServices: priceOverrides,
         overriddenTotal: appointment.total_price,
       });
+      changes.priceOverrides = priceOverrides;
+      changes.overriddenTotal = appointment.total_price;
+    }
+
+    if (summary) {
+      appointment.edit_history.push({
+        summary,
+        changes,
+        changed_by: req.user.id,
+        changed_by_model: req.user.role === "staff-admin" ? "Staff" : "Admin",
+      });
+    } else if (priceOverrides.length > 0) {
       appointment.edit_history.push({
         summary: "Manual appointment price override applied during staff assignment",
         changes: { priceOverrides, overriddenTotal: appointment.total_price },
@@ -1831,12 +1946,12 @@ export const updateStaffAssignment = async (req, res) => {
 
     await appointment.save();
 
-    if (appointment.customer_id) {
+    if (appointment.customer_id && summary) {
       await Notification.create({
         recipient_id: appointment.customer_id,
         recipient_model: "Customer",
         title: "Appointment Updated",
-        message: `Your appointment for ${appointment.appointment_date} has been updated. Staff assignment or timing changed; please review the new details.`,
+        message: `Your appointment for ${appointment.appointment_date} has been updated. ${summary}.`,
         appointment_id: appointment._id,
       });
       const customer = await Customer.findById(appointment.customer_id).select("email").lean();
@@ -1850,7 +1965,7 @@ export const updateStaffAssignment = async (req, res) => {
             from: process.env.EMAIL_USER,
             to: customer.email,
             subject: `Appointment Updated: #${appointment._id.toString().slice(-6).toUpperCase()}`,
-            text: `Your appointment #${appointment._id.toString().slice(-6).toUpperCase()} was updated. Please review the new staff assignment and appointment time.`,
+            text: `Your appointment #${appointment._id.toString().slice(-6).toUpperCase()} was updated.\n\n${summary}\n\nPlease contact the salon if the new time does not work for you.`,
           });
         } catch (emailError) {
           console.error("Failed to send appointment reassignment email:", emailError.message);
@@ -1869,6 +1984,145 @@ export const updateStaffAssignment = async (req, res) => {
     res.status(200).json(updatedAppointment);
   } catch (err) {
     console.error("updateStaffAssignment error:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PATCH /api/appointments/:id/reassign-staff
+// Staff-only reassignment. Appointment date, time, services, duration, and total stay unchanged.
+export const reassignStaff = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assignments } = req.body;
+    if (
+      !mongoose.isValidObjectId(id) ||
+      !Array.isArray(assignments) ||
+      assignments.length === 0 ||
+      assignments.some(
+        (item) =>
+          !item.service_id ||
+          !item.staff_id ||
+          !mongoose.isValidObjectId(item.service_id) ||
+          !mongoose.isValidObjectId(item.staff_id)
+      )
+    ) {
+      return res.status(400).json({ message: "Staff assignments are required" });
+    }
+
+    const appointment = await Appointment.findById(id);
+    if (!appointment) return res.status(404).json({ message: "Appointment not found" });
+    if (
+      req.user.role !== "super-admin" &&
+      String(req.user.salon_id) !== String(appointment.salon_id)
+    ) {
+      return res.status(403).json({
+        message: "You do not have permission to reassign this appointment",
+      });
+    }
+    if (!["pending", "confirmed"].includes(appointment.status)) {
+      return res.status(400).json({ message: `Cannot reassign staff for appointment with status: ${appointment.status}.` });
+    }
+
+    const existingServices = await AppointmentService.find({ appointment_id: id }).lean();
+    const appointmentServiceIds = new Set(
+      existingServices.map((service) => String(service.service_id))
+    );
+    const assignmentServiceIds = assignments.map((item) => String(item.service_id));
+    if (
+      existingServices.length !== assignments.length ||
+      new Set(assignmentServiceIds).size !== assignmentServiceIds.length ||
+      assignmentServiceIds.some((serviceId) => !appointmentServiceIds.has(serviceId))
+    ) {
+      return res.status(400).json({ message: "Assignments must include every appointment service" });
+    }
+
+    const assignmentByService = new Map(assignments.map((item) => [String(item.service_id), item]));
+    const otherAppointmentIds = await Appointment.find({
+      _id: { $ne: id },
+      appointment_date: appointment.appointment_date,
+      status: { $in: ["confirmed", "pending"] },
+    }).distinct("_id");
+    const normalized = [];
+    for (const existing of existingServices) {
+      const assignment = assignmentByService.get(String(existing.service_id));
+      if (!assignment) return res.status(400).json({ message: "Assignments must match the appointment services" });
+
+      const staff = await Staff.findOne({ _id: assignment.staff_id, salon_id: appointment.salon_id, status: "Active" }).lean();
+      if (!staff) return res.status(400).json({ message: "Selected staff member is not active in this salon" });
+
+      const service = await Service.findOne({ _id: existing.service_id, salon_id: appointment.salon_id }).select("base_price").lean();
+      if (!service) return res.status(400).json({ message: "Appointment service is no longer available" });
+      const canPerformService = staff.services?.some(
+        (serviceId) => String(serviceId) === String(existing.service_id)
+      ) || /^manager$/i.test(staff.role);
+      if (!canPerformService) {
+        return res.status(400).json({
+          message: `${staff.full_name} cannot perform this service`,
+        });
+      }
+
+      const unavailable = await StaffUnavailability.findOne({
+        staff_id: staff._id,
+        start_date_time: { $lt: new Date(`${appointment.appointment_date}T${appointment.end_time}:00`) },
+        end_date_time: { $gt: new Date(`${appointment.appointment_date}T${appointment.start_time}:00`) },
+      }).lean();
+      if (unavailable) return res.status(409).json({ message: `${staff.full_name} is unavailable at this appointment time` });
+
+      const conflictingAppointment = await Appointment.findOne({
+        _id: { $ne: id },
+        staff_id: staff._id,
+        appointment_date: appointment.appointment_date,
+        status: { $in: ["confirmed", "pending"] },
+        start_time: { $lt: existing.service_end_time },
+        end_time: { $gt: existing.service_start_time },
+      }).lean();
+      if (conflictingAppointment) {
+        return res.status(409).json({
+          message: `${staff.full_name} has a conflicting appointment at this time`,
+        });
+      }
+
+      if (otherAppointmentIds.length > 0) {
+        const conflictingService = await AppointmentService.findOne({
+          staff_id: staff._id,
+          appointment_id: { $in: otherAppointmentIds },
+          service_start_time: { $lt: existing.service_end_time },
+          service_end_time: { $gt: existing.service_start_time },
+        }).lean();
+        if (conflictingService) {
+          return res.status(409).json({
+            message: `${staff.full_name} is already assigned to another service at this time`,
+          });
+        }
+      }
+
+      normalized.push({ existing, staff, sub_price: Number(service.base_price) });
+    }
+
+    const staffIds = normalized.map(({ staff }) => staff._id.toString());
+    if (new Set(staffIds).size !== staffIds.length && normalized.length > 1) {
+      const ranges = normalized.map(({ existing, staff }) => ({ staffId: staff._id.toString(), start: existing.service_start_time, end: existing.service_end_time }));
+      if (ranges.some((range, index) => ranges.slice(index + 1).some((other) => range.staffId === other.staffId && timesOverlap(range.start, range.end, other.start, other.end)))) {
+        return res.status(409).json({ message: "A staff member cannot be assigned to overlapping services" });
+      }
+    }
+
+    for (const { existing, staff, sub_price } of normalized) {
+      await AppointmentService.updateOne({ _id: existing._id }, { $set: { staff_id: staff._id, sub_price } });
+    }
+    appointment.staff_id = normalized[0].staff._id;
+    appointment.needsCustomerConfirmation = true;
+    await appointment.save();
+
+    const updatedAppointment = await Appointment.findById(id)
+      .populate("customer_id", "name email phone")
+      .populate("service_id", "service_name base_price duration")
+      .populate("service_ids", "service_name base_price duration")
+      .populate("staff_id", "full_name specification image")
+      .populate("salon_id", "name location");
+    res.status(200).json(updatedAppointment);
+  } catch (err) {
+    console.error("reassignStaff error:", err);
     res.status(500).json({ message: err.message });
   }
 };
