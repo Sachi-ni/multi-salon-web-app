@@ -45,7 +45,6 @@ export default function AdminBookings() {
 
   const [appointments, setAppointments] = useState([]);
   const [filter, setFilter] = useState("all");
-  const [needsReassignmentOnly, setNeedsReassignmentOnly] = useState(false);
   const [dateFilter, setDateFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
@@ -179,9 +178,7 @@ export default function AdminBookings() {
   };
 
   const filteredAppointments = useMemo(() => {
-    const source = needsReassignmentOnly
-      ? appointments.filter((appointment) => appointment.needsReassignment)
-      : appointments;
+    const source = appointments;
     if (!searchTerm) return source;
     const term = searchTerm.toLowerCase();
 
@@ -193,7 +190,7 @@ export default function AdminBookings() {
 
       return custName.includes(term) || phone.includes(term) || email.includes(term) || idStr.includes(term);
     });
-  }, [appointments, searchTerm, needsReassignmentOnly]);
+  }, [appointments, searchTerm]);
 
   const getStatusBadge = (status) => {
     switch (status?.toLowerCase()) {
@@ -264,9 +261,6 @@ export default function AdminBookings() {
             );
           })}
         </div>
-        <Button variant={needsReassignmentOnly ? "primary" : "secondary"} onClick={() => setNeedsReassignmentOnly((value) => !value)}>
-          Needs Reassignment
-        </Button>
         <Button variant="secondary" icon={Calendar} onClick={() => navigate(`/salon-admin/${salonId}/adminSchedule`)}>
           Staff Schedule
         </Button>
