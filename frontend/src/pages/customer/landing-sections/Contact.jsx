@@ -15,9 +15,13 @@ const Contact = () => {
   });
   const [status, setStatus] = useState("idle"); // 'idle', 'loading', 'success', 'error'
   const [statusMessage, setStatusMessage] = useState("");
-  const { errors, handleBlur, validateAll, isValid, fieldMessages } = useFormValidation(formData, {
+  const { errors, handleBlur, validateAll, fieldMessages } = useFormValidation(formData, {
+    firstName: (value) => String(value).trim() ? { valid: true, message: "" } : { valid: false, message: "First name is required." },
+    lastName: (value) => String(value).trim() ? { valid: true, message: "" } : { valid: false, message: "Last name is required." },
     email: validateEmail,
     contactNumber: validatePhoneGeneric,
+    subject: (value) => String(value).trim() ? { valid: true, message: "" } : { valid: false, message: "Subject is required." },
+    message: (value) => String(value).trim() ? { valid: true, message: "" } : { valid: false, message: "Message is required." },
   });
 
   const handleChange = (e) => {
@@ -126,7 +130,7 @@ const Contact = () => {
                 {statusMessage}
               </div>
             )}
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <form className="space-y-6" onSubmit={handleSubmit} noValidate>
               <div className="grid sm:grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-white/80">First Name</label>
@@ -135,10 +139,12 @@ const Contact = () => {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleChange}
-                    required
-                    className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
+                    onBlur={() => handleBlur("firstName")}
+                    aria-invalid={Boolean(errors.firstName)}
+                    className={`w-full bg-surface-3 border rounded-xl px-4 py-3 text-white focus:outline-none transition-colors ${errors.firstName ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
                     placeholder="Your first name"
                   />
+                  {errors.firstName && <p className="text-xs text-red-400">{errors.firstName}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-white/80">Last Name</label>
@@ -147,10 +153,12 @@ const Contact = () => {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleChange}
-                    required
-                    className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
+                    onBlur={() => handleBlur("lastName")}
+                    aria-invalid={Boolean(errors.lastName)}
+                    className={`w-full bg-surface-3 border rounded-xl px-4 py-3 text-white focus:outline-none transition-colors ${errors.lastName ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
                     placeholder="Your last name"
                   />
+                  {errors.lastName && <p className="text-xs text-red-400">{errors.lastName}</p>}
                 </div>
               </div>
               
@@ -163,8 +171,7 @@ const Contact = () => {
                   onChange={handleChange}
                   onBlur={() => handleBlur("email")}
                   aria-invalid={Boolean(errors.email)}
-                  required
-                  className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
+                  className={`w-full bg-surface-3 border rounded-xl px-4 py-3 text-white focus:outline-none transition-colors ${errors.email ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
                   placeholder="Your email"
                 />
                 {errors.email && <p className="text-xs text-red-400">{errors.email}</p>}
@@ -181,8 +188,7 @@ const Contact = () => {
                     onChange={handleChange}
                     onBlur={() => handleBlur("contactNumber")}
                     aria-invalid={Boolean(errors.contactNumber)}
-                    required
-                    className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
+                    className={`w-full bg-surface-3 border rounded-xl px-4 py-3 text-white focus:outline-none transition-colors ${errors.contactNumber ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
                     placeholder="Your contact number"
                   />
                   {errors.contactNumber && <p className="text-xs text-red-400">{errors.contactNumber}</p>}
@@ -194,10 +200,12 @@ const Contact = () => {
                     name="subject"
                     value={formData.subject}
                     onChange={handleChange}
-                    required
-                    className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
+                    onBlur={() => handleBlur("subject")}
+                    aria-invalid={Boolean(errors.subject)}
+                    className={`w-full bg-surface-3 border rounded-xl px-4 py-3 text-white focus:outline-none transition-colors ${errors.subject ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
                     placeholder="How can we help?"
                   />
+                  {errors.subject && <p className="text-xs text-red-400">{errors.subject}</p>}
                 </div>
               </div>
 
@@ -208,15 +216,17 @@ const Contact = () => {
                   name="message"
                   value={formData.message}
                   onChange={handleChange}
-                  required
-                  className="w-full bg-surface-3 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors resize-none"
+                  onBlur={() => handleBlur("message")}
+                  aria-invalid={Boolean(errors.message)}
+                  className={`w-full bg-surface-3 border rounded-xl px-4 py-3 text-white focus:outline-none transition-colors resize-none ${errors.message ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
                   placeholder="Your message"
                 ></textarea>
+                {errors.message && <p className="text-xs text-red-400">{errors.message}</p>}
               </div>
 
               <button 
                 type="submit"
-                disabled={status === "loading" || !isValid}
+                disabled={status === "loading"}
                 className="w-full py-4 bg-white text-primary rounded-xl font-bold hover:bg-accent transition-colors disabled:opacity-70"
               >
                 {status === "loading" ? "Sending..." : "Send Message"}

@@ -69,7 +69,7 @@ const ForgotPassword = () => {
         {message ? (
           <div className="rounded-lg border border-accent/40 bg-accent-dim/30 px-4 py-3 text-sm text-accent">{message}</div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Email</label>
             <input
               type="email"

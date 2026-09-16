@@ -6,7 +6,7 @@ const API = axios.create({
 
 // Add token to requests
 API.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token") || localStorage.getItem("token");
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -74,3 +74,12 @@ export const updateStaff = async (id, data) => {
 
 export const deleteStaff = (id) =>
   API.delete(`/staff/${id}`);
+
+export const createStaffUnavailability = (data) =>
+  API.post("/unavailability", data);
+
+export const getStaffUnavailability = (params = {}) =>
+  API.get("/unavailability", { params });
+
+export const deleteStaffUnavailability = (id) =>
+  API.delete(`/unavailability/${id}`);

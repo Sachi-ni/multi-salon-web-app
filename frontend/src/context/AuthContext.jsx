@@ -4,29 +4,29 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("user");
+    const savedUser = sessionStorage.getItem("user");
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
   const [token, setToken] = useState(() => {
-    return localStorage.getItem("token") || null;
+    return sessionStorage.getItem("token") || null;
   });
 
-  // Sync user to localStorage
+  // Sync user to sessionStorage
   useEffect(() => {
     if (user) {
-      localStorage.setItem("user", JSON.stringify(user));
+      sessionStorage.setItem("user", JSON.stringify(user));
     } else {
-      localStorage.removeItem("user");
+      sessionStorage.removeItem("user");
     }
   }, [user]);
 
-  // Sync token to localStorage
+  // Sync token to sessionStorage
   useEffect(() => {
     if (token) {
-      localStorage.setItem("token", token);
+      sessionStorage.setItem("token", token);
     } else {
-      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
     }
   }, [token]);
 
@@ -40,6 +40,8 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("token");
   }, []);

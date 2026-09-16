@@ -24,22 +24,22 @@ const Input = ({
       )}
       {type === "textarea" ? (
         <textarea
-          className={clsx(baseInput, "resize-y min-h-[80px]", className)}
+          className={clsx(baseInput, "resize-y min-h-[80px]", error && "border-danger focus:border-danger focus:ring-danger/20", className)}
           {...props}
         />
       ) : type === "select" ? (
-        <select className={clsx(baseInput, "cursor-pointer", className)} {...props}>
+        <select className={clsx(baseInput, "cursor-pointer", error && "border-danger focus:border-danger focus:ring-danger/20", className)} {...props}>
           {props.children}
         </select>
       ) : (
         <div className="relative">
           <input
             type={type === "password" && showPassword ? "text" : type}
-            className={clsx(baseInput, type === "password" && "pr-10", className)}
+            className={clsx(baseInput, type === "password" && "pr-10", error && "border-danger focus:border-danger focus:ring-danger/20", className)}
             autoComplete={props.autoComplete || "new-password"}
             {...props}
           />
-          {type === "password" && Boolean(props.value) && (
+          {type === "password" && (
             <button
               type="button"
               onClick={() => setShowPassword((visible) => !visible)}

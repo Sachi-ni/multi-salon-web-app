@@ -65,10 +65,10 @@ const validateManagerDetails = ({ email, phone, password }) => {
       password.length >= 6 &&
       /[A-Z]/.test(password) &&
       /[a-z]/.test(password) &&
-      /\d/.test(password);
+      /[^A-Za-z]/.test(password);
 
     if (!isComplex || COMMON_PASSWORDS.has(password.toLowerCase())) {
-      return "Password must be at least 6 characters and include uppercase, lowercase, and number.";
+      return "Password must be at least 6 characters and include uppercase, lowercase, and a number or special character.";
     }
   }
 
@@ -756,7 +756,7 @@ const handleEditOpen = async (id) => {
 
       {/* Edit Modal */}
       <Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="Edit Salon Details" maxWidth="max-w-md">
-        <form onSubmit={handleEditSubmit} autoComplete="off" className="space-y-4 pt-1">
+        <form onSubmit={handleEditSubmit} autoComplete="off" noValidate className="space-y-4 pt-1">
           {editError && (
             <div className="px-3 py-2.5 rounded-xl bg-danger-dim border border-danger-border text-xs text-danger font-semibold">
               {editError}

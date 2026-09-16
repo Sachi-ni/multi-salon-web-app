@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getMyAppointments, cancelAppointment } from "../../services/appointmentService";
+import { formatDuration } from "../../utils/formatDuration";
 
 const STATUS_COLORS = {
   pending:   "bg-warning-dim text-warning border-warning-border",
@@ -29,7 +30,16 @@ export default function MyAppointments() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchAppointments(); }, []);
+  useEffect(() => {
+    fetchAppointments();
+    const refreshOnFocus = () => fetchAppointments();
+    const refreshInterval = window.setInterval(fetchAppointments, 30000);
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, []);
 
   const handleCancel = async (id) => {
     if (!window.confirm("Are you sure you want to cancel this appointment?")) return;
@@ -93,6 +103,11 @@ export default function MyAppointments() {
                     <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border ${STATUS_COLORS[a.status]}`}>
                       {STATUS_ICONS[a.status]} {a.status.toUpperCase()}
                     </span>
+                    {a.last_updated_at && (
+                      <span className="ml-2 px-2.5 py-1 rounded-lg text-xs font-extrabold border bg-accent/10 text-accent border-accent/30">
+                        ✎ UPDATED
+                      </span>
+                    )}
                   </div>
 
                   {/* Service details */}
@@ -159,6 +174,13 @@ export default function MyAppointments() {
                         </div>
                       </>
                     )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-muted-2 mb-3">
+                    <span>Total Duration:</span>
+                    <span className="text-white font-semibold">
+                      {formatDuration(a.duration || (a.appointment_services || []).reduce((sum, svc) => sum + (svc.service_id?.duration || 0), 0))}
+                    </span>
                   </div>
 
                   {/* Footer — Actions */}

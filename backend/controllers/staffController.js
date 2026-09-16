@@ -3,6 +3,7 @@ import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 import Salary from "../models/Salary.js";
 import Appointment from "../models/Appointment.js";
+import AppointmentService from "../models/AppointmentService.js";
 import Feedback from "../models/Feedback.js";
 import { storeMedia } from "../utils/mediaStorage.js";
 import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
@@ -260,11 +261,11 @@ export const createStaff = async (req, res) => {
 export const getStaff = async (req, res) => {
   try {
     const userRole = req.user?.role?.toLowerCase();
-    const isSalonScopedAdmin = userRole === "manager";
+    const isSalonScopedAdmin = ["manager", "staff-admin"].includes(userRole);
     const isSuperAdmin = userRole === "super-admin";
 
     let filter = {};
-    const isCustomer = !["super-admin", "manager"].includes(userRole);
+    const isCustomer = !["super-admin", "manager", "staff-admin"].includes(userRole);
 
     if (isCustomer) {
       filter.salon_id = { $in: await Salon.find({ status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).distinct("_id") };
@@ -673,7 +674,7 @@ export const getStaffDashboard = async (req, res) => {
       role: {
         $in: [
           /^manager$/i,
-          /^manager$/i
+          /^admin$/i
         ]
       },
     });
@@ -685,10 +686,19 @@ export const getStaffDashboard = async (req, res) => {
       managerPhone: manager ? manager.phone : "N/A",
     };
 
-    // Find all appointments for this staff
-    const appointments = await Appointment.find({ staff_id: staffId })
-      .populate("customer_id", "name")
+    // Find appointment IDs linked to this staff via AppointmentService
+    const apptServiceApptIds = await AppointmentService.find({ staff_id: staffId }).distinct("appointment_id");
+
+    // Find all appointments for this staff (direct staff_id OR via AppointmentService)
+    const appointments = await Appointment.find({
+      $or: [
+        { staff_id: staffId },
+        { _id: { $in: apptServiceApptIds } }
+      ]
+    })
+      .populate("customer_id", "name phone")
       .populate("service_ids", "service_name")
+      .populate("service_id", "service_name")
       .sort({ appointment_date: -1 });
 
     res.json({

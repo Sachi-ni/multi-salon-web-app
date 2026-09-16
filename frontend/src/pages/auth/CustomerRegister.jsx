@@ -118,7 +118,7 @@ const CustomerRegister = () => {
           </motion.div>
         )}
 
-        <form onSubmit={handleRegister} autoComplete="off">
+        <form onSubmit={handleRegister} autoComplete="off" noValidate>
           {/* Name */}
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">

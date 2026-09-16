@@ -1,0 +1,14 @@
+◇ injected env (12) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+Server running on port 5000
+MongoDB Connected: 127.0.0.1
+============================================================
+🔑 [SUPERADMIN OTP CODE]: 123174 (For: superadmin@gmail.com)
+============================================================
+============================================================
+🔑 [SUPERADMIN OTP CODE]: 744570 (For: superadmin@gmail.com)
+============================================================
+============================================================
+🔑 [SUPERADMIN OTP CODE]: 318983 (For: superadmin@gmail.com)
+============================================================

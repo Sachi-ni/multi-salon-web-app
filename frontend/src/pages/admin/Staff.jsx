@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getServices } from "../../services/serviceService";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail } from "../../utils/validation";
+import StaffUnavailableModal from "../../components/booking/StaffUnavailableModal";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
@@ -28,8 +31,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { API_BASE } from "../../config";
-import useFormValidation from "../../hooks/useFormValidation";
-import { validateEmail } from "../../utils/validation";
 
 const buildImageUrl = (image) => {
   if (!image) return null;
@@ -53,6 +54,7 @@ const ActionsMenu = ({
   onEdit,
   onToggleStatus,
   onDelete,
+  onMarkUnavailable,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -118,6 +120,18 @@ const ActionsMenu = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                onMarkUnavailable(staff);
+                setOpen(false);
+              }}
+              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-danger-dim text-danger"
+            >
+              <Power className="w-3.5 h-3.5" />
+              Mark Unavailable
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
                 onDelete(staff._id);
                 setOpen(false);
               }}
@@ -140,6 +154,7 @@ const StaffCard = ({
   onEdit,
   onToggleStatus,
   onDelete,
+  onMarkUnavailable,
 }) => {
   const isActive = staff.status === "Active";
   const isInactive = !isActive;
@@ -239,6 +254,7 @@ const StaffCard = ({
               onEdit={onEdit}
               onToggleStatus={onToggleStatus}
               onDelete={onDelete}
+              onMarkUnavailable={onMarkUnavailable}
             />
           </div>
 
@@ -380,6 +396,8 @@ export default function AdminStaffPage() {
   const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(editForm, { email: validateEmail });
   const [editPicture, setEditPicture] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
+  const editSubmitInFlight = useRef(false);
+  const [unavailableStaff, setUnavailableStaff] = useState(null);
 
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -539,6 +557,7 @@ export default function AdminStaffPage() {
       else setError(message);
     } finally {
       setEditLoading(false);
+      editSubmitInFlight.current = false;
     }
   };
 
@@ -713,6 +732,7 @@ export default function AdminStaffPage() {
               onEdit={() => handleEditOpen(staff)}
               onToggleStatus={handleToggleStatus}
               onDelete={setDeleteId}
+              onMarkUnavailable={setUnavailableStaff}
             />
           ))}
         </div>
@@ -1069,6 +1089,15 @@ export default function AdminStaffPage() {
           </Modal.Actions>
         </form>
       </Modal>
+
+      <StaffUnavailableModal
+        staff={unavailableStaff}
+        onClose={() => setUnavailableStaff(null)}
+        onSuccess={() => {
+          setUnavailableStaff(null);
+          fetchStaffData();
+        }}
+      />
 
       {/* Delete Modal */}
       <Modal

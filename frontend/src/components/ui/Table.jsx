@@ -50,9 +50,16 @@ const TBody = ({ children }) => (
   </tbody>
 );
 
+const Tr = ({ children, className = "" }) => (
+  <tr className={className}>
+    {children}
+  </tr>
+);
+
 Table.Head = THead;
 Table.Th = Th;
 Table.Body = TBody;
 Table.Td = Td;
+Table.Tr = Tr;
 
 export default Table;

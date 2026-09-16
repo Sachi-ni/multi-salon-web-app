@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Eye, EyeOff } from "lucide-react";
 import { API_URL } from "../../config";
 import useFormValidation from "../../hooks/useFormValidation";
 import { validateConfirmPassword, validatePassword } from "../../utils/validation";
@@ -11,6 +12,8 @@ const ResetPassword = () => {
   const token = searchParams.get("token") || "";
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState(token ? "" : "This reset link is missing its token.");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -63,12 +66,23 @@ const ResetPassword = () => {
         {success ? (
           <div className="rounded-lg border border-accent/40 bg-accent-dim/30 px-4 py-3 text-sm text-accent">{success}. Redirecting to login...</div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">New password</label>
-            <input type="password" required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} onBlur={() => handleBlur("newPassword")} className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none placeholder:text-muted focus:border-accent ${errors.newPassword ? "border-red-500/50 focus:border-red-500" : ""}`} autoComplete="new-password" />
+            <div className="relative">
+              <input type={showNewPassword ? "text" : "password"} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} onBlur={() => handleBlur("newPassword")} className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 pr-10 text-sm text-white outline-none placeholder:text-muted focus:border-accent ${errors.newPassword ? "border-red-500/50 focus:border-red-500" : ""}`} autoComplete="new-password" />
+              <button type="button" onClick={() => setShowNewPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors" aria-label={showNewPassword ? "Hide password" : "Show password"}>
+                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {errors.newPassword && <p className="mt-1 text-xs text-red-300">{errors.newPassword}</p>}
+            
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mt-4 mb-1.5">Confirm password</label>
-            <input type="password" required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} onBlur={() => handleBlur("confirmPassword")} className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none placeholder:text-muted focus:border-accent ${errors.confirmPassword ? "border-red-500/50 focus:border-red-500" : ""}`} autoComplete="new-password" />
+            <div className="relative">
+              <input type={showConfirmPassword ? "text" : "password"} required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} onBlur={() => handleBlur("confirmPassword")} className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 pr-10 text-sm text-white outline-none placeholder:text-muted focus:border-accent ${errors.confirmPassword ? "border-red-500/50 focus:border-red-500" : ""}`} autoComplete="new-password" />
+              <button type="button" onClick={() => setShowConfirmPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors" aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {errors.confirmPassword && <p className="mt-1 text-xs text-red-300">{errors.confirmPassword}</p>}
             {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
             <button type="submit" disabled={loading || !isValid} className="w-full mt-5 bg-accent text-primary border-none rounded-lg py-3.5 text-sm font-extrabold tracking-wider uppercase disabled:opacity-50">{loading ? "Resetting..." : "Reset Password"}</button>
