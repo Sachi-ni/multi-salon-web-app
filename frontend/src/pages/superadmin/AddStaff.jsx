@@ -28,10 +28,15 @@ const AddStaff = () => {
     salaryPaymentFrequency: "monthly",
     salaryPaymentCountPerDay: 1,
   });
-  const { errors, handleBlur, validateAll, isValid, fieldMessages } = useFormValidation(formData, {
+  const { errors, handleBlur, validateAll, fieldMessages } = useFormValidation(formData, {
+    firstName: (value) => String(value).trim() ? { valid: true, message: "" } : { valid: false, message: "First name is required." },
+    lastName: (value) => String(value).trim() ? { valid: true, message: "" } : { valid: false, message: "Last name is required." },
     email: validateEmail,
     phone: validatePhoneSriLankan,
     password: validatePassword,
+    salon: (value) => value ? { valid: true, message: "" } : { valid: false, message: "Please select a salon." },
+    services: (value) => value.length ? { valid: true, message: "" } : { valid: false, message: "Select at least one service." },
+    picture: (value) => value ? { valid: true, message: "" } : { valid: false, message: "Profile picture is required." },
   });
 
   useEffect(() => {
@@ -136,9 +141,9 @@ const AddStaff = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} autoComplete="off">
-          <Input label="First Name" name="firstName" placeholder="Enter first name" required value={formData.firstName} onChange={handleChange} />
-          <Input label="Last Name" name="lastName" placeholder="Enter last name" required value={formData.lastName} onChange={handleChange} />
+        <form onSubmit={handleSubmit} autoComplete="off" noValidate>
+          <Input label="First Name" name="firstName" placeholder="Enter first name" required value={formData.firstName} onChange={handleChange} onBlur={() => handleBlur("firstName")} error={errors.firstName} />
+          <Input label="Last Name" name="lastName" placeholder="Enter last name" required value={formData.lastName} onChange={handleChange} onBlur={() => handleBlur("lastName")} error={errors.lastName} />
           <Input label="Email" name="email" type="email" placeholder="Enter email" required value={formData.email} onChange={(event) => { setEmailSubmitError(""); handleChange(event); }} onBlur={() => handleBlur("email")} error={errors.email || emailSubmitError} helper={fieldMessages.email} />
           <Input
             label="Phone"
@@ -200,20 +205,22 @@ const AddStaff = () => {
             <select
               name="salon"
               required
-              value={formData.salon}
-              onChange={handleSalonChange}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-accent cursor-pointer"
+                  value={formData.salon}
+                  onChange={handleSalonChange}
+                  onBlur={() => handleBlur("salon")}
+                  className={`w-full bg-surface-2 border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 cursor-pointer ${errors.salon ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
             >
               <option value="">Select Salon...</option>
               {salons.map((s) => (
                 <option key={s._id} value={s._id}>{s.name}</option>
               ))}
             </select>
+            {errors.salon && <p className="mt-1 text-xs text-danger font-medium">{errors.salon}</p>}
           </div>
 
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Services <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
-            <div className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3">
+            <div className={`w-full bg-surface-2 border rounded-lg px-3.5 py-3 ${errors.services ? "border-danger" : "border-border"}`}>
               {!formData.salon ? (
                 <p className="text-xs text-muted-2">Select a salon to choose services.</p>
               ) : servicesLoading ? (
@@ -239,6 +246,7 @@ const AddStaff = () => {
                 </div>
               )}
             </div>
+            {errors.services && <p className="mt-1 text-xs text-danger font-medium">{errors.services}</p>}
           </div>
 
           <div className="mb-3.5">
@@ -246,15 +254,16 @@ const AddStaff = () => {
             <input
               type="file"
               accept="image/*"
-              onChange={(e) => setFormData({ ...formData, picture: e.target.files[0] })}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
-              required
+              onChange={(e) => setFormData({ ...formData, picture: e.target.files[0] || null })}
+              onBlur={() => handleBlur("picture")}
+              className={`w-full bg-surface-2 border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer ${errors.picture ? "border-danger" : "border-border"}`}
             />
+            {errors.picture && <p className="mt-1 text-xs text-danger font-medium">{errors.picture}</p>}
           </div>
 
           <div className="flex gap-2.5 justify-end mt-5 pt-4 border-t border-border">
             <Button variant="ghost" type="button" onClick={() => navigate("/Staff")}>Cancel</Button>
-            <Button variant="primary" type="submit" loading={loading} disabled={loading || !isValid}>{loading ? "Saving..." : "Save Staff"}</Button>
+            <Button variant="primary" type="submit" loading={loading} disabled={loading}>{loading ? "Saving..." : "Save Staff"}</Button>
           </div>
         </form>
       </Card>

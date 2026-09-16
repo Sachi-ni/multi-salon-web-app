@@ -310,7 +310,7 @@ const Login = () => {
 
         {isOtpStep ? (
           /* OTP Verification Form */
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <div className="mb-4">
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-2">
                 6-Digit Authentication Code
@@ -379,7 +379,7 @@ const Login = () => {
           </form>
         ) : (
           /* Standard Email & Password Form */
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             {/* Email */}
             <div className="mb-3.5">
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">

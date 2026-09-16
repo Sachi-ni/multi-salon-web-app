@@ -164,7 +164,11 @@ const ServiceCard = ({ service, index, onEdit, onDelete, onToggleStatus }) => {
 };
 
 /* ─────────── Service Form (Add/Edit modal) ─────────── */
-const ServiceForm = ({ formData, setFormData }) => {
+const ServiceForm = ({ formData, errors, onFieldChange }) => {
+  const inputClassName = (field) => clsx(
+    "w-full bg-surface-2 border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium",
+    errors[field] ? "border-danger focus:border-danger" : "border-border"
+  );
   return (
     <div className="space-y-4 pt-1">
       {/* Service Title */}
@@ -174,13 +178,14 @@ const ServiceForm = ({ formData, setFormData }) => {
         </label>
         <input
           type="text"
-          className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium"
+          className={inputClassName("service_name")}
           placeholder="e.g. Haircut & Styling, Deluxe Facial"
           value={formData.service_name}
-          onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+          onChange={(e) => onFieldChange("service_name", e.target.value)}
           autoComplete="off"
-          required
+          aria-invalid={Boolean(errors.service_name)}
         />
+        {errors.service_name && <p className="mt-1.5 text-xs font-medium text-danger">{errors.service_name}</p>}
       </div>
 
       {/* Price + Duration Row */}
@@ -192,12 +197,13 @@ const ServiceForm = ({ formData, setFormData }) => {
           <input
             type="number"
             min="0"
-            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium"
+            className={inputClassName("base_price")}
             placeholder="0.00"
             value={formData.base_price}
-            onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
-            required
+            onChange={(e) => onFieldChange("base_price", e.target.value)}
+            aria-invalid={Boolean(errors.base_price)}
           />
+          {errors.base_price && <p className="mt-1.5 text-xs font-medium text-danger">{errors.base_price}</p>}
         </div>
         <div>
           <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
@@ -206,12 +212,13 @@ const ServiceForm = ({ formData, setFormData }) => {
           <input
             type="number"
             min="1"
-            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium"
+            className={inputClassName("duration")}
             placeholder="60"
             value={formData.duration}
-            onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-            required
+            onChange={(e) => onFieldChange("duration", e.target.value)}
+            aria-invalid={Boolean(errors.duration)}
           />
+          {errors.duration && <p className="mt-1.5 text-xs font-medium text-danger">{errors.duration}</p>}
         </div>
       </div>
 
@@ -225,7 +232,7 @@ const ServiceForm = ({ formData, setFormData }) => {
           className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 resize-none font-medium"
           placeholder="Detailed description of what's included in this service..."
           value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          onChange={(e) => onFieldChange("description", e.target.value)}
           autoComplete="off"
         />
       </div>
@@ -260,6 +267,8 @@ export default function AdminServicesPage() {
     description: "",
   }), []);
   const [formData, setFormData] = useState(emptyForm);
+  const [formErrors, setFormErrors] = useState({});
+  const [formError, setFormError] = useState("");
 
   const fetchServices = () => {
     setLoading(true);
@@ -289,6 +298,8 @@ export default function AdminServicesPage() {
   const openAddModal = () => {
     setEditingService(null);
     setFormData(emptyForm);
+    setFormErrors({});
+    setFormError("");
     setModalOpen(true);
   };
 
@@ -300,6 +311,8 @@ export default function AdminServicesPage() {
       duration: service.duration || "",
       description: service.description || "",
     });
+    setFormErrors({});
+    setFormError("");
     setModalOpen(true);
   };
 
@@ -307,21 +320,30 @@ export default function AdminServicesPage() {
     setModalOpen(false);
     setEditingService(null);
     setFormData(emptyForm);
+    setFormErrors({});
+    setFormError("");
+  };
+
+  const handleFieldChange = (field, value) => {
+    setFormData((current) => ({ ...current, [field]: value }));
+    setFormErrors((current) => {
+      if (!current[field]) return current;
+      const { [field]: _removed, ...remaining } = current;
+      return remaining;
+    });
+    setFormError("");
   };
 
   const handleSave = async () => {
-    if (!formData.service_name || !formData.base_price || !formData.duration) {
-      setError("Please fill all required fields (Name, Price, Duration)");
-      return;
-    }
-    
-    if (Number(formData.base_price) < 0) {
-      setError("Price cannot be a negative value.");
-      return;
-    }
-    
-    if (Number(formData.duration) <= 0) {
-      setError("Duration must be greater than 0.");
+    const validationErrors = {};
+    if (!formData.service_name.trim()) validationErrors.service_name = "Service title is required.";
+    if (formData.base_price === "") validationErrors.base_price = "Base price is required.";
+    else if (Number(formData.base_price) < 0) validationErrors.base_price = "Price cannot be negative.";
+    if (formData.duration === "") validationErrors.duration = "Duration is required.";
+    else if (Number(formData.duration) <= 0) validationErrors.duration = "Duration must be greater than 0.";
+    if (Object.keys(validationErrors).length) {
+      setFormErrors(validationErrors);
+      setFormError("");
       return;
     }
 
@@ -343,7 +365,7 @@ export default function AdminServicesPage() {
       closeModal();
       fetchServices();
     } catch (err) {
-      setError(
+      setFormError(
         err.response?.data?.message ||
           `Failed to ${editingService ? "update" : "create"} service`
       );
@@ -527,7 +549,8 @@ export default function AdminServicesPage() {
         title={editingService ? "✏️ Edit Service Details" : "✨ Add New Service"}
         maxWidth="max-w-xl"
       >
-        <ServiceForm formData={formData} setFormData={setFormData} />
+        <ServiceForm formData={formData} errors={formErrors} onFieldChange={handleFieldChange} />
+        {formError && <p className="mt-4 rounded-lg border border-danger-border bg-danger-dim px-3 py-2 text-sm font-medium text-danger" role="alert">{formError}</p>}
         <Modal.Actions>
           <Button variant="ghost" size="sm" onClick={closeModal}>
             Cancel

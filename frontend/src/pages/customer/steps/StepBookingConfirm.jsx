@@ -14,7 +14,8 @@ export default function StepBookingConfirm({ booking, onBack }) {
   // Guest details state
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
-  const { errors, handleBlur, validateAll, isValid } = useFormValidation({ guestPhone }, {
+  const { errors, handleBlur, validateAll } = useFormValidation({ guestName, guestPhone }, {
+    guestName: (value) => String(value).trim() ? { valid: true, message: "" } : { valid: false, message: "Full name is required." },
     guestPhone: (value) => user ? { valid: true, message: "" } : validatePhoneGeneric(value),
   });
 
@@ -29,16 +30,6 @@ export default function StepBookingConfirm({ booking, onBack }) {
 
   const handleSubmit = async () => {
     if (!user && !validateAll()) return;
-    if (!user && (!guestName || !guestPhone)) {
-      setError("Please provide your Name and Phone Number to complete the booking.");
-      return;
-    }
-
-    if (!user && !/^\+?[0-9]{10}$/.test(guestPhone.replace(/[\s()-]/g, ""))) {
-      setError("Please enter a valid 10-digit phone number.");
-      return;
-    }
-
     setLoading(true);
     setError("");
     try {
@@ -146,10 +137,12 @@ export default function StepBookingConfirm({ booking, onBack }) {
                 type="text"
                 value={guestName}
                 onChange={(e) => setGuestName(e.target.value)}
+                onBlur={() => handleBlur("guestName")}
                 placeholder="Enter your name"
-                className="w-full bg-surface-3 border border-border rounded-lg px-4 py-2.5 text-white text-sm focus:border-accent focus:outline-none transition-colors"
-                required
+                className={`w-full bg-surface-3 border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none transition-colors ${errors.guestName ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
+                aria-invalid={Boolean(errors.guestName)}
               />
+              {errors.guestName && <p className="text-xs text-red-400 mt-1">{errors.guestName}</p>}
             </div>
             <div>
               <label className="block text-xs font-bold text-muted-2 mb-1.5 uppercase tracking-wider">Phone Number *</label>
@@ -160,8 +153,8 @@ export default function StepBookingConfirm({ booking, onBack }) {
                 onBlur={() => handleBlur("guestPhone")}
                 placeholder="Enter your phone number"
                 inputMode="tel"
-                className="w-full bg-surface-3 border border-border rounded-lg px-4 py-2.5 text-white text-sm focus:border-accent focus:outline-none transition-colors"
-                required
+                className={`w-full bg-surface-3 border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none transition-colors ${errors.guestPhone ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
+                aria-invalid={Boolean(errors.guestPhone)}
               />
               {errors.guestPhone && <p className="text-xs text-red-400 mt-1">{errors.guestPhone}</p>}
             </div>
@@ -191,7 +184,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
         </button>
         <button
           onClick={handleSubmit}
-          disabled={loading || !isValid}
+          disabled={loading}
           className="px-6 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-glow"
         >
           {loading ? (

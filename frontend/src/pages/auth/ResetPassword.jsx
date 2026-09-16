@@ -66,7 +66,7 @@ const ResetPassword = () => {
         {success ? (
           <div className="rounded-lg border border-accent/40 bg-accent-dim/30 px-4 py-3 text-sm text-accent">{success}. Redirecting to login...</div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">New password</label>
             <div className="relative">
               <input type={showNewPassword ? "text" : "password"} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} onBlur={() => handleBlur("newPassword")} className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 pr-10 text-sm text-white outline-none placeholder:text-muted focus:border-accent ${errors.newPassword ? "border-red-500/50 focus:border-red-500" : ""}`} autoComplete="new-password" />

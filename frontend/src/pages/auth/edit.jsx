@@ -135,7 +135,7 @@ const Edit = () => {
 
         <h1 className="text-2xl font-extrabold text-white mb-6">Edit Profile</h1>
 
-<form onSubmit={handleUpdate}>
+<form onSubmit={handleUpdate} noValidate>
           {/* Profile Picture */}
           <div className="mb-5 flex items-center gap-4">
             <div className="relative">

@@ -213,9 +213,16 @@ const ServiceCard = ({ service, index, onEdit, onDelete, onToggleStatus }) => {
 /* ─────────── Service Form (for Add/Edit modal) ─────────── */
 const ServiceForm = ({
   formData,
-  setFormData,
   salons,
+  errors,
+  onFieldChange,
 }) => {
+  const inputClassName = (field) =>
+    clsx(
+      "w-full bg-surface-2 border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium",
+      errors[field] ? "border-danger focus:border-danger" : "border-border"
+    );
+
   return (
     <div className="space-y-4 pt-1">
       {/* Salon */}
@@ -225,13 +232,15 @@ const ServiceForm = ({
         </label>
         <div className="relative">
           <select
-            className="w-full appearance-none bg-surface-2 border border-border rounded-xl px-4 pr-9 py-2.5 text-sm text-white outline-none cursor-pointer transition-all duration-200 focus:border-amber-400 font-medium"
+            className={clsx(
+              "w-full appearance-none bg-surface-2 border rounded-xl px-4 pr-9 py-2.5 text-sm text-white outline-none cursor-pointer transition-all duration-200 focus:border-amber-400 font-medium",
+              errors.salon_id ? "border-danger focus:border-danger" : "border-border"
+            )}
             style={{ colorScheme: "dark" }}
             value={formData.salon_id}
-            onChange={(e) =>
-              setFormData({ ...formData, salon_id: e.target.value })
-            }
-            required
+            onChange={(e) => onFieldChange("salon_id", e.target.value)}
+            aria-invalid={Boolean(errors.salon_id)}
+            aria-describedby={errors.salon_id ? "salon-id-error" : undefined}
           >
             <option value="" style={{ background: "#1a1a2e", color: "#fff" }}>Select a salon branch</option>
             {salons.map((s) => (
@@ -242,6 +251,7 @@ const ServiceForm = ({
           </select>
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
         </div>
+        {errors.salon_id && <p id="salon-id-error" className="mt-1.5 text-xs font-medium text-danger">{errors.salon_id}</p>}
       </div>
 
       {/* Service Name */}
@@ -251,15 +261,15 @@ const ServiceForm = ({
         </label>
         <input
           type="text"
-          className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium"
+          className={inputClassName("service_name")}
           placeholder="e.g. Haircut & Styling, Deluxe Facial"
           value={formData.service_name}
-          onChange={(e) =>
-            setFormData({ ...formData, service_name: e.target.value })
-          }
+          onChange={(e) => onFieldChange("service_name", e.target.value)}
           autoComplete="off"
-          required
+          aria-invalid={Boolean(errors.service_name)}
+          aria-describedby={errors.service_name ? "service-name-error" : undefined}
         />
+        {errors.service_name && <p id="service-name-error" className="mt-1.5 text-xs font-medium text-danger">{errors.service_name}</p>}
       </div>
 
       {/* Price + Duration Row */}
@@ -271,14 +281,14 @@ const ServiceForm = ({
           <input
             type="number"
             min="0"
-            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium"
+            className={inputClassName("base_price")}
             placeholder="0.00"
             value={formData.base_price}
-            onChange={(e) =>
-              setFormData({ ...formData, base_price: e.target.value })
-            }
-            required
+            onChange={(e) => onFieldChange("base_price", e.target.value)}
+            aria-invalid={Boolean(errors.base_price)}
+            aria-describedby={errors.base_price ? "base-price-error" : undefined}
           />
+          {errors.base_price && <p id="base-price-error" className="mt-1.5 text-xs font-medium text-danger">{errors.base_price}</p>}
         </div>
         <div>
           <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
@@ -287,14 +297,14 @@ const ServiceForm = ({
           <input
             type="number"
             min="1"
-            className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium"
+            className={inputClassName("duration")}
             placeholder="60"
             value={formData.duration}
-            onChange={(e) =>
-              setFormData({ ...formData, duration: e.target.value })
-            }
-            required
+            onChange={(e) => onFieldChange("duration", e.target.value)}
+            aria-invalid={Boolean(errors.duration)}
+            aria-describedby={errors.duration ? "duration-error" : undefined}
           />
+          {errors.duration && <p id="duration-error" className="mt-1.5 text-xs font-medium text-danger">{errors.duration}</p>}
         </div>
       </div>
 
@@ -308,9 +318,7 @@ const ServiceForm = ({
           className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 resize-none font-medium"
           placeholder="Detailed description of what's included in this service..."
           value={formData.description}
-          onChange={(e) =>
-            setFormData({ ...formData, description: e.target.value })
-          }
+          onChange={(e) => onFieldChange("description", e.target.value)}
           autoComplete="off"
         />
       </div>
@@ -343,6 +351,8 @@ const Services = () => {
     salon_id: "",
   }), []);
   const [formData, setFormData] = useState(emptyForm);
+  const [formErrors, setFormErrors] = useState({});
+  const [formError, setFormError] = useState("");
 
   const { salonId } = useParams();
 
@@ -383,6 +393,8 @@ const Services = () => {
   const openAddModal = () => {
     setEditingService(null);
     setFormData(emptyForm);
+    setFormErrors({});
+    setFormError("");
     setModalOpen(true);
   };
 
@@ -398,27 +410,33 @@ const Services = () => {
           ? service.salon_id?._id
           : service.salon_id) || "",
     });
+    setFormErrors({});
+    setFormError("");
     setModalOpen(true);
   };
 
+  const handleFieldChange = (field, value) => {
+    setFormData((current) => ({ ...current, [field]: value }));
+    setFormErrors((current) => {
+      if (!current[field]) return current;
+      const { [field]: _removed, ...remaining } = current;
+      return remaining;
+    });
+    setFormError("");
+  };
+
   const handleSave = async () => {
-    if (
-      !formData.service_name ||
-      !formData.base_price ||
-      !formData.duration ||
-      !formData.salon_id
-    ) {
-      setError("Please fill all required fields (Name, Price, Duration, Salon)");
-      return;
-    }
-    
-    if (Number(formData.base_price) < 0) {
-      setError("Price cannot be a negative value.");
-      return;
-    }
-    
-    if (Number(formData.duration) <= 0) {
-      setError("Duration must be greater than 0.");
+    const validationErrors = {};
+    if (!formData.salon_id) validationErrors.salon_id = "Please select a salon branch.";
+    if (!formData.service_name.trim()) validationErrors.service_name = "Service title is required.";
+    if (formData.base_price === "") validationErrors.base_price = "Base price is required.";
+    else if (Number(formData.base_price) < 0) validationErrors.base_price = "Price cannot be negative.";
+    if (formData.duration === "") validationErrors.duration = "Duration is required.";
+    else if (Number(formData.duration) <= 0) validationErrors.duration = "Duration must be greater than 0.";
+
+    if (Object.keys(validationErrors).length) {
+      setFormErrors(validationErrors);
+      setFormError("");
       return;
     }
 
@@ -441,9 +459,11 @@ const Services = () => {
       setModalOpen(false);
       setFormData(emptyForm);
       setEditingService(null);
+      setFormErrors({});
+      setFormError("");
       fetchData();
     } catch (err) {
-      setError(
+      setFormError(
         err.response?.data?.message ||
           `Failed to ${editingService ? "update" : "create"} service`
       );
@@ -690,15 +710,23 @@ const Services = () => {
           setModalOpen(false);
           setEditingService(null);
           setFormData(emptyForm);
+          setFormErrors({});
+          setFormError("");
         }}
         title={editingService ? "✏️ Edit Service Details" : "✨ Add New Service"}
         maxWidth="max-w-xl"
       >
         <ServiceForm
           formData={formData}
-          setFormData={setFormData}
           salons={salons}
+          errors={formErrors}
+          onFieldChange={handleFieldChange}
         />
+        {formError && (
+          <p className="mt-4 rounded-lg border border-danger-border bg-danger-dim px-3 py-2 text-sm font-medium text-danger" role="alert">
+            {formError}
+          </p>
+        )}
         <Modal.Actions>
           <Button
             variant="ghost"
@@ -707,6 +735,8 @@ const Services = () => {
               setModalOpen(false);
               setEditingService(null);
               setFormData(emptyForm);
+              setFormErrors({});
+              setFormError("");
             }}
           >
             Cancel

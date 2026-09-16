@@ -68,7 +68,7 @@ const SuperAdminHardening = () => {
 
   return (
     <div className="fixed inset-0 bg-primary flex items-center justify-center px-4">
-      <form onSubmit={submit} className="w-full max-w-md bg-surface border border-border rounded-2xl p-8">
+      <form onSubmit={submit} noValidate className="w-full max-w-md bg-surface border border-border rounded-2xl p-8">
         <h1 className="text-2xl font-extrabold text-white mb-2">Secure your account</h1>
         <p className="text-sm text-muted-2 mb-6">
           {step === "change-password" ? "Choose a new password before continuing." : "Complete MFA setup before opening the dashboard."}

@@ -35,8 +35,13 @@ const AddSalon = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [emailSubmitError, setEmailSubmitError] = useState("");
-  const { errors, handleBlur, validateAll, isValid, fieldMessages } = useFormValidation(formData, {
+  const { errors, handleBlur, validateAll, fieldMessages } = useFormValidation(formData, {
+    name: (value) => String(value).trim() ? { valid: true, message: "" } : { valid: false, message: "Salon name is required." },
     phone: validatePhoneSriLankan,
+    location: (value) => String(value).trim() ? { valid: true, message: "" } : { valid: false, message: "Address is required." },
+    open_time: (value) => value ? { valid: true, message: "" } : { valid: false, message: "Opening time is required." },
+    close_time: (value) => value ? { valid: true, message: "" } : { valid: false, message: "Closing time is required." },
+    managerName: (value) => String(value).trim() ? { valid: true, message: "" } : { valid: false, message: "Manager name is required." },
     managerEmail: validateEmail,
     managerPhone: validatePhoneSriLankan,
     managerPassword: validatePassword,
@@ -104,10 +109,10 @@ const AddSalon = () => {
           <Card.Subtitle>Fill all required fields</Card.Subtitle>
         </Card.Header>
 
-        <form onSubmit={handleSubmit} autoComplete="off">
-          <Input label="Salon Name" name="name" placeholder="Enter salon name" required value={formData.name} onChange={handleChange} />
+        <form onSubmit={handleSubmit} autoComplete="off" noValidate>
+          <Input label="Salon Name" name="name" placeholder="Enter salon name" required value={formData.name} onChange={handleChange} onBlur={() => handleBlur("name")} error={errors.name} />
           <Input label="Phone" name="phone" placeholder="0771234567 or +94771234567" required value={formData.phone} onChange={handleChange} onBlur={() => handleBlur("phone")} error={errors.phone} />
-          <Input label="Address" name="location" placeholder="Enter address" required value={formData.location} onChange={handleChange} />
+          <Input label="Address" name="location" placeholder="Enter address" required value={formData.location} onChange={handleChange} onBlur={() => handleBlur("location")} error={errors.location} />
 <Input label="About" name="about" placeholder="Enter about the salon" value={formData.about} onChange={handleChange} />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3.5">
@@ -119,14 +124,16 @@ const AddSalon = () => {
                 name="open_time"
                 value={formData.open_time}
                 onChange={handleChange}
-                required
-                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none focus:border-accent transition-colors cursor-pointer"
+                onBlur={() => handleBlur("open_time")}
+                aria-invalid={Boolean(errors.open_time)}
+                className={`w-full bg-surface-2 border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors cursor-pointer ${errors.open_time ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
               >
                 <option value="" disabled>Select opening time</option>
                 {TIME_SLOTS.map((time) => (
                   <option key={time} value={time}>{time}</option>
                 ))}
               </select>
+              {errors.open_time && <p className="mt-1 text-xs text-danger font-medium">{errors.open_time}</p>}
             </div>
             <div>
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
@@ -136,14 +143,16 @@ const AddSalon = () => {
                 name="close_time"
                 value={formData.close_time}
                 onChange={handleChange}
-                required
-                className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none focus:border-accent transition-colors cursor-pointer"
+                onBlur={() => handleBlur("close_time")}
+                aria-invalid={Boolean(errors.close_time)}
+                className={`w-full bg-surface-2 border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors cursor-pointer ${errors.close_time ? "border-danger focus:border-danger" : "border-border focus:border-accent"}`}
               >
                 <option value="" disabled>Select closing time</option>
                 {TIME_SLOTS.map((time) => (
                   <option key={time} value={time}>{time}</option>
                 ))}
               </select>
+              {errors.close_time && <p className="mt-1 text-xs text-danger font-medium">{errors.close_time}</p>}
             </div>
           </div>
           {/* Salon Logo Upload */}
@@ -173,7 +182,7 @@ const AddSalon = () => {
 
           <div className="mt-8 mb-3.5 border-t border-border pt-6">
             <h2 className="text-lg font-bold text-white mb-3">Salon Manager Details</h2>
-            <Input label="Manager Name" name="managerName" placeholder="Enter manager full name" required value={formData.managerName} onChange={handleChange} />
+            <Input label="Manager Name" name="managerName" placeholder="Enter manager full name" required value={formData.managerName} onChange={handleChange} onBlur={() => handleBlur("managerName")} error={errors.managerName} />
             <Input label="Manager Email" name="managerEmail" type="email" placeholder="Enter manager email" required value={formData.managerEmail} onChange={handleChange} onBlur={() => handleBlur("managerEmail")} error={errors.managerEmail || emailSubmitError} helper={fieldMessages.managerEmail} />
             <Input label="Manager Phone" name="managerPhone" placeholder="0771234567 or +94771234567" required value={formData.managerPhone} onChange={handleChange} onBlur={() => handleBlur("managerPhone")} error={errors.managerPhone} />
             <Input label="Manager Password" name="managerPassword" type="password" placeholder="Enter manager password" required value={formData.managerPassword} onChange={handleChange} onBlur={() => handleBlur("managerPassword")} error={errors.managerPassword} />
@@ -181,7 +190,7 @@ const AddSalon = () => {
 
           <div className="flex gap-2.5 justify-end mt-5 pt-4 border-t border-border">
             <Button variant="ghost" type="button" onClick={() => navigate("/Salons")} disabled={loading}>Cancel</Button>
-            <Button variant="primary" type="submit" loading={loading} disabled={loading || !isValid}>{loading ? "Adding..." : "Add Salon"}</Button>
+            <Button variant="primary" type="submit" loading={loading} disabled={loading}>{loading ? "Adding..." : "Add Salon"}</Button>
           </div>
         </form>
       </Card>
