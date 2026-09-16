@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useAlert } from "../../context/AlertContext";
 import { motion } from "framer-motion";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, X } from "lucide-react";
 import { API_URL } from "../../config";
 import useFormValidation from "../../hooks/useFormValidation";
 import { validateEmail } from "../../utils/validation";
@@ -260,6 +260,14 @@ const Login = () => {
       >
         {/* Top accent bar */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent to-accent-hover rounded-t-2xl" />
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          aria-label="Close sign-in form"
+          className="absolute right-4 top-4 sm:right-5 sm:top-5 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface-2 text-muted-2 transition-colors hover:border-accent/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-accent/50"
+        >
+          <X className="h-4 w-4" />
+        </button>
 
         {/* Logo */}
         <div className="flex items-center gap-2.5 mb-1.5">

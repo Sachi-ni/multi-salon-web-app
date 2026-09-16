@@ -110,28 +110,14 @@ export const getAvailableStaff = async (req, res) => {
     const salon = await Salon.findOne({ _id: salonId, status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).select("_id");
     if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
 
-    // Admin users may assign a salon manager as a service provider. Customer
-    // booking must only list staff explicitly assigned to the selected service.
-    const userRole = req.user?.role || "";
-    const isAdminUser = ["super-admin", "manager"].includes(userRole);
-
-    // Find active staff in this salon who can perform at least one
-    // of the selected services.
+    // All booking flows (customer, manager, and SuperAdmin) may list only
+    // active staff explicitly assigned to the selected service. A manager is
+    // eligible only when their profile has that service assigned as well.
     const staffList = await Staff.find({
       salon_id: salonId,
       status: "Active",
-
-      ...(isAdminUser
-        ? {
-            $or: [
-              { services: { $in: serviceIdList } },
-              { role: { $regex: /^manager$/i } },
-            ],
-          }
-        : {
-            services: { $in: serviceIdList },
-            role: { $not: /^(manager|super-admin)$/i },
-          }),
+      services: { $in: serviceIdList },
+      role: { $not: /^(super-admin)$/i },
     })
       .populate("salon_id", "name")
       .populate("services", "service_name");
@@ -1203,41 +1189,15 @@ export const completeAppointment = async (req, res) => {
     }
 
     appointment.status = "completed";
-    appointment.completed_at = new Date();
     await appointment.save();
 
-    // Resolve the bill total from service rows when the appointment total is
-    // missing, then create exactly one bill for this completed appointment.
-    const appointmentServices = await AppointmentService.find({
-      appointment_id: appointment._id,
-    }).lean();
-    const serviceTotal = appointmentServices.reduce(
-      (sum, service) => sum + Number(service.sub_price || 0),
-      0
-    );
-    if (!appointment.total_price && serviceTotal > 0) {
-      appointment.total_price = serviceTotal;
-      await appointment.save();
+    // SALARY: Process salary calculation for completed appointment
+    try {
+      await processSalaryOnCompletion(appointment._id);
+      console.log(`Salary processed for appointment ${appointment._id}`);
+    } catch (salaryErr) {
+      console.error("Failed to process salary:", salaryErr);
     }
-
-    await Bill.findOneAndUpdate(
-      { appointment_id: appointment._id },
-      {
-        appointment_id: appointment._id,
-        total_amount: appointment.total_price || serviceTotal,
-        bill_date: appointment.completed_at,
-        payment_method: "Cash",
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-
-    // Salary processing must complete with the appointment action. Do not
-    // hide failures, otherwise the UI reports completion while payroll is stale.
-    const salaryResult = await processSalaryOnCompletion(appointment._id);
-    if (!salaryResult?.success) {
-      throw new Error(salaryResult?.message || "Failed to update salary");
-    }
-    console.log(`Salary processed for appointment ${appointment._id}`);
 
     // NOTIFICATION: Notify the customer
     try {

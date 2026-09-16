@@ -155,12 +155,8 @@ export default function Appointments() {
     setActionLoading(id);
     setActionError("");
     try {
-      const response = await completeAppointment(id);
+      await completeAppointment(id);
       triggerSalaryRefresh();
-      setCompletedAppointment({
-        ...(appointments.find((appointment) => appointment._id === id) || {}),
-        ...(response.data || {}),
-      });
       fetchAppointments();
     } catch {
       setActionError(`${id}:Failed to complete appointment.`);
@@ -652,15 +648,6 @@ export default function Appointments() {
                     )}
 
                     {a.status === "completed" && (
-                      <button
-                        onClick={() => setCompletedAppointment(a)}
-                        disabled={isActionLoading}
-                        className="px-4 py-2 rounded-xl bg-amber-400/10 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-amber-400/30"
-                      >
-                        <Receipt className="w-4 h-4" />
-                        View Bill
-                      </button>
-                    )}
                       <>
                         {a.bill ? (
                           <button
