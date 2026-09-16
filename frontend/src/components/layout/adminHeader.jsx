@@ -148,12 +148,14 @@ const AdminHeader = ({ onToggleSidebar }) => {
     <header className="h-header bg-surface/90 backdrop-blur-glass border-b border-border flex items-center px-5 gap-3 fixed top-0 left-0 right-0 z-[200]">
 
       {/* Mobile Menu */}
-      <button
-        onClick={onToggleSidebar}
-        className="lg:hidden flex items-center justify-center p-1.5"
-      >
-        <Menu className="w-5 h-5 text-white" />
-      </button>
+      {onToggleSidebar && (
+        <button
+          onClick={onToggleSidebar}
+          className="lg:hidden flex items-center justify-center p-1.5"
+        >
+          <Menu className="w-5 h-5 text-white" />
+        </button>
+      )}
 
       {/* Logo - show salon name & logo for salon users, else SalonHub */}
       <div className="flex items-center gap-2 text-lg font-black text-accent whitespace-nowrap tracking-tight">
@@ -295,7 +297,7 @@ const AdminHeader = ({ onToggleSidebar }) => {
 
             <button
               onClick={() => {
-                navigate(user?.role === "super-admin" ? "/Profile" : "/editProfile");
+                navigate(user?.role === "super-admin" ? "/Profile" : "/account/profile");
                 setDropdownOpen(false);
               }}
               className="w-full px-4 py-2 text-left text-sm text-muted-2 hover:text-white hover:bg-white/5 flex items-center gap-2"
