@@ -24,6 +24,7 @@ import {
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import EditStaffAssignmentModal from "../../components/booking/EditStaffAssignmentModal";
+import AppointmentEditWorkflowModal from "../../components/booking/AppointmentEditWorkflowModal";
 import GenerateBillModal from "../../components/billing/GenerateBillModal";
 import InvoiceModal from "../../components/billing/InvoiceModal";
 import { formatDuration } from "../../utils/formatDuration";
@@ -56,6 +57,7 @@ export default function AdminBookings() {
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
   const [editingStaffAppointment, setEditingStaffAppointment] = useState(null);
+  const [editingAppointment, setEditingAppointment] = useState(null);
 
   // Billing state
   const [billingAppointment, setBillingAppointment] = useState(null);
@@ -749,6 +751,15 @@ export default function AdminBookings() {
             setEditingStaffAppointment(null);
             fetchAppointments();
           }}
+        />
+      )}
+      {editingAppointment && (
+        <AppointmentEditWorkflowModal
+          appointment={editingAppointment}
+          salonId={salonId}
+          onClose={() => setEditingAppointment(null)}
+          onReassign={() => { setEditingAppointment(null); setEditingStaffAppointment(editingAppointment); }}
+          onSuccess={() => { setEditingAppointment(null); fetchAppointments(); }}
         />
       )}
       {/* Bill Generation Modal */}

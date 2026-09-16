@@ -37,6 +37,12 @@ export const getAppointment = (id) =>
 export const cancelAppointment = (id) =>
   api.patch(`/appointments/${id}/cancel`);
 
+export const confirmAppointmentUpdate = (id) =>
+  api.patch(`/appointments/${id}/confirm-update`);
+
+export const requestDifferentTime = (id, note) =>
+  api.patch(`/appointments/${id}/request-different-time`, { note });
+
 // ── Admin endpoints ─────────────────────────────────────────────────────────
 
 export const getSalonAppointments = (salonId, status = "", date = "") =>

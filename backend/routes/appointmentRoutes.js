@@ -6,6 +6,8 @@ import {
   getMyAppointments,
   getAppointment,
   cancelAppointment,
+  confirmAppointmentUpdate,
+  requestDifferentTime,
   getSalonAppointments,
   confirmAppointment,
   rejectAppointment,
@@ -31,6 +33,8 @@ router.post("/", optionalProtect, createAppointment);
 router.get("/my", protect, getMyAppointments);
 router.get("/:id", protect, getAppointment);
 router.patch("/:id/cancel", protect, cancelAppointment);
+router.patch("/:id/confirm-update", protect, confirmAppointmentUpdate);
+router.patch("/:id/request-different-time", protect, requestDifferentTime);
 
 // ── Admin routes ────────────────────────────────────────────────────────────
 router.get("/daily-schedule", protect, authorizeRoles("super-admin", "manager", "staff-admin"), getDailySchedule);
