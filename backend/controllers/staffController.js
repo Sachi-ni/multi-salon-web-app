@@ -8,6 +8,7 @@ import Feedback from "../models/Feedback.js";
 import { storeMedia } from "../utils/mediaStorage.js";
 import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
 import { validateNewPassword } from "../utils/passwordPolicy.js";
+import { transitionSalaryFrequency } from "./salaryController.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
@@ -374,6 +375,11 @@ export const updateStaff = async (req, res) => {
     }
 
     const originalStaff = existing;
+    const previousFrequency = originalStaff.salary_payment_frequency || "monthly";
+    const requestedFrequency = req.body.salaryPaymentFrequency;
+    const frequencyChanged =
+      requestedFrequency !== undefined && requestedFrequency !== previousFrequency;
+    const frequencyChangedAt = new Date();
 
     const updateData = {};
 
@@ -521,16 +527,27 @@ export const updateStaff = async (req, res) => {
       .populate("services", "service_name")
       .populate("salon_id", "name");
 
-    // Update staff snapshots in unpaid salary records if name, count per day, or frequency changed
+    // Keep salary records in sync for both staff and managers. Managers have
+    // their own super-admin salary table, so they must follow the same
+    // frequency transition and current-period initialization rules.
     try {
-      const isNonManager = (staff.role || "").toLowerCase() !== "manager";
-      if (isNonManager) {
+      const shouldSyncSalary = Boolean(staff._id);
+      if (shouldSyncSalary) {
         const salonId = staff.salon_id;
         const frequency = staff.salary_payment_frequency || "monthly";
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
         const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+        let previousSalary = null;
+        if (frequencyChanged) {
+          previousSalary = await transitionSalaryFrequency(
+            staff,
+            previousFrequency,
+            frequencyChangedAt
+          );
+        }
 
         let period, periodStart, periodEnd, weekNumber = 0;
         if (frequency === "daily") {
@@ -596,18 +613,49 @@ export const updateStaff = async (req, res) => {
               year,
               month,
               weekNumber,
-              dateRange: { start: periodStart, end: periodEnd },
+              dateRange: {
+                start: frequencyChanged ? yyyymmdd : periodStart,
+                end: periodEnd,
+              },
               dailyRecords: [],
             },
           },
           { upsert: true, new: true }
         );
+
+        if (frequencyChanged) {
+          const currentSalary = await Salary.findOne({
+            salon_id: salonId,
+            staff_id: staff._id,
+            period,
+            frequency,
+          });
+          if (currentSalary && currentSalary.status !== "Paid") {
+            currentSalary.dateRange = { start: yyyymmdd, end: periodEnd };
+            currentSalary.dailyRecords = (currentSalary.dailyRecords || []).filter(
+              (record) => record.date >= yyyymmdd
+            );
+            await currentSalary.save();
+          }
+        }
+
+        res.locals.salaryTransition = previousSalary;
       }
     } catch (e) {
       console.error("Error updating salary snapshot:", e);
     }
 
-    res.json(staff);
+    const response = staff.toObject();
+    if (res.locals.salaryTransition) {
+      response.salaryTransition = {
+        salaryId: res.locals.salaryTransition._id,
+        frequency: res.locals.salaryTransition.frequency,
+        period: res.locals.salaryTransition.period,
+        totalSalary: res.locals.salaryTransition.totalSalary || 0,
+        status: res.locals.salaryTransition.status,
+      };
+    }
+    res.json(response);
   } catch (error) {
     console.error(error);
     res.status(500).json({
