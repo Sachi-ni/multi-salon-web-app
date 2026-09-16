@@ -98,11 +98,11 @@ const Edit = () => {
 
       alert("Profile updated successfully!");
       if (user?.role === "customer" || user?.role === "user") {
-        navigate("/customer/dashboard");
+        navigate("/customer/profile");
       } else if (user?.role === "super-admin") {
         navigate("/Profile");
       } else {
-        navigate(-1);
+        navigate("/account/profile");
       }
     } catch (error) {
       console.error("Update error:", error);
