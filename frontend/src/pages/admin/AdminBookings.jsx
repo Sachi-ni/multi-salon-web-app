@@ -18,13 +18,13 @@ import EmptyState from "../../components/ui/EmptyState";
 import { 
   Calendar, Clock, User, Search, LayoutGrid, 
   List, CheckCircle2, AlertCircle, Trash2, 
-  Check, X, Plus, Hash, Edit2, Receipt
   Check, X, Plus, Hash, Edit2,
   Receipt, FileText
 } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import EditStaffAssignmentModal from "../../components/booking/EditStaffAssignmentModal";
+import AppointmentEditWorkflowModal from "../../components/booking/AppointmentEditWorkflowModal";
 import CompletedAppointmentBill from "../../components/booking/CompletedAppointmentBill";
 import GenerateBillModal from "../../components/billing/GenerateBillModal";
 import InvoiceModal from "../../components/billing/InvoiceModal";
@@ -58,6 +58,7 @@ export default function AdminBookings() {
   const [editingDuration, setEditingDuration] = useState("");
   const [newDuration, setNewDuration] = useState(60);
   const [editingStaffAppointment, setEditingStaffAppointment] = useState(null);
+  const [editingAppointment, setEditingAppointment] = useState(null);
   const [completedAppointment, setCompletedAppointment] = useState(null);
 
   // Billing state
@@ -384,8 +385,9 @@ export default function AdminBookings() {
                 )}
               >
                   {a.needsReassignment && (
-                    <div className="mb-3 rounded-lg border border-danger-border bg-danger-dim px-3 py-2 text-xs font-bold text-danger">
-                      Staff Unavailable - Needs Reassignment{a.staffUnavailableReason ? `: ${a.staffUnavailableReason}` : ""}
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-danger-border bg-danger-dim px-3 py-2 text-xs font-bold text-danger">
+                      <span>Staff Unavailable - Needs Reassignment{a.staffUnavailableReason ? `: ${a.staffUnavailableReason}` : ""}</span>
+                      <button onClick={() => setEditingStaffAppointment(a)} className="rounded-lg border border-danger-border px-3 py-1.5 text-2xs font-black text-danger hover:bg-danger/20">Reassign Staff</button>
                     </div>
                   )}
                 {/* Top Reference Banner */}
@@ -481,7 +483,7 @@ export default function AdminBookings() {
                       <span className="text-neutral-400 font-medium">Duration:</span>
                       {a.status?.toLowerCase() === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
                         <button 
-                          onClick={() => { setEditingDuration(a._id); setNewDuration(a.duration || 60); }}
+                          onClick={() => setEditingAppointment(a)}
                           className="text-amber-400 text-2xs hover:underline font-bold"
                         >
                           Edit
@@ -553,10 +555,10 @@ export default function AdminBookings() {
                     {a.status?.toLowerCase() === "confirmed" && (
                       <>
                         <button
-                          onClick={() => setEditingStaffAppointment(a)}
+                          onClick={() => setEditingAppointment(a)}
                           disabled={isActionLoading}
                           className="px-4 py-2 rounded-xl bg-surface-2 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
-                          title="Reassign Staff"
+                          title="Edit Appointment"
                         >
                         <Edit2 className="w-4 h-4" />
                           Edit
@@ -686,10 +688,10 @@ export default function AdminBookings() {
                       {a.status?.toLowerCase() === "confirmed" && (
                         <>
                           <button
-                            onClick={() => setEditingStaffAppointment(a)}
+                          onClick={() => setEditingAppointment(a)}
                             disabled={isActionLoading}
                             className="px-4 py-2 rounded-xl bg-surface-2 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
-                            title="Reassign Staff"
+                          title="Edit Appointment"
                           >
                             <Edit2 className="w-4 h-4" />
                             Edit
@@ -776,9 +778,19 @@ export default function AdminBookings() {
           }}
         />
       )}
+      {editingAppointment && (
+        <AppointmentEditWorkflowModal
+          appointment={editingAppointment}
+          salonId={salonId}
+          onClose={() => setEditingAppointment(null)}
+          onReassign={() => { setEditingAppointment(null); setEditingStaffAppointment(editingAppointment); }}
+          onSuccess={() => { setEditingAppointment(null); fetchAppointments(); }}
+        />
+      )}
       <CompletedAppointmentBill
         appointment={completedAppointment}
         onClose={() => setCompletedAppointment(null)}
+      />
 
       {/* Bill Generation Modal */}
       <GenerateBillModal

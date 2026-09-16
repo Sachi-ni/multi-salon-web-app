@@ -16,6 +16,7 @@ import {
   updateAppointmentDuration,
   updateAppointmentDetails,
   updateStaffAssignment,
+  reassignStaff,
   deleteAppointment
 } from "../controllers/appointmentController.js";
 import { protect, optionalProtect } from "../middleware/authMiddleware.js";
@@ -42,6 +43,7 @@ router.patch("/:id/reject", protect, authorizeRoles("super-admin", "manager"), r
 router.patch("/:id/complete", protect, authorizeRoles("super-admin", "manager"), completeAppointment);
 router.patch("/:id/admin-cancel", protect, authorizeRoles("super-admin", "manager"), adminCancelAppointment);
 router.patch("/:id/assign-staff", protect, authorizeRoles("super-admin", "staff-admin", "manager"), updateStaffAssignment);
+router.patch("/:id/reassign-staff", protect, authorizeRoles("super-admin", "staff-admin", "manager"), reassignStaff);
 router.delete("/:id", protect, deleteAppointment);
 
 export default router;

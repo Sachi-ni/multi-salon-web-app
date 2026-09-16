@@ -62,6 +62,9 @@ export const updateAppointmentDetails = (id, data) =>
 
 export const updateStaffAssignment = (id, services) =>
   api.patch(`/appointments/${id}/assign-staff`, { services });
+
+export const reassignStaff = (id, assignments) =>
+  api.patch(`/appointments/${id}/reassign-staff`, { assignments });
 export const getStaffAppointments = (staffId, status = "", date = "") =>
   api.get(`/appointments/staff/${staffId}`, { params: { status, date } });
 
