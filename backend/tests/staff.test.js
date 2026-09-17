@@ -4,6 +4,7 @@ import Staff from "../models/Staff.js";
 import Salon from "../models/Salon.js";
 import generateToken from "../utils/generateToken.js";
 import Admin from "../models/Admin.js";
+import Salary from "../models/Salary.js";
 
 const staffPayload = (email, extra = {}) => ({ name: "New Staff Member", firstName: "New", lastName: "Staff", email, phone: "0771234567", password: "Strong!Pass1", ...extra });
 
@@ -65,4 +66,40 @@ test("manager cannot reassign staff to another salon", async () => {
 
   expect([200, 403]).toContain(response.status);
   expect((await Staff.findById(staff._id)).salon_id.toString()).toBe(salonA._id.toString());
+});
+
+test("changing frequency closes the old salary and opens the new salary from today", async () => {
+  const salon = await Salon.create({ name: "A", staffCount: 0 });
+  const manager = await Staff.create({ full_name: "Manager A", first_name: "Manager", last_name: "A", email: "manager-frequency@gmail.com", password_hash: "unused", role: "manager", salon_id: salon._id });
+  const staff = await Staff.create({ full_name: "Staff Frequency", first_name: "Staff", last_name: "Frequency", email: "staff-frequency@gmail.com", password_hash: "unused", role: "staff", salon_id: salon._id, salary_payment_frequency: "daily" });
+  const today = new Date();
+  const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  await Salary.create({
+    salon_id: salon._id,
+    staff_id: staff._id,
+    frequency: "daily",
+    period: dateKey,
+    staff_name: staff.full_name,
+    dateRange: { start: dateKey, end: dateKey },
+    workingAmount: 1000,
+    rate: 10,
+    workRate: 100,
+    daySalary: 100,
+    totalSalary: 100,
+    status: "Not Paid",
+  });
+
+  const response = await request(app)
+    .put(`/api/staff/${staff._id}`)
+    .set("Authorization", `Bearer ${generateToken(manager)}`)
+    .send({ salaryPaymentFrequency: "weekly" });
+
+  expect(response.status).toBe(200);
+  const oldSalary = await Salary.findOne({ staff_id: staff._id, frequency: "daily" });
+  const newSalary = await Salary.findOne({ staff_id: staff._id, frequency: "weekly" });
+  expect(oldSalary.isTransitioned).toBe(true);
+  expect(oldSalary.totalSalary).toBeGreaterThanOrEqual(100);
+  expect(newSalary.dateRange.start).toBe(dateKey);
+  expect(response.body.salaryTransition.salaryId).toBe(String(oldSalary._id));
 });

@@ -38,6 +38,7 @@ const appointmentSchema = new mongoose.Schema({
   },
   total_price: { type: Number, default: 0 },
   notes: { type: String, default: "" },
+  customer_note: { type: String, default: "" },
   confirmed_at: { type: Date, default: null },
   rejected_at: { type: Date, default: null },
   cancelled_at: { type: Date, default: null },
@@ -51,7 +52,7 @@ const appointmentSchema = new mongoose.Schema({
     summary: { type: String, required: true },
     changes: { type: mongoose.Schema.Types.Mixed, default: {} },
     changed_by: { type: mongoose.Schema.Types.ObjectId, refPath: "edit_history.changed_by_model" },
-    changed_by_model: { type: String, enum: ["Admin", "Staff"] },
+    changed_by_model: { type: String, enum: ["Admin", "Staff", "Customer"] },
     changed_at: { type: Date, default: Date.now }
   }],
 }, { timestamps: true });

@@ -6,13 +6,33 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 const AdminSalonLayout = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
   const location = useLocation();
   const { user } = useAuth();
   const isStandardStaff = user?.role && !["super-admin", "manager"].includes(user.role);
 
-  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
-  const closeSidebar = () => setSidebarOpen(false);
+  const toggleSidebar = () => {
+    if (window.innerWidth >= 1024) {
+      setIsCollapsed((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem("sidebar_collapsed", String(next));
+        } catch {}
+        return next;
+      });
+    } else {
+      setMobileOpen((prev) => !prev);
+    }
+  };
+
+  const closeMobileSidebar = () => setMobileOpen(false);
 
   // Extract current salon-admin base: /salon-admin/:salonId
   // Example path: /salon-admin/6a1e.../adminDashboard
@@ -27,15 +47,24 @@ const AdminSalonLayout = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-primary">
-      <AdminHeader onToggleSidebar={isStandardStaff ? undefined : toggleSidebar} />
+      <AdminHeader
+        onToggleSidebar={isStandardStaff ? undefined : toggleSidebar}
+        isCollapsed={isCollapsed}
+      />
       {!isStandardStaff && (
-        <AdminSidebar isOpen={sidebarOpen} onClose={closeSidebar} basePath={base} />
+        <AdminSidebar
+          isOpen={mobileOpen}
+          onClose={closeMobileSidebar}
+          isCollapsed={isCollapsed}
+          onToggleCollapse={toggleSidebar}
+          basePath={base}
+        />
       )}
 
       <main
         className={clsx(
-          "pt-header min-h-screen transition-[margin] duration-300 ease-in-out",
-          !isStandardStaff && "lg:ml-sidebar",
+          "pt-header min-h-screen transition-all duration-300 ease-in-out",
+          !isStandardStaff && (isCollapsed ? "lg:ml-[72px]" : "lg:ml-sidebar"),
           "px-4 sm:px-5 pb-5"
         )}
       >

@@ -520,7 +520,7 @@ export default function Analytics() {
                     </div>
                   </div>
                   <div className="text-lg sm:text-xl font-black text-white truncate leading-tight">
-                    {forecast?.topBranchPrediction || "Flagship Branch"}
+                    {forecast?.topBranchPrediction || "Top Branch"}
                   </div>
                   <p className="text-[0.65rem] text-muted-2 mt-2">
                     Highest anticipated revenue contribution
@@ -617,7 +617,7 @@ export default function Analytics() {
                       Executive Strategic Outlook
                     </span>
                     <blockquote className="text-xs sm:text-sm text-white/90 italic leading-relaxed pl-3 border-l-2 border-accent my-3">
-                      "{forecast?.executiveSummary || 'Anticipating resilient business performance with positive momentum across flagship branches.'}"
+                      "{forecast?.executiveSummary || 'Anticipating resilient business performance with positive momentum across salon branches.'}"
                     </blockquote>
                   </div>
 
