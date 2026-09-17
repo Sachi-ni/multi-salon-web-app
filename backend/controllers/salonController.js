@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import Salon from "../models/Salon.js";
 import Staff from "../models/Staff.js";
+import Salary from "../models/Salary.js";
 import Feedback from "../models/Feedback.js";
 import Appointment from "../models/Appointment.js";
 import Notification from "../models/Notification.js";
@@ -177,8 +178,35 @@ export const createSalon = async (req, res) => {
       phone: validation.normalizedPhone,
       password_hash,
       role: "manager",
+      salaryCalculationEnabled: true,
       status: "Active",
       salon_id: salon._id,
+    });
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+    const monthEnd = new Date(year, month, 0).getDate();
+    const addedDate = `${monthKey}-${String(now.getDate()).padStart(2, "0")}`;
+
+    await Salary.create({
+      salon_id: salon._id,
+      staff_id: manager._id,
+      employmentStartDate: addedDate,
+      frequency: "monthly",
+      period: monthKey,
+      staff_name: manager.full_name,
+      staff_role: manager.role,
+      commission_rate: manager.commission_rate || 0,
+      salary_payment_count_per_day: manager.salary_payment_count_per_day || 1,
+      calculationStartDate: addedDate,
+      dateRange: {
+        start: addedDate,
+        end: `${monthKey}-${String(monthEnd).padStart(2, "0")}`,
+      },
+      status: "Not Paid",
+      dailyRecords: [],
     });
 
     salon.staffCount = 1;

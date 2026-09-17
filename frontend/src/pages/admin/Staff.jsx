@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
-import { markAsPaid } from "../../services/salaryService";
 import { getServices } from "../../services/serviceService";
 import useFormValidation from "../../hooks/useFormValidation";
 import { validateEmail } from "../../utils/validation";
@@ -402,9 +401,7 @@ export default function AdminStaffPage() {
 
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [pendingPayment, setPendingPayment] = useState(null);
-  const [paymentLoading, setPaymentLoading] = useState(false);
-  const [paymentError, setPaymentError] = useState("");
+  const [frequencyConfirmation, setFrequencyConfirmation] = useState(null);
 
   const fetchStaffData = useCallback(async () => {
     try {
@@ -507,6 +504,17 @@ export default function AdminStaffPage() {
     e.preventDefault();
     if (!validateStaffEdit()) return;
 
+    const oldFrequency = editStaff.salary_payment_frequency || "monthly";
+    const newFrequency = editForm.paymentFrequency || "monthly";
+    if (oldFrequency !== newFrequency && !frequencyConfirmation) {
+      setFrequencyConfirmation({
+        name: editStaff.full_name || `${editForm.firstName} ${editForm.lastName}`.trim(),
+        oldFrequency,
+        newFrequency,
+      });
+      return;
+    }
+
     setEditLoading(true);
     setError("");
 
@@ -537,12 +545,6 @@ export default function AdminStaffPage() {
         updateData
       );
 
-      const transition = response.data?.salaryTransition;
-      if (transition && transition.status !== "Paid" && Number(transition.totalSalary) > 0) {
-        setPaymentError("");
-        setPendingPayment(transition);
-      }
-
       console.log("UPDATED STAFF RESPONSE:", response.data);
       console.log(
         "UPDATED SERVICES:",
@@ -571,6 +573,11 @@ export default function AdminStaffPage() {
     }
   };
 
+  const confirmFrequencyChange = async () => {
+    setFrequencyConfirmation(null);
+    await handleEditSubmit({ preventDefault: () => {} });
+  };
+
   const handleDelete = async () => {
     setDeleteLoading(true);
 
@@ -582,42 +589,21 @@ export default function AdminStaffPage() {
       fetchStaffData();
     } catch (err) {
       console.error(err);
-
-      setError(
-        err.response?.data?.message ||
-          "Failed to delete staff member"
-      );
+      setError(err.response?.data?.message || "Failed to delete staff member");
     } finally {
       setDeleteLoading(false);
     }
   };
 
   const filteredStaff = useMemo(() => {
-    if (!searchTerm) {
-      return staffList;
-    }
-
+    if (!searchTerm) return staffList;
     const term = searchTerm.toLowerCase();
-
     return staffList.filter((s) => {
-      const name =
-        (s.full_name || "").toLowerCase();
-
-      const spec =
-        (s.specification || "").toLowerCase();
-
-      const email =
-        (s.email || "").toLowerCase();
-
-      const phone =
-        (s.phone || "").toLowerCase();
-
-      return (
-        name.includes(term) ||
-        spec.includes(term) ||
-        email.includes(term) ||
-        phone.includes(term)
-      );
+      const name = (s.full_name || "").toLowerCase();
+      const spec = (s.specification || "").toLowerCase();
+      const email = (s.email || "").toLowerCase();
+      const phone = (s.phone || "").toLowerCase();
+      return name.includes(term) || spec.includes(term) || email.includes(term) || phone.includes(term);
     });
   }, [staffList, searchTerm]);
 
@@ -631,11 +617,7 @@ export default function AdminStaffPage() {
         <Button
           variant="primary"
           icon={Plus}
-          onClick={() =>
-            navigate(
-              `/salon-admin/${salonId}/AddStaff`
-            )
-          }
+          onClick={() => navigate(`/salon-admin/${salonId}/AddStaff`)}
         >
           Add Staff Member
         </Button>
@@ -1101,55 +1083,23 @@ export default function AdminStaffPage() {
       </Modal>
 
       <Modal
-        isOpen={Boolean(pendingPayment)}
-        onClose={() => setPendingPayment(null)}
-        title="Pending salary payment"
+        isOpen={Boolean(frequencyConfirmation)}
+        onClose={() => setFrequencyConfirmation(null)}
+        title="Confirm Payment Frequency Change"
         maxWidth="max-w-md"
       >
-        {pendingPayment && (
+        {frequencyConfirmation && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
-              <div className="flex items-start gap-3">
-                <Coins className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-400" />
-                <div>
-                  <p className="text-sm font-bold text-white">Previous salary is still pending</p>
-                  <p className="mt-1 text-xs leading-5 text-neutral-300">
-                    The previous {pendingPayment.frequency} salary period has an unpaid balance of{" "}
-                    <strong className="text-amber-300">
-                      LKR {Number(pendingPayment.totalSalary).toLocaleString()}
-                    </strong>.
-                  </p>
-                  <p className="mt-2 text-xs text-amber-200/80">
-                    The new payment frequency starts separately from the change date.
-                  </p>
-                </div>
-              </div>
-            </div>
-            {paymentError && <p className="text-sm font-semibold text-danger">{paymentError}</p>}
+            <p className="text-sm text-muted-1">
+              You are changing <strong className="text-white">{frequencyConfirmation.name}</strong>'s payment frequency from <strong className="text-white">{frequencyConfirmation.oldFrequency}</strong> to <strong className="text-white">{frequencyConfirmation.newFrequency}</strong>.
+            </p>
+            <p className="text-sm text-muted-1">
+              This will mark all pending salary under the current frequency as <strong className="text-white">Paid up to today ({new Date().toLocaleDateString()})</strong>.
+            </p>
+            <p className="text-sm text-muted-1">Do you want to continue?</p>
             <Modal.Actions className="justify-end">
-              <Button variant="ghost" size="sm" onClick={() => setPendingPayment(null)} disabled={paymentLoading}>
-                Pay Later
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={paymentLoading}
-                onClick={async () => {
-                  try {
-                    setPaymentLoading(true);
-                    setPaymentError("");
-                    await markAsPaid(pendingPayment.salaryId);
-                    setPendingPayment(null);
-                    await fetchStaffData();
-                  } catch (err) {
-                    setPaymentError(err.response?.data?.message || "Failed to mark salary as paid");
-                  } finally {
-                    setPaymentLoading(false);
-                  }
-                }}
-              >
-                {paymentLoading ? "Processing..." : "Pay Now"}
-              </Button>
+              <Button variant="ghost" onClick={() => setFrequencyConfirmation(null)}>Cancel</Button>
+              <Button variant="primary" onClick={confirmFrequencyChange}>Pay &amp; Update Frequency</Button>
             </Modal.Actions>
           </div>
         )}

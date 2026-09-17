@@ -153,8 +153,7 @@ const getStaffJoinDateStr = (staff) => {
 // Number of days of a period that have already elapsed (period start up to
 // today). Used for fallback rows so the fixed salary-per-day amount is
 // included in the period totals for days without completed appointments.
-// When staffJoinDate is provided, days prior to joining the salon are excluded.
-const countElapsedPeriodDays = (frequency, dateStr, staffJoinDate = "") => {
+const countElapsedPeriodDays = (frequency, dateStr) => {
   const selected = new Date(dateStr);
   if (Number.isNaN(selected.getTime())) return 0;
 
@@ -178,21 +177,6 @@ const countElapsedPeriodDays = (frequency, dateStr, staffJoinDate = "") => {
     start = new Date(selected);
     start.setHours(0, 0, 0, 0);
     end = start;
-  }
-
-  // If staff joined after this entire period ended, elapsed days is 0
-  const joinDateKey = staffJoinDate ? toDateKey(staffJoinDate) : "";
-  const periodEndKey = toDateKey(end);
-  if (joinDateKey && periodEndKey < joinDateKey) {
-    return 0;
-  }
-
-  // Adjust start to staff join date if they joined mid-period
-  if (joinDateKey) {
-    const joinDateObj = new Date(joinDateKey + "T00:00:00");
-    if (!Number.isNaN(joinDateObj.getTime()) && joinDateObj > start) {
-      start = joinDateObj;
-    }
   }
 
   const effectiveEnd = end < todayStart ? end : todayStart;
@@ -603,8 +587,8 @@ const Salary = () => {
 
       const totalWorkingAmount = rows.reduce((sum, row) => sum + Number(row.workingAmount || 0), 0);
       const totalWorkRate = rows.reduce((sum, row) => sum + Number(row.workRate || 0), 0);
-      const totalSalary = salary.status === "Paid"
-        ? (salary.paidTotal || salary.totalSalary || 0)
+      const totalSalary = salary.status === "Paid" || salary.isTransitioned
+        ? (salary.paidTotal ?? salary.totalSalary ?? 0)
         : (salary.totalSalary || totalWorkRate || 0);
 
       const formatDate = (value) => {
@@ -715,6 +699,10 @@ const Salary = () => {
       drawSection("STAFF INFORMATION");
       drawInfoRow("Full Name", staff.name || staff.full_name || salary.staff_name || "N/A");
       drawInfoRow("Email", staff.email || "N/A");
+      drawInfoRow("Calculation Start", formatDate(salary.calculationStartDate || salary.dateRange?.start));
+      if (salary.isTransitioned) {
+        drawInfoRow("Frequency Changed", formatDate(salary.transitionedAt));
+      }
       yPos += 1;
 
       // Services Section
@@ -904,14 +892,14 @@ const Salary = () => {
         .map((staff) => {
           const joinDate = getStaffJoinDateStr(staff);
           const perDayAmount = Number(staff.salary_payment_count_per_day || 0);
-          const fallbackTotalSalary =
+          const employmentStartKey = staff.createdAt ? toDateKey(staff.createdAt) : "";
+          const selectedDateKey =
             frequency === "daily"
-              ? (dailyDate <= today && (!joinDate || dailyDate >= joinDate) ? perDayAmount : 0)
+              ? (dailyDate <= today ? perDayAmount : 0)
               : perDayAmount *
                 countElapsedPeriodDays(
                   frequency,
-                  frequency === "weekly" ? weeklyDate : monthlyDate,
-                  joinDate
+                  frequency === "weekly" ? weeklyDate : monthlyDate
                 );
 
           return {
@@ -1005,7 +993,7 @@ const Salary = () => {
           continue;
         }
         const perDay = Number(staff.salary_payment_count_per_day) || 0;
-        pendingOverdue += perDay * countElapsedPeriodDays(frequency, anchorStr, joinDate);
+        pendingOverdue += perDay * countElapsedPeriodDays(frequency, anchorStr);
       }
     }
 
