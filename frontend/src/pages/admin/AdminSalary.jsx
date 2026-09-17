@@ -136,7 +136,7 @@ const FALLBACK_PREFIX = "fallback-";
 // Number of days of a period that have already elapsed (period start up to
 // today). Used for fallback rows so the fixed salary-per-day amount is
 // included in the period totals for days without completed appointments.
-const countElapsedPeriodDays = (frequency, dateStr) => {
+const countElapsedPeriodDays = (frequency, dateStr, employmentStartDate) => {
   const selected = new Date(dateStr);
   if (Number.isNaN(selected.getTime())) return 0;
 
@@ -160,6 +160,14 @@ const countElapsedPeriodDays = (frequency, dateStr) => {
     start = new Date(selected);
     start.setHours(0, 0, 0, 0);
     end = start;
+  }
+
+  if (employmentStartDate) {
+    const employmentStart = new Date(employmentStartDate);
+    employmentStart.setHours(0, 0, 0, 0);
+    if (!Number.isNaN(employmentStart.getTime()) && employmentStart > start) {
+      start = employmentStart;
+    }
   }
 
   const effectiveEnd = end < todayStart ? end : todayStart;
@@ -560,8 +568,8 @@ const Salary = () => {
 
       const totalWorkingAmount = rows.reduce((sum, row) => sum + Number(row.workingAmount || 0), 0);
       const totalWorkRate = rows.reduce((sum, row) => sum + Number(row.workRate || 0), 0);
-      const totalSalary = salary.status === "Paid"
-        ? (salary.paidTotal || salary.totalSalary || 0)
+      const totalSalary = salary.status === "Paid" || salary.isTransitioned
+        ? (salary.paidTotal ?? salary.totalSalary ?? 0)
         : (salary.totalSalary || totalWorkRate || 0);
 
       const formatDate = (value) => {
@@ -672,6 +680,10 @@ const Salary = () => {
       drawSection("STAFF INFORMATION");
       drawInfoRow("Full Name", staff.name || staff.full_name || salary.staff_name || "N/A");
       drawInfoRow("Email", staff.email || "N/A");
+      drawInfoRow("Calculation Start", formatDate(salary.calculationStartDate || salary.dateRange?.start));
+      if (salary.isTransitioned) {
+        drawInfoRow("Frequency Changed", formatDate(salary.transitionedAt));
+      }
       yPos += 1;
 
       // Services Section
@@ -850,13 +862,24 @@ const Salary = () => {
           // Days without completed appointments still earn the fixed
           // salary-per-day amount, so fallback rows show it too.
           const perDayAmount = Number(staff.salary_payment_count_per_day || 0);
-          const fallbackTotalSalary =
+          const employmentStartKey = staff.createdAt ? toDateKey(staff.createdAt) : "";
+          const selectedDateKey =
             frequency === "daily"
+              ? dailyDate
+              : frequency === "weekly"
+                ? weeklyDate
+                : monthlyDate;
+          const fallbackTotalSalary =
+            staff.salaryCalculationEnabled === false ||
+            (employmentStartKey && selectedDateKey < employmentStartKey)
+              ? 0
+              : frequency === "daily"
               ? (dailyDate <= today ? perDayAmount : 0)
               : perDayAmount *
                 countElapsedPeriodDays(
                   frequency,
-                  frequency === "weekly" ? weeklyDate : monthlyDate
+                  frequency === "weekly" ? weeklyDate : monthlyDate,
+                  staff.createdAt
                 );
 
           return {
@@ -954,7 +977,8 @@ const Salary = () => {
           continue;
         }
         const perDay = Number(staff.salary_payment_count_per_day) || 0;
-        pendingOverdue += perDay * countElapsedPeriodDays(frequency, anchorStr);
+        pendingOverdue +=
+          perDay * countElapsedPeriodDays(frequency, anchorStr, staff.createdAt);
       }
     }
 

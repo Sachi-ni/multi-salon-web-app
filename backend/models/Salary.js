@@ -50,6 +50,9 @@ const salarySchema = new mongoose.Schema(
       index: true,
     },
 
+    // Salary must not accrue before the staff member was added.
+    employmentStartDate: { type: String, default: "" },
+
     // Frequency: daily, weekly, monthly
     frequency: {
       type: String,
@@ -57,6 +60,11 @@ const salarySchema = new mongoose.Schema(
       required: true,
       default: "monthly",
     },
+
+    // A new cycle is created whenever payment frequency changes. This keeps
+    // a later switch back to the same frequency separate from old history.
+    cycleId: { type: String, default: null },
+    calculationStartDate: { type: String, default: "" },
 
     // Period identifier
     // For daily: "2026-07-24"
@@ -130,8 +138,8 @@ const salarySchema = new mongoose.Schema(
 
 // One record per staff per period per frequency per salon
 salarySchema.index(
-  { salon_id: 1, staff_id: 1, period: 1, frequency: 1 },
-  { unique: true }
+  { salon_id: 1, staff_id: 1, period: 1, frequency: 1, cycleId: 1 },
+  { unique: true, partialFilterExpression: { cycleId: { $type: "string" } } }
 );
 
 export default mongoose.model("Salary", salarySchema);

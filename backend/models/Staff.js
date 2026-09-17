@@ -10,6 +10,8 @@ const staffSchema = new mongoose.Schema({
   role:            { type: String, required: true },
   specification:   { type: String, default: "" },
   commission_rate: { type: Number, default: 0 },
+  // Newly added staff and managers accrue salary from their added date.
+  salaryCalculationEnabled: { type: Boolean, default: true },
   salary_payment_frequency: {
     type: String,
     enum: ["daily", "weekly", "monthly"],
@@ -20,6 +22,7 @@ const staffSchema = new mongoose.Schema({
     default: 1,
     min: 1
   },
+  salary_cycle_id: { type: String, default: null },
 
   status:{ 
     type: String,
@@ -35,7 +38,7 @@ const staffSchema = new mongoose.Schema({
   resetPasswordTokenHash: { type: String, default: null },
   resetPasswordExpires: { type: Date, default: null },
   image:    { type: String, default: "" },
-  services: [{ type: mongoose.Schema.Types.ObjectId, ref: "Service" }] // ← new
-});
+  services: [{ type: mongoose.Schema.Types.ObjectId, ref: "Service" }]
+}, { timestamps: true });
 
 export default mongoose.model("Staff", staffSchema);

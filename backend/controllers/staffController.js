@@ -1,6 +1,7 @@
 import Staff from "../models/Staff.js";
 import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "node:crypto";
 import Salary from "../models/Salary.js";
 import Appointment from "../models/Appointment.js";
 import AppointmentService from "../models/AppointmentService.js";
@@ -8,7 +9,10 @@ import Feedback from "../models/Feedback.js";
 import { storeMedia } from "../utils/mediaStorage.js";
 import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
 import { validateNewPassword } from "../utils/passwordPolicy.js";
-import { transitionSalaryFrequency } from "./salaryController.js";
+import {
+  calculateDaySalary,
+  transitionSalaryFrequency,
+} from "./salaryController.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]);
@@ -149,6 +153,7 @@ export const createStaff = async (req, res) => {
       role: "staff",
       specification: req.body.specification,
       commission_rate: req.body.commission_rate || 0,
+      salaryCalculationEnabled: true,
       salary_payment_frequency: req.body.salaryPaymentFrequency || "monthly",
       salary_payment_count_per_day: Number.isFinite(salaryPaymentCountPerDay) && salaryPaymentCountPerDay > 0 ? salaryPaymentCountPerDay : 1,
       salon_id: salonId,
@@ -171,8 +176,8 @@ export const createStaff = async (req, res) => {
       );
     }
 
-    // Auto-generate salary record for current period for this staff (excluding managers)
-    if ((staff.role || "").toLowerCase() !== "manager") {
+    // Auto-generate the current salary record for both staff and managers.
+    {
       try {
         const now = new Date();
         const year = now.getFullYear();
@@ -180,6 +185,7 @@ export const createStaff = async (req, res) => {
         const frequency = staff.salary_payment_frequency || "monthly";
 
         const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const employmentStartDate = `${staff.createdAt.getFullYear()}-${String(staff.createdAt.getMonth() + 1).padStart(2, "0")}-${String(staff.createdAt.getDate()).padStart(2, "0")}`;
         let period, periodStart, periodEnd, weekNumber = 0;
 
         if (frequency === "daily") {
@@ -215,13 +221,22 @@ export const createStaff = async (req, res) => {
         }
 
         await Salary.findOneAndUpdate(
-          { salon_id: salonId, staff_id: staff._id, period, frequency },
+          {
+            salon_id: salonId,
+            staff_id: staff._id,
+            period,
+            frequency,
+            cycleId: null,
+          },
           {
             $setOnInsert: {
               salon_id: salonId,
               staff_id: staff._id,
+              employmentStartDate,
               frequency,
               period,
+              cycleId: null,
+              calculationStartDate: employmentStartDate,
               staff_name: staff.full_name || "",
               staff_role: staff.role || "",
               commission_rate: staff.commission_rate || 0,
@@ -235,7 +250,7 @@ export const createStaff = async (req, res) => {
               year,
               month,
               weekNumber,
-              dateRange: { start: periodStart, end: periodEnd },
+              dateRange: { start: employmentStartDate, end: periodEnd },
               dailyRecords: [],
             },
           },
@@ -379,7 +394,28 @@ export const updateStaff = async (req, res) => {
     const requestedFrequency = req.body.salaryPaymentFrequency;
     const frequencyChanged =
       requestedFrequency !== undefined && requestedFrequency !== previousFrequency;
+    const requestedCommissionRate = req.body.commission_rate !== undefined
+      ? Number(req.body.commission_rate)
+      : originalStaff.commission_rate;
+    const commissionRateChanged =
+      req.body.commission_rate !== undefined &&
+      Number.isFinite(requestedCommissionRate) &&
+      requestedCommissionRate !== Number(originalStaff.commission_rate || 0);
+    const requestedPaymentCount = req.body.salaryPaymentCountPerDay !== undefined
+      ? Number(req.body.salaryPaymentCountPerDay)
+      : originalStaff.salary_payment_count_per_day;
+    const paymentCountChanged =
+      req.body.salaryPaymentCountPerDay !== undefined &&
+      Number.isFinite(requestedPaymentCount) &&
+      requestedPaymentCount !== Number(originalStaff.salary_payment_count_per_day || 1);
+    const salarySettingsChanged =
+      frequencyChanged || commissionRateChanged || paymentCountChanged;
+    const paymentCountOnlyChanged =
+      paymentCountChanged && !frequencyChanged && !commissionRateChanged;
     const frequencyChangedAt = new Date();
+    const transitionCycleId = salarySettingsChanged && !paymentCountOnlyChanged
+      ? randomUUID()
+      : null;
 
     const updateData = {};
 
@@ -470,8 +506,18 @@ export const updateStaff = async (req, res) => {
       updateData.specification = req.body.specification;
     }
 
+    if (req.body.commission_rate !== undefined) {
+      if (!Number.isFinite(requestedCommissionRate) || requestedCommissionRate < 0) {
+        return res.status(400).json({ message: "Commission rate must be a valid non-negative number" });
+      }
+      updateData.commission_rate = requestedCommissionRate;
+    }
+
     if (req.body.salaryPaymentFrequency !== undefined)
       updateData.salary_payment_frequency = req.body.salaryPaymentFrequency;
+    if (salarySettingsChanged && !paymentCountOnlyChanged) {
+      updateData.salary_cycle_id = transitionCycleId;
+    }
 
     if (req.body.salaryPaymentCountPerDay !== undefined) {
       const parsedCount = Number(req.body.salaryPaymentCountPerDay);
@@ -535,17 +581,23 @@ export const updateStaff = async (req, res) => {
       if (shouldSyncSalary) {
         const salonId = staff.salon_id;
         const frequency = staff.salary_payment_frequency || "monthly";
+        const cycleId = salarySettingsChanged
+          ? transitionCycleId
+          : staff.salary_cycle_id;
         const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1;
-        const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const calculationDate = new Date(now);
+        if (salarySettingsChanged) calculationDate.setDate(calculationDate.getDate() + 1);
+        const year = calculationDate.getFullYear();
+        const month = calculationDate.getMonth() + 1;
+        const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(calculationDate.getDate()).padStart(2, "0")}`;
 
         let previousSalary = null;
-        if (frequencyChanged) {
+        if (salarySettingsChanged && !paymentCountOnlyChanged) {
           previousSalary = await transitionSalaryFrequency(
             staff,
             previousFrequency,
-            frequencyChangedAt
+            frequencyChangedAt,
+            req.user?.id
           );
         }
 
@@ -555,7 +607,7 @@ export const updateStaff = async (req, res) => {
           periodStart = yyyymmdd;
           periodEnd = yyyymmdd;
         } else if (frequency === "weekly") {
-          const d = new Date(yyyymmdd);
+          const d = new Date(`${yyyymmdd}T00:00:00`);
           const dayNum = d.getUTCDay() || 7;
           d.setUTCDate(d.getUTCDate() + 4 - dayNum);
           const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -586,20 +638,95 @@ export const updateStaff = async (req, res) => {
           {
             $set: {
               staff_name: staff.full_name || "",
+              employmentStartDate: `${staff.createdAt.getFullYear()}-${String(staff.createdAt.getMonth() + 1).padStart(2, "0")}-${String(staff.createdAt.getDate()).padStart(2, "0")}`,
               salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
             }
           }
         );
 
+        if (paymentCountOnlyChanged) {
+          const activeSalaryRecords = await Salary.find({
+            salon_id: salonId,
+            staff_id: staff._id,
+            frequency,
+            status: "Not Paid",
+            ...(staff.salary_cycle_id
+              ? { cycleId: staff.salary_cycle_id }
+              : { cycleId: null }),
+          });
+
+          for (const salaryRecord of activeSalaryRecords) {
+            const workingAmount = Number(salaryRecord.workingAmount || 0);
+            const dailyWorkingAmounts = new Map(
+              (salaryRecord.dailyRecords || []).map((record) => [
+                String(record.date),
+                Number(record.workingAmount || 0),
+              ])
+            );
+            const perDay = Number(salaryRecord.salary_payment_count_per_day || 0);
+            const rate = Number(salaryRecord.rate || salaryRecord.commission_rate || 0);
+
+            if (salaryRecord.frequency === "daily") {
+              const workRate = workingAmount * (Number(salaryRecord.rate || 0) / 100);
+              salaryRecord.workingAmount = workingAmount;
+              salaryRecord.workRate = workRate;
+              salaryRecord.daySalary = calculateDaySalary(
+                workRate,
+                perDay,
+                Boolean(salaryRecord.isAbsent)
+              );
+              salaryRecord.totalSalary = salaryRecord.daySalary;
+            } else {
+              for (const record of salaryRecord.dailyRecords || []) {
+                const recordWorkingAmount = dailyWorkingAmounts.get(String(record.date)) ?? 0;
+                const workRate = recordWorkingAmount * (rate / 100);
+                record.workingAmount = recordWorkingAmount;
+                record.rate = rate;
+                record.workRate = workRate;
+                record.daySalary = calculateDaySalary(
+                  workRate,
+                  perDay,
+                  Boolean(record.isAbsent)
+                );
+                record.totalSalary = record.daySalary;
+              }
+              const countedRecords = salaryRecord.dailyRecords || [];
+              salaryRecord.workingAmount = countedRecords.reduce(
+                (sum, record) => sum + Number(record.workingAmount || 0),
+                0
+              );
+              salaryRecord.workRate = countedRecords.reduce(
+                (sum, record) => sum + Number(record.workRate || 0),
+                0
+              );
+              salaryRecord.daySalary = countedRecords.reduce(
+                (sum, record) => sum + Number(record.daySalary || 0),
+                0
+              );
+              salaryRecord.totalSalary = salaryRecord.daySalary;
+            }
+            await salaryRecord.save();
+          }
+        }
+
         // Ensure a current period record exists with the updated frequency
         await Salary.findOneAndUpdate(
-          { salon_id: salonId, staff_id: staff._id, period, frequency },
+          {
+            salon_id: salonId,
+            staff_id: staff._id,
+            period,
+            frequency,
+            cycleId: salarySettingsChanged && !paymentCountOnlyChanged ? cycleId : null,
+          },
           {
             $setOnInsert: {
               salon_id: salonId,
               staff_id: staff._id,
+              employmentStartDate: `${staff.createdAt.getFullYear()}-${String(staff.createdAt.getMonth() + 1).padStart(2, "0")}-${String(staff.createdAt.getDate()).padStart(2, "0")}`,
               frequency,
               period,
+              cycleId: salarySettingsChanged && !paymentCountOnlyChanged ? cycleId : null,
+              calculationStartDate: salarySettingsChanged && !paymentCountOnlyChanged ? yyyymmdd : periodStart,
               staff_name: staff.full_name || "",
               staff_role: staff.role || "",
               commission_rate: staff.commission_rate || 0,
@@ -614,7 +741,7 @@ export const updateStaff = async (req, res) => {
               month,
               weekNumber,
               dateRange: {
-                start: frequencyChanged ? yyyymmdd : periodStart,
+                start: salarySettingsChanged && !paymentCountOnlyChanged ? yyyymmdd : periodStart,
                 end: periodEnd,
               },
               dailyRecords: [],
@@ -622,22 +749,6 @@ export const updateStaff = async (req, res) => {
           },
           { upsert: true, new: true }
         );
-
-        if (frequencyChanged) {
-          const currentSalary = await Salary.findOne({
-            salon_id: salonId,
-            staff_id: staff._id,
-            period,
-            frequency,
-          });
-          if (currentSalary && currentSalary.status !== "Paid") {
-            currentSalary.dateRange = { start: yyyymmdd, end: periodEnd };
-            currentSalary.dailyRecords = (currentSalary.dailyRecords || []).filter(
-              (record) => record.date >= yyyymmdd
-            );
-            await currentSalary.save();
-          }
-        }
 
         res.locals.salaryTransition = previousSalary;
       }
