@@ -133,10 +133,27 @@ const SALARY_REFRESH_KEY = "salary-refresh-token";
 // Prefix used for row ids of staff that do not have a salary record yet
 const FALLBACK_PREFIX = "fallback-";
 
+// Helper to extract a staff member's join date (YYYY-MM-DD)
+const getStaffJoinDateStr = (staff) => {
+  if (!staff) return "";
+  if (staff.joined_date) return toDateKey(staff.joined_date);
+  if (staff.createdAt) return toDateKey(staff.createdAt);
+  const id = staff._id || staff;
+  if (typeof id === "string" && id.length === 24) {
+    try {
+      const timestamp = parseInt(id.substring(0, 8), 16) * 1000;
+      return toDateKey(new Date(timestamp));
+    } catch {
+      return "";
+    }
+  }
+  return "";
+};
+
 // Number of days of a period that have already elapsed (period start up to
 // today). Used for fallback rows so the fixed salary-per-day amount is
 // included in the period totals for days without completed appointments.
-const countElapsedPeriodDays = (frequency, dateStr, employmentStartDate) => {
+const countElapsedPeriodDays = (frequency, dateStr) => {
   const selected = new Date(dateStr);
   if (Number.isNaN(selected.getTime())) return 0;
 
@@ -160,14 +177,6 @@ const countElapsedPeriodDays = (frequency, dateStr, employmentStartDate) => {
     start = new Date(selected);
     start.setHours(0, 0, 0, 0);
     end = start;
-  }
-
-  if (employmentStartDate) {
-    const employmentStart = new Date(employmentStartDate);
-    employmentStart.setHours(0, 0, 0, 0);
-    if (!Number.isNaN(employmentStart.getTime()) && employmentStart > start) {
-      start = employmentStart;
-    }
   }
 
   const effectiveEnd = end < todayStart ? end : todayStart;
@@ -490,7 +499,17 @@ const Salary = () => {
       if (isFallbackRow) {
         // Staff without a salary record yet - create the record for this
         // period and mark the day absent in one step.
-        const staffId = salaryId.slice(FALLBACK_PREFIX.length);
+        const staffId =
+          row.staff_id?._id ||
+          row.staff_id ||
+          (String(salaryId).startsWith(FALLBACK_PREFIX)
+            ? salaryId.slice(FALLBACK_PREFIX.length)
+            : salaryId);
+        if (!staffId) {
+          setError("Staff information missing for this row");
+          setLoading(false);
+          return;
+        }
         await markStaffDayAbsent(staffId, {
           frequency,
           period: getPeriod(),
@@ -856,30 +875,31 @@ const Salary = () => {
         rows.map((row) => String(row.staff_id?._id || row.staff_id || ""))
       );
 
+      const currentPeriod = getPeriod();
+      const anchorStr = getPeriodAnchorDateStr(frequency, currentPeriod);
+      const periodEndStr = getPeriodEndDateStr(frequency, anchorStr);
+
       const pendingRows = fallbackStaff
-        .filter((staff) => !recordedStaffIds.has(String(staff._id)))
+        .filter((staff) => {
+          if (recordedStaffIds.has(String(staff._id))) return false;
+          // If staff joined after this period ended, don't show fallback row for past period
+          const joinDate = getStaffJoinDateStr(staff);
+          if (joinDate && periodEndStr && periodEndStr < joinDate) {
+            return false;
+          }
+          return true;
+        })
         .map((staff) => {
-          // Days without completed appointments still earn the fixed
-          // salary-per-day amount, so fallback rows show it too.
+          const joinDate = getStaffJoinDateStr(staff);
           const perDayAmount = Number(staff.salary_payment_count_per_day || 0);
           const employmentStartKey = staff.createdAt ? toDateKey(staff.createdAt) : "";
           const selectedDateKey =
             frequency === "daily"
-              ? dailyDate
-              : frequency === "weekly"
-                ? weeklyDate
-                : monthlyDate;
-          const fallbackTotalSalary =
-            staff.salaryCalculationEnabled === false ||
-            (employmentStartKey && selectedDateKey < employmentStartKey)
-              ? 0
-              : frequency === "daily"
               ? (dailyDate <= today ? perDayAmount : 0)
               : perDayAmount *
                 countElapsedPeriodDays(
                   frequency,
-                  frequency === "weekly" ? weeklyDate : monthlyDate,
-                  staff.createdAt
+                  frequency === "weekly" ? weeklyDate : monthlyDate
                 );
 
           return {
@@ -900,7 +920,7 @@ const Salary = () => {
     }
 
     return rows;
-  }, [salaries, fallbackStaff, frequency, dailyDate, today, weeklyDate, monthlyDate]);
+  }, [salaries, fallbackStaff, frequency, dailyDate, today, weeklyDate, monthlyDate, getPeriod]);
 
   // ─── Summary cards (computed from the same rows the table renders) ───────
 
@@ -968,17 +988,12 @@ const Salary = () => {
       for (const staff of fallbackStaff) {
         if (staffMap.has(String(staff._id || ""))) continue;
         // Staff created after this period ended were not employed then.
-        const createdAt = staff.createdAt ? new Date(staff.createdAt) : null;
-        if (
-          createdAt &&
-          !Number.isNaN(createdAt.getTime()) &&
-          toDateKey(createdAt) > periodEndStr
-        ) {
+        const joinDate = getStaffJoinDateStr(staff);
+        if (joinDate && joinDate > periodEndStr) {
           continue;
         }
         const perDay = Number(staff.salary_payment_count_per_day) || 0;
-        pendingOverdue +=
-          perDay * countElapsedPeriodDays(frequency, anchorStr, staff.createdAt);
+        pendingOverdue += perDay * countElapsedPeriodDays(frequency, anchorStr);
       }
     }
 

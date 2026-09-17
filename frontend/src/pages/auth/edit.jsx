@@ -185,7 +185,7 @@ const Edit = () => {
             />
           </div>
 
-          {user?.role !== "customer" && user?.role !== "user" && (
+          {user?.role === "super-admin" && (
             <div className="mb-3.5">
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
                 Username

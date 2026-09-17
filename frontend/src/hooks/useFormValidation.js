@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { API_URL } from "../config";
+import { readJsonResponse } from "../utils/apiResponse";
 
 const getError = (rule, value, values) => {
   const result = rule(value, values);
@@ -48,7 +49,7 @@ export const useFormValidation = (values, rules) => {
         signal: controller.signal,
       });
       if (!response.ok) return;
-      const result = await response.json();
+      const result = await readJsonResponse(response);
       if (requestIds.current[field] !== requestId) return;
 
       setFieldMessages((current) => ({

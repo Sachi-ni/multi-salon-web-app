@@ -15,6 +15,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response && (!error.response.data || typeof error.response.data !== "object")) {
+      error.response.data = { message: "Something went wrong. Please try again." };
+    }
     // Auto logout if token expired
     if (error.response?.status === 401) {
       sessionStorage.removeItem("token");

@@ -24,7 +24,12 @@ phone:     { type: String },
   otpCodeHash: { type: String, default: null },
   otpExpires: { type: Date, default: null },
   otpAttempts: { type: Number, default: 0 },
-  otpLastSentAt: { type: Date, default: null }
+  otpLastSentAt: { type: Date, default: null },
+  passwordResetOtpCodeHash: { type: String, default: null },
+  passwordResetOtpExpires: { type: Date, default: null },
+  passwordResetOtpAttempts: { type: Number, default: 0 },
+  passwordResetOtpLastSentAt: { type: Date, default: null },
+  passwordResetSessionHash: { type: String, default: null }
 }, { timestamps: true });
 
 export default mongoose.model("Admin", adminSchema);
