@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { API_URL } from "../../config";
+import { readJsonResponse } from "../../utils/apiResponse";
 
 const StaffDashboard = () => {
   const { user, token } = useAuth();
@@ -36,7 +37,7 @@ const StaffDashboard = () => {
           throw new Error("Failed to fetch dashboard data");
         }
 
-        const data = await res.json();
+        const data = await readJsonResponse(res);
         if (isMounted) {
           setProfile(data.profile);
           setAppointments(data.appointments || []);

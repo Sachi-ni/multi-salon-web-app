@@ -35,16 +35,21 @@ export const maskEmail = (email) => {
 };
 
 /**
- * Sends the 6-digit OTP code to the SuperAdmin's email address.
+ * Sends a 6-digit OTP code through the configured email provider.
  * Supports both HTTP-based email (Resend API) and standard SMTP (Nodemailer).
- * If cloud hosting (like Render Free Tier) blocks outbound SMTP ports, the code is
- * prominently logged in the server console so login is never broken.
+ * Delivery failures are reported without including credential values.
  */
-export const sendSuperAdminOtpEmail = async ({ email, code }) => {
-  // Always log the OTP code in the server logs so developers / admins can always access it
-  console.log("============================================================");
-  console.log(`🔑 [SUPERADMIN OTP CODE]: ${code} (For: ${email})`);
-  console.log("============================================================");
+export const sendOtpEmail = async ({ email, code, type = "superadmin" }) => {
+  // Never log OTP values. They are credentials and must only be delivered to the user.
+  // SECURITY: Never enable DEBUG_LOG_OTP in production. This requires an explicit local opt-in.
+  if (process.env.NODE_ENV === "development" && process.env.DEBUG_LOG_OTP === "true") {
+    console.log(`[DEV ONLY] OTP for ${email}: ${code}`);
+  }
+  const isPasswordReset = type === "password-reset";
+  const title = isPasswordReset ? "Password Reset Code" : "SuperAdmin Verification Code";
+  const description = isPasswordReset
+    ? "A password reset was requested for your SalonHub account. Enter the verification code below to continue."
+    : "A sign-in request was initiated for your SalonHub SuperAdmin account. Enter the verification code below to complete your authentication:";
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -71,14 +76,14 @@ export const sendSuperAdminOtpEmail = async ({ email, code }) => {
             <span class="logo">SalonHub Security</span>
           </div>
           <div class="body">
-            <h1 class="title">SuperAdmin Verification Code</h1>
-            <p class="desc">A sign-in request was initiated for your SalonHub SuperAdmin account. Enter the verification code below to complete your authentication:</p>
+            <h1 class="title">${title}</h1>
+            <p class="desc">${description}</p>
             <div class="code-box">
               <span class="code">${code}</span>
             </div>
             <p class="desc">This code expires in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
             <div class="warning">
-              If you did not request this login, someone may know your password. Please change your SuperAdmin password immediately.
+              If you did not request this, you can safely ignore this email.
             </div>
           </div>
           <div class="footer">
@@ -101,7 +106,7 @@ export const sendSuperAdminOtpEmail = async ({ email, code }) => {
         body: JSON.stringify({
           from: "SalonHub Security <onboarding@resend.dev>",
           to: [email],
-          subject: `SalonHub Verification Code: ${code}`,
+          subject: `SalonHub ${isPasswordReset ? "Password Reset" : "Verification"} Code: ${code}`,
           html: htmlContent,
         }),
       });
@@ -137,19 +142,23 @@ export const sendSuperAdminOtpEmail = async ({ email, code }) => {
       await transporter.sendMail({
         from: `"SalonHub Security" <${process.env.EMAIL_USER}>`,
         to: email,
-        subject: `SalonHub Verification Code: ${code}`,
-        text: `Your SalonHub SuperAdmin verification code is: ${code}\n\nThis code expires in 10 minutes.`,
+        subject: `SalonHub ${isPasswordReset ? "Password Reset" : "Verification"} Code: ${code}`,
+        text: `Your SalonHub ${isPasswordReset ? "password reset" : "verification"} code is: ${code}\n\nThis code expires in 10 minutes.`,
         html: htmlContent,
       });
 
       console.log(`[SuperAdmin OTP] Verification code successfully emailed to: ${email}`);
       return { delivered: true, provider: "smtp" };
     } catch (smtpErr) {
-      console.warn(`[SuperAdmin OTP] SMTP delivery blocked or failed (${smtpErr.message}). Code is available in server logs above.`);
-      // Return gracefully so cloud host port blocking does not break the login flow
-      return { delivered: false, inLogs: true, error: smtpErr.message };
+      console.warn(`[OTP] SMTP delivery blocked or failed: ${smtpErr.message}`);
+      return { delivered: false, error: smtpErr.message };
     }
   }
 
-  return { delivered: false, inLogs: true };
+  return { delivered: false };
 };
+
+// Kept as a named wrapper so the established SuperAdmin flow continues to use
+// the same delivery infrastructure as password reset without duplicating it.
+export const sendSuperAdminOtpEmail = ({ email, code }) =>
+  sendOtpEmail({ email, code, type: "superadmin" });

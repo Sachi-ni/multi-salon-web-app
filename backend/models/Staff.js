@@ -34,6 +34,11 @@ const staffSchema = new mongoose.Schema({
   },
   resetPasswordTokenHash: { type: String, default: null },
   resetPasswordExpires: { type: Date, default: null },
+  passwordResetOtpCodeHash: { type: String, default: null },
+  passwordResetOtpExpires: { type: Date, default: null },
+  passwordResetOtpAttempts: { type: Number, default: 0 },
+  passwordResetOtpLastSentAt: { type: Date, default: null },
+  passwordResetSessionHash: { type: String, default: null },
   image:    { type: String, default: "" },
   services: [{ type: mongoose.Schema.Types.ObjectId, ref: "Service" }] // ← new
 }, { timestamps: true });

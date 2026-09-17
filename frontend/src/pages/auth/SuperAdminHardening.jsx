@@ -5,6 +5,7 @@ import { API_URL } from "../../config";
 import { useAuth } from "../../context/AuthContext";
 import useFormValidation from "../../hooks/useFormValidation";
 import { validatePassword } from "../../utils/validation";
+import { readJsonResponse } from "../../utils/apiResponse";
 
 const SuperAdminHardening = () => {
   const location = useLocation();
@@ -36,7 +37,7 @@ const SuperAdminHardening = () => {
         },
         body: step === "change-password" ? JSON.stringify({ password }) : undefined,
       });
-      const data = await response.json();
+      const data = await readJsonResponse(response);
       if (!response.ok) throw new Error(data.message || "Security setup failed");
 
       if (step === "change-password") {
@@ -55,7 +56,7 @@ const SuperAdminHardening = () => {
       const profileResponse = await fetch(`${API_URL}/auth/profile`, {
         headers: { Authorization: `Bearer ${data.token}` },
       });
-      const profile = await profileResponse.json();
+      const profile = await readJsonResponse(profileResponse);
       if (!profileResponse.ok) throw new Error(profile.message || "Could not load your profile");
       login(profile, data.token);
       navigate("/superAdminDashboard", { replace: true });

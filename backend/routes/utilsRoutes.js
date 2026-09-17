@@ -1,12 +1,12 @@
 import express from "express";
 import dns from "dns";
-import rateLimit from "express-rate-limit";
+import { createJsonRateLimiter } from "../utils/rateLimiter.js";
 import Customer from "../models/Customer.js";
 import Staff from "../models/Staff.js";
 import Salon from "../models/Salon.js";
 
 const router = express.Router();
-const emailDomainLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30 });
+const emailDomainLimiter = createJsonRateLimiter({ windowMs: 15 * 60 * 1000, max: 30 });
 const DOMAIN_PATTERN = /^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/;
 const DNS_TIMEOUT_MS = 3000;
 
