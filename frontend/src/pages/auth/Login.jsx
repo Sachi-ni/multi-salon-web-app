@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useAlert } from "../../context/AlertContext";
 import { motion } from "framer-motion";
@@ -7,22 +7,16 @@ import { Eye, EyeOff, X } from "lucide-react";
 import { API_URL } from "../../config";
 import useFormValidation from "../../hooks/useFormValidation";
 import { validateEmail } from "../../utils/validation";
+import { GENERIC_API_ERROR_MESSAGE, readJsonResponse } from "../../utils/apiResponse";
 
 const readResponse = async (response) => {
-  const body = await response.text();
-  if (!body) {
-    return { message: `Login request failed (${response.status})` };
-  }
-
-  try {
-    return JSON.parse(body);
-  } catch {
-    return { message: body };
-  }
+  const data = await readJsonResponse(response);
+  return Object.keys(data).length ? data : { message: GENERIC_API_ERROR_MESSAGE };
 };
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const { showAlert } = useAlert();
   const [email, setEmail] = useState("");
@@ -30,6 +24,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage] = useState(location.state?.message || "");
 
   // SuperAdmin 2FA Email OTP state
   const [isOtpStep, setIsOtpStep] = useState(false);
@@ -300,6 +295,16 @@ const Login = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span>{otpInfoMsg}</span>
+          </motion.div>
+        )}
+
+        {!isOtpStep && successMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 px-3.5 py-2.5 rounded-xl bg-accent-dim/30 border border-accent/40 text-xs text-accent font-semibold flex items-center gap-2"
+          >
+            <span>{successMessage}</span>
           </motion.div>
         )}
 

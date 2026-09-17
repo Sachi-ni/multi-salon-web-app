@@ -4,18 +4,19 @@ import Customer from "../models/Customer.js";
 import Salon from "../models/Salon.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import generateToken, { generateHardeningToken, generatePending2FaToken } from "../utils/generateToken.js";
+import generateToken, {
+  generateHardeningToken,
+  generatePending2FaToken,
+  generatePasswordResetSessionToken,
+  hashPasswordResetSessionToken,
+} from "../utils/generateToken.js";
 import { storeMedia } from "../utils/mediaStorage.js";
 import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
-import {
-  createPasswordResetToken,
-  hashPasswordResetToken,
-  sendPasswordResetEmail,
-} from "../utils/passwordReset.js";
 import {
   generateOtpCode,
   hashOtpCode,
   maskEmail,
+  sendOtpEmail,
   sendSuperAdminOtpEmail,
   OTP_EXPIRATION_MS,
   OTP_RESEND_COOLDOWN_MS,
@@ -26,7 +27,11 @@ import { validateNewPassword } from "../utils/passwordPolicy.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{3,63}$/;
 const PHONE_PATTERN = /^\+?[0-9]{10}$/;
-const GENERIC_RESET_MESSAGE = "If an account exists, a reset link has been sent.";
+const GENERIC_RESET_MESSAGE = "If this email is registered, an OTP has been sent.";
+const GENERIC_OTP_ERROR = "Invalid or expired code";
+const RESET_RESPONSE_DELAY_MS = 300;
+
+const waitForResetResponse = () => new Promise((resolve) => setTimeout(resolve, RESET_RESPONSE_DELAY_MS));
 
 const validateProfileFields = ({ email, phone, password, username }) => {
   const enteredEmail = email?.trim();
@@ -351,85 +356,139 @@ export const setupMfa = async (req, res) => {
 
 const findAccountByEmail = async (email) => {
   const normalizedEmail = email.trim().toLowerCase();
-  const admin = await Admin.findOne({ email: normalizedEmail });
-  if (admin) return { user: admin, passwordField: "password" };
-
-  const staff = await Staff.findOne({ email: normalizedEmail });
-  if (staff) return { user: staff, passwordField: "password_hash" };
-
-  const customer = await Customer.findOne({ email: normalizedEmail });
-  if (customer) return { user: customer, passwordField: "password_hash" };
+  const [admin, staff, customer] = await Promise.all([
+    Admin.findOne({ email: normalizedEmail }),
+    Staff.findOne({ email: normalizedEmail }),
+    Customer.findOne({ email: normalizedEmail }),
+  ]);
+  if (admin) return { user: admin, Model: Admin, passwordField: "password" };
+  if (staff) return { user: staff, Model: Staff, passwordField: "password_hash" };
+  if (customer) return { user: customer, Model: Customer, passwordField: "password_hash" };
 
   return null;
 };
 
-const findAccountByResetHash = async (tokenHash) => {
-  const models = [Admin, Staff, Customer];
-  for (const Model of models) {
-    const user = await Model.findOne({ resetPasswordTokenHash: tokenHash });
-    if (user) return { user, passwordField: Model === Admin ? "password" : "password_hash" };
-  }
+const findAccountById = async (id) => {
+  const [admin, staff, customer] = await Promise.all([
+    Admin.findById(id),
+    Staff.findById(id),
+    Customer.findById(id),
+  ]);
+  if (admin) return { user: admin, Model: Admin, passwordField: "password" };
+  if (staff) return { user: staff, Model: Staff, passwordField: "password_hash" };
+  if (customer) return { user: customer, Model: Customer, passwordField: "password_hash" };
+
   return null;
 };
 
 export const forgotPassword = async (req, res) => {
   const normalizedEmail = req.body.email?.trim().toLowerCase();
-  if (!normalizedEmail || !EMAIL_PATTERN.test(normalizedEmail)) {
-    return res.status(400).json({ message: "Please enter a valid email address" });
-  }
 
   try {
-    const account = await findAccountByEmail(normalizedEmail);
+    const account = normalizedEmail && EMAIL_PATTERN.test(normalizedEmail)
+      ? await findAccountByEmail(normalizedEmail)
+      : null;
     if (account) {
-      const { rawToken, tokenHash, expiresAt } = createPasswordResetToken();
-      account.user.resetPasswordTokenHash = tokenHash;
-      account.user.resetPasswordExpires = expiresAt;
-      await account.user.save();
+      const now = Date.now();
+      const lastSentAt = account.user.passwordResetOtpLastSentAt
+        ? new Date(account.user.passwordResetOtpLastSentAt).getTime()
+        : 0;
+      if (!lastSentAt || now - lastSentAt >= OTP_RESEND_COOLDOWN_MS) {
+        const otpCode = generateOtpCode();
+        account.user.passwordResetOtpCodeHash = hashOtpCode(otpCode);
+        account.user.passwordResetOtpExpires = new Date(now + OTP_EXPIRATION_MS);
+        account.user.passwordResetOtpAttempts = 0;
+        account.user.passwordResetOtpLastSentAt = new Date(now);
+        account.user.passwordResetSessionHash = null;
+        await account.user.save();
 
-      try {
-        await sendPasswordResetEmail({ email: normalizedEmail, rawToken });
-      } catch (emailError) {
-        console.error("Password reset email delivery failed", { email: normalizedEmail, error: emailError.message });
+        // Do not await delivery: both account paths retain comparable response timing.
+        void sendOtpEmail({ email: normalizedEmail, code: otpCode, type: "password-reset" })
+          .catch((emailError) => console.error("Password reset OTP delivery failed", { error: emailError.message }));
       }
     }
-
-    return res.status(200).json({ message: GENERIC_RESET_MESSAGE });
   } catch (error) {
     console.error("Password reset request failed", { error: error.message });
-    return res.status(200).json({ message: GENERIC_RESET_MESSAGE });
+  }
+  await waitForResetResponse();
+  return res.status(200).json({ message: GENERIC_RESET_MESSAGE });
+};
+
+export const verifyPasswordResetOtp = async (req, res) => {
+  const normalizedEmail = req.body.email?.trim().toLowerCase();
+  const otpCode = String(req.body.otpCode || "").trim();
+
+  try {
+    const account = normalizedEmail && EMAIL_PATTERN.test(normalizedEmail)
+      ? await findAccountByEmail(normalizedEmail)
+      : null;
+    const user = account?.user;
+    const now = new Date();
+    if (!user || !user.passwordResetOtpExpires || user.passwordResetOtpExpires <= now
+      || !user.passwordResetOtpCodeHash || (user.passwordResetOtpAttempts || 0) >= MAX_OTP_ATTEMPTS) {
+      return res.status(400).json({ message: GENERIC_OTP_ERROR });
+    }
+
+    const providedHash = hashOtpCode(otpCode);
+    const activeOtpFilter = {
+      _id: user._id,
+      passwordResetOtpCodeHash: user.passwordResetOtpCodeHash,
+      passwordResetOtpExpires: { $gt: now },
+      passwordResetOtpAttempts: { $lt: MAX_OTP_ATTEMPTS },
+    };
+
+    if (providedHash !== user.passwordResetOtpCodeHash) {
+      // Atomic increment prevents parallel requests from overwriting each
+      // other's count and bypassing the five-attempt lockout.
+      await account.Model.findOneAndUpdate(activeOtpFilter, {
+        $inc: { passwordResetOtpAttempts: 1 },
+      });
+      return res.status(400).json({ message: GENERIC_OTP_ERROR });
+    }
+
+    const resetSessionToken = generatePasswordResetSessionToken(user);
+    // Consume the OTP atomically, conditioned on the same lockout state.
+    const consumedOtp = await account.Model.findOneAndUpdate(activeOtpFilter, {
+      $set: {
+        passwordResetOtpCodeHash: null,
+        passwordResetOtpExpires: null,
+        passwordResetOtpAttempts: 0,
+        passwordResetOtpLastSentAt: null,
+        passwordResetSessionHash: hashPasswordResetSessionToken(resetSessionToken),
+      },
+    }, { returnDocument: "after" });
+    if (!consumedOtp) return res.status(400).json({ message: GENERIC_OTP_ERROR });
+    return res.status(200).json({ resetSessionToken });
+  } catch (error) {
+    console.error("Password reset OTP verification failed", { error: error.message });
+    return res.status(400).json({ message: GENERIC_OTP_ERROR });
   }
 };
 
 export const resetPassword = async (req, res) => {
-  const { token, newPassword } = req.body;
-  if (!token || !newPassword) {
-    return res.status(400).json({ message: "Token and new password are required" });
-  }
+  const { resetSessionToken, newPassword } = req.body;
+  if (!resetSessionToken) return res.status(400).json({ message: GENERIC_OTP_ERROR });
 
   const validation = validateProfileFields({ password: newPassword });
   if (validation.message) return res.status(400).json(validation);
 
   try {
-    const account = await findAccountByResetHash(hashPasswordResetToken(token));
-    if (!account || !account.user.resetPasswordExpires || account.user.resetPasswordExpires <= new Date()) {
-      if (account) {
-        account.user.resetPasswordTokenHash = null;
-        account.user.resetPasswordExpires = null;
-        await account.user.save();
-      }
-      return res.status(400).json({ message: "Invalid or expired reset token" });
+    const decoded = jwt.verify(resetSessionToken, process.env.JWT_SECRET);
+    if (decoded.purpose !== "password_reset") throw new Error("Invalid reset session");
+    const account = await findAccountById(decoded.id);
+    if (!account || account.user.passwordResetSessionHash !== hashPasswordResetSessionToken(resetSessionToken)) {
+      return res.status(400).json({ message: GENERIC_OTP_ERROR });
     }
 
     account.user[account.passwordField] = await bcrypt.hash(newPassword, 12);
-    account.user.resetPasswordTokenHash = null;
-    account.user.resetPasswordExpires = null;
+    account.user.passwordResetSessionHash = null;
     if (account.passwordField === "password") account.user.mustChangePassword = false;
     await account.user.save();
 
     return res.status(200).json({ message: "Password reset successfully" });
   } catch (error) {
     console.error("Password reset failed", { error: error.message });
-    return res.status(500).json({ message: "Unable to reset password. Please try again later." });
+    return res.status(400).json({ message: GENERIC_OTP_ERROR });
   }
 };
 
