@@ -941,6 +941,11 @@ const Salary = () => {
                   frequency,
                   frequency === "weekly" ? weeklyDate : monthlyDate
                 );
+          const fallbackTotalSalary =
+            staff.salaryCalculationEnabled === false ||
+            (employmentStartKey && selectedDateKey < employmentStartKey)
+              ? 0
+              : selectedDateKey;
 
           return {
             _id: `${FALLBACK_PREFIX}${staff._id}`,
