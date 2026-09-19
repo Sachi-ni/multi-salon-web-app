@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
-import { markAsPaid } from "../../services/salaryService";
 import { getSalons } from "../../services/salonService";
 import { getServices } from "../../services/serviceService";
 import useFormValidation from "../../hooks/useFormValidation";
@@ -284,9 +283,7 @@ const Staff = () => {
   const [editEmailSubmitError, setEditEmailSubmitError] = useState("");
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [unavailableStaff, setUnavailableStaff] = useState(null);
-  const [pendingPayment, setPendingPayment] = useState(null);
-  const [paymentLoading, setPaymentLoading] = useState(false);
-  const [paymentError, setPaymentError] = useState("");
+  const [frequencyConfirmation, setFrequencyConfirmation] = useState(null);
 
   const optionalValidator = (validator) => (value = "") => (value ? validator(value) : { valid: true, message: "" });
   const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(
@@ -326,6 +323,7 @@ const Staff = () => {
       services: assignedServices,
       status: staff.status || "Active",
       salaryPaymentFrequency: staff.salary_payment_frequency || "monthly",
+      currentPaymentFrequency: staff.salary_payment_frequency || "monthly",
       salaryPaymentCountPerDay: staff.salary_payment_count_per_day || 1,
       picture: null,
       currentImage: staff.image || "",
@@ -416,6 +414,16 @@ const Staff = () => {
     if (!validateStaffEdit()) {
       return;
     }
+    const oldFrequency = editingStaff.currentPaymentFrequency || "monthly";
+    const newFrequency = editingStaff.salaryPaymentFrequency || "monthly";
+    if (oldFrequency !== newFrequency && !frequencyConfirmation) {
+      setFrequencyConfirmation({
+        name: `${editingStaff.firstName} ${editingStaff.lastName}`.trim(),
+        oldFrequency,
+        newFrequency,
+      });
+      return;
+    }
     try {
       const data = {
         firstName: editingStaff.firstName,
@@ -436,12 +444,7 @@ const Staff = () => {
         data.image = editingStaff.picture;
       }
 
-      const response = await updateStaff(editingStaff.id, data);
-      const transition = response.data?.salaryTransition;
-      if (transition && transition.status !== "Paid" && Number(transition.totalSalary) > 0) {
-        setPaymentError("");
-        setPendingPayment(transition);
-      }
+      await updateStaff(editingStaff.id, data);
       setEditModalOpen(false);
       setEditingStaff(null);
       fetchData();
@@ -452,6 +455,11 @@ const Staff = () => {
       if (/email/i.test(message)) setEditEmailSubmitError(message);
       else setEditError(message);
     }
+  };
+
+  const confirmFrequencyChange = async () => {
+    setFrequencyConfirmation(null);
+    await handleUpdateStaff();
   };
 
   const filteredStaff = staffList.filter((s) => {
@@ -860,55 +868,23 @@ const Staff = () => {
       </Modal>
 
       <Modal
-        isOpen={Boolean(pendingPayment)}
-        onClose={() => setPendingPayment(null)}
-        title="Pending salary payment"
+        isOpen={Boolean(frequencyConfirmation)}
+        onClose={() => setFrequencyConfirmation(null)}
+        title="Confirm Payment Frequency Change"
         maxWidth="max-w-md"
       >
-        {pendingPayment && (
+        {frequencyConfirmation && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
-              <div className="flex items-start gap-3">
-                <Coins className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-400" />
-                <div>
-                  <p className="text-sm font-bold text-white">Previous salary is still pending</p>
-                  <p className="mt-1 text-xs leading-5 text-neutral-300">
-                    The previous {pendingPayment.frequency} salary period has an unpaid balance of{" "}
-                    <strong className="text-amber-300">
-                      LKR {Number(pendingPayment.totalSalary).toLocaleString()}
-                    </strong>.
-                  </p>
-                  <p className="mt-2 text-xs text-amber-200/80">
-                    The new payment frequency starts separately from the change date.
-                  </p>
-                </div>
-              </div>
-            </div>
-            {paymentError && <p className="text-sm font-semibold text-danger">{paymentError}</p>}
+            <p className="text-sm text-muted-1">
+              You are changing <strong className="text-white">{frequencyConfirmation.name}</strong>'s payment frequency from <strong className="text-white">{frequencyConfirmation.oldFrequency}</strong> to <strong className="text-white">{frequencyConfirmation.newFrequency}</strong>.
+            </p>
+            <p className="text-sm text-muted-1">
+              This will mark all pending salary under the current frequency as <strong className="text-white">Paid up to today ({new Date().toLocaleDateString()})</strong>.
+            </p>
+            <p className="text-sm text-muted-1">Do you want to continue?</p>
             <Modal.Actions className="justify-end">
-              <Button variant="ghost" size="sm" onClick={() => setPendingPayment(null)} disabled={paymentLoading}>
-                Pay Later
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={paymentLoading}
-                onClick={async () => {
-                  try {
-                    setPaymentLoading(true);
-                    setPaymentError("");
-                    await markAsPaid(pendingPayment.salaryId);
-                    setPendingPayment(null);
-                    fetchData();
-                  } catch (err) {
-                    setPaymentError(err.response?.data?.message || "Failed to mark salary as paid");
-                  } finally {
-                    setPaymentLoading(false);
-                  }
-                }}
-              >
-                {paymentLoading ? "Processing..." : "Pay Now"}
-              </Button>
+              <Button variant="ghost" onClick={() => setFrequencyConfirmation(null)}>Cancel</Button>
+              <Button variant="primary" onClick={confirmFrequencyChange}>Pay &amp; Update Frequency</Button>
             </Modal.Actions>
           </div>
         )}

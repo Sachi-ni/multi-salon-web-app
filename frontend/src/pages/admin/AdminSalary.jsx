@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
+import SalarySlipPreview from "../../components/salary/SalarySlipPreview";
 
 import {
   getSalaries,
@@ -153,8 +154,7 @@ const getStaffJoinDateStr = (staff) => {
 // Number of days of a period that have already elapsed (period start up to
 // today). Used for fallback rows so the fixed salary-per-day amount is
 // included in the period totals for days without completed appointments.
-// When staffJoinDate is provided, days prior to joining the salon are excluded.
-const countElapsedPeriodDays = (frequency, dateStr, staffJoinDate = "") => {
+const countElapsedPeriodDays = (frequency, dateStr) => {
   const selected = new Date(dateStr);
   if (Number.isNaN(selected.getTime())) return 0;
 
@@ -178,21 +178,6 @@ const countElapsedPeriodDays = (frequency, dateStr, staffJoinDate = "") => {
     start = new Date(selected);
     start.setHours(0, 0, 0, 0);
     end = start;
-  }
-
-  // If staff joined after this entire period ended, elapsed days is 0
-  const joinDateKey = staffJoinDate ? toDateKey(staffJoinDate) : "";
-  const periodEndKey = toDateKey(end);
-  if (joinDateKey && periodEndKey < joinDateKey) {
-    return 0;
-  }
-
-  // Adjust start to staff join date if they joined mid-period
-  if (joinDateKey) {
-    const joinDateObj = new Date(joinDateKey + "T00:00:00");
-    if (!Number.isNaN(joinDateObj.getTime()) && joinDateObj > start) {
-      start = joinDateObj;
-    }
   }
 
   const effectiveEnd = end < todayStart ? end : todayStart;
@@ -567,7 +552,6 @@ const Salary = () => {
       setPdfData(salary);
       setShowPdfModal(true);
       setPdfLoading(false);
-      setTimeout(() => generatePdf(salary), 300);
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || "Failed to load salary details");
       setPdfLoading(false);
@@ -601,11 +585,12 @@ const Salary = () => {
             daySalary: salary.daySalary || 0,
           }];
 
+      const getDisplayedSalary = (record) => isWeekly || isMonthly
+        ? Number(record.daySalary || 0)
+        : Number(record.daySalary ?? record.workRate ?? 0);
       const totalWorkingAmount = rows.reduce((sum, row) => sum + Number(row.workingAmount || 0), 0);
       const totalWorkRate = rows.reduce((sum, row) => sum + Number(row.workRate || 0), 0);
-      const totalSalary = salary.status === "Paid"
-        ? (salary.paidTotal || salary.totalSalary || 0)
-        : (salary.totalSalary || totalWorkRate || 0);
+      const totalSalary = rows.reduce((sum, row) => sum + getDisplayedSalary(row), 0);
 
       const formatDate = (value) => {
         if (!value) return "N/A";
@@ -629,20 +614,26 @@ const Salary = () => {
       };
 
       const drawBanner = () => {
-        doc.setFillColor(255, 215, 0);
-        doc.rect(0, 0, pageWidth, 42, "F");
-        doc.setTextColor(0, 0, 0);
+        doc.setTextColor(17, 24, 39);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(20);
-        doc.text("SALARY PAYMENT SLIP", pageWidth / 2, 14, { align: "center" });
-        doc.setFontSize(11);
+        doc.setFontSize(18);
+        doc.text(salon.name || "Tom Salon", margin, 14);
+        doc.setTextColor(47, 107, 217);
+        doc.setFontSize(18);
+        doc.text("PAYSLIP", pageWidth - margin, 14, { align: "right" });
+        doc.setTextColor(107, 114, 128);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        doc.text(`${frequencyLabel} Salary Report`, pageWidth / 2, 28, { align: "center" });
+        doc.text(salon.location || "Salon", margin, 22);
+        doc.text(`${frequencyLabel} Pay Period`, pageWidth - margin, 22, { align: "right" });
+        doc.setDrawColor(47, 107, 217);
+        doc.setLineWidth(0.6);
+        doc.line(margin, 27, pageWidth - margin, 27);
       };
 
       const drawSection = (title) => {
         yPos += 2;
-        doc.setFillColor(70, 130, 180);
+        doc.setFillColor(54, 65, 82);
         doc.rect(margin, yPos - 4, contentWidth, 8, "F");
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(9);
@@ -680,12 +671,12 @@ const Salary = () => {
           : formatDate(salary.period);
 
       drawBanner();
-      yPos = 48;
+      yPos = 38;
 
       // Header Info Section
       doc.setTextColor(30, 30, 30);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
+      doc.setFontSize(8.5);
       
       // Left column
       doc.text("Payment Type", margin + 2, yPos);
@@ -715,15 +706,19 @@ const Salary = () => {
       drawSection("STAFF INFORMATION");
       drawInfoRow("Full Name", staff.name || staff.full_name || salary.staff_name || "N/A");
       drawInfoRow("Email", staff.email || "N/A");
+      drawInfoRow("Calculation Start", formatDate(salary.calculationStartDate || salary.dateRange?.start));
+      if (salary.isTransitioned) {
+        drawInfoRow("Frequency Changed", formatDate(salary.transitionedAt));
+      }
       yPos += 1;
 
       // Services Section
       drawSection("SERVICES ASSIGNED");
       doc.setFontSize(7.5);
       doc.setFont("helvetica", "bold");
-      doc.setFillColor(70, 130, 180);
+      doc.setFillColor(243, 244, 246);
       doc.rect(margin, yPos - 4, contentWidth, rowHeight, "F");
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(17, 24, 39);
       doc.text("Service Name", margin + 2, yPos + 1);
       doc.text("Amount", pageWidth - margin - 22, yPos + 1, { align: "left" });
       yPos += rowHeight + 1;
@@ -736,7 +731,7 @@ const Salary = () => {
 
       serviceRows.forEach((service, index) => {
         ensureSpace(rowHeight + 2);
-        doc.setFillColor(...(index % 2 === 0 ? [250, 250, 250] : [240, 248, 255]));
+        doc.setFillColor(255, 255, 255);
         doc.rect(margin, yPos - 3.5, contentWidth, rowHeight, "F");
         doc.setLineWidth(0.1);
         doc.setDrawColor(220, 220, 220);
@@ -757,15 +752,16 @@ const Salary = () => {
       drawSection("DAILY RECORDS");
       doc.setFontSize(7.5);
       doc.setFont("helvetica", "bold");
-      doc.setFillColor(70, 130, 180);
+      doc.setFillColor(243, 244, 246);
       doc.rect(margin, yPos - 4, contentWidth, rowHeight, "F");
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(17, 24, 39);
 
       if (isWeekly) {
         doc.text("Day", margin + 2, yPos + 1);
         doc.text("Amount", margin + 25, yPos + 1);
         doc.text("Rate %", margin + 65, yPos + 1);
-        doc.text("Salary", pageWidth - margin - 22, yPos + 1, { align: "left" });
+        doc.text("Work Rate", margin + 95, yPos + 1);
+        doc.text("Day Salary", pageWidth - margin - 22, yPos + 1, { align: "left" });
       } else {
         doc.text("Date", margin + 2, yPos + 1);
         doc.text("Amount", margin + 25, yPos + 1);
@@ -780,7 +776,7 @@ const Salary = () => {
       doc.setFontSize(8);
       rows.forEach((record, index) => {
         ensureSpace(rowHeight + 2);
-        doc.setFillColor(...(index % 2 === 0 ? [250, 250, 250] : [240, 248, 255]));
+        doc.setFillColor(255, 255, 255);
         doc.rect(margin, yPos - 3.5, contentWidth, rowHeight, "F");
         doc.setLineWidth(0.1);
         doc.setDrawColor(220, 220, 220);
@@ -792,73 +788,57 @@ const Salary = () => {
           doc.text(dayName, margin + 2, yPos + 1);
           doc.text(formatMoney(record.workingAmount), margin + 25, yPos + 1);
           doc.text(`${Number(record.rate || salary.rate || 0)}%`, margin + 65, yPos + 1);
-          doc.text(formatMoney(record.daySalary), pageWidth - margin - 2, yPos + 1, { align: "right" });
+          doc.text(formatMoney(record.workRate), margin + 95, yPos + 1);
+          doc.text(formatMoney(getDisplayedSalary(record)), pageWidth - margin - 2, yPos + 1, { align: "right" });
         } else {
           doc.text(formatDate(record.date), margin + 2, yPos + 1);
           doc.text(formatMoney(record.workingAmount), margin + 25, yPos + 1);
           doc.text(`${Number(record.rate || salary.rate || 0)}%`, margin + 65, yPos + 1);
           doc.text(formatMoney(record.workRate), margin + 95, yPos + 1);
-          doc.text(formatMoney(record.daySalary), pageWidth - margin - 2, yPos + 1, { align: "right" });
+          doc.text(formatMoney(getDisplayedSalary(record)), pageWidth - margin - 2, yPos + 1, { align: "right" });
         }
         yPos += rowHeight + 0.5;
       });
 
       yPos += 3;
 
-      // Divider
-      doc.setDrawColor(255, 215, 0);
-      doc.setLineWidth(1);
-      doc.line(margin, yPos, pageWidth - margin, yPos);
-      yPos += 5;
-
-      // Summary Section with creative styling
+      // Summary section
       drawSection("PAYMENT SUMMARY");
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
       
-      // Summary with background boxes
       const summaryItems = [
-        { label: "Total Working Amount", value: formatMoney(totalWorkingAmount), color: [230, 240, 250] },
-        { label: "Total Work Rate", value: formatMoney(totalWorkRate), color: [240, 250, 240] },
-        { label: "TOTAL SALARY", value: formatMoney(totalSalary), color: [255, 250, 240] },
-        { label: "Payment Status", value: salary.status || "Not Paid", color: [255, 240, 245] },
+        { label: "Total Working Amount", value: formatMoney(totalWorkingAmount), color: [255, 255, 255] },
+        { label: "Total Work Rate", value: formatMoney(totalWorkRate), color: [255, 255, 255] },
+        { label: "TOTAL SALARY", value: formatMoney(totalSalary), color: [239, 246, 255] },
       ];
 
       summaryItems.forEach((item, idx) => {
         ensureSpace(7);
         doc.setFillColor(...item.color);
         doc.rect(margin, yPos - 3.5, contentWidth, 7, "F");
-        doc.setDrawColor(180, 180, 180);
-        doc.setLineWidth(0.3);
-        doc.rect(margin, yPos - 3.5, contentWidth, 7);
+        doc.setDrawColor(229, 231, 235);
+        doc.setLineWidth(0.2);
+        doc.line(margin, yPos + 3.5, pageWidth - margin, yPos + 3.5);
         
         doc.setTextColor(30, 30, 30);
         doc.text(item.label, margin + 3, yPos + 1);
-        doc.setTextColor(...(idx === 2 ? [180, 40, 40] : [60, 60, 60]));
+        doc.setTextColor(...(idx === 2 ? [47, 107, 217] : [60, 60, 60]));
         doc.setFont("helvetica", "bold");
         doc.text(item.value, pageWidth - margin - 2, yPos + 1, { align: "right" });
         yPos += 8;
       });
 
-      if (salary.paidAt) {
-        ensureSpace(6);
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(80, 80, 80);
-        doc.text(`Paid Date: ${formatDate(salary.paidAt)}`, margin + 3, yPos);
-        yPos += 6;
-      }
-
       // Footer
-      yPos = pageHeight - 18;
-      doc.setDrawColor(255, 215, 0);
-      doc.setLineWidth(0.5);
+      yPos = pageHeight - 22;
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.3);
       doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 4;
       doc.setTextColor(120, 120, 120);
       doc.setFontSize(7);
-      doc.setFont("helvetica", "italic");
-      doc.text("✓ This is a computer-generated salary slip. No signature required.", pageWidth / 2, yPos, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.text("This is a computer-generated payslip. No signature required.", pageWidth / 2, yPos, { align: "center" });
       yPos += 3;
       doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: "center" });
 
@@ -904,15 +884,20 @@ const Salary = () => {
         .map((staff) => {
           const joinDate = getStaffJoinDateStr(staff);
           const perDayAmount = Number(staff.salary_payment_count_per_day || 0);
-          const fallbackTotalSalary =
+          const employmentStartKey = staff.createdAt ? toDateKey(staff.createdAt) : "";
+          const selectedDateKey =
             frequency === "daily"
-              ? (dailyDate <= today && (!joinDate || dailyDate >= joinDate) ? perDayAmount : 0)
+              ? (dailyDate <= today ? perDayAmount : 0)
               : perDayAmount *
                 countElapsedPeriodDays(
                   frequency,
-                  frequency === "weekly" ? weeklyDate : monthlyDate,
-                  joinDate
+                  frequency === "weekly" ? weeklyDate : monthlyDate
                 );
+          const fallbackTotalSalary =
+            staff.salaryCalculationEnabled === false ||
+            (employmentStartKey && selectedDateKey < employmentStartKey)
+              ? 0
+              : selectedDateKey;
 
           return {
             _id: `${FALLBACK_PREFIX}${staff._id}`,
@@ -1005,7 +990,7 @@ const Salary = () => {
           continue;
         }
         const perDay = Number(staff.salary_payment_count_per_day) || 0;
-        pendingOverdue += perDay * countElapsedPeriodDays(frequency, anchorStr, joinDate);
+        pendingOverdue += perDay * countElapsedPeriodDays(frequency, anchorStr);
       }
     }
 
@@ -1399,27 +1384,18 @@ const Salary = () => {
         )}
       </div>
 
-      {/* ─── PDF Loading Modal ─────────────────────────────────────────── */}
+      {/* ─── Payslip Preview Modal ─────────────────────────────────────── */}
       <Modal
         isOpen={showPdfModal}
         onClose={() => { setShowPdfModal(false); setPdfData(null); }}
-        title="Generating PDF..."
-        maxWidth="max-w-sm"
+        title="Salary Payslip"
+        maxWidth="max-w-4xl"
       >
-        <div className="flex flex-col items-center justify-center py-8">
-          <Loader2 className="w-12 h-12 text-yellow-400 animate-spin mb-4" />
-          <p className="text-sm text-gray-400">Preparing salary slip PDF...</p>
-          {pdfData && (
-            <div className="mt-4 text-center">
-              <p className="text-white font-semibold">
-                {pdfData.staff_id?.full_name || pdfData.staff_name}
-              </p>
-              <p className="text-xs text-gray-500">
-                {pdfData.period}
-              </p>
-            </div>
-          )}
-        </div>
+        <SalarySlipPreview
+          salary={pdfData}
+          onClose={() => { setShowPdfModal(false); setPdfData(null); }}
+          onDownload={() => generatePdf(pdfData)}
+        />
       </Modal>
     </div>
   );
