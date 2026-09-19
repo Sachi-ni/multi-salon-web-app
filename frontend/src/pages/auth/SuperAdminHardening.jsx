@@ -19,6 +19,13 @@ const SuperAdminHardening = () => {
   const [loading, setLoading] = useState(false);
   const { errors, handleBlur, validateAll, isValid } = useFormValidation({ password }, { password: validatePassword });
 
+  const dashboardFor = (user) => {
+    if (user.role === "super-admin") return "/superAdminDashboard";
+    if (user.role === "manager" && user.salon_id) return `/salon-admin/${user.salon_id}/adminDashboard`;
+    if (user.salon_id) return "/staff/dashboard";
+    return "/";
+  };
+
   const submit = async (event) => {
     event.preventDefault();
     setLoading(true);
@@ -41,10 +48,10 @@ const SuperAdminHardening = () => {
       if (!response.ok) throw new Error(data.message || "Security setup failed");
 
       if (step === "change-password") {
-        if (data.token && data.role === "super-admin") {
+        if (data.token && data.role) {
           const { token: sessionToken, ...userData } = data;
           login(userData, sessionToken);
-          navigate("/superAdminDashboard", { replace: true });
+          navigate(dashboardFor(userData), { replace: true });
           return;
         }
         setPassword("");
@@ -72,7 +79,7 @@ const SuperAdminHardening = () => {
       <form onSubmit={submit} noValidate className="w-full max-w-md bg-surface border border-border rounded-2xl p-8">
         <h1 className="text-2xl font-extrabold text-white mb-2">Secure your account</h1>
         <p className="text-sm text-muted-2 mb-6">
-          {step === "change-password" ? "Choose a new password before continuing." : "Complete MFA setup before opening the dashboard."}
+          {step === "change-password" ? "Choose a new password before continuing. It must be different from your temporary password." : "Complete MFA setup before opening the dashboard."}
         </p>
         {step === "change-password" && (
           <>
@@ -102,7 +109,7 @@ const SuperAdminHardening = () => {
         {step === "mfa-setup" && <p className="text-sm text-white mb-5">Click continue to enroll MFA for this account.</p>}
         {error && <p className="text-sm text-danger mt-4">{error}</p>}
         <button type="submit" disabled={loading || (step === "change-password" && !isValid)} className="w-full mt-6 bg-accent text-primary rounded-lg py-3 font-bold disabled:opacity-60">
-          {loading ? "Please wait..." : step === "change-password" ? "Continue to MFA setup" : "Finish and open dashboard"}
+          {loading ? "Please wait..." : step === "change-password" ? "Save password and open dashboard" : "Finish and open dashboard"}
         </button>
       </form>
     </div>

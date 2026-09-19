@@ -327,22 +327,29 @@ export const changePassword = async (req, res) => {
   if (!password) return res.status(400).json({ message: "Password is required" });
   const validation = validateProfileFields({ password });
   if (validation.message) return res.status(400).json(validation);
-  const admin = await Admin.findById(req.user.id);
-  if (!admin) return res.status(404).json({ message: "User not found" });
-  admin.password = await bcrypt.hash(password, 12);
-  admin.mustChangePassword = false;
-  admin.mfaEnrolled = true;
-  await admin.save();
+
+  const account = await findAccountById(req.user.id);
+  if (!account || !["password", "password_hash"].includes(account.passwordField)) {
+    return res.status(404).json({ message: "User not found" });
+  }
+  if (await bcrypt.compare(password, account.user[account.passwordField])) {
+    return res.status(400).json({ message: "New password must be different from your temporary password" });
+  }
+
+  account.user[account.passwordField] = await bcrypt.hash(password, 12);
+  account.user.mustChangePassword = false;
+  if (account.passwordField === "password") account.user.mfaEnrolled = true;
+  await account.user.save();
   res.json({
     message: "Password changed successfully",
-    token: generateToken(admin),
-    id: admin._id,
-    name: admin.full_name,
-    email: admin.email,
-    phone: admin.phone,
-    image: admin.image,
-    role: admin.role,
-    salon_id: admin.salon_id,
+    token: generateToken(account.user),
+    id: account.user._id,
+    name: account.user.full_name,
+    email: account.user.email,
+    phone: account.user.phone,
+    image: account.user.image,
+    role: account.user.role,
+    salon_id: account.user.salon_id,
   });
 };
 
@@ -482,7 +489,10 @@ export const resetPassword = async (req, res) => {
 
     account.user[account.passwordField] = await bcrypt.hash(newPassword, 12);
     account.user.passwordResetSessionHash = null;
-    if (account.passwordField === "password") account.user.mustChangePassword = false;
+    // Completing an email-verified reset also replaces the temporary
+    // password for any account type, so it must not lead to a second forced
+    // change at the next login.
+    if (account.user.mustChangePassword === true) account.user.mustChangePassword = false;
     await account.user.save();
 
     return res.status(200).json({ message: "Password reset successfully" });
@@ -511,17 +521,10 @@ export const loginStaff = async (req, res) => {
       return res.status(404).json({ message: "Staff not found" });
     }
 
-    // Verify password match OR phone number match
+    // Phone may identify the account, but it is never a password substitute.
     const isPasswordMatch = await bcrypt.compare(password, staff.password_hash);
-    const cleanedEnteredPassword = password?.trim().replace(/[\s()-]/g, "");
-    const cleanedStaffPhone = staff.phone?.trim().replace(/[\s()-]/g, "");
-    const isPhoneMatch = Boolean(
-      cleanedEnteredPassword &&
-      cleanedStaffPhone &&
-      (cleanedEnteredPassword === cleanedStaffPhone || cleanedStaffPhone.endsWith(cleanedEnteredPassword))
-    );
 
-    if (!isPasswordMatch && !isPhoneMatch) {
+    if (!isPasswordMatch) {
       return res.status(401).json({ message: "Invalid password" });
     }
 
@@ -530,6 +533,15 @@ export const loginStaff = async (req, res) => {
       if (salon?.status === "deactivated") {
         return res.status(403).json({ message: "This salon has been deactivated. Staff login is unavailable." });
       }
+    }
+
+    if (staff.mustChangePassword === true) {
+      return res.status(200).json({
+        requiresHardening: true,
+        hardeningStep: "change-password",
+        message: "Please set a new password before proceeding.",
+        token: generateHardeningToken(staff, "change-password"),
+      });
     }
 
     res.json({

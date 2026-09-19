@@ -42,6 +42,7 @@ test("manager staff creation increments the effective salon count", async () => 
   expect((await Salon.findById(salon._id)).staffCount).toBe(1);
   const createdStaff = await Staff.findOne({ email: "staff-d@gmail.com" });
   expect(createdStaff.salaryCalculationEnabled).toBe(true);
+  expect(createdStaff.mustChangePassword).toBe(true);
   expect(await Salary.exists({ staff_id: createdStaff._id })).toBeTruthy();
 });
 
@@ -83,6 +84,24 @@ test("super-admin cannot update staff to an unknown salon", async () => {
 
   expect(response.status).toBe(404);
   expect((await Staff.findById(staff._id)).salon_id.toString()).toBe(salon._id.toString());
+});
+
+test("super-admin can make a manually-set replacement password temporary", async () => {
+  const salon = await Salon.create({ name: "Password reset salon", staffCount: 0 });
+  const admin = await Admin.create({ full_name: "Super", username: "super-reset", email: "super-reset@gmail.com", password: "unused", role: "super-admin" });
+  const staff = await Staff.create({
+    full_name: "Staff Reset", first_name: "Staff", last_name: "Reset", email: "staff-reset-force@gmail.com",
+    password_hash: "unused", role: "staff", salon_id: salon._id, mustChangePassword: false,
+  });
+
+  const response = await request(app)
+    .put(`/api/staff/${staff._id}`)
+    .set("Authorization", `Bearer ${generateToken(admin)}`)
+    .send({ password: "Replacement!Pass1", forcePasswordChange: "true" });
+
+  expect(response.status).toBe(200);
+  const updated = await Staff.findById(staff._id);
+  expect(updated.mustChangePassword).toBe(true);
 });
 
 test("manager cannot reassign staff to another salon", async () => {

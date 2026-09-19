@@ -19,6 +19,14 @@ const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail
 const PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
 const normalizePhone = (phone) => String(phone || "").trim().replace(/[\s()-]/g, "");
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const getEmploymentStartDate = (staff) => {
+  const timestamp = staff?.createdAt
+    || (typeof staff?._id?.getTimestamp === "function" ? staff._id.getTimestamp() : null);
+  if (!timestamp) return "";
+
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
 
 // Compute average staff rating from the Feedback collection for all staff
 const attachRatings = async (staffList) => {
@@ -151,6 +159,7 @@ export const createStaff = async (req, res) => {
       password_hash,
       phone,
       role: "staff",
+      mustChangePassword: true,
       specification: req.body.specification,
       commission_rate: req.body.commission_rate || 0,
       salaryCalculationEnabled: true,
@@ -185,7 +194,7 @@ export const createStaff = async (req, res) => {
         const frequency = staff.salary_payment_frequency || "monthly";
 
         const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-        const employmentStartDate = `${staff.createdAt.getFullYear()}-${String(staff.createdAt.getMonth() + 1).padStart(2, "0")}-${String(staff.createdAt.getDate()).padStart(2, "0")}`;
+        const employmentStartDate = getEmploymentStartDate(staff);
         let period, periodStart, periodEnd, weekNumber = 0;
 
         if (frequency === "daily") {
@@ -494,6 +503,12 @@ export const updateStaff = async (req, res) => {
       if (passwordError) return res.status(400).json({ message: passwordError });
       const salt = await bcrypt.genSalt(10);
       updateData.password_hash = await bcrypt.hash(req.body.password, salt);
+
+      // A super-admin may choose to make an administrator-set replacement
+      // password temporary. Managers cannot alter this security state.
+      if (req.user.role?.toLowerCase() === "super-admin" && String(req.body.forcePasswordChange).toLowerCase() === "true") {
+        updateData.mustChangePassword = true;
+      }
     }
 
     if (req.body.role !== undefined && String(req.body.role).toLowerCase() !== "staff") {
@@ -638,7 +653,7 @@ export const updateStaff = async (req, res) => {
           {
             $set: {
               staff_name: staff.full_name || "",
-              employmentStartDate: `${staff.createdAt.getFullYear()}-${String(staff.createdAt.getMonth() + 1).padStart(2, "0")}-${String(staff.createdAt.getDate()).padStart(2, "0")}`,
+              employmentStartDate: getEmploymentStartDate(staff),
               salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
             }
           }
@@ -722,7 +737,7 @@ export const updateStaff = async (req, res) => {
             $setOnInsert: {
               salon_id: salonId,
               staff_id: staff._id,
-              employmentStartDate: `${staff.createdAt.getFullYear()}-${String(staff.createdAt.getMonth() + 1).padStart(2, "0")}-${String(staff.createdAt.getDate()).padStart(2, "0")}`,
+              employmentStartDate: getEmploymentStartDate(staff),
               frequency,
               period,
               cycleId: salarySettingsChanged && !paymentCountOnlyChanged ? cycleId : null,
