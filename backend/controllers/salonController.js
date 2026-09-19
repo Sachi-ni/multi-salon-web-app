@@ -178,6 +178,7 @@ export const createSalon = async (req, res) => {
       phone: validation.normalizedPhone,
       password_hash,
       role: "manager",
+      mustChangePassword: true,
       salaryCalculationEnabled: true,
       status: "Active",
       salon_id: salon._id,

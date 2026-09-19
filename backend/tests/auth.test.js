@@ -7,6 +7,18 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { readFile } from "node:fs/promises";
 
+const createStaffAccount = async ({ email, role = "staff", password = "Strong!Pass1", mustChangePassword } = {}) => Staff.create({
+  full_name: role === "manager" ? "Test Manager" : "Test Staff",
+  first_name: "Test",
+  last_name: role === "manager" ? "Manager" : "Staff",
+  email,
+  phone: "0771234567",
+  password_hash: await bcrypt.hash(password, 12),
+  role,
+  salon_id: new (await import("mongoose")).default.Types.ObjectId(),
+  ...(mustChangePassword === undefined ? {} : { mustChangePassword }),
+});
+
 // Authentication tests must never deliver email through developer credentials.
 process.env.RESEND_API_KEY = "";
 process.env.EMAIL_USER = "";
@@ -115,6 +127,55 @@ test("SuperAdmin OTP verification issues full session when mustChangePassword is
   expect(verifyRes.status).toBe(200);
   expect(verifyRes.body.role).toBe("super-admin");
   expect(verifyRes.body.token).toBeDefined();
+});
+
+test.each(["staff", "manager"])("new %s login is restricted to the change-password hardening flow", async (role) => {
+  const staff = await createStaffAccount({ email: `${role}-hardening@example.com`, role, mustChangePassword: true });
+
+  const login = await request(app).post("/api/staff/login")
+    .send({ email: staff.email, password: "Strong!Pass1" });
+  expect(login.status).toBe(200);
+  expect(login.body.requiresHardening).toBe(true);
+  expect(login.body.hardeningStep).toBe("change-password");
+  expect(jwt.verify(login.body.token, process.env.JWT_SECRET)).toMatchObject({
+    id: String(staff._id), role, purpose: "change-password",
+  });
+
+  // The scoped token cannot call ordinary protected endpoints.
+  expect((await request(app).get("/api/auth/profile").set("Authorization", `Bearer ${login.body.token}`)).status).toBe(403);
+  expect((await request(app).post("/api/auth/change-password")
+    .set("Authorization", `Bearer ${login.body.token}`)
+    .send({ password: "Strong!Pass1" })).status).toBe(400);
+
+  const changed = await request(app).post("/api/auth/change-password")
+    .set("Authorization", `Bearer ${login.body.token}`)
+    .send({ password: "Replacement!Pass1" });
+  expect(changed.status).toBe(200);
+  expect(changed.body.role).toBe(role);
+  expect((await Staff.findById(staff._id)).mustChangePassword).toBe(false);
+  expect((await request(app).get("/api/auth/profile").set("Authorization", `Bearer ${changed.body.token}`)).status).toBe(200);
+});
+
+test("a flagged staff account is blocked on all normal protected API routes even with a normal JWT", async () => {
+  const staff = await createStaffAccount({ email: "protected-block@example.com", mustChangePassword: true });
+  const { default: generateToken } = await import("../utils/generateToken.js");
+  const response = await request(app).get("/api/auth/profile")
+    .set("Authorization", `Bearer ${generateToken(staff)}`);
+  expect(response.status).toBe(403);
+  expect(response.body.message).toMatch(/required password change/i);
+});
+
+test("legacy staff without the flag receives a normal session, while phone is not accepted as a password", async () => {
+  const staff = await createStaffAccount({ email: "legacy-staff@example.com" });
+  const phonePassword = await request(app).post("/api/staff/login")
+    .send({ email: staff.email, password: staff.phone });
+  expect(phonePassword.status).toBe(401);
+
+  const login = await request(app).post("/api/staff/login")
+    .send({ email: staff.email, password: "Strong!Pass1" });
+  expect(login.status).toBe(200);
+  expect(login.body.requiresHardening).toBeUndefined();
+  expect(login.body.token).toBeDefined();
 });
 
 test("password reset requests are generic and create a hashed OTP only for an account", async () => {

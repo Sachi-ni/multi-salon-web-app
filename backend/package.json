@@ -8,6 +8,7 @@
     "start": "node server.js",
     "seed:superadmin": "node seed/seedSuperAdmin.js",
     "migrate:salon-status": "node migrations/20260909_add_salon_status.js",
+    "migrate:staff-password-hardening": "node migrations/20260919_add_staff_must_change_password.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
   },
   "keywords": [],

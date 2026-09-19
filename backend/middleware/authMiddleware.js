@@ -27,6 +27,13 @@ export const protect = async (req, res, next) => {
         return res.status(401).json({ message: "User not found" });
       }
 
+      // A normal session must never bypass the first-login/reset password
+      // hardening flow. This shared middleware protects every API route that
+      // uses `protect`, not merely dashboard endpoints.
+      if (user.mustChangePassword === true) {
+        return res.status(403).json({ message: "Complete your required password change before using this session" });
+      }
+
       req.user = {
         id: String(user._id),
         role: user.role,
@@ -83,9 +90,15 @@ export const protectHardening = (purpose) => async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.purpose !== purpose) return res.status(403).json({ message: "Invalid hardening token" });
-    const admin = await Admin.findById(decoded.id);
-    if (!admin) return res.status(401).json({ message: "User not found" });
-    req.user = { id: String(admin._id), role: admin.role, salon_id: admin.salon_id ? String(admin.salon_id) : null };
+    let user = await Admin.findById(decoded.id);
+    if (!user) user = await Staff.findById(decoded.id);
+    if (!user) return res.status(401).json({ message: "User not found" });
+
+    if (purpose === "change-password" && user.mustChangePassword !== true) {
+      return res.status(403).json({ message: "A password change is not required for this account" });
+    }
+
+    req.user = { id: String(user._id), role: user.role, salon_id: user.salon_id ? String(user.salon_id) : null };
     next();
   } catch {
     res.status(401).json({ message: "Not authorized, token failed" });
