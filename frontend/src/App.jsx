@@ -74,6 +74,12 @@ const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
     return <Navigate to="/" />;
   }
 
+  // Normal sessions are never issued while password hardening is pending;
+  // retain this guard as a defence for any stale client-side state.
+  if (user.mustChangePassword === true) {
+    return <Navigate to="/login" replace />;
+  }
+
   if (requireSalonAccess && user.role !== "super-admin" && !user.salon_id) {
     return <Navigate to="/unauthorized" />;
   }

@@ -87,10 +87,13 @@ export const createBill = async (req, res) => {
       }
 
       const calculatedSubtotal = items.reduce((sum, it) => sum + (it.price || 0), 0);
-      const subtotal = Number(req.body.subtotal) || appointment.total_price || calculatedSubtotal || 0;
+      // The appointment is the authoritative source for what was charged.
+      // Client totals are display values and must not be able to reduce a
+      // bill below the completed appointment amount.
+      const subtotal = appointment.total_price || calculatedSubtotal || 0;
       const discountNum = Math.max(0, Number(discount) || 0);
       const taxNum = Math.max(0, Number(tax) || 0);
-      const total_amount = Math.max(0, Number(req.body.total_amount) || Math.round(subtotal - discountNum + taxNum));
+      const total_amount = Math.max(0, Math.round(subtotal - discountNum + taxNum));
 
       // Generate invoice number e.g. INV-2609-8421
       const now = new Date();
@@ -136,8 +139,10 @@ export const createBill = async (req, res) => {
          issued_by: req.user.full_name || req.user.username || (req.user.role === "super-admin" ? "Super Admin" : "Salon Manager"),
          issued_by_id: req.user._id,
          bill_date: bill_date ? new Date(bill_date) : new Date(),
-         payout_status: "paid",
-         paid_out_at: new Date()
+         // Payout is an internal settlement state; issuing a bill does not
+         // settle it, and clients cannot override it in this endpoint.
+         payout_status: "pending",
+         paid_out_at: null
       });
 
       // Send email receipt to customer if customer has an email
@@ -235,6 +240,7 @@ export const createBill = async (req, res) => {
 
       res.status(201).json({
         message: "Bill generated successfully",
+        ...bill.toObject(),
         bill
       });
    } catch (error) {

@@ -430,10 +430,22 @@ export const recalcWeeklyMonthlyTotals = (salaryRecord) => {
     const workingAmount = (isBeforeJoinDate || isBeforeCalculationStart)
       ? 0
       : recordedWorkingAmount;
+    // Mongoose subdocuments are not reliably spreadable. Normalize the
+    // current map item once, then use that same item for every preserved
+    // field below.
+    const rec = record.toObject ? record.toObject() : record;
+    const workingAmount = safeNumber(rec.workingAmount, 0);
+    const rate = safeNumber(rec.rate, 0);
+    const recordDate = normalizeSalaryDate(rec.date);
+    const isBeforeJoinDate = Boolean(staffJoinDate && recordDate && recordDate < staffJoinDate);
+    const countedWorkingAmount = isBeforeJoinDate ? 0 : workingAmount;
+
     const workRate =
-      workingAmount > 0 && rate > 0
-        ? workingAmount * (rate / 100)
+      countedWorkingAmount > 0 && rate > 0
+        ? countedWorkingAmount * (rate / 100)
         : 0;
+
+    const isAbsent = Boolean(rec.isAbsent);
 
     const daySalary = calculateDaySalary(
       workRate,
@@ -443,9 +455,9 @@ export const recalcWeeklyMonthlyTotals = (salaryRecord) => {
     );
 
     return {
-      ...record,
-      date: normalizeSalaryDate(record.date),
-      workingAmount,
+      ...rec,
+      date: recordDate,
+      workingAmount: countedWorkingAmount,
       rate,
       workRate,
       daySalary,
@@ -805,7 +817,7 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
   let weekNumber = 0;
 
   const normalizedAppointmentDate = normalizeSalaryDate(appointmentDate);
-  const employmentStartDate = normalizeSalaryDate(staff.createdAt);
+  const employmentStartDate = getStaffJoinDate(staff);
 
   if (
     employmentStartDate &&
@@ -1353,7 +1365,7 @@ export const createAndMarkPaid = async (req, res) => {
       salaryRecord = new Salary({
         salon_id,
         staff_id: staff._id,
-        employmentStartDate: normalizeSalaryDate(staff.createdAt),
+        employmentStartDate: getStaffJoinDate(staff),
         frequency,
         period,
         staff_name: staff.full_name || "",
@@ -1703,7 +1715,7 @@ export const markStaffDayAbsent = async (req, res) => {
       salaryRecord = new Salary({
         salon_id,
         staff_id: staff._id,
-        employmentStartDate: normalizeSalaryDate(staff.createdAt),
+        employmentStartDate: getStaffJoinDate(staff),
         frequency,
         period,
         staff_name: staff.full_name || "",
@@ -1952,7 +1964,7 @@ export const generatePayroll = async (req, res) => {
         : null;
       const salaryBoundary = latestFrequencyChange?.changed_date
         ? getNextSalaryDate(latestFrequencyChange.changed_date)
-        : normalizeSalaryDate(staff.createdAt);
+        : getStaffJoinDate(staff);
 
       // Find completed appointments for this staff
       const staffAppointments = completedAppointments.filter(
@@ -2015,7 +2027,7 @@ export const generatePayroll = async (req, res) => {
         salaryRecord = new Salary({
           salon_id: salonFilter.salon_id || req.user.salon_id,
           staff_id: staff._id,
-          employmentStartDate: normalizeSalaryDate(staff.createdAt),
+          employmentStartDate: getStaffJoinDate(staff),
           frequency,
           cycleId: staff.salary_cycle_id || null,
           calculationStartDate: salaryBoundary,
@@ -2266,7 +2278,7 @@ export const initializeSalaries = async (req, res) => {
     for (const staff of staffList) {
       const commissionRate = staff.commission_rate || 0;
       const salaryPaymentCountPerDay = staff.salary_payment_count_per_day || 1;
-      const employmentStartDate = normalizeSalaryDate(staff.createdAt);
+      const employmentStartDate = getStaffJoinDate(staff);
       const calculationStartDate = employmentStartDate && employmentStartDate > periodStart
         ? employmentStartDate
         : periodStart;
@@ -2486,7 +2498,7 @@ export const updateStaffRate = async (req, res) => {
         createdSalary = await Salary.create({
           salon_id: staff.salon_id,
           staff_id: staff._id,
-          employmentStartDate: normalizeSalaryDate(staff.createdAt),
+          employmentStartDate: getStaffJoinDate(staff),
           frequency,
           period,
           staff_name: staff.full_name || "",
@@ -2531,7 +2543,7 @@ export const updateStaffRate = async (req, res) => {
     }
 
     // Existing record - apply the new rate and recalculate
-    salary.employmentStartDate = normalizeSalaryDate(staff.createdAt);
+    salary.employmentStartDate = getStaffJoinDate(staff);
     salary.rate = numericRate;
     salary.commission_rate = numericRate;
 
@@ -2591,8 +2603,8 @@ export const transitionSalaryFrequency = async (
   const changedDate = toLocalDateStr(changedAt);
 
   if (
-    normalizeSalaryDate(staff.createdAt) &&
-    changedDate < normalizeSalaryDate(staff.createdAt)
+    getStaffJoinDate(staff) &&
+    changedDate < getStaffJoinDate(staff)
   ) {
     return null;
   }
@@ -2632,7 +2644,7 @@ export const transitionSalaryFrequency = async (
     salary = new Salary({
       salon_id: staff.salon_id,
       staff_id: staff._id,
-      employmentStartDate: normalizeSalaryDate(staff.createdAt),
+      employmentStartDate: getStaffJoinDate(staff),
       frequency: previousFrequency,
       period,
       staff_name: staff.full_name || "",
@@ -2647,7 +2659,7 @@ export const transitionSalaryFrequency = async (
     });
   }
 
-  salary.employmentStartDate = normalizeSalaryDate(staff.createdAt);
+  salary.employmentStartDate = getStaffJoinDate(staff);
   salary.dateRange = { start: periodStart, end: periodEnd };
   if (Array.isArray(salary.dailyRecords)) {
     salary.dailyRecords = salary.dailyRecords.filter(

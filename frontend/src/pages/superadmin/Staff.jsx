@@ -319,6 +319,7 @@ const Staff = () => {
       email: staff.email || "",
       phone: staff.phone || "",
       password: "",
+      forcePasswordChange: false,
       salon: staff.salon_id?._id || staff.salon || "",
       services: assignedServices,
       status: staff.status || "Active",
@@ -450,6 +451,7 @@ const Staff = () => {
 
       if (editingStaff.password) {
         data.password = editingStaff.password;
+        data.forcePasswordChange = editingStaff.forcePasswordChange === true;
       }
       if (editingStaff.picture) {
         data.image = editingStaff.picture;
@@ -778,6 +780,17 @@ const Staff = () => {
                 </button>}
               </div>
               {editErrors.password && <p className="mt-1 text-xs text-danger">{editErrors.password}</p>}
+              {editingStaff.password && (
+                <label className="mt-3 flex items-start gap-2 text-xs text-neutral-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editingStaff.forcePasswordChange === true}
+                    onChange={(e) => setEditingStaff({ ...editingStaff, forcePasswordChange: e.target.checked })}
+                    className="mt-0.5 accent-amber-400"
+                  />
+                  Require this account holder to choose a new password at their next login.
+                </label>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

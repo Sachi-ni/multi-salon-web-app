@@ -35,6 +35,10 @@ const staffSchema = new mongoose.Schema({
     ref: "Salon",
     required: true
   },
+  // Match Admin's undefined default so legacy documents remain unaffected
+  // during a staged deployment. Every supported new-account creation path
+  // sets this to true explicitly; the migration marks legacy accounts false.
+  mustChangePassword: { type: Boolean, default: undefined },
   resetPasswordTokenHash: { type: String, default: null },
   resetPasswordExpires: { type: Date, default: null },
   passwordResetOtpCodeHash: { type: String, default: null },
