@@ -11,6 +11,7 @@ import { assertNotPrivilegedRole } from "../utils/roleGuard.js";
 import { validateNewPassword } from "../utils/passwordPolicy.js";
 import {
   calculateDaySalary,
+  refreshSalaryRecord,
   transitionSalaryFrequency,
 } from "./salaryController.js";
 
@@ -19,6 +20,11 @@ const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail
 const PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
 const normalizePhone = (phone) => String(phone || "").trim().replace(/[\s()-]/g, "");
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const staffAddedDateKey = (staff) => {
+  const timestamp = staff?.createdAt || staff?._id?.getTimestamp?.() || new Date();
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
 
 // Compute average staff rating from the Feedback collection for all staff
 const attachRatings = async (staffList) => {
@@ -185,7 +191,7 @@ export const createStaff = async (req, res) => {
         const frequency = staff.salary_payment_frequency || "monthly";
 
         const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-        const employmentStartDate = `${staff.createdAt.getFullYear()}-${String(staff.createdAt.getMonth() + 1).padStart(2, "0")}-${String(staff.createdAt.getDate()).padStart(2, "0")}`;
+        const employmentStartDate = staffAddedDateKey(staff);
         let period, periodStart, periodEnd, weekNumber = 0;
 
         if (frequency === "daily") {
@@ -394,6 +400,7 @@ export const updateStaff = async (req, res) => {
     const requestedFrequency = req.body.salaryPaymentFrequency;
     const frequencyChanged =
       requestedFrequency !== undefined && requestedFrequency !== previousFrequency;
+    const statusChanged = req.body.status !== undefined && req.body.status !== originalStaff.status;
     const requestedCommissionRate = req.body.commission_rate !== undefined
       ? Number(req.body.commission_rate)
       : originalStaff.commission_rate;
@@ -408,12 +415,13 @@ export const updateStaff = async (req, res) => {
       req.body.salaryPaymentCountPerDay !== undefined &&
       Number.isFinite(requestedPaymentCount) &&
       requestedPaymentCount !== Number(originalStaff.salary_payment_count_per_day || 1);
-    const salarySettingsChanged =
-      frequencyChanged || commissionRateChanged || paymentCountChanged;
-    const paymentCountOnlyChanged =
-      paymentCountChanged && !frequencyChanged && !commissionRateChanged;
+    // Only a frequency switch closes a cycle.  Rate edits take effect today
+    // and forward, while older unpaid days keep their saved daily snapshot.
+    const salarySettingsChanged = frequencyChanged;
+    const paymentCountOnlyChanged = false;
+    const rateOrAmountChanged = commissionRateChanged || paymentCountChanged;
     const frequencyChangedAt = new Date();
-    const transitionCycleId = salarySettingsChanged && !paymentCountOnlyChanged
+    const transitionCycleId = frequencyChanged
       ? randomUUID()
       : null;
 
@@ -535,8 +543,13 @@ export const updateStaff = async (req, res) => {
       updateData.salon_id = req.body.salonId;
     }
 
-    if (req.body.status !== undefined)
+    if (req.body.status !== undefined) {
       updateData.status = req.body.status;
+      // Inactive staff retain the salary already accrued, but no later page
+      // refresh or appointment may add salary.  Reactivating enables normal
+      // accrual again from the activation day.
+      updateData.salaryCalculationEnabled = String(req.body.status) === "Active";
+    }
 
     console.log("FINAL SERVICES TO SAVE:", services);
 
@@ -590,6 +603,36 @@ export const updateStaff = async (req, res) => {
         const year = calculationDate.getFullYear();
         const month = calculationDate.getMonth() + 1;
         const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(calculationDate.getDate()).padStart(2, "0")}`;
+        const statusDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+        // Record inactive ranges on the salary documents themselves.  This
+        // lets a later reactivation resume on its activation date without
+        // retroactively paying inactive days in the same week/month.
+        if (statusChanged) {
+          const openSalaryRecords = await Salary.find({
+            staff_id: staff._id,
+            status: "Not Paid",
+            staffDeleted: { $ne: true },
+          });
+          for (const salaryRecord of openSalaryRecords) {
+            salaryRecord.inactiveRanges = salaryRecord.inactiveRanges || [];
+            if (staff.status === "Inactive") {
+              if (!salaryRecord.inactiveRanges.some((range) => !range.end)) {
+                salaryRecord.inactiveRanges.push({ start: statusDate, end: "" });
+              }
+            } else {
+              const openRange = [...salaryRecord.inactiveRanges]
+                .reverse()
+                .find((range) => !range.end);
+              if (openRange) {
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                openRange.end = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+              }
+            }
+            await salaryRecord.save();
+          }
+        }
 
         let previousSalary = null;
         if (salarySettingsChanged && !paymentCountOnlyChanged) {
@@ -632,19 +675,19 @@ export const updateStaff = async (req, res) => {
           periodEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
         }
 
-        // Update name and count per day on all unpaid records
+        // Keep identifying details in sync, but never overwrite the
+        // historical per-day snapshot on an unpaid salary record.
         await Salary.updateMany(
           { staff_id: staff._id, status: "Not Paid" },
           {
             $set: {
               staff_name: staff.full_name || "",
-              employmentStartDate: `${staff.createdAt.getFullYear()}-${String(staff.createdAt.getMonth() + 1).padStart(2, "0")}-${String(staff.createdAt.getDate()).padStart(2, "0")}`,
-              salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+              employmentStartDate: staffAddedDateKey(staff),
             }
           }
         );
 
-        if (paymentCountOnlyChanged) {
+        if (rateOrAmountChanged) {
           const activeSalaryRecords = await Salary.find({
             salon_id: salonId,
             staff_id: staff._id,
@@ -655,54 +698,91 @@ export const updateStaff = async (req, res) => {
               : { cycleId: null }),
           });
 
+          const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
           for (const salaryRecord of activeSalaryRecords) {
-            const workingAmount = Number(salaryRecord.workingAmount || 0);
-            const dailyWorkingAmounts = new Map(
-              (salaryRecord.dailyRecords || []).map((record) => [
-                String(record.date),
-                Number(record.workingAmount || 0),
-              ])
-            );
-            const perDay = Number(salaryRecord.salary_payment_count_per_day || 0);
-            const rate = Number(salaryRecord.rate || salaryRecord.commission_rate || 0);
+            // First materialize every historical day using the settings that
+            // applied before this edit. Otherwise a later refresh can fill a
+            // missing weekly/monthly row with the newly edited daily amount.
+            if (salaryRecord.frequency !== "daily") {
+              const savedRate = salaryRecord.rate;
+              const savedCommissionRate = salaryRecord.commission_rate;
+              const savedPaymentPerDay = salaryRecord.salary_payment_count_per_day;
+              salaryRecord.rate = Number(originalStaff.commission_rate || 0);
+              salaryRecord.commission_rate = Number(originalStaff.commission_rate || 0);
+              salaryRecord.salary_payment_count_per_day = Number(originalStaff.salary_payment_count_per_day || 1);
+              refreshSalaryRecord(salaryRecord);
+              salaryRecord.rate = savedRate;
+              salaryRecord.commission_rate = savedCommissionRate;
+              salaryRecord.salary_payment_count_per_day = savedPaymentPerDay;
+            }
+
+            // Freeze every earlier date with the settings that existed before
+            // this edit. Older documents did not always carry a per-day
+            // snapshot, so populate it before changing the parent setting.
+            for (const daily of salaryRecord.dailyRecords || []) {
+              if (String(daily.date) < todayKey) {
+                daily.salaryPaymentCountPerDay = Number(originalStaff.salary_payment_count_per_day || 1);
+                if (commissionRateChanged) {
+                  daily.rate = Number(originalStaff.commission_rate || 0);
+                }
+                // Rebuild the saved historical snapshot with the old values.
+                // This also repairs older records that predate the per-day
+                // snapshot field (Mongoose supplied its default of 1).
+                const workingAmount = Number(daily.workingAmount || 0);
+                daily.workRate = workingAmount * (Number(daily.rate || 0) / 100);
+                daily.daySalary = calculateDaySalary(
+                  daily.workRate,
+                  daily.salaryPaymentCountPerDay,
+                  Boolean(daily.isAbsent)
+                );
+                daily.totalSalary = daily.daySalary;
+              }
+            }
+            salaryRecord.commission_rate = Number(staff.commission_rate || 0);
+            salaryRecord.salary_payment_count_per_day = Number(staff.salary_payment_count_per_day || 1);
+            salaryRecord.rate = Number(staff.commission_rate || 0);
 
             if (salaryRecord.frequency === "daily") {
-              const workRate = workingAmount * (Number(salaryRecord.rate || 0) / 100);
-              salaryRecord.workingAmount = workingAmount;
+              // A daily record is its own date: edit only today's unpaid row.
+              if (salaryRecord.period !== todayKey) continue;
+              const workingAmount = Number(salaryRecord.workingAmount || 0);
+              const workRate = workingAmount * (salaryRecord.rate / 100);
               salaryRecord.workRate = workRate;
               salaryRecord.daySalary = calculateDaySalary(
                 workRate,
-                perDay,
+                salaryRecord.salary_payment_count_per_day,
                 Boolean(salaryRecord.isAbsent)
               );
               salaryRecord.totalSalary = salaryRecord.daySalary;
             } else {
-              for (const record of salaryRecord.dailyRecords || []) {
-                const recordWorkingAmount = dailyWorkingAmounts.get(String(record.date)) ?? 0;
-                const workRate = recordWorkingAmount * (rate / 100);
-                record.workingAmount = recordWorkingAmount;
-                record.rate = rate;
-                record.workRate = workRate;
+              // Weekly/monthly rows hold one snapshot per day.  Change only
+              // today's snapshot; prior dates retain their old rate and pay.
+              const record = (salaryRecord.dailyRecords || []).find(
+                (daily) => String(daily.date) === todayKey
+              );
+              if (record) {
+                record.rate = salaryRecord.rate;
+                record.salaryPaymentCountPerDay = salaryRecord.salary_payment_count_per_day;
+                const workingAmount = Number(record.workingAmount || 0);
+                record.workRate = workingAmount * (record.rate / 100);
                 record.daySalary = calculateDaySalary(
-                  workRate,
-                  perDay,
+                  record.workRate,
+                  record.salaryPaymentCountPerDay,
                   Boolean(record.isAbsent)
                 );
                 record.totalSalary = record.daySalary;
               }
-              const countedRecords = salaryRecord.dailyRecords || [];
-              salaryRecord.workingAmount = countedRecords.reduce(
-                (sum, record) => sum + Number(record.workingAmount || 0),
-                0
+              // Do not re-run the general recalculation here: it would apply
+              // today's rate to every earlier day in this week/month. Sum the
+              // already-saved daily snapshots instead.
+              const countThroughDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+              const counted = (salaryRecord.dailyRecords || []).filter(
+                (daily) => String(daily.date) <= countThroughDate
               );
-              salaryRecord.workRate = countedRecords.reduce(
-                (sum, record) => sum + Number(record.workRate || 0),
-                0
-              );
-              salaryRecord.daySalary = countedRecords.reduce(
-                (sum, record) => sum + Number(record.daySalary || 0),
-                0
-              );
+              salaryRecord.workingAmount = counted.reduce((sum, daily) => sum + Number(daily.workingAmount || 0), 0);
+              salaryRecord.workRate = counted.reduce((sum, daily) => sum + Number(daily.workRate || 0), 0);
+              salaryRecord.daySalary = counted.reduce((sum, daily) => sum + Number(daily.daySalary || 0), 0);
               salaryRecord.totalSalary = salaryRecord.daySalary;
             }
             await salaryRecord.save();
@@ -716,17 +796,17 @@ export const updateStaff = async (req, res) => {
             staff_id: staff._id,
             period,
             frequency,
-            cycleId: salarySettingsChanged && !paymentCountOnlyChanged ? cycleId : null,
+            cycleId: frequencyChanged ? cycleId : (staff.salary_cycle_id || null),
           },
           {
             $setOnInsert: {
               salon_id: salonId,
               staff_id: staff._id,
-              employmentStartDate: `${staff.createdAt.getFullYear()}-${String(staff.createdAt.getMonth() + 1).padStart(2, "0")}-${String(staff.createdAt.getDate()).padStart(2, "0")}`,
+              employmentStartDate: staffAddedDateKey(staff),
               frequency,
               period,
-              cycleId: salarySettingsChanged && !paymentCountOnlyChanged ? cycleId : null,
-              calculationStartDate: salarySettingsChanged && !paymentCountOnlyChanged ? yyyymmdd : periodStart,
+              cycleId: frequencyChanged ? cycleId : (staff.salary_cycle_id || null),
+              calculationStartDate: frequencyChanged ? yyyymmdd : periodStart,
               staff_name: staff.full_name || "",
               staff_role: staff.role || "",
               commission_rate: staff.commission_rate || 0,
@@ -741,7 +821,7 @@ export const updateStaff = async (req, res) => {
               month,
               weekNumber,
               dateRange: {
-                start: salarySettingsChanged && !paymentCountOnlyChanged ? yyyymmdd : periodStart,
+                start: frequencyChanged ? yyyymmdd : periodStart,
                 end: periodEnd,
               },
               dailyRecords: [],
@@ -797,6 +877,60 @@ export const deleteStaff = async (req, res) => {
         message: "Forbidden: cannot delete staff for another salon",
       });
     }
+
+    const pendingSalaries = await Salary.find({
+      staff_id: staff._id,
+      status: "Not Paid",
+      staffDeleted: { $ne: true },
+    });
+    for (const salary of pendingSalaries) refreshSalaryRecord(salary);
+    const pendingTotal = pendingSalaries.reduce(
+      (sum, salary) => sum + Number(salary.totalSalary || 0),
+      0
+    );
+
+    // The UI must explicitly confirm payment before deletion. This prevents
+    // an accidental staff deletion from silently settling salary.
+    if (pendingTotal > 0 && req.query.settlePending !== "true") {
+      return res.status(409).json({
+        message: "This staff member has pending salary. Confirm payment before deletion.",
+        requiresSalarySettlement: true,
+        pendingCount: pendingSalaries.length,
+        pendingTotal,
+      });
+    }
+
+    // Deletion settles the current open cycle exactly like a frequency
+    // transition.  The salary documents are retained as paid history, but
+    // flagged so the person cannot appear in an active salary table again.
+    await transitionSalaryFrequency(
+      staff,
+      staff.salary_payment_frequency || "monthly",
+      new Date(),
+      req.user?.id
+    );
+    // Frequency transition settles the current period. Any older pending
+    // history is also explicitly settled because this person is being removed.
+    const remainingPending = await Salary.find({
+      staff_id: staff._id,
+      status: "Not Paid",
+    });
+    for (const salary of remainingPending) {
+      refreshSalaryRecord(salary);
+      salary.paidTotal = Number(salary.totalSalary || 0);
+      salary.status = "Paid";
+      salary.paidAt = new Date();
+      salary.dailyRecords = (salary.dailyRecords || []).map((daily) => ({
+        ...daily,
+        status: "Paid",
+        paidAt: salary.paidAt,
+      }));
+      await salary.save();
+    }
+    await Salary.updateMany(
+      { staff_id: staff._id },
+      { $set: { staffDeleted: true, staffDeletedAt: new Date() } }
+    );
 
     await Staff.findByIdAndDelete(req.params.id);
 

@@ -401,6 +401,7 @@ export default function AdminStaffPage() {
 
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deletePaymentConfirmation, setDeletePaymentConfirmation] = useState(null);
   const [frequencyConfirmation, setFrequencyConfirmation] = useState(null);
 
   const fetchStaffData = useCallback(async () => {
@@ -578,18 +579,26 @@ export default function AdminStaffPage() {
     await handleEditSubmit({ preventDefault: () => {} });
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (settlePending = false) => {
     setDeleteLoading(true);
 
     try {
-      await deleteStaff(deleteId);
+      await deleteStaff(deleteId, { settlePending });
 
       setDeleteId(null);
+      setDeletePaymentConfirmation(null);
 
       fetchStaffData();
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || "Failed to delete staff member");
+      if (err.response?.data?.requiresSalarySettlement) {
+        setDeletePaymentConfirmation({
+          pendingCount: err.response.data.pendingCount,
+          pendingTotal: err.response.data.pendingTotal,
+        });
+      } else {
+        setError(err.response?.data?.message || "Failed to delete staff member");
+      }
     } finally {
       setDeleteLoading(false);
     }
@@ -1118,19 +1127,20 @@ export default function AdminStaffPage() {
       <Modal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
-        title="🗑️ Delete Staff Member?"
+        title={deletePaymentConfirmation ? "Pending Salary Payment" : "🗑️ Delete Staff Member?"}
         maxWidth="max-w-sm"
       >
         <p className="text-xs text-neutral-300 py-3 text-center leading-relaxed">
-          Are you sure you want to delete this staff member?
-          This action cannot be undone.
+          {deletePaymentConfirmation
+            ? `This staff member has ${deletePaymentConfirmation.pendingCount} pending salary record(s), totaling LKR ${Number(deletePaymentConfirmation.pendingTotal || 0).toLocaleString()}. Do you want to mark it as paid and delete the staff member?`
+            : "Are you sure you want to delete this staff member? Pending salary will be checked before deletion."}
         </p>
 
         <Modal.Actions className="justify-center">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setDeleteId(null)}
+            onClick={() => { setDeleteId(null); setDeletePaymentConfirmation(null); }}
             disabled={deleteLoading}
           >
             Cancel
@@ -1139,10 +1149,10 @@ export default function AdminStaffPage() {
           <Button
             variant="danger"
             size="sm"
-            onClick={handleDelete}
+            onClick={() => handleDelete(Boolean(deletePaymentConfirmation))}
             loading={deleteLoading}
           >
-            Delete Staff
+            {deletePaymentConfirmation ? "Pay & Delete" : "Continue"}
           </Button>
         </Modal.Actions>
       </Modal>

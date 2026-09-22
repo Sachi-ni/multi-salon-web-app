@@ -44,6 +44,6 @@ const staffSchema = new mongoose.Schema({
   passwordResetSessionHash: { type: String, default: null },
   image:    { type: String, default: "" },
   services: [{ type: mongoose.Schema.Types.ObjectId, ref: "Service" }] // ← new
-});
+}, { timestamps: true });
 
 export default mongoose.model("Staff", staffSchema);
