@@ -63,6 +63,11 @@ const toDateKey = (date) => {
 };
 
 const isSalaryVisibleOnDate = (salary, selectedDate) => {
+  // A deleted manager's paid row remains visible on the deletion date for
+  // history, then disappears from salary tables tomorrow.
+  if (salary?.staffDeleted && salary?.staffDeletedAt) {
+    return toDateKey(selectedDate) <= toDateKey(salary.staffDeletedAt);
+  }
   if (!salary?.isTransitioned || !salary.dateRange?.end) return true;
   return toDateKey(selectedDate) <= toDateKey(salary.dateRange.end);
 };
@@ -1241,6 +1246,7 @@ const Salary = () => {
                 {filteredDisplayRows.map((row) => {
                   const staff = row.staff_id || {};
                   const staffName = staff.name || staff.full_name || row.staff_name || "Unknown";
+                  const isStaffInactive = staff.status === "Inactive" || staff.salaryCalculationEnabled === false;
                   const isFallback =
                     !row.period || String(row._id).startsWith(FALLBACK_PREFIX);
                   const monthlyDayRecord =
@@ -1316,7 +1322,7 @@ const Salary = () => {
                     frequency,
                     frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate
                   );
-                  const canPay = !isPaid && totalSal > 0 && periodEnded;
+                  const canPay = !isStaffInactive && !isPaid && totalSal > 0 && periodEnded;
                   const canDownloadPdf = !isFallback && isPaid;
                   // Absent toggle: only for days that already passed and are
                   // not paid yet.
@@ -1325,7 +1331,7 @@ const Salary = () => {
                     frequency === "daily"
                       ? isPaid
                       : (selectedPeriodDayRecord?.status === "Paid" || isPaid);
-                  const canToggleAbsent = !selectedDayPaid && selectedDayPassed;
+                  const canToggleAbsent = !isStaffInactive && !selectedDayPaid && selectedDayPassed;
                   const absentDisabledReason = selectedDayPaid
                     ? (frequency === "daily" ? "Salary already paid" : "This day has already been paid")
                     : !selectedDayPassed
@@ -1334,7 +1340,12 @@ const Salary = () => {
 
                   return (
                     <tr key={row._id}>
-                      <td className="font-bold text-white">{staffName}</td>
+                      <td className="font-bold text-white">
+                        {staffName}
+                        {isStaffInactive && (
+                          <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-gray-500/20 text-gray-300 border border-gray-500/30 uppercase">Inactive</span>
+                        )}
+                      </td>
                       <td className="text-gray-400 text-xs">
                         {row.salon_id?.name ||
                          salonNameById.get(String(row.salon_id || staff.salon_id || "")) ||
@@ -1347,6 +1358,7 @@ const Salary = () => {
                             type="number"
                             value={currentRate}
                             onChange={(e) => handleRateChange(row._id, e.target.value)}
+                            disabled={isStaffInactive}
                             className="w-16 bg-[#1d1d1d] border border-gray-700 rounded px-2 py-1 text-xs text-white text-center outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/20"
                             min="0" max="100" step="0.1"
                           />
@@ -1391,7 +1403,7 @@ const Salary = () => {
                                   : "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30"
                               }`}
                               title={
-                                absentDisabledReason ||
+                                  (isStaffInactive ? "Staff is inactive; salary actions are disabled" : absentDisabledReason) ||
                                 (isDayAbsent
                                   ? "Remove absence - salary for this date is recalculated"
                                   : "Mark absent - salary for this date becomes 0")
