@@ -20,8 +20,7 @@ const EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail
 const PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
 const normalizePhone = (phone) => String(phone || "").trim().replace(/[\s()-]/g, "");
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const staffAddedDateKey = (staff) => {
-  const timestamp = staff?.createdAt || staff?._id?.getTimestamp?.() || new Date();
+
 const getEmploymentStartDate = (staff) => {
   const timestamp = staff?.createdAt
     || (typeof staff?._id?.getTimestamp === "function" ? staff._id.getTimestamp() : null);
@@ -197,7 +196,6 @@ export const createStaff = async (req, res) => {
         const frequency = staff.salary_payment_frequency || "monthly";
 
         const yyyymmdd = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-        const employmentStartDate = staffAddedDateKey(staff);
         const employmentStartDate = getEmploymentStartDate(staff);
         let period, periodStart, periodEnd, weekNumber = 0;
 
@@ -695,7 +693,6 @@ export const updateStaff = async (req, res) => {
           {
             $set: {
               staff_name: staff.full_name || "",
-              employmentStartDate: staffAddedDateKey(staff),
               employmentStartDate: getEmploymentStartDate(staff),
               salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
             }
@@ -817,7 +814,6 @@ export const updateStaff = async (req, res) => {
             $setOnInsert: {
               salon_id: salonId,
               staff_id: staff._id,
-              employmentStartDate: staffAddedDateKey(staff),
               employmentStartDate: getEmploymentStartDate(staff),
               frequency,
               period,

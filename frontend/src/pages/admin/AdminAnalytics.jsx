@@ -244,7 +244,7 @@ export default function AdminAnalytics() {
         if (a.appointment_services && a.appointment_services.length > 0) {
           const staffSeenInThisBooking = new Set();
           a.appointment_services.forEach(asv => {
-            const sid = typeof asv.staff_id === 'object' ? asv.staff_id._id : asv.staff_id;
+            const sid = typeof asv?.staff_id === 'object' ? asv.staff_id?._id : asv?.staff_id;
             if (staffMap[sid]) {
               if (!staffSeenInThisBooking.has(sid)) {
                 staffMap[sid].completed += 1;

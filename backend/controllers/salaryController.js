@@ -416,29 +416,32 @@ export const recalcWeeklyMonthlyTotals = (salaryRecord) => {
 
   // Make sure all daily values are valid numbers.
   salaryRecord.dailyRecords = salaryRecord.dailyRecords.map((record) => {
-    const recordedWorkingAmount = safeNumber(record.workingAmount, 0);
-    const rate = safeNumber(record.rate, 0);
-    const isAbsent = Boolean(record.isAbsent);
-    const recordDate = normalizeSalaryDate(record.date);
-    const isBeforeJoinDate = Boolean(staffJoinDate && recordDate && recordDate < staffJoinDate);
-    const calculationStart = normalizeSalaryDate(salaryRecord.calculationStartDate);
-    const isBeforeCalculationStart = Boolean(
-      calculationStart && recordDate && recordDate < calculationStart
-    );
-    // A record may have been created for the period before the staff member
-    // was added.  It must not retain appointment value or salary.
-    const workingAmount = (isBeforeJoinDate || isBeforeCalculationStart)
-      ? 0
-      : recordedWorkingAmount;
     // Mongoose subdocuments are not reliably spreadable. Normalize the
     // current map item once, then use that same item for every preserved
     // field below.
     const rec = record.toObject ? record.toObject() : record;
-    const workingAmount = safeNumber(rec.workingAmount, 0);
-    const rate = safeNumber(rec.rate, 0);
+
     const recordDate = normalizeSalaryDate(rec.date);
-    const isBeforeJoinDate = Boolean(staffJoinDate && recordDate && recordDate < staffJoinDate);
-    const countedWorkingAmount = isBeforeJoinDate ? 0 : workingAmount;
+    const calculationStart = normalizeSalaryDate(salaryRecord.calculationStartDate);
+
+    const isBeforeJoinDate = Boolean(
+      staffJoinDate && recordDate && recordDate < staffJoinDate
+    );
+
+    const isBeforeCalculationStart = Boolean(
+      calculationStart && recordDate && recordDate < calculationStart
+    );
+
+    // A record may have been created for the period before the staff member
+    // was added or before the calculation period started.
+    // It must not retain appointment value or salary.
+    const workingAmount =
+      isBeforeJoinDate || isBeforeCalculationStart
+        ? 0
+        : safeNumber(rec.workingAmount, 0);
+
+    const rate = safeNumber(rec.rate, 0);
+    const countedWorkingAmount = workingAmount;
 
     const workRate =
       countedWorkingAmount > 0 && rate > 0
