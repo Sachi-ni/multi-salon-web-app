@@ -1079,7 +1079,7 @@ export const getSalaries = async (req, res) => {
 
     let salaries = await Salary.find(filter)
       .populate("staff_id", "full_name email phone role status salaryCalculationEnabled salary_payment_frequency salary_payment_count_per_day commission_rate image")
-      .populate("salon_id", "name location phone email")
+      .populate("salon_id", "name location phone email close_time")
       .sort({ "staff_name": 1 });
 
     // Role scoping: the super-admin salary page asks for salon managers only;
