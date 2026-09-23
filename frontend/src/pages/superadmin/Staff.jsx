@@ -391,12 +391,23 @@ const Staff = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to remove this staff member?")) {
+    if (window.confirm("Remove this staff member? The system will check for pending salary first.")) {
       try {
         await deleteStaff(id);
         fetchData();
       } catch (err) {
-        alert("Delete failed");
+        if (err.response?.data?.requiresSalarySettlement) {
+          const { pendingCount, pendingTotal } = err.response.data;
+          const shouldPay = window.confirm(
+            `There are ${pendingCount} pending salary record(s), totaling LKR ${Number(pendingTotal || 0).toLocaleString()}. Mark them as paid and delete this staff member?`
+          );
+          if (shouldPay) {
+            await deleteStaff(id, { settlePending: true });
+            fetchData();
+          }
+        } else {
+          alert(err.response?.data?.message || "Delete failed");
+        }
       }
     }
   };

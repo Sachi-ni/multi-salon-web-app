@@ -72,8 +72,10 @@ export const updateStaff = async (id, data) => {
   return API.put(`/staff/${id}`, formData);
 };
 
-export const deleteStaff = (id) =>
-  API.delete(`/staff/${id}`);
+export const deleteStaff = (id, { settlePending = false } = {}) =>
+  API.delete(`/staff/${id}`, {
+    params: settlePending ? { settlePending: "true" } : {},
+  });
 
 export const createStaffUnavailability = (data) =>
   API.post("/unavailability", data);

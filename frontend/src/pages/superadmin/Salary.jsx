@@ -63,6 +63,11 @@ const toDateKey = (date) => {
 };
 
 const isSalaryVisibleOnDate = (salary, selectedDate) => {
+  // A deleted manager's paid row remains visible on the deletion date for
+  // history, then disappears from salary tables tomorrow.
+  if (salary?.staffDeleted && salary?.staffDeletedAt) {
+    return toDateKey(selectedDate) <= toDateKey(salary.staffDeletedAt);
+  }
   if (!salary?.isTransitioned || !salary.dateRange?.end) return true;
   return toDateKey(selectedDate) <= toDateKey(salary.dateRange.end);
 };
@@ -98,14 +103,25 @@ const getMonthLabel = (dateStr) => {
   return `${months[d.getMonth()]} ${d.getFullYear()}`;
 };
 
-const isPeriodEnded = (frequency, currentDateStr) => {
+const isPeriodEnded = (frequency, currentDateStr, salonCloseTime) => {
   const today = new Date();
-  today.setHours(23, 59, 59, 999);
   if (frequency === "daily") {
-    const d = new Date(currentDateStr);
-    d.setHours(23, 59, 59, 999);
-    return today >= d;
+    const [year, month, day] = currentDateStr.split("-").map(Number);
+    const selectedDay = new Date(year, month - 1, day);
+    const todayStart = new Date(today);
+    todayStart.setHours(0, 0, 0, 0);
+
+    if (selectedDay < todayStart) return true;
+    if (selectedDay > todayStart) return false;
+
+    const [hours, minutes] = /^\d{2}:\d{2}$/.test(salonCloseTime || "")
+      ? salonCloseTime.split(":").map(Number)
+      : [17, 0];
+    const closingTime = new Date(today);
+    closingTime.setHours(hours, minutes, 0, 0);
+    return today >= closingTime;
   }
+  today.setHours(23, 59, 59, 999);
   if (frequency === "weekly") {
     const range = getWeekRange(currentDateStr);
     const weekEnd = new Date(range.end);
@@ -1241,6 +1257,7 @@ const Salary = () => {
                 {filteredDisplayRows.map((row) => {
                   const staff = row.staff_id || {};
                   const staffName = staff.name || staff.full_name || row.staff_name || "Unknown";
+                  const isStaffInactive = staff.status === "Inactive" || staff.salaryCalculationEnabled === false;
                   const isFallback =
                     !row.period || String(row._id).startsWith(FALLBACK_PREFIX);
                   const monthlyDayRecord =
@@ -1314,9 +1331,10 @@ const Salary = () => {
                   const isPaid = status === "Paid";
                   const periodEnded = Boolean(row.isTransitioned) || isPeriodEnded(
                     frequency,
-                    frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate
+                    frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate,
+                    row.salon_id?.close_time
                   );
-                  const canPay = !isPaid && totalSal > 0 && periodEnded;
+                  const canPay = !isStaffInactive && !isPaid && totalSal > 0 && periodEnded;
                   const canDownloadPdf = !isFallback && isPaid;
                   // Absent toggle: only for days that already passed and are
                   // not paid yet.
@@ -1325,7 +1343,7 @@ const Salary = () => {
                     frequency === "daily"
                       ? isPaid
                       : (selectedPeriodDayRecord?.status === "Paid" || isPaid);
-                  const canToggleAbsent = !selectedDayPaid && selectedDayPassed;
+                  const canToggleAbsent = !isStaffInactive && !selectedDayPaid && selectedDayPassed;
                   const absentDisabledReason = selectedDayPaid
                     ? (frequency === "daily" ? "Salary already paid" : "This day has already been paid")
                     : !selectedDayPassed
@@ -1334,7 +1352,12 @@ const Salary = () => {
 
                   return (
                     <tr key={row._id}>
-                      <td className="font-bold text-white">{staffName}</td>
+                      <td className="font-bold text-white">
+                        {staffName}
+                        {isStaffInactive && (
+                          <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-gray-500/20 text-gray-300 border border-gray-500/30 uppercase">Inactive</span>
+                        )}
+                      </td>
                       <td className="text-gray-400 text-xs">
                         {row.salon_id?.name ||
                          salonNameById.get(String(row.salon_id || staff.salon_id || "")) ||
@@ -1347,6 +1370,7 @@ const Salary = () => {
                             type="number"
                             value={currentRate}
                             onChange={(e) => handleRateChange(row._id, e.target.value)}
+                            disabled={isStaffInactive}
                             className="w-16 bg-[#1d1d1d] border border-gray-700 rounded px-2 py-1 text-xs text-white text-center outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/20"
                             min="0" max="100" step="0.1"
                           />
@@ -1391,7 +1415,7 @@ const Salary = () => {
                                   : "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30"
                               }`}
                               title={
-                                absentDisabledReason ||
+                                  (isStaffInactive ? "Staff is inactive; salary actions are disabled" : absentDisabledReason) ||
                                 (isDayAbsent
                                   ? "Remove absence - salary for this date is recalculated"
                                   : "Mark absent - salary for this date becomes 0")
@@ -1406,7 +1430,7 @@ const Salary = () => {
                                 onClick={() => handlePay(row)}
                                 disabled={!canPay}
                                 className="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition-all uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
-                                title={periodEnded ? "Mark as Paid" : "Period has not ended yet - daily can be paid each day, weekly after the week, monthly after the month"}
+                                title={periodEnded ? "Mark as Paid" : frequency === "daily" ? "Available after the salon closes" : "Period has not ended yet - weekly after the week, monthly after the month"}
                               >
                                 Paid
                               </button>

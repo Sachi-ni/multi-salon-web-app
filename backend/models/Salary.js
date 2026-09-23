@@ -15,6 +15,9 @@ const dailySalarySchema = new mongoose.Schema({
   // Day Salary - calculated based on daily rules
   daySalary: { type: Number, default: 0 },
 
+  // Fixed daily amount in effect on this date.
+  salaryPaymentCountPerDay: { type: Number, default: 1 },
+
   // Total Salary accumulated (used for weekly/monthly rollup)
   totalSalary: { type: Number, default: 0 },
 
@@ -115,6 +118,17 @@ const salarySchema = new mongoose.Schema(
     isTransitioned: { type: Boolean, default: false },
     transitionedAt: { type: Date, default: null },
 
+    // Settled history remains available for reports but is hidden from active tables.
+    staffDeleted: { type: Boolean, default: false, index: true },
+    staffDeletedAt: { type: Date, default: null },
+
+    // Closed date ranges during which the staff member was inactive.  They
+    // preserve the surrounding period while ensuring those dates earn zero.
+    inactiveRanges: [{
+      start: { type: String, required: true },
+      end: { type: String, default: "" },
+    }],
+
     // Manually marked absent (daily frequency records represent one day).
     // Absent days earn no salary: daySalary is forced to 0.
     isAbsent: { type: Boolean, default: false },
@@ -137,10 +151,15 @@ const salarySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// One record per staff per period per frequency per salon
+// A cycle is part of a salary record's identity.  This allows a staff member
+// to return to a frequency later without mixing that new cycle with history.
 salarySchema.index(
-  { salon_id: 1, staff_id: 1, period: 1, frequency: 1 },
-  { unique: true }
+  { salon_id: 1, staff_id: 1, period: 1, frequency: 1, cycleId: 1 },
+  {
+    name: "salary_cycle_unique",
+    unique: true,
+    partialFilterExpression: { cycleId: { $type: "string" } },
+  }
 );
 
 export default mongoose.model("Salary", salarySchema);
