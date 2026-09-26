@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import nodemailer from "nodemailer";
+import { sendEmail } from "./sendEmail.js";
 
 export const OTP_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
 export const OTP_RESEND_COOLDOWN_MS = 60 * 1000;  // 60 seconds
@@ -35,8 +35,8 @@ export const maskEmail = (email) => {
 };
 
 /**
- * Sends a 6-digit OTP code through the configured email provider.
- * Supports both HTTP-based email (Resend API) and standard SMTP (Nodemailer).
+ * Sends a 6-digit OTP code through the shared email-sending utility, which
+ * tries SendGrid, then Resend, then Gmail SMTP in order.
  * Delivery failures are reported without including credential values.
  */
 export const sendOtpEmail = async ({ email, code, type = "superadmin" }) => {
@@ -94,68 +94,21 @@ export const sendOtpEmail = async ({ email, code, type = "superadmin" }) => {
     </html>
   `;
 
-  // 1. If RESEND_API_KEY is configured, use HTTP REST API (never blocked by cloud firewalls on port 443)
-  if (process.env.RESEND_API_KEY) {
-    try {
-      const resendRes = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: "SalonHub Security <onboarding@resend.dev>",
-          to: [email],
-          subject: `SalonHub ${isPasswordReset ? "Password Reset" : "Verification"} Code: ${code}`,
-          html: htmlContent,
-        }),
-      });
+  const result = await sendEmail({
+    to: email,
+    subject: `SalonHub ${isPasswordReset ? "Password Reset" : "Verification"} Code: ${code}`,
+    text: `Your SalonHub ${isPasswordReset ? "password reset" : "verification"} code is: ${code}\n\nThis code expires in 10 minutes.`,
+    html: htmlContent,
+    fromName: "SalonHub Security",
+  });
 
-      if (resendRes.ok) {
-        console.log(`[SuperAdmin OTP] Verification code emailed via Resend HTTP API to: ${email}`);
-        return { delivered: true, provider: "resend" };
-      }
-      const resendErr = await resendRes.text();
-      console.warn(`[SuperAdmin OTP] Resend HTTP API error: ${resendErr}`);
-    } catch (httpErr) {
-      console.warn(`[SuperAdmin OTP] Resend HTTP fetch failed: ${httpErr.message}`);
-    }
+  if (result.delivered) {
+    console.log(`[SuperAdmin OTP] Verification code emailed via ${result.provider} to: ${email}`);
+  } else {
+    console.warn(`[SuperAdmin OTP] Verification code delivery failed for: ${email}`);
   }
 
-  // 2. If SMTP credentials exist, attempt SMTP with a fast 4s timeout
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 465,
-        secure: true,
-        family: 4,
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-        connectionTimeout: 4000,
-        greetingTimeout: 4000,
-        socketTimeout: 5000,
-      });
-
-      await transporter.sendMail({
-        from: `"SalonHub Security" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: `SalonHub ${isPasswordReset ? "Password Reset" : "Verification"} Code: ${code}`,
-        text: `Your SalonHub ${isPasswordReset ? "password reset" : "verification"} code is: ${code}\n\nThis code expires in 10 minutes.`,
-        html: htmlContent,
-      });
-
-      console.log(`[SuperAdmin OTP] Verification code successfully emailed to: ${email}`);
-      return { delivered: true, provider: "smtp" };
-    } catch (smtpErr) {
-      console.warn(`[OTP] SMTP delivery blocked or failed: ${smtpErr.message}`);
-      return { delivered: false, error: smtpErr.message };
-    }
-  }
-
-  return { delivered: false };
+  return result;
 };
 
 // Kept as a named wrapper so the established SuperAdmin flow continues to use

@@ -1,1 +1,0 @@
-{"t":{"$date":"2026-09-12T17:30:01.403Z"},"s":"F",  "c":"CONTROL",  "id":20574,   "ctx":"-","msg":"Error during global initialization","attr":{"error":{"code":38,"codeName":"FileNotOpen","errmsg":"Can't initialize rotatable log file :: caused by :: Failed to open C:\\Users\\Sachini"}}}

@@ -5,7 +5,7 @@ import Salon from "../models/Salon.js";
 import Admin from "../models/Admin.js";
 import Customer from "../models/Customer.js";
 import mongoose from "mongoose";
-import nodemailer from "nodemailer";
+import { sendEmail } from "../utils/sendEmail.js";
 
 export const createBill = async (req, res) => {
    try {
@@ -146,21 +146,13 @@ export const createBill = async (req, res) => {
       });
 
       // Send email receipt to customer if customer has an email
-      if (customerEmail && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      if (customerEmail) {
         try {
-          const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: {
-              user: process.env.EMAIL_USER,
-              pass: process.env.EMAIL_PASS
-            }
-          });
-
           const salonName = appointment.salon_id?.name || "SalonHub";
-          await transporter.sendMail({
-            from: `"${salonName}" <${process.env.EMAIL_USER}>`,
+          const receiptResult = await sendEmail({
             to: customerEmail,
             subject: `Receipt: ${bill.bill_number} - ${salonName}`,
+            fromName: salonName,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #eaeaea; border-radius: 12px; background: #ffffff;">
                 <div style="text-align: center; margin-bottom: 20px;">
@@ -233,6 +225,12 @@ export const createBill = async (req, res) => {
               </div>
             `
           });
+
+          if (receiptResult.delivered) {
+            console.log(`Bill receipt emailed via ${receiptResult.provider} to: ${customerEmail}`);
+          } else {
+            console.warn("Bill receipt email delivery failed.");
+          }
         } catch (mailErr) {
           console.warn("Bill email warning:", mailErr.message);
         }

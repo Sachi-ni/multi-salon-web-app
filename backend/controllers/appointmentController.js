@@ -10,7 +10,7 @@ import Admin from "../models/Admin.js";
 import Customer from "../models/Customer.js";
 import Bill from "../models/Bill.js";
 import mongoose from "mongoose";
-import nodemailer from "nodemailer";
+import { sendEmail } from "../utils/sendEmail.js";
 import dotenv from "dotenv";
 import { processSalaryOnCompletion } from "./salaryController.js";
 
@@ -1604,15 +1604,18 @@ export const updateAppointmentDetails = async (req, res) => {
       const message = `Your appointment for ${normalizedDate} has been updated. ${summary}.`;
       await Notification.create({ recipient_id: appointment.customer_id._id, recipient_model: "Customer", title: "Appointment Updated", message, appointment_id: appointment._id });
 
-      if (appointment.customer_id.email && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      if (appointment.customer_id.email) {
         try {
-          const transporter = nodemailer.createTransport({ service: "gmail", auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS } });
-          await transporter.sendMail({
-            from: process.env.EMAIL_USER,
+          const updateResult = await sendEmail({
             to: appointment.customer_id.email,
             subject: `Appointment Updated: #${appointment._id.toString().slice(-6).toUpperCase()}`,
-            text: `Your appointment #${appointment._id.toString().slice(-6).toUpperCase()} was updated.\n\n${summary}\n\nPlease contact the salon if the new time does not work for you.`
+            text: `Your appointment #${appointment._id.toString().slice(-6).toUpperCase()} was updated.\n\n${summary}\n\nPlease contact the salon if the new time does not work for you.`,
           });
+          if (updateResult.delivered) {
+            console.log(`Appointment update email sent via ${updateResult.provider} to: ${appointment.customer_id.email}`);
+          } else {
+            console.warn("Appointment update email delivery failed.");
+          }
         } catch (emailError) {
           console.error("Failed to send appointment update email:", emailError.message);
         }
@@ -1955,18 +1958,18 @@ export const updateStaffAssignment = async (req, res) => {
         appointment_id: appointment._id,
       });
       const customer = await Customer.findById(appointment.customer_id).select("email").lean();
-      if (customer?.email && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      if (customer?.email) {
         try {
-          const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-          });
-          await transporter.sendMail({
-            from: process.env.EMAIL_USER,
+          const reassignResult = await sendEmail({
             to: customer.email,
             subject: `Appointment Updated: #${appointment._id.toString().slice(-6).toUpperCase()}`,
             text: `Your appointment #${appointment._id.toString().slice(-6).toUpperCase()} was updated.\n\n${summary}\n\nPlease contact the salon if the new time does not work for you.`,
           });
+          if (reassignResult.delivered) {
+            console.log(`Appointment reassignment email sent via ${reassignResult.provider} to: ${customer.email}`);
+          } else {
+            console.warn("Appointment reassignment email delivery failed.");
+          }
         } catch (emailError) {
           console.error("Failed to send appointment reassignment email:", emailError.message);
         }

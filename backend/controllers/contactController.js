@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import { sendEmail } from '../utils/sendEmail.js';
 dotenv.config();
 
 const EMAIL_PATTERN = /^[^\s@]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,63}$/;
@@ -23,16 +23,7 @@ export const sendContactMessage = async (req, res) => {
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    const result = await sendEmail({
       to: process.env.SUPERADMIN_EMAIL,
       subject: `New Contact Form Message: ${subject}`,
       text: `You have received a new message from the contact form.\n\nName: ${firstName} ${lastName}\nEmail: ${normalizedEmail}\nContact number: ${normalizedPhone}\nSubject: ${subject}\nMessage:\n${message}`,
@@ -45,12 +36,18 @@ export const sendContactMessage = async (req, res) => {
         <p><strong>Message:</strong></p>
         <p>${message.replace(/\n/g, '<br>')}</p>
       `,
-    };
+      fromName: 'SalonHub Contact Form',
+    });
 
-    await transporter.sendMail(mailOptions);
+    if (!result.delivered) {
+      console.error('Contact form email delivery failed.');
+      return res.status(500).json({ message: 'Failed to send message. Please try again later.' });
+    }
+
+    console.log(`Contact form message delivered via ${result.provider}.`);
     res.status(200).json({ message: 'Message sent successfully.' });
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error sending email:', error.message);
     res.status(500).json({ message: 'Failed to send message. Please try again later.' });
   }
 };
