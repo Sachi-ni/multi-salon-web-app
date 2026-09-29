@@ -8,7 +8,8 @@ export const markAsPaid = (salaryId) => api.patch(`/salary/${salaryId}/paid`);
 export const createSalaryAndMarkPaid = (body = {}) => api.post("/salary/pay", body);
 export const generatePayroll = (body = {}) => api.post("/salary/generate-payroll", body);
 export const initializeSalaries = (body = {}) => api.post("/salary/initialize", body);
-export const updateRate = (salaryId, rate) => api.patch(`/salary/${salaryId}/rate`, { rate });
+export const updateRate = (salaryId, rate, effectiveDate) =>
+  api.patch(`/salary/${salaryId}/rate`, { rate, effectiveDate });
 export const updateStaffRate = (staffId, body = {}) =>
   api.patch(`/salary/staff/${staffId}/rate`, body);
 // Mark/unmark an absent day (salary for that date becomes 0)

@@ -387,7 +387,12 @@ const Salary = () => {
 
       const rates = {};
       for (const sal of data) {
-        rates[sal._id] = sal.rate ?? sal.commission_rate ?? 0;
+        const selectedDateRate = frequency === "monthly"
+          ? sal.dailyRecords?.find((record) => toDateKey(record.date) === selectedMonthlyDateKey)?.rate
+          : frequency === "weekly"
+            ? sal.dailyRecords?.find((record) => toDateKey(record.date) === weeklyDate)?.rate
+            : undefined;
+        rates[sal._id] = selectedDateRate ?? sal.rate ?? sal.commission_rate ?? 0;
       }
       // Seed editable rates for staff without salary records too
       for (const staff of staffData) {
@@ -466,10 +471,15 @@ const Salary = () => {
           rate: numericRate,
           frequency,
           period: getPeriod(),
+          effectiveDate: frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate,
         });
         message = "Rate saved successfully";
       } else {
-        await updateRate(rowId, numericRate);
+        await updateRate(
+          rowId,
+          numericRate,
+          frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate
+        );
       }
 
       setDirtyRates((prev) => ({ ...prev, [rowId]: false }));
@@ -632,22 +642,38 @@ const Salary = () => {
       const frequencyLabel = frequency.charAt(0).toUpperCase() + frequency.slice(1);
       const isWeekly = frequency === "weekly";
       const isMonthly = frequency === "monthly";
-      const rows = Array.isArray(salary.dailyRecords) && salary.dailyRecords.length > 0
+      const rows = frequency === "daily"
+        ? [{
+            date: salary.period || salary.dateRange?.start,
+            workingAmount: salary.workingAmount || 0,
+            rate: salary.rate ?? salary.commission_rate ?? 0,
+            workRate: salary.workRate || 0,
+            daySalary: salary.totalSalary || salary.paidTotal || salary.daySalary || 0,
+            totalSalary: salary.totalSalary || salary.paidTotal || 0,
+          }]
+        : Array.isArray(salary.dailyRecords) && salary.dailyRecords.length > 0
         ? salary.dailyRecords
         : [{
             date: salary.period || salary.dateRange?.start,
             workingAmount: salary.workingAmount || 0,
             rate: salary.rate ?? salary.commission_rate ?? 0,
             workRate: salary.workRate || 0,
-            daySalary: salary.daySalary || 0,
+            daySalary: salary.daySalary || salary.totalSalary || salary.paidTotal || 0,
+            totalSalary: salary.totalSalary || salary.paidTotal || 0,
           }];
 
       const getDisplayedSalary = (record) => isWeekly || isMonthly
         ? Number(record.daySalary || 0)
-        : Number(record.daySalary ?? record.workRate ?? 0);
-      const totalWorkingAmount = rows.reduce((sum, row) => sum + Number(row.workingAmount || 0), 0);
-      const totalWorkRate = rows.reduce((sum, row) => sum + Number(row.workRate || 0), 0);
-      const totalSalary = rows.reduce((sum, row) => sum + getDisplayedSalary(row), 0);
+        : Number(record.totalSalary || record.daySalary || record.workRate || salary.totalSalary || salary.paidTotal || 0);
+      const totalWorkingAmount = frequency === "daily"
+        ? Number(salary.workingAmount || 0)
+        : rows.reduce((sum, row) => sum + Number(row.workingAmount || 0), 0);
+      const totalWorkRate = frequency === "daily"
+        ? Number(salary.workRate || 0)
+        : rows.reduce((sum, row) => sum + Number(row.workRate || 0), 0);
+      const totalSalary = frequency === "daily"
+        ? Number(salary.totalSalary || salary.paidTotal || salary.daySalary || 0)
+        : rows.reduce((sum, row) => sum + getDisplayedSalary(row), 0);
 
       const formatDate = (value) => {
         if (!value) return "N/A";
@@ -844,13 +870,13 @@ const Salary = () => {
           const dayName = new Date(dateValue).toLocaleDateString("en-US", { weekday: "short" });
           doc.text(dayName, margin + 2, yPos + 1);
           doc.text(formatMoney(record.workingAmount), margin + 25, yPos + 1);
-          doc.text(`${Number(record.rate || salary.rate || 0)}%`, margin + 65, yPos + 1);
+          doc.text(`${Number(record.rate ?? salary.rate ?? salary.commission_rate ?? 0)}%`, margin + 65, yPos + 1);
           doc.text(formatMoney(record.workRate), margin + 95, yPos + 1);
           doc.text(formatMoney(getDisplayedSalary(record)), pageWidth - margin - 2, yPos + 1, { align: "right" });
         } else {
           doc.text(formatDate(record.date), margin + 2, yPos + 1);
           doc.text(formatMoney(record.workingAmount), margin + 25, yPos + 1);
-          doc.text(`${Number(record.rate || salary.rate || 0)}%`, margin + 65, yPos + 1);
+          doc.text(`${Number(record.rate ?? salary.rate ?? salary.commission_rate ?? 0)}%`, margin + 65, yPos + 1);
           doc.text(formatMoney(record.workRate), margin + 95, yPos + 1);
           doc.text(formatMoney(getDisplayedSalary(record)), pageWidth - margin - 2, yPos + 1, { align: "right" });
         }
