@@ -23,13 +23,30 @@ const SalarySlipPreview = ({ salary, onClose, onDownload }) => {
   const frequencyLabel = frequency.charAt(0).toUpperCase() + frequency.slice(1);
   const services = Array.isArray(staff.services) ? staff.services : [];
   const records = Array.isArray(salary.dailyRecords) ? salary.dailyRecords : [];
-  const displayRecords = records.length ? records : [{ date: salary.period, workingAmount: 0, rate: salary.rate || 0, workRate: 0, daySalary: 0 }];
+  const displayRecords = frequency === "daily"
+    ? [{
+        date: salary.period,
+        workingAmount: salary.workingAmount || 0,
+        rate: salary.rate ?? salary.commission_rate ?? 0,
+        workRate: salary.workRate || 0,
+        daySalary: salary.totalSalary || salary.paidTotal || salary.daySalary || 0,
+        totalSalary: salary.totalSalary || salary.paidTotal || 0,
+      }]
+    : records.length
+      ? records
+      : [{ date: salary.period, workingAmount: 0, rate: salary.rate || 0, workRate: 0, daySalary: 0 }];
   const getDisplayedSalary = (row) => frequency === "weekly" || frequency === "monthly"
     ? Number(row.daySalary || 0)
-    : Number(row.daySalary ?? row.workRate ?? 0);
-  const totalWorkingAmount = displayRecords.reduce((sum, row) => sum + Number(row.workingAmount || 0), 0);
-  const totalWorkRate = displayRecords.reduce((sum, row) => sum + Number(row.workRate || 0), 0);
-  const totalSalary = displayRecords.reduce((sum, row) => sum + getDisplayedSalary(row), 0);
+    : Number(row.totalSalary || row.daySalary || row.workRate || 0);
+  const totalWorkingAmount = frequency === "daily"
+    ? Number(salary.workingAmount || 0)
+    : displayRecords.reduce((sum, row) => sum + Number(row.workingAmount || 0), 0);
+  const totalWorkRate = frequency === "daily"
+    ? Number(salary.workRate || 0)
+    : displayRecords.reduce((sum, row) => sum + Number(row.workRate || 0), 0);
+  const totalSalary = frequency === "daily"
+    ? Number(salary.totalSalary || salary.paidTotal || salary.daySalary || 0)
+    : displayRecords.reduce((sum, row) => sum + getDisplayedSalary(row), 0);
   const period = frequency === "weekly"
     ? `${formatDate(salary.dateRange?.start || salary.period)} - ${formatDate(salary.dateRange?.end || salary.period)}`
     : salary.period || formatDate(salary.dateRange?.start);
@@ -80,7 +97,7 @@ const SalarySlipPreview = ({ salary, onClose, onDownload }) => {
         <SlipSection title="DAILY RECORDS">
           <table className="w-full text-sm sm:text-base"><thead><tr className="bg-gray-100"><th className="text-left px-4 py-3">Day</th><th className="text-right px-4 py-3">Amount</th><th className="text-center px-4 py-3">Rate %</th><th className="text-right px-4 py-3">Work Rate</th><th className="text-right px-4 py-3">{frequency === "weekly" || frequency === "monthly" ? "Day Salary" : "Salary"}</th></tr></thead><tbody>
             {displayRecords.map((row, index) => (
-              <tr key={`${row.date || "record"}-${index}`} className="border-b border-gray-200"><td className="px-4 py-3">{frequency === "weekly" ? new Date(row.date).toLocaleDateString(undefined, { weekday: "short" }) : formatDate(row.date)}</td><td className="px-4 py-3 text-right">{formatMoney(row.workingAmount)}</td><td className="px-4 py-3 text-center">{Number(row.rate || salary.rate || 0)}%</td><td className="px-4 py-3 text-right">{formatMoney(row.workRate)}</td><td className="px-4 py-3 text-right">{formatMoney(getDisplayedSalary(row))}</td></tr>
+              <tr key={`${row.date || "record"}-${index}`} className="border-b border-gray-200"><td className="px-4 py-3">{frequency === "weekly" ? new Date(row.date).toLocaleDateString(undefined, { weekday: "short" }) : formatDate(row.date)}</td><td className="px-4 py-3 text-right">{formatMoney(row.workingAmount)}</td><td className="px-4 py-3 text-center">{Number(row.rate ?? salary.rate ?? salary.commission_rate ?? 0)}%</td><td className="px-4 py-3 text-right">{formatMoney(row.workRate)}</td><td className="px-4 py-3 text-right">{formatMoney(getDisplayedSalary(row))}</td></tr>
             ))}
           </tbody></table>
         </SlipSection>

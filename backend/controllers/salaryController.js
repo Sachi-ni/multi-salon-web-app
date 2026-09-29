@@ -45,6 +45,14 @@ const getEffectiveRate = (salaryRecord, staffCommissionRate = 0) => {
     return savedRate;
   }
 
+  // commission_rate is the period snapshot for older records whose rate was
+  // left at the schema default. Preserve an explicit zero instead of reading
+  // the staff's newer profile rate into a historical period.
+  const savedCommissionRate = safeNumber(salaryRecord?.commission_rate, NaN);
+  if (Number.isFinite(savedCommissionRate) && savedCommissionRate >= 0) {
+    return savedCommissionRate;
+  }
+
   return safeNumber(staffCommissionRate, 0);
 };
 
@@ -286,6 +294,25 @@ const getWeekDates = (year, weekNum) => {
   return dates;
 };
 
+// Daily rows are rate snapshots. When a row is first materialized later, use
+// the closest known rate on or before that date so a newer rate cannot flow
+// backward into an earlier day. The nearest later row is only a fallback for
+// dates before the first stored snapshot.
+const getRateForSalaryDate = (records, date, fallbackRate) => {
+  const datedRecords = (records || [])
+    .map((record) => record.toObject ? record.toObject() : record)
+    .filter((record) => record.rate !== undefined && record.rate !== null)
+    .map((record) => ({ ...record, date: normalizeSalaryDate(record.date) }))
+    .filter((record) => record.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const previous = datedRecords.filter((record) => record.date <= date).pop();
+  if (previous) return safeNumber(previous.rate, fallbackRate);
+
+  const next = datedRecords.find((record) => record.date > date);
+  return next ? safeNumber(next.rate, fallbackRate) : safeNumber(fallbackRate, 0);
+};
+
 // ─── Helper: ensure ALL days in a period have a daily record ──────────────
 const ensureAllDaysInPeriod = (
   salaryRecord,
@@ -307,19 +334,22 @@ const ensureAllDaysInPeriod = (
     safeNumber(salaryRecord.rate, 0)
   );
 
+  // Keep the original snapshots available while filling any missing dates.
+  const rateSnapshots = salaryRecord.dailyRecords.map((record) =>
+    record.toObject ? record.toObject() : record
+  );
+
   // Normalize all existing records.
   salaryRecord.dailyRecords = salaryRecord.dailyRecords.map((record) => ({
     ...record,
     date: normalizeSalaryDate(record.date),
     workingAmount: safeNumber(record.workingAmount, 0),
 
-    // Keep the staff rate even when there are no appointments.
-    rate:
-      record.rate !== undefined &&
-      record.rate !== null &&
-      Number(record.rate) > 0
-        ? safeNumber(record.rate)
-        : validRate,
+    // Zero is a valid rate snapshot; only missing values use another date's
+    // known rate or the current period rate.
+    rate: record.rate !== undefined && record.rate !== null
+      ? safeNumber(record.rate, validRate)
+      : getRateForSalaryDate(rateSnapshots, normalizeSalaryDate(record.date), validRate),
 
     workRate: safeNumber(record.workRate, 0),
     daySalary: safeNumber(record.daySalary, 0),
@@ -372,8 +402,8 @@ const ensureAllDaysInPeriod = (
         // applies (applied by recalcWeeklyMonthlyTotals below).
         workingAmount: 0,
 
-        // Important: keep the staff commission rate.
-        rate: validRate,
+        // Use the rate in effect on this date, not the latest period rate.
+        rate: getRateForSalaryDate(rateSnapshots, date, validRate),
 
         workRate: 0,
         daySalary: 0,
@@ -996,13 +1026,17 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
       safeNumber(dailyRecord.workingAmount, 0) +
       safeNumber(amount, 0);
 
-    // Keep the rate for the current day.
-    dailyRecord.rate = effectiveRate;
+    // Keep the rate snapshot already saved for this date. Reprocessing an
+    // appointment later must not apply today's rate to an earlier day.
+    const dailyRate = dailyRecord.rate !== undefined && dailyRecord.rate !== null
+      ? safeNumber(dailyRecord.rate, effectiveRate)
+      : effectiveRate;
+    dailyRecord.rate = dailyRate;
 
     // Calculate only the current day's salary.
     dailyRecord.workRate =
       dailyRecord.workingAmount *
-      (effectiveRate / 100);
+      (dailyRate / 100);
 
     dailyRecord.daySalary =
       calculateDaySalary(
@@ -2058,7 +2092,9 @@ export const generatePayroll = async (req, res) => {
 
       // Update snapshot
       salaryRecord.staff_name = staff.full_name || "";
-      salaryRecord.commission_rate = commissionRate;
+      if (salaryRecord.commission_rate === undefined || salaryRecord.commission_rate === null) {
+        salaryRecord.commission_rate = commissionRate;
+      }
       salaryRecord.salary_payment_count_per_day = salaryPaymentCountPerDay;
       salaryRecord.dateRange = { start: periodStart, end: periodEnd };
 
@@ -2089,9 +2125,12 @@ export const generatePayroll = async (req, res) => {
           const newAmount = dailyMap[dr.date] || 0;
           if (newAmount > 0) {
             dr.workingAmount = (dr.workingAmount || 0) + newAmount;
-            const dailyWorkRate = dr.workingAmount * (effectiveRate / 100);
+            const dailyRate = dr.rate !== undefined && dr.rate !== null
+              ? safeNumber(dr.rate, effectiveRate)
+              : getRateForSalaryDate(salaryRecord.dailyRecords, dr.date, effectiveRate);
+            const dailyWorkRate = dr.workingAmount * (dailyRate / 100);
             dr.workRate = dailyWorkRate;
-            dr.rate = effectiveRate;
+            dr.rate = dailyRate;
             const isBeforeJoinDate = Boolean(staffJoinDate && dr.date < staffJoinDate);
             dr.daySalary = calculateDaySalary(
               dailyWorkRate,
@@ -2106,12 +2145,13 @@ export const generatePayroll = async (req, res) => {
         // Add new daily entries
         for (const [date, amount] of dateEntries) {
           if (!existingDates.has(date)) {
-            const dailyWorkRate = amount * (effectiveRate / 100);
+            const dailyRate = getRateForSalaryDate(salaryRecord.dailyRecords, date, effectiveRate);
+            const dailyWorkRate = amount * (dailyRate / 100);
             const isBeforeJoinDate = Boolean(staffJoinDate && date < staffJoinDate);
             salaryRecord.dailyRecords.push({
               date,
               workingAmount: amount,
-              rate: effectiveRate,
+              rate: dailyRate,
               workRate: dailyWorkRate,
               daySalary: calculateDaySalary(dailyWorkRate, salaryPaymentCountPerDay, false, isBeforeJoinDate),
               totalSalary: calculateDaySalary(dailyWorkRate, salaryPaymentCountPerDay, false, isBeforeJoinDate),
@@ -2341,7 +2381,7 @@ export const initializeSalaries = async (req, res) => {
 export const updateRate = async (req, res) => {
   try {
     const { salaryId } = req.params;
-    const { rate } = req.body;
+    const { rate, effectiveDate: requestedEffectiveDate } = req.body;
 
     if (rate === undefined || rate === null || isNaN(rate)) {
       return res.status(400).json({ success: false, message: "Rate is required and must be a number" });
@@ -2364,7 +2404,30 @@ export const updateRate = async (req, res) => {
     if (numericRate < 0) {
       return res.status(400).json({ success: false, message: "Rate cannot be negative" });
     }
-    salary.rate = numericRate;
+    const effectiveDate =
+      normalizeSalaryDate(requestedEffectiveDate) || toLocalDateStr(new Date());
+    const isEffectiveForDailyRecord =
+      salary.frequency !== "daily" ||
+      normalizeSalaryDate(salary.period) >= effectiveDate;
+
+    // Materialize the current period with its saved rate before changing the
+    // period rate. Otherwise dates that have not been materialized yet would
+    // inherit the new rate when the record is refreshed later.
+    if (salary.frequency !== "daily" && salary.status !== "Paid") {
+      refreshSalaryRecord(salary);
+    }
+
+    // Keep the staff profile in sync so salary periods created after this one
+    // start with the newly selected rate. Existing daily snapshots below keep
+    // their original rate when they precede the effective date.
+    await Staff.findByIdAndUpdate(salary.staff_id, {
+      commission_rate: numericRate,
+    });
+
+    if (isEffectiveForDailyRecord) {
+      salary.rate = numericRate;
+      salary.commission_rate = numericRate;
+    }
     salary.employmentStartDate = getEmploymentStartDate(salary);
 
     // Recalculate work rate and total salary
@@ -2380,21 +2443,26 @@ export const updateRate = async (req, res) => {
         await salary.save();
         return res.json({ success: true, message: "Rate updated successfully", salary });
       }
-      salary.workRate = salary.workingAmount * (numericRate / 100);
-      salary.daySalary = calculateDaySalary(
-        salary.workRate,
-        salary.salary_payment_count_per_day,
-        Boolean(salary.isAbsent)
-      );
-      salary.totalSalary = salary.daySalary;
+      if (isEffectiveForDailyRecord) {
+        salary.workRate = salary.workingAmount * (numericRate / 100);
+        salary.daySalary = calculateDaySalary(
+          salary.workRate,
+          salary.salary_payment_count_per_day,
+          Boolean(salary.isAbsent)
+        );
+        salary.totalSalary = salary.daySalary;
+      }
     } else {
-      // Weekly or monthly - recalculate each daily record
+      // Keep earlier days at their saved rate. The new rate applies starting
+      // on the change date and carries forward for the rest of this period.
       if (salary.employmentStartDate) {
         salary.dailyRecords = salary.dailyRecords.filter(
           (record) => normalizeSalaryDate(record.date) >= salary.employmentStartDate
         );
       }
       for (const dr of salary.dailyRecords) {
+        const recordDate = normalizeSalaryDate(dr.date);
+        if (recordDate < effectiveDate) continue;
         dr.rate = numericRate;
         dr.workRate = dr.workingAmount * (numericRate / 100);
         dr.daySalary = calculateDaySalary(
@@ -2420,7 +2488,7 @@ export const updateRate = async (req, res) => {
 export const updateStaffRate = async (req, res) => {
   try {
     const { staffId } = req.params;
-    const { rate, frequency, period } = req.body;
+    const { rate, frequency, period, effectiveDate: requestedEffectiveDate } = req.body;
 
     const numericRate = Number(rate);
     if (rate === undefined || rate === null || isNaN(numericRate)) {
@@ -2432,6 +2500,8 @@ export const updateStaffRate = async (req, res) => {
     if (!frequency || !period) {
       return res.status(400).json({ success: false, message: "Frequency and period are required" });
     }
+    const effectiveDate =
+      normalizeSalaryDate(requestedEffectiveDate) || toLocalDateStr(new Date());
 
     const staff = await Staff.findById(staffId);
     if (!staff) {
@@ -2445,6 +2515,8 @@ export const updateStaffRate = async (req, res) => {
         message: "You do not have permission to update this staff member's rate",
       });
     }
+
+    const previousCommissionRate = safeNumber(staff.commission_rate, numericRate);
 
     // Persist the rate on the staff so future periods pick it up automatically.
     // Use findByIdAndUpdate (not staff.save()) because older staff documents may
@@ -2506,10 +2578,10 @@ export const updateStaffRate = async (req, res) => {
           period,
           staff_name: staff.full_name || "",
           staff_role: staff.role || "",
-          commission_rate: numericRate,
+          commission_rate: previousCommissionRate,
           salary_payment_count_per_day: salaryPaymentCountPerDay,
           workingAmount: 0,
-          rate: numericRate,
+          rate: previousCommissionRate,
           workRate: 0,
           daySalary: 0,
           totalSalary: 0,
@@ -2536,19 +2608,55 @@ export const updateStaffRate = async (req, res) => {
       }
 
       refreshSalaryRecord(createdSalary);
+      // Materialize the old rate through the days before the change, then
+      // apply the new snapshot from the selected date onward.
+      createdSalary.rate = numericRate;
+      createdSalary.commission_rate = numericRate;
+      if (frequency === "daily") {
+        if (normalizeSalaryDate(createdSalary.period) >= effectiveDate) {
+          createdSalary.rate = numericRate;
+          createdSalary.workRate =
+            safeNumber(createdSalary.workingAmount, 0) * (numericRate / 100);
+          createdSalary.daySalary = calculateDaySalary(
+            createdSalary.workRate,
+            createdSalary.salary_payment_count_per_day,
+            Boolean(createdSalary.isAbsent)
+          );
+          createdSalary.totalSalary = createdSalary.daySalary;
+        }
+      } else {
+        for (const record of createdSalary.dailyRecords || []) {
+          if (normalizeSalaryDate(record.date) < effectiveDate) continue;
+          record.rate = numericRate;
+          record.workRate = safeNumber(record.workingAmount, 0) * (numericRate / 100);
+          record.daySalary = calculateDaySalary(
+            record.workRate,
+            createdSalary.salary_payment_count_per_day,
+            Boolean(record.isAbsent)
+          );
+          record.totalSalary = record.daySalary;
+        }
+        recalcWeeklyMonthlyTotals(createdSalary);
+      }
       await createdSalary.save();
       const salary = createdSalary;
-
-      refreshSalaryRecord(salary);
-      await salary.save();
 
       return res.json({ success: true, message: "Rate saved successfully", salary });
     }
 
-    // Existing record - apply the new rate and recalculate
+    // Existing record - apply the new rate from the selected effective date
+    // forward while retaining earlier daily snapshots in this period.
     salary.employmentStartDate = getStaffJoinDate(staff);
-    salary.rate = numericRate;
-    salary.commission_rate = numericRate;
+    if (salary.frequency !== "daily" && salary.status !== "Paid") {
+      refreshSalaryRecord(salary);
+    }
+    const isEffectiveForDailyRecord =
+      salary.frequency !== "daily" ||
+      normalizeSalaryDate(salary.period) >= effectiveDate;
+    if (isEffectiveForDailyRecord) {
+      salary.rate = numericRate;
+      salary.commission_rate = numericRate;
+    }
 
     if (salary.frequency === "daily") {
       if (salary.period < salary.employmentStartDate) {
@@ -2559,19 +2667,22 @@ export const updateStaffRate = async (req, res) => {
         await salary.save();
         return res.json({ success: true, message: "Rate updated successfully", salary });
       }
-      salary.workRate = salary.workingAmount * (numericRate / 100);
-      salary.daySalary = calculateDaySalary(
-        salary.workRate,
-        salary.salary_payment_count_per_day,
-        Boolean(salary.isAbsent)
-      );
-      salary.totalSalary = salary.daySalary;
+      if (isEffectiveForDailyRecord) {
+        salary.workRate = salary.workingAmount * (numericRate / 100);
+        salary.daySalary = calculateDaySalary(
+          salary.workRate,
+          salary.salary_payment_count_per_day,
+          Boolean(salary.isAbsent)
+        );
+        salary.totalSalary = salary.daySalary;
+      }
     } else {
-      // Weekly or monthly - recalculate each daily record
+      // Weekly or monthly - recalculate only today and future daily records.
       salary.dailyRecords = salary.dailyRecords.filter(
         (record) => normalizeSalaryDate(record.date) >= salary.employmentStartDate
       );
       for (const dr of salary.dailyRecords) {
+        if (normalizeSalaryDate(dr.date) < effectiveDate) continue;
         dr.rate = numericRate;
         dr.workRate = dr.workingAmount * (numericRate / 100);
         dr.daySalary = calculateDaySalary(
