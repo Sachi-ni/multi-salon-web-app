@@ -214,6 +214,18 @@ export const isSalaryPeriodEnded = (salaryRecord) => {
   return periodEnd < today;
 };
 
+// A salary becomes payable at salon closing time on the period's final day.
+const canPaySalaryPeriod = (salaryRecord, closeTime = "17:00") => {
+  if (salaryRecord?.isTransitioned) return true;
+  const endDate = getSalaryPeriodEndDate(salaryRecord);
+  if (!endDate) return false;
+  const [hours, minutes] = /^\d{2}:\d{2}$/.test(closeTime || "")
+    ? closeTime.split(":").map(Number)
+    : [17, 0];
+  endDate.setHours(hours, minutes, 0, 0);
+  return new Date() >= endDate;
+};
+
 export const calculateDaySalary = (
   workRate,
   salaryPaymentCountPerDay = 0,
@@ -479,10 +491,17 @@ export const recalcWeeklyMonthlyTotals = (salaryRecord) => {
         : 0;
 
     const isAbsent = Boolean(rec.isAbsent);
+    // Weekly records created before the per-day snapshot was reliably stored
+    // can contain the schema default (1). Use the weekly record's configured
+    // salary-per-day value for its rollup; monthly calculations keep their
+    // existing per-date snapshot behavior.
+    const recordSalaryPerDay = salaryRecord.frequency === "weekly"
+      ? salaryPaymentCountPerDay
+      : safeNumber(rec.salaryPaymentCountPerDay, salaryPaymentCountPerDay);
 
     const daySalary = calculateDaySalary(
       workRate,
-      safeNumber(record.salaryPaymentCountPerDay, salaryPaymentCountPerDay),
+      recordSalaryPerDay,
       isAbsent || isInactiveSalaryDate(salaryRecord, recordDate),
       isBeforeJoinDate || isBeforeCalculationStart
     );
@@ -499,7 +518,7 @@ export const recalcWeeklyMonthlyTotals = (salaryRecord) => {
       isAbsent,
       absentMarkedAt: record.absentMarkedAt || null,
       salaryPaymentCountPerDay: safeNumber(
-        record.salaryPaymentCountPerDay,
+        recordSalaryPerDay,
         salaryPaymentCountPerDay
       ),
       isBeforeJoinDate: isBeforeJoinDate || isBeforeCalculationStart,
@@ -532,15 +551,14 @@ export const recalcWeeklyMonthlyTotals = (salaryRecord) => {
       0
     );
 
-  salaryRecord.daySalary =
-    countedRecords.reduce(
-      (total, record) =>
-        total + safeNumber(record.daySalary, 0),
-      0
-    );
-
-  // Final weekly/monthly salary.
-  salaryRecord.totalSalary = salaryRecord.daySalary;
+  // Keep the period total as its own accumulation of every daily salary.
+  // `daySalary` on the table is a single date's value; it must never be used
+  // as the weekly/monthly total.
+  salaryRecord.totalSalary = countedRecords.reduce(
+    (total, record) => total + safeNumber(record.daySalary, 0),
+    0
+  );
+  salaryRecord.daySalary = salaryRecord.totalSalary;
 };
 
 // ─── Refresh salary records so they follow the salary-per-day rules ────────
@@ -1299,6 +1317,17 @@ export const markAsPaid = async (req, res) => {
       });
     }
 
+    const salarySalonId = salary.salon_id?._id ?? salary.salon_id;
+    const salon = salarySalonId
+      ? await Salon.findById(salarySalonId).select("close_time")
+      : null;
+    if (!canPaySalaryPeriod(salary, salon?.close_time)) {
+      return res.status(400).json({
+        success: false,
+        message: "Salary can be paid after the salon closes on the period end date",
+      });
+    }
+
     // Capture the totalSalary before paying so reports show the paid value
     salary.paidTotal = salary.totalSalary || 0;
 
@@ -1357,6 +1386,14 @@ export const createAndMarkPaid = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Staff not found in your salon",
+      });
+    }
+
+    const salon = await Salon.findById(salon_id).select("close_time");
+    if (!canPaySalaryPeriod({ frequency, period }, salon?.close_time)) {
+      return res.status(400).json({
+        success: false,
+        message: "Salary can be paid after the salon closes on the period end date",
       });
     }
 

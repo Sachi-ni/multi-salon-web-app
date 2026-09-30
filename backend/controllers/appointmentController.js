@@ -984,6 +984,13 @@ export const confirmAppointment = async (req, res) => {
       return res.status(404).json({ message: "Appointment not found" });
     }
 
+    if (
+      req.user.role !== "super-admin" &&
+      String(appointment.salon_id?._id ?? appointment.salon_id) !== String(req.user.salon_id)
+    ) {
+      return res.status(403).json({ message: "You do not have permission to confirm this appointment" });
+    }
+
     if (appointment.status !== "pending") {
       return res.status(400).json({
         message: `Cannot confirm an appointment with status: ${appointment.status}`

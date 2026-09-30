@@ -121,17 +121,19 @@ const isPeriodEnded = (frequency, currentDateStr, salonCloseTime) => {
     closingTime.setHours(hours, minutes, 0, 0);
     return today >= closingTime;
   }
-  today.setHours(23, 59, 59, 999);
+  const [hours, minutes] = /^\d{2}:\d{2}$/.test(salonCloseTime || "")
+    ? salonCloseTime.split(":").map(Number)
+    : [17, 0];
   if (frequency === "weekly") {
     const range = getWeekRange(currentDateStr);
     const weekEnd = new Date(range.end);
-    weekEnd.setHours(23, 59, 59, 999);
-    return today >= weekEnd;
+    weekEnd.setHours(hours, minutes, 0, 0);
+    return new Date() >= weekEnd;
   }
   const range = getMonthRange(currentDateStr);
   const monthEnd = new Date(range.end);
-  monthEnd.setHours(23, 59, 59, 999);
-  return today >= monthEnd;
+  monthEnd.setHours(hours, minutes, 0, 0);
+  return new Date() >= monthEnd;
 };
 
 const getMonthRange = (dateStr) => {
@@ -1239,11 +1241,50 @@ const Salary = () => {
                     frequency === "weekly" && Array.isArray(row.dailyRecords)
                       ? row.dailyRecords.find((dr) => toDateKey(dr.date) === weeklyDate)
                       : null;
+                  const weeklyRange = frequency === "weekly" ? getWeekRange(weeklyDate) : null;
+                  const weeklyRecords = frequency === "weekly" && Array.isArray(row.dailyRecords)
+                    ? row.dailyRecords.filter((dr) => {
+                        const date = toDateKey(dr.date);
+                        return date >= weeklyRange.start && date <= weeklyRange.end && date <= today;
+                      })
+                    : [];
+                  const weeklyCalculation = weeklyRecords.reduce((totals, record) => {
+                    const amount = Number(record.workingAmount) || 0;
+                    const rate = Number(record.rate) || Number(row.rate ?? row.commission_rate) || 0;
+                    const workRate = amount > 0 ? amount * (rate / 100) : 0;
+                    const joinDate = getStaffJoinDateStr(staff);
+                    const recordDate = toDateKey(record.date);
+                    const isBeforeJoinDate = Boolean(joinDate && recordDate < joinDate);
+                    const isBeforeCalculationStart = Boolean(
+                      row.calculationStartDate && recordDate < toDateKey(row.calculationStartDate)
+                    );
+                    const isInactiveDate = (row.inactiveRanges || []).some((range) =>
+                      recordDate >= toDateKey(range.start) &&
+                      (!range.end || recordDate <= toDateKey(range.end))
+                    );
+                    // Prefer the staff/period salary amount. Older weekly daily
+                    // snapshots can contain the schema default (1) or 0 rather
+                    // than the configured salary-per-day amount.
+                    const perDay = Number(
+                      row.salary_payment_count_per_day ||
+                      staff.salary_payment_count_per_day ||
+                      record.salaryPaymentCountPerDay ||
+                      0
+                    );
+                    const daySalary = record.isAbsent || record.isBeforeJoinDate || isBeforeJoinDate || isBeforeCalculationStart || isInactiveDate
+                      ? 0
+                      : Math.max(workRate, perDay);
+                    totals.workingAmount += amount;
+                    totals.workRate += workRate;
+                    totals.totalSalary += daySalary;
+                    if (recordDate === weeklyDate) totals.selectedDaySalary = daySalary;
+                    return totals;
+                  }, { workingAmount: 0, workRate: 0, totalSalary: 0, selectedDaySalary: 0 });
                   const selectedDailyRecord = monthlyDayRecord || null;
                   const workingAmt = frequency === "monthly"
                     ? (selectedDailyRecord?.workingAmount || 0)
                     : frequency === "weekly"
-                      ? (selectedWeeklyRecord?.workingAmount || 0)
+                      ? weeklyCalculation.workingAmount
                       : (row.workingAmount || 0);
                   const currentRate = editingRates[row._id] !== undefined
                     ? editingRates[row._id]
@@ -1252,7 +1293,7 @@ const Salary = () => {
                   const workRate = frequency === "monthly"
                     ? (selectedDailyRecord?.workRate || 0)
                     : frequency === "weekly"
-                      ? (selectedWeeklyRecord?.workRate || 0)
+                      ? weeklyCalculation.workRate
                       : (row.workRate || 0);
                   const fallbackPerDay = isFallback
                     ? Number(staff.salary_payment_count_per_day || 0)
@@ -1284,7 +1325,7 @@ const Salary = () => {
                     : frequency === "weekly"
                       ? (isDayAbsent
                           ? 0
-                          : (selectedWeeklyRecord?.daySalary ||
+                          : (weeklyCalculation.selectedDaySalary ||
                              (isFallback && selectedDateKey <= today ? fallbackPerDay : 0)))
                       : (row.daySalary || 0);
                   const totalSal = frequency === "monthly"
@@ -1295,7 +1336,9 @@ const Salary = () => {
                               : sum;
                           }, 0)
                         : (row.totalSalary || 0))
-                    : (row.totalSalary || 0);
+                    : frequency === "weekly" && weeklyRecords.length > 0
+                      ? weeklyCalculation.totalSalary
+                      : (row.totalSalary || 0);
                   const status = frequency === "monthly"
                     ? (selectedDailyRecord?.status || row.status || "Not Paid")
                     : (row.status || "Not Paid");
