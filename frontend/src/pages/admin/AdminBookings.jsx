@@ -475,14 +475,6 @@ export default function AdminBookings() {
                   <div className="pt-2.5 border-t border-border/50 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-neutral-400 font-medium">Duration:</span>
-                      {a.status?.toLowerCase() === "pending" && editingDuration !== a._id && (!a.appointment_services || a.appointment_services.length <= 1) && (
-                        <button 
-                          onClick={() => setEditingAppointment(a)}
-                          className="text-amber-400 text-2xs hover:underline font-bold"
-                        >
-                          Edit
-                        </button>
-                      )}
                       {editingDuration === a._id ? (
                         <div className="flex items-center gap-1.5">
                           <select 
@@ -527,6 +519,15 @@ export default function AdminBookings() {
                   <div className="flex items-center gap-2">
                     {a.status?.toLowerCase() === "pending" && (
                       <>
+                        <button
+                          onClick={() => setEditingAppointment(a)}
+                          disabled={isActionLoading}
+                          className="px-4 py-2 rounded-xl bg-surface-2 text-amber-400 hover:bg-amber-400 hover:text-black transition-all text-xs font-bold flex items-center gap-1.5 border border-border disabled:opacity-40"
+                          title="Edit appointment before accepting"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Edit
+                        </button>
                         <button
                           onClick={() => handleConfirm(a._id)}
                           disabled={isActionLoading}
@@ -654,6 +655,14 @@ export default function AdminBookings() {
                     <div className="flex items-center justify-end gap-2">
                       {a.status?.toLowerCase() === "pending" && (
                         <>
+                          <button
+                            onClick={() => setEditingAppointment(a)}
+                            disabled={isActionLoading}
+                            className="px-3 py-1.5 rounded-lg bg-surface-2 text-amber-400 border border-border hover:bg-amber-400 hover:text-black transition-colors text-2xs font-extrabold disabled:opacity-40"
+                            title="Edit appointment before accepting"
+                          >
+                            Edit
+                          </button>
                           <button
                             onClick={() => handleConfirm(a._id)}
                             disabled={isActionLoading}
