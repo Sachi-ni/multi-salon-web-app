@@ -34,7 +34,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
     setError("");
     try {
       // Map to the new per-service format
-      const servicesPayload = booking.services.map(s => ({
+      const servicesPayload = (booking?.services || []).map(s => ({
         service_id: s.serviceId,
         staff_id: s.staffId,
         start_time: s.startTime
@@ -49,6 +49,14 @@ export default function StepBookingConfirm({ booking, onBack }) {
         guest_phone: !user ? guestPhone : undefined,
       });
 
+      // Clear draft storage on successful booking
+      try {
+        sessionStorage.removeItem("appointment_booking_draft");
+        sessionStorage.removeItem("appointment_booking_step");
+      } catch {
+        // Ignore
+      }
+
       if (!user) {
         window.alert("Your booking has been submitted as pending! Our salon will review and confirm it shortly.");
         navigate("/");
@@ -61,7 +69,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
     }
   };
 
-  const totalPrice = booking.services.reduce((sum, s) => sum + s.servicePrice, 0);
+  const totalPrice = (booking?.services || []).reduce((sum, s) => sum + (s.servicePrice || 0), 0);
 
   return (
     <div>
@@ -88,7 +96,7 @@ export default function StepBookingConfirm({ booking, onBack }) {
             Services & Assigned Staff
           </p>
           <div className="space-y-3">
-            {booking.services.map((svc, idx) => {
+            {(booking?.services || []).map((svc, idx) => {
               const svcHours = Math.ceil(svc.serviceDuration / 60);
               return (
                 <div key={idx} className="pb-3 border-b border-border/50 last:border-0 last:pb-0">
