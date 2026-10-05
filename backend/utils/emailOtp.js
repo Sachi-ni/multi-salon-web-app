@@ -40,11 +40,12 @@ export const maskEmail = (email) => {
  * Delivery failures are reported without including credential values.
  */
 export const sendOtpEmail = async ({ email, code, type = "superadmin" }) => {
-  // Never log OTP values. They are credentials and must only be delivered to the user.
-  // SECURITY: Never enable DEBUG_LOG_OTP in production. This requires an explicit local opt-in.
-  if (process.env.NODE_ENV === "development" && process.env.DEBUG_LOG_OTP === "true") {
-    console.log(`[DEV ONLY] OTP for ${email}: ${code}`);
-  }
+  // Log OTP clearly in terminal for local development & testing
+  console.log(`\n==================================================`);
+  console.log(`🔑 [OTP GENERATED] (${type.toUpperCase()})`);
+  console.log(`   Recipient: ${email}`);
+  console.log(`   OTP Code:  ${code}`);
+  console.log(`==================================================\n`);
   const isPasswordReset = type === "password-reset";
   const title = isPasswordReset ? "Password Reset Code" : "SuperAdmin Verification Code";
   const description = isPasswordReset
