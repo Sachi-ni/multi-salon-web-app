@@ -15,11 +15,15 @@ export default function StepSelectService({ booking, onNext, onBack }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!booking?.salonId) {
+      setLoading(false);
+      return;
+    }
     getSalonServices(booking.salonId)
-      .then(res => setServices(res.data))
+      .then(res => setServices(res.data || []))
       .catch(() => setError("Failed to load services."))
       .finally(() => setLoading(false));
-  }, [booking.salonId]);
+  }, [booking?.salonId]);
 
   const toggle = (id) => {
     setSelected(prev =>

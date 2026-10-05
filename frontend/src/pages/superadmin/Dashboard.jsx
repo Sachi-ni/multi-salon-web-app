@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Building2, Users, Calendar, Wallet, Plus, Download, 
   ArrowRight, Store, UserPlus, CalendarPlus, DollarSign, 
-  ShieldCheck, ChevronRight
+  ShieldCheck, ChevronRight, UserCheck, Phone, Mail, MapPin, Search
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { 
@@ -33,6 +33,45 @@ export default function Dashboard() {
   const [staff, setStaff] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [revenueStats, setRevenueStats] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const getSalonManagerInfo = useCallback((salon) => {
+    let name = salon.managerName;
+    let email = salon.managerEmail;
+    let phone = salon.managerPhone;
+
+    if (!name || !email) {
+      const mgr = staff.find(
+        (s) => String(s.salon_id) === String(salon._id) && s.role === "manager"
+      );
+      if (mgr) {
+        name = name || mgr.full_name || `${mgr.first_name || ""} ${mgr.last_name || ""}`.trim();
+        email = email || mgr.email;
+        phone = phone || mgr.phone;
+      }
+    }
+
+    return {
+      managerName: name || "Not Assigned",
+      managerEmail: email || "N/A",
+      managerPhone: phone || "N/A",
+    };
+  }, [staff]);
+
+  const filteredSalons = useMemo(() => {
+    if (!searchTerm.trim()) return salons;
+    const q = searchTerm.toLowerCase();
+    return salons.filter((s) => {
+      const mgr = getSalonManagerInfo(s);
+      return (
+        s.name?.toLowerCase().includes(q) ||
+        s.location?.toLowerCase().includes(q) ||
+        mgr.managerName?.toLowerCase().includes(q) ||
+        mgr.managerEmail?.toLowerCase().includes(q) ||
+        mgr.managerPhone?.toLowerCase().includes(q)
+      );
+    });
+  }, [salons, searchTerm, getSalonManagerInfo]);
 
   useEffect(() => {
     let isMounted = true;
@@ -312,6 +351,155 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
+
+      {/* Salons & Managers Contact Directory Section */}
+      <Card>
+        <Card.Header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
+          <div>
+            <Card.Title className="flex items-center gap-2 text-base font-extrabold text-white">
+              <Building2 className="w-5 h-5 text-accent" />
+              Salons & Salon Managers Directory
+            </Card.Title>
+            <Card.Subtitle className="text-xs text-muted-2">
+              Overview of registered salon branches, assigned managers, email addresses, and contact phone numbers
+            </Card.Subtitle>
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-4 h-4 text-muted-2 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search salon or manager..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 bg-surface-2 border border-border rounded-xl text-xs text-white placeholder-muted-2 focus:outline-none focus:border-accent/50 transition-colors"
+              />
+            </div>
+            <Button variant="ghost" size="xs" icon={ArrowRight} onClick={() => navigate("/salons")}>
+              Manage Salons
+            </Button>
+          </div>
+        </Card.Header>
+
+        {loading ? (
+          <div className="space-y-3 p-4">
+            <Skeleton className="w-full h-12 rounded-xl" />
+            <Skeleton className="w-full h-12 rounded-xl" />
+            <Skeleton className="w-full h-12 rounded-xl" />
+          </div>
+        ) : filteredSalons.length === 0 ? (
+          <div className="py-10 text-center text-muted-2 text-sm">
+            {searchTerm ? "No salons or managers match your search criteria." : "No salons registered yet."}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <Table.Head>
+                <Table.Th>Salon Branch</Table.Th>
+                <Table.Th>Salon Manager</Table.Th>
+                <Table.Th>Manager Phone</Table.Th>
+                <Table.Th>Manager Email</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th align="right">Action</Table.Th>
+              </Table.Head>
+              <Table.Body>
+                {filteredSalons.map((salon) => {
+                  const managerInfo = getSalonManagerInfo(salon);
+                  const isActive = salon.status !== "deactivated";
+
+                  return (
+                    <tr key={salon._id} className="hover:bg-surface-2/60 transition-colors">
+                      <Table.Td>
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg bg-accent-dim border border-accent/20 flex items-center justify-center text-accent overflow-hidden shrink-0">
+                            {salon.logo ? (
+                              <img
+                                src={salon.logo.startsWith("http") ? salon.logo : `${API_BASE}/${salon.logo.replace(/\\/g, "/")}`}
+                                alt={`${salon.name} logo`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.style.display = "none"; }}
+                              />
+                            ) : (
+                              <Store className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-white">{salon.name}</h4>
+                            <p className="text-xs text-muted-2 flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-accent/70 shrink-0" />
+                              {salon.location || "Location specified"}
+                            </p>
+                          </div>
+                        </div>
+                      </Table.Td>
+
+                      <Table.Td>
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-accent text-xs font-bold shrink-0">
+                            <UserCheck className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-bold text-white block">
+                              {managerInfo.managerName}
+                            </span>
+                            <span className="text-[10px] uppercase tracking-wider text-accent font-semibold">
+                              Manager
+                            </span>
+                          </div>
+                        </div>
+                      </Table.Td>
+
+                      <Table.Td>
+                        {managerInfo.managerPhone !== "N/A" ? (
+                          <a
+                            href={`tel:${managerInfo.managerPhone}`}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-2 border border-border text-xs text-white hover:text-accent hover:border-accent/40 transition-colors"
+                          >
+                            <Phone className="w-3 h-3 text-accent shrink-0" />
+                            <span className="font-mono">{managerInfo.managerPhone}</span>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-2">—</span>
+                        )}
+                      </Table.Td>
+
+                      <Table.Td>
+                        {managerInfo.managerEmail !== "N/A" ? (
+                          <a
+                            href={`mailto:${managerInfo.managerEmail}`}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-2 border border-border text-xs text-white hover:text-accent hover:border-accent/40 transition-colors max-w-[220px] truncate"
+                          >
+                            <Mail className="w-3 h-3 text-info shrink-0" />
+                            <span className="truncate">{managerInfo.managerEmail}</span>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-2">—</span>
+                        )}
+                      </Table.Td>
+
+                      <Table.Td>
+                        <Badge variant={isActive ? "success" : "danger"}>
+                          {isActive ? "Active" : "Deactivated"}
+                        </Badge>
+                      </Table.Td>
+
+                      <Table.Td align="right">
+                        <button
+                          onClick={() => navigate("/salons")}
+                          className="p-1.5 rounded-lg bg-surface-2 text-muted-2 hover:text-white hover:bg-accent-dim/40 transition-colors"
+                          title="View & Manage Salon"
+                        >
+                          <ArrowRight className="w-4 h-4 text-accent" />
+                        </button>
+                      </Table.Td>
+                    </tr>
+                  );
+                })}
+              </Table.Body>
+            </Table>
+          </div>
+        )}
+      </Card>
 
       {/* Dual Tables/Cards Section: Recent Appointments & Top Salons */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
