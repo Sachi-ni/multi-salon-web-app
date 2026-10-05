@@ -4,7 +4,7 @@ import { getAvailableStaff, getAvailableSlots } from "../../../services/appointm
 export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
   // Each service entry: { serviceId, serviceName, serviceDuration, servicePrice, staffId?, staffName?, staffSpecification?, startTime?, endTime? }
   const [assignments, setAssignments] = useState(() =>
-    (booking.services || []).map(s => ({
+    (booking?.services || []).map(s => ({
       ...s,
       staffId: s.staffId || "",
       staffName: s.staffName || "",
