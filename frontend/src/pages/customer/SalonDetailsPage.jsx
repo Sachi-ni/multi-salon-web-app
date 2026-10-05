@@ -159,7 +159,7 @@ export default function SalonDetailsPage() {
               <div className="mt-auto">
                 <button 
                   onClick={handleBookClick}
-                  className="w-full py-4 bg-accent text-primary rounded-xl font-bold text-lg hover:bg-accent-hover transition-all duration-300 shadow-glow"
+                  className="w-full py-3.5 sm:py-4 bg-accent text-primary rounded-xl font-bold text-base sm:text-lg hover:bg-accent-hover active:scale-[0.98] transition-all duration-300 shadow-glow whitespace-nowrap touch-manipulation transform-gpu"
                 >
                   Book Appointment Here
                 </button>
