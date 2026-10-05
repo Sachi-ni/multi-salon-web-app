@@ -140,7 +140,7 @@ const LandingNavbar = () => {
           )}
           <button
             onClick={() => navigate("/book")}
-            className="px-6 py-2.5 bg-accent text-primary rounded-xl text-sm font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-[0_0_20px_rgba(245,200,0,0.6)] transition-all duration-300 hover:-translate-y-0.5"
+            className="px-5 sm:px-6 py-2.5 bg-accent text-primary rounded-xl text-sm font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-[0_0_20px_rgba(245,200,0,0.6)] active:scale-[0.98] transition-all duration-300 sm:hover:-translate-y-0.5 whitespace-nowrap shrink-0 touch-manipulation transform-gpu"
           >
             Book Appointment
           </button>
@@ -180,13 +180,19 @@ const LandingNavbar = () => {
               {!user ? (
                 <>
                   <button
-                    onClick={() => navigate("/login")}
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      navigate("/login");
+                    }}
                     className="text-center text-lg font-bold text-white py-3 rounded-xl border border-border hover:bg-surface-2 transition-colors"
                   >
                     Login
                   </button>
                   <button
-                    onClick={() => navigate("/register")}
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      navigate("/register");
+                    }}
                     className="text-center text-lg font-bold text-white py-3 rounded-xl border border-border hover:bg-surface-2 transition-colors"
                   >
                     Sign Up
@@ -195,13 +201,17 @@ const LandingNavbar = () => {
               ) : user.role === "customer" ? (
                 <>
                   <button
-                    onClick={() => navigate("/customer/dashboard")}
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      navigate("/customer/dashboard");
+                    }}
                     className="text-center text-lg font-bold text-white py-3 rounded-xl border border-border hover:bg-surface-2 transition-colors"
                   >
                     My Appointments
                   </button>
                   <button
                     onClick={() => {
+                      setIsMobileMenuOpen(false);
                       logout();
                       navigate("/");
                     }}
@@ -213,6 +223,7 @@ const LandingNavbar = () => {
               ) : (
                 <button
                   onClick={() => {
+                    setIsMobileMenuOpen(false);
                     logout();
                     navigate("/");
                   }}
@@ -222,8 +233,11 @@ const LandingNavbar = () => {
                 </button>
               )}
               <button
-                onClick={() => navigate("/book")}
-                className="text-center text-lg font-extrabold text-primary bg-accent py-3 rounded-xl hover:bg-accent-hover transition-colors"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  navigate("/book");
+                }}
+                className="text-center text-base sm:text-lg font-extrabold text-primary bg-accent py-3.5 rounded-xl hover:bg-accent-hover active:scale-[0.98] transition-all whitespace-nowrap touch-manipulation transform-gpu"
               >
                 Book Appointment
               </button>
