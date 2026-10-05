@@ -17,7 +17,19 @@ const readResponse = async (response) => {
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      if (user.role === "customer" || user.role === "user") {
+        navigate("/customer/dashboard", { replace: true });
+      } else if (user.role === "super-admin") {
+        navigate("/superAdminDashboard", { replace: true });
+      } else if (user.role === "manager" || user.role === "staff") {
+        navigate("/staff/dashboard", { replace: true });
+      }
+    }
+  }, [user, navigate]);
   const { showAlert } = useAlert();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
