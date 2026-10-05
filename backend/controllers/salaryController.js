@@ -49,7 +49,7 @@ const getEffectiveRate = (salaryRecord, staffCommissionRate = 0) => {
   // left at the schema default. Preserve an explicit zero instead of reading
   // the staff's newer profile rate into a historical period.
   const savedCommissionRate = safeNumber(salaryRecord?.commission_rate, NaN);
-  if (Number.isFinite(savedCommissionRate) && savedCommissionRate >= 0) {
+  if (Number.isFinite(savedCommissionRate) && savedCommissionRate > 0) {
     return savedCommissionRate;
   }
 

@@ -8,6 +8,7 @@ import billRoutes from "../routes/billRoutes.js";
 import serviceRoutes from "../routes/serviceRoutes.js";
 import reviewRoutes from "../routes/reviewRoutes.js";
 import salaryRoutes from "../routes/salaryRoutes.js";
+import revenueRoutes from "../routes/revenueRoutes.js";
 
 const app = express();
 app.use(express.json());
@@ -20,4 +21,5 @@ app.use("/api/bills", billRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/salary", salaryRoutes);
+app.use("/api/revenue", revenueRoutes);
 export default app;

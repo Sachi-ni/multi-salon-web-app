@@ -5,6 +5,16 @@ import Salary from '../models/Salary.js';
 import Service from '../models/Service.js';
 import mongoose from 'mongoose';
 
+const getPeriodStart = (period) => {
+  const now = new Date();
+  if (period === "year") return new Date(now.getFullYear(), 0, 1);
+  if (period === "all") return new Date(0);
+  const days = period === "7days" ? 7 : period === "90days" ? 90 : 30;
+  const start = new Date(now);
+  start.setDate(start.getDate() - days);
+  return start;
+};
+
 export const getRevenueStats = async (req, res) => {
   try {
     const { period = "30days" } = req.query;
@@ -136,6 +146,52 @@ export const getMonthlyRevenue = async (req, res) => {
     const topMonthName = new Date(topMonth._id.year, topMonth._id.month - 1).toLocaleString('default', { month: 'long' });
 
     res.json({ total, growth, topMonth: topMonthName });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getStaffOperationalMetrics = async (req, res) => {
+  try {
+    const start = getPeriodStart(req.query.period || "30days");
+    const metrics = await Appointment.aggregate([
+      {
+        $match: {
+          appointment_date: { $gte: start.toISOString().slice(0, 10) },
+          status: { $in: ["completed", "cancelled", "rejected", "pending", "confirmed"] },
+        },
+      },
+      {
+        $lookup: {
+          from: "staffs",
+          localField: "staff_id",
+          foreignField: "_id",
+          as: "staff",
+        },
+      },
+      { $unwind: "$staff" },
+      {
+        $group: {
+          _id: "$staff._id",
+          name: { $first: "$staff.full_name" },
+          role: { $first: "$staff.role" },
+          salon_id: { $first: "$salon_id" },
+          totalBookings: { $sum: 1 },
+          completedBookings: {
+            $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+          },
+          cancelledBookings: {
+            $sum: { $cond: [{ $in: ["$status", ["cancelled", "rejected"]] }, 1, 0] },
+          },
+          revenue: {
+            $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$total_price", 0] },
+          },
+        },
+      },
+      { $sort: { revenue: -1, completedBookings: -1, name: 1 } },
+    ]);
+
+    res.json(metrics);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

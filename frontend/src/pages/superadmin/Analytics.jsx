@@ -13,7 +13,7 @@ import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
 import api from "../../services/api";
 import { getSalonAppointments } from "../../services/appointmentService";
 import { getSalons } from "../../services/salonService";
-import { getRevenueStats, getAIForecast } from "../../services/revenueService";
+import { getRevenueStats, getStaffOperationalMetrics, getAIForecast } from "../../services/revenueService";
 
 import PageHeader from "../../components/ui/PageHeader";
 import Card from "../../components/ui/Card";
@@ -150,6 +150,7 @@ export default function Analytics() {
   const [customers, setCustomers] = useState([]);
   const [salons, setSalons] = useState([]);
   const [revenueStats, setRevenueStats] = useState(null);
+  const [staffMetrics, setStaffMetrics] = useState([]);
 
   const [forecast, setForecast] = useState(null);
   const [loadingForecast, setLoadingForecast] = useState(false);
@@ -160,17 +161,19 @@ export default function Analytics() {
       setLoading(true);
       setError("");
 
-      const [apptsRes, custRes, salonsRes, revStatsRes] = await Promise.allSettled([
+      const [apptsRes, custRes, salonsRes, revStatsRes, staffMetricsRes] = await Promise.allSettled([
         getSalonAppointments("all"),
         api.get("/customers"),
         getSalons(),
-        getRevenueStats(dateRange)
+        getRevenueStats(dateRange),
+        getStaffOperationalMetrics(dateRange),
       ]);
 
       if (apptsRes.status === "fulfilled") setAppointments(apptsRes.value.data || []);
       if (custRes.status === "fulfilled") setCustomers(custRes.value.data || []);
       if (salonsRes.status === "fulfilled") setSalons(salonsRes.value.data || []);
       if (revStatsRes.status === "fulfilled") setRevenueStats(revStatsRes.value.data);
+      if (staffMetricsRes.status === "fulfilled") setStaffMetrics(staffMetricsRes.value.data || []);
 
     } catch (err) {
       console.error(err);
@@ -918,6 +921,38 @@ export default function Analytics() {
                     })
                   )}
                 </div>
+              </div>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeUp}>
+            <Card>
+              <SectionHeader icon={Users} title="Staff Operational Metrics" subtitle="Booking completion and revenue by staff member" />
+              <div className="overflow-x-auto mt-4">
+                {staffMetrics.length === 0 ? (
+                  <p className="text-xs text-muted-2 text-center py-8">No staff operational data available.</p>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead className="text-muted-2 border-b border-border">
+                      <tr>
+                        <th className="py-2 pr-4 font-semibold">Staff</th>
+                        <th className="py-2 pr-4 font-semibold">Bookings</th>
+                        <th className="py-2 pr-4 font-semibold">Completed</th>
+                        <th className="py-2 font-semibold">Revenue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffMetrics.map((staff) => (
+                        <tr key={staff._id} className="border-b border-border/60 last:border-0">
+                          <td className="py-3 pr-4 font-semibold text-white">{staff.name || "Unknown"}</td>
+                          <td className="py-3 pr-4 text-muted-2">{staff.totalBookings}</td>
+                          <td className="py-3 pr-4 text-muted-2">{staff.completedBookings}</td>
+                          <td className="py-3 font-bold text-accent">{formatCurrency(staff.revenue || 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </Card>
           </motion.div>

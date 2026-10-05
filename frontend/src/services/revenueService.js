@@ -11,5 +11,8 @@ export const getSalonRevenue = (period = "30days") =>
 export const getMonthlyRevenue = () =>
   api.get("/revenue/monthly");
 
+export const getStaffOperationalMetrics = (period = "30days") =>
+  api.get(`/revenue/staff?period=${period}`);
+
 export const getAIForecast = () =>
   api.get("/revenue/ai-forecast");
