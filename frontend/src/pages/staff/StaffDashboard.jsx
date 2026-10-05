@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { motion } from "framer-motion";
 import StatCard from "../../components/ui/StatCard";
@@ -14,46 +14,73 @@ import {
 import clsx from "clsx";
 import { API_URL } from "../../config";
 import { readJsonResponse } from "../../utils/apiResponse";
+import { confirmAppointment } from "../../services/appointmentService";
+import { useToast } from "../../context/ToastContext";
 
 const StaffDashboard = () => {
   const { user, token } = useAuth();
+  const toast = useToast();
   const [profile, setProfile] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState("");
   const [filter, setFilter] = useState("All");
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchDashboardData = async () => {
-      try {
-        const res = await fetch(`${API_URL}/staff/dashboard`, {
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          }
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch dashboard data");
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/staff/dashboard`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         }
+      });
 
-        const data = await readJsonResponse(res);
-        if (isMounted) {
-          setProfile(data.profile);
-          setAppointments(data.appointments || []);
-        }
-      } catch (error) {
-        console.error("Error fetching staff dashboard:", error);
-      } finally {
-        if (isMounted) setLoading(false);
+      if (!res.ok) {
+        throw new Error("Failed to fetch dashboard data");
       }
-    };
 
+      const data = await readJsonResponse(res);
+      setProfile(data.profile);
+      setAppointments(data.appointments || []);
+    } catch (error) {
+      console.error("Error fetching staff dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
     if (token) {
       fetchDashboardData();
     }
-    return () => { isMounted = false; };
-  }, [token]);
+  }, [token, fetchDashboardData]);
+
+  const handleAcceptAppointment = async (appointmentId) => {
+    setActionLoading(appointmentId);
+    try {
+      const res = await confirmAppointment(appointmentId);
+      toast.success("Appointment accepted successfully!");
+      setAppointments(prev => prev.map(a => {
+        if (a._id === appointmentId) {
+          return {
+            ...a,
+            status: "confirmed",
+            confirmed_at: new Date(),
+            confirmed_by_name: res.data?.confirmed_by_name || user?.name || user?.full_name || "Staff Member",
+            confirmed_by_role: res.data?.confirmed_by_role || "Staff",
+          };
+        }
+        return a;
+      }));
+      fetchDashboardData();
+    } catch (err) {
+      console.error("Error accepting appointment:", err);
+      const msg = err.response?.data?.message || "Failed to accept appointment";
+      toast.error(msg);
+    } finally {
+      setActionLoading("");
+    }
+  };
 
   const parseAppDate = (dateStr) => {
     if (!dateStr) return null;
@@ -265,6 +292,8 @@ const StaffDashboard = () => {
                   <Table.Th>Services</Table.Th>
                   <Table.Th>Date & Time</Table.Th>
                   <Table.Th>Status</Table.Th>
+                  <Table.Th>Accepted By</Table.Th>
+                  <Table.Th align="right">Actions</Table.Th>
                 </Table.Head>
                 <Table.Body>
                   {filteredAppointments.map((app) => {
@@ -273,6 +302,8 @@ const StaffDashboard = () => {
                       : (app.service_id?.service_name || "N/A");
                     const customerName = app.customer_id?.name || app.guest_name || "Guest";
                     const displayDate = app.appointment_date || "N/A";
+                    const isConfirmed = app.status?.toLowerCase() === "confirmed";
+                    const isPending = app.status?.toLowerCase() === "pending";
 
                     return (
                       <Table.Tr key={app._id} className="hover:bg-surface-2/60 transition-colors">
@@ -295,6 +326,50 @@ const StaffDashboard = () => {
                           <div className="text-[0.7rem] text-accent font-semibold mt-0.5">{app.start_time} - {app.end_time}</div>
                         </Table.Td>
                         <Table.Td>{getStatusBadge(app.status)}</Table.Td>
+                        <Table.Td>
+                          {isConfirmed || app.status === "completed" ? (
+                            app.confirmed_by_name ? (
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                                  <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                  <span className="truncate max-w-[130px]">{app.confirmed_by_name}</span>
+                                </span>
+                                <span className="text-[0.7rem] text-muted-2">
+                                  {app.confirmed_by_role || "Staff"}
+                                  {app.confirmed_at && ` · ${new Date(app.confirmed_at).toLocaleDateString()}`}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-2">Confirmed</span>
+                            )
+                          ) : (
+                            <span className="text-xs text-muted-2 italic">Awaiting</span>
+                          )}
+                        </Table.Td>
+                        <Table.Td align="right">
+                          {isPending ? (
+                            <button
+                              onClick={() => handleAcceptAppointment(app._id)}
+                              disabled={actionLoading === app._id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-extrabold transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                              title="Accept appointment"
+                            >
+                              {actionLoading === app._id ? (
+                                <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              )}
+                              Accept
+                            </button>
+                          ) : isConfirmed ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400/90">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              Accepted
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-2 capitalize">{app.status}</span>
+                          )}
+                        </Table.Td>
                       </Table.Tr>
                     );
                   })}
