@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getSalons } from "../../services/salonService";
@@ -9,7 +9,8 @@ import StaffUnavailableModal from "../../components/booking/StaffUnavailableModa
 import { 
   Plus, Search, Users, Star, MapPin, 
   MoreVertical, Power, Pencil, Trash2, 
-  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins, Eye, EyeOff
+  ChevronDown, LayoutGrid, List, CheckCircle2, XCircle, Coins, Eye, EyeOff,
+  Crown, Phone, Mail, Building2, Info
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
@@ -103,6 +104,337 @@ const ActionsMenu = ({ staff, onEdit, onToggleStatus, onDelete, onMarkUnavailabl
         )}
       </AnimatePresence>
     </div>
+  );
+};
+
+/* ── Branch Manager Card Component ── */
+const BranchManagerCard = ({
+  manager,
+  index,
+  totalSalonStaff,
+  onViewDetails,
+  onEdit,
+  onToggleStatus,
+  onDelete,
+  onMarkUnavailable,
+}) => {
+  const name = manager.name || manager.full_name || "Branch Manager";
+  const initials = name
+    ? name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : "BM";
+  const salonName = manager.salon_id?.name || manager.salonName || "Unassigned Salon";
+  const isActive = manager.status === "Active";
+  const imageUrl = manager.image ? mediaUrl(manager.image) : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05, duration: 0.3 }}
+      className="group relative bg-gradient-to-br from-surface via-surface to-surface-2 border-2 border-amber-400/30 hover:border-amber-400/80 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 shadow-[0_4px_25px_rgba(212,175,55,0.06)] hover:shadow-[0_8px_30px_rgba(212,175,55,0.18)] flex flex-col justify-between"
+    >
+      <div>
+        {/* Top Gold Leadership Banner */}
+        <div className="h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-600" />
+
+        <div className="p-5">
+          {/* Header Row: Avatar + Name + Role Badge + Actions */}
+          <div className="flex items-start gap-3.5 mb-4">
+            <div className="relative flex-shrink-0">
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt={name}
+                  className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400/50 shadow-md group-hover:border-amber-400 transition-colors duration-200"
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                    if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+                  }}
+                />
+              ) : null}
+              <div
+                className={clsx(
+                  "w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/25 via-amber-400/15 to-yellow-600/20 border-2 border-amber-400/50 items-center justify-center text-amber-400 font-black text-lg shadow-sm transition-colors duration-200",
+                  imageUrl ? "hidden" : "flex"
+                )}
+              >
+                {initials}
+              </div>
+              <span
+                className={clsx(
+                  "absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-surface",
+                  isActive ? "bg-success animate-pulse" : "bg-neutral-600"
+                )}
+                title={isActive ? "Active" : "Inactive"}
+              />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="px-2 py-0.5 rounded-md bg-amber-400/15 border border-amber-400/30 text-amber-400 font-black text-[0.65rem] uppercase tracking-wider flex items-center gap-1">
+                  <Crown className="w-3 h-3 text-amber-400" />
+                  Branch Manager
+                </span>
+              </div>
+              <h3 className="text-base font-black text-white leading-tight truncate group-hover:text-amber-400 transition-colors">
+                {name}
+              </h3>
+              <p className="text-xs text-neutral-400 font-medium flex items-center gap-1 mt-1 truncate">
+                <MapPin className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                <span className="truncate">{salonName}</span>
+              </p>
+            </div>
+
+            <ActionsMenu
+              staff={manager}
+              onEdit={onEdit}
+              onToggleStatus={onToggleStatus}
+              onDelete={onDelete}
+              onMarkUnavailable={onMarkUnavailable}
+            />
+          </div>
+
+          {/* Quick Contact & Operation Details */}
+          <div className="space-y-2 mb-4 bg-surface-2/60 border border-border/60 rounded-xl p-3 text-xs">
+            {/* Phone */}
+            <div className="flex items-center justify-between text-neutral-300">
+              <span className="flex items-center gap-1.5 text-neutral-400">
+                <Phone className="w-3.5 h-3.5 text-amber-400/90" />
+                Phone:
+              </span>
+              <span className="font-semibold text-white">{manager.phone || "Not provided"}</span>
+            </div>
+
+            {/* Email */}
+            <div className="flex items-center justify-between text-neutral-300">
+              <span className="flex items-center gap-1.5 text-neutral-400">
+                <Mail className="w-3.5 h-3.5 text-amber-400/90" />
+                Email:
+              </span>
+              <span className="font-medium text-white truncate max-w-[170px]" title={manager.email}>
+                {manager.email || "No email"}
+              </span>
+            </div>
+
+            {/* Salary */}
+            {manager.salary_payment_count_per_day && (
+              <div className="flex items-center justify-between text-neutral-300 pt-1.5 border-t border-border/40">
+                <span className="flex items-center gap-1.5 text-neutral-400">
+                  <Coins className="w-3.5 h-3.5 text-emerald-400" />
+                  Salary:
+                </span>
+                <span className="font-extrabold text-emerald-400">
+                  LKR {Number(manager.salary_payment_count_per_day).toLocaleString()}
+                  <span className="text-neutral-400 font-normal text-2xs"> / {manager.salary_payment_frequency || "monthly"}</span>
+                </span>
+              </div>
+            )}
+
+            {/* Supervised Staff */}
+            <div className="flex items-center justify-between text-neutral-300 pt-1.5 border-t border-border/40">
+              <span className="flex items-center gap-1.5 text-neutral-400">
+                <Users className="w-3.5 h-3.5 text-blue-400" />
+                Supervising:
+              </span>
+              <span className="font-bold text-white">
+                {totalSalonStaff} {totalSalonStaff === 1 ? "Stylist" : "Stylists"}
+              </span>
+            </div>
+          </div>
+
+          {/* View Details Button */}
+          <button
+            onClick={onViewDetails}
+            className="w-full py-2 px-3 rounded-xl bg-amber-400/10 hover:bg-amber-400 text-amber-400 hover:text-black border border-amber-400/30 hover:border-amber-400 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-sm"
+          >
+            <Info className="w-3.5 h-3.5" />
+            View Manager Details
+          </button>
+        </div>
+      </div>
+
+      {/* Footer Bar */}
+      <div className="px-5 py-3 bg-surface-2/40 border-t border-border flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+          <span className="text-xs font-extrabold text-white">
+            {manager.rating || "0.0"}
+          </span>
+          <span className="text-2xs text-neutral-500">Rating</span>
+        </div>
+
+        <button
+          onClick={() => onToggleStatus(manager)}
+          title={isActive ? "Deactivate Manager" : "Activate Manager"}
+          className={clsx(
+            "px-3 py-1.5 rounded-lg text-[0.65rem] font-extrabold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5",
+            isActive
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20"
+              : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-700"
+          )}
+        >
+          <Power className="w-3 h-3" />
+          {isActive ? "Active" : "Inactive"}
+        </button>
+      </div>
+    </motion.div>
+  );
+};
+
+/* ── Branch Manager Details Modal ── */
+const BranchManagerDetailsModal = ({ manager, totalSalonStaff, isOpen, onClose, onEdit }) => {
+  if (!manager) return null;
+
+  const name = manager.name || manager.full_name || "Branch Manager";
+  const initials = name
+    ? name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : "BM";
+  const salonName = manager.salon_id?.name || manager.salonName || "Unassigned Salon";
+  const isActive = manager.status === "Active";
+  const imageUrl = manager.image ? mediaUrl(manager.image) : null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="👑 Branch Manager Profile" maxWidth="max-w-lg">
+      <div className="space-y-5 pt-1">
+        {/* Profile Header */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-surface-2 via-surface-2 to-surface border border-amber-400/30 flex items-center gap-4">
+          <div className="relative flex-shrink-0">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={name}
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400/60 shadow-md"
+                onError={(e) => {
+                  e.target.style.display = "none";
+                  if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+                }}
+              />
+            ) : null}
+            <div
+              className={clsx(
+                "w-16 h-16 rounded-2xl bg-amber-400/20 border-2 border-amber-400/50 items-center justify-center text-amber-400 font-black text-xl shadow-sm",
+                imageUrl ? "hidden" : "flex"
+              )}
+            >
+              {initials}
+            </div>
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-400 font-black text-2xs uppercase tracking-wider flex items-center gap-1">
+                <Crown className="w-3 h-3" />
+                Branch Manager
+              </span>
+              <Badge variant={isActive ? "success" : "neutral"} dot>
+                {isActive ? "Active" : "Inactive"}
+              </Badge>
+            </div>
+            <h3 className="text-lg font-black text-white truncate">{name}</h3>
+            <p className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5">
+              <MapPin className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+              <span>{salonName}</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Info Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          {/* Phone */}
+          <div className="p-3 rounded-xl bg-surface-2 border border-border/80 space-y-1">
+            <span className="text-2xs font-extrabold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+              <Phone className="w-3.5 h-3.5 text-amber-400" />
+              Phone Number
+            </span>
+            <p className="font-bold text-white text-sm">
+              {manager.phone ? (
+                <a href={`tel:${manager.phone}`} className="hover:text-amber-400 transition-colors">
+                  {manager.phone}
+                </a>
+              ) : (
+                <span className="text-neutral-500 font-normal">Not provided</span>
+              )}
+            </p>
+          </div>
+
+          {/* Email */}
+          <div className="p-3 rounded-xl bg-surface-2 border border-border/80 space-y-1">
+            <span className="text-2xs font-extrabold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+              <Mail className="w-3.5 h-3.5 text-amber-400" />
+              Email Address
+            </span>
+            <p className="font-bold text-white text-sm truncate" title={manager.email}>
+              {manager.email ? (
+                <a href={`mailto:${manager.email}`} className="hover:text-amber-400 transition-colors">
+                  {manager.email}
+                </a>
+              ) : (
+                <span className="text-neutral-500 font-normal">Not provided</span>
+              )}
+            </p>
+          </div>
+
+          {/* Salary Rate */}
+          <div className="p-3 rounded-xl bg-surface-2 border border-border/80 space-y-1">
+            <span className="text-2xs font-extrabold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+              <Coins className="w-3.5 h-3.5 text-emerald-400" />
+              Compensation Rate
+            </span>
+            <p className="font-extrabold text-emerald-400 text-sm">
+              LKR {Number(manager.salary_payment_count_per_day || 0).toLocaleString()}
+              <span className="text-neutral-400 font-normal text-xs"> / {manager.salary_payment_frequency || "monthly"}</span>
+            </p>
+          </div>
+
+          {/* Supervised Team */}
+          <div className="p-3 rounded-xl bg-surface-2 border border-border/80 space-y-1">
+            <span className="text-2xs font-extrabold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+              <Users className="w-3.5 h-3.5 text-blue-400" />
+              Supervised Personnel
+            </span>
+            <p className="font-bold text-white text-sm">
+              {totalSalonStaff} {totalSalonStaff === 1 ? "Stylist" : "Stylists"}
+            </p>
+          </div>
+        </div>
+
+        {/* Assigned Branch Card */}
+        <div className="p-3.5 rounded-xl bg-surface-2/60 border border-border/60 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-surface border border-border flex items-center justify-center text-amber-400">
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-white">{salonName}</p>
+              <p className="text-2xs text-neutral-400">Primary administrative branch assignment</p>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 rounded-lg bg-amber-400/10 border border-amber-400/25 text-amber-400 text-2xs font-bold">
+            Assigned Location
+          </span>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border/80">
+          <Button
+            variant="secondary"
+            onClick={onClose}
+          >
+            Close
+          </Button>
+          <Button
+            variant="primary"
+            icon={Pencil}
+            onClick={() => {
+              onClose();
+              onEdit(manager);
+            }}
+          >
+            Edit Manager Details
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 };
 
@@ -284,6 +616,7 @@ const Staff = () => {
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [unavailableStaff, setUnavailableStaff] = useState(null);
   const [frequencyConfirmation, setFrequencyConfirmation] = useState(null);
+  const [selectedManagerDetails, setSelectedManagerDetails] = useState(null);
 
   const optionalValidator = (validator) => (value = "") => (value ? validator(value) : { valid: true, message: "" });
   const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(
@@ -475,6 +808,11 @@ const Staff = () => {
     await handleUpdateStaff();
   };
 
+  const isManagerRole = (role) => {
+    const r = String(role || "").trim().toLowerCase();
+    return r === "manager" || r === "branch manager";
+  };
+
   const filteredStaff = staffList.filter((s) => {
     const staffName = s.name || s.full_name || "";
     const matchesSearch = staffName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -484,6 +822,25 @@ const Staff = () => {
 
     return matchesSearch && matchesRole && matchesSalon;
   });
+
+  const branchManagers = useMemo(
+    () => filteredStaff.filter((s) => isManagerRole(s.role)),
+    [filteredStaff]
+  );
+
+  const regularStaff = useMemo(
+    () => filteredStaff.filter((s) => !isManagerRole(s.role)),
+    [filteredStaff]
+  );
+
+  const getSalonStaffCount = (salonId) => {
+    if (!salonId) return 0;
+    const targetId = typeof salonId === "object" ? salonId._id : salonId;
+    return staffList.filter((s) => {
+      const staffSalonId = typeof s.salon_id === "object" ? s.salon_id?._id : s.salon_id;
+      return String(staffSalonId) === String(targetId) && !isManagerRole(s.role);
+    }).length;
+  };
 
   const activeCount = filteredStaff.filter((s) => s.status === "Active").length;
 
@@ -508,17 +865,27 @@ const Staff = () => {
         <div className="flex flex-wrap gap-3">
           <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
             <Users className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-semibold text-neutral-400">Total Staff:</span>
+            <span className="text-xs font-semibold text-neutral-400">Total Personnel:</span>
             <span className="text-sm font-black text-white">{filteredStaff.length}</span>
+          </div>
+          <div className="bg-surface border border-amber-400/40 rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm bg-gradient-to-r from-amber-400/10 via-amber-400/5 to-transparent">
+            <Crown className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-semibold text-amber-300">Branch Managers:</span>
+            <span className="text-sm font-black text-amber-400">{branchManagers.length}</span>
+          </div>
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
+            <Users className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-semibold text-neutral-400">Staff &amp; Stylists:</span>
+            <span className="text-sm font-black text-white">{regularStaff.length}</span>
           </div>
           <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-semibold text-neutral-400">Active Staff:</span>
+            <span className="text-xs font-semibold text-neutral-400">Active:</span>
             <span className="text-sm font-black text-emerald-400">{activeCount}</span>
           </div>
           <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
             <XCircle className="w-4 h-4 text-neutral-500" />
-            <span className="text-xs font-semibold text-neutral-400">Inactive Staff:</span>
+            <span className="text-xs font-semibold text-neutral-400">Inactive:</span>
             <span className="text-sm font-black text-neutral-400">{filteredStaff.length - activeCount}</span>
           </div>
         </div>
@@ -616,18 +983,118 @@ const Staff = () => {
           onAction={() => navigate("/AddStaff")}
         />
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredStaff.map((s, i) => (
-            <StaffCard
-              key={s._id}
-              staff={s}
-              index={i}
-              onEdit={() => handleEdit(s)}
-              onToggleStatus={handleToggleStatus}
-              onDelete={handleDelete}
-              onMarkUnavailable={setUnavailableStaff}
-            />
-          ))}
+        <div className="space-y-8">
+          {/* ── Section 1: Branch Managers ── */}
+          {branchManagers.length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-border/60">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400/25 to-yellow-500/10 border border-amber-400/40 flex items-center justify-center text-amber-400 shadow-sm">
+                    <Crown className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black text-white flex items-center gap-2">
+                      Branch {branchManagers.length === 1 ? "Manager" : "Managers"}
+                      <span className="px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-400 text-2xs font-extrabold">
+                        {branchManagers.length}
+                      </span>
+                    </h2>
+                    <p className="text-xs text-neutral-400">
+                      {selectedSalon !== "All Salons"
+                        ? `Branch manager overseeing ${selectedSalon} salon operations and staff`
+                        : "Appointed leadership overseeing branch operations, personnel, and daily performance"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {branchManagers.map((bm, i) => (
+                  <BranchManagerCard
+                    key={bm._id}
+                    manager={bm}
+                    index={i}
+                    totalSalonStaff={getSalonStaffCount(bm.salon_id?._id || bm.salon_id || bm.salon)}
+                    onViewDetails={() => setSelectedManagerDetails(bm)}
+                    onEdit={() => handleEdit(bm)}
+                    onToggleStatus={handleToggleStatus}
+                    onDelete={handleDelete}
+                    onMarkUnavailable={setUnavailableStaff}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : selectedSalon !== "All Salons" && (selectedRole === "All Roles" || isManagerRole(selectedRole)) ? (
+            <div className="p-5 rounded-2xl bg-surface border border-dashed border-amber-400/30 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 flex-shrink-0">
+                  <Crown className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">No Branch Manager Assigned</h3>
+                  <p className="text-xs text-neutral-400">
+                    There is currently no branch manager assigned to <span className="text-amber-400 font-semibold">{selectedSalon}</span>.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Plus}
+                onClick={() => navigate("/AddStaff")}
+              >
+                Assign Manager
+              </Button>
+            </div>
+          ) : null}
+
+          {/* ── Section 2: Salon Staff & Stylists ── */}
+          {(selectedRole === "All Roles" || !isManagerRole(selectedRole)) && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-border/60">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-surface-2 border border-border flex items-center justify-center text-neutral-300 shadow-sm">
+                    <Users className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black text-white flex items-center gap-2">
+                      Salon Staff &amp; Stylists
+                      <span className="px-2 py-0.5 rounded-full bg-surface-2 border border-border text-neutral-300 text-2xs font-extrabold">
+                        {regularStaff.length}
+                      </span>
+                    </h2>
+                    <p className="text-xs text-neutral-400">
+                      Stylists, beauticians, and service providers delivering salon treatments
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {regularStaff.length === 0 ? (
+                <div className="p-8 rounded-2xl bg-surface border border-border text-center">
+                  <Users className="w-8 h-8 text-neutral-500 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-white">No stylists found</p>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    No regular salon staff members match your current filter.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {regularStaff.map((s, i) => (
+                    <StaffCard
+                      key={s._id}
+                      staff={s}
+                      index={i}
+                      onEdit={() => handleEdit(s)}
+                      onToggleStatus={handleToggleStatus}
+                      onDelete={handleDelete}
+                      onMarkUnavailable={setUnavailableStaff}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         /* Table View */
@@ -645,21 +1112,57 @@ const Staff = () => {
               const salonName = s.salon_id?.name || s.salonName || "Unassigned";
               const isActive = s.status === "Active";
               const servicesCount = s.services?.length || 0;
+              const isManager = isManagerRole(s.role);
 
               return (
-                <tr key={s._id} className="hover:bg-surface-2/60 transition-colors">
+                <tr
+                  key={s._id}
+                  className={clsx(
+                    "transition-colors",
+                    isManager
+                      ? "bg-amber-400/[0.04] hover:bg-amber-400/[0.08]"
+                      : "hover:bg-surface-2/60"
+                  )}
+                >
                   <Table.Td bold className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs">
+                    <div
+                      className={clsx(
+                        "w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-xs",
+                        isManager
+                          ? "bg-amber-400/20 border border-amber-400/50 text-amber-400 shadow-sm"
+                          : "bg-surface-2 border border-border text-neutral-300"
+                      )}
+                    >
                       {(s.name || s.full_name || "S").charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-white font-extrabold text-sm">{s.name || s.full_name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-white font-extrabold text-sm">{s.name || s.full_name}</p>
+                        {isManager && (
+                          <Crown className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" title="Branch Manager" />
+                        )}
+                      </div>
                       <p className="text-2xs text-neutral-400">{s.email || "No email"}</p>
                     </div>
                   </Table.Td>
-                  <Table.Td className="text-amber-400 font-semibold text-xs">{s.role || "Stylist"}</Table.Td>
+                  <Table.Td className="text-xs">
+                    {isManager ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-400 font-extrabold text-2xs uppercase tracking-wider">
+                        <Crown className="w-3 h-3 text-amber-400" />
+                        Branch Manager
+                      </span>
+                    ) : (
+                      <span className="text-neutral-300 font-semibold">{s.role || "Stylist"}</span>
+                    )}
+                  </Table.Td>
                   <Table.Td className="text-neutral-300 text-xs">{salonName}</Table.Td>
-                  <Table.Td className="text-xs text-neutral-400">{servicesCount} Services Assigned</Table.Td>
+                  <Table.Td className="text-xs text-neutral-400">
+                    {isManager ? (
+                      <span className="text-amber-400/90 font-medium">Branch Administration</span>
+                    ) : (
+                      `${servicesCount} Services Assigned`
+                    )}
+                  </Table.Td>
                   <Table.Td>
                     <Badge variant={isActive ? "success" : "neutral"} dot>
                       {s.status}
@@ -667,6 +1170,15 @@ const Staff = () => {
                   </Table.Td>
                   <Table.Td align="right">
                     <div className="flex items-center justify-end gap-2">
+                      {isManager && (
+                        <button
+                          onClick={() => setSelectedManagerDetails(s)}
+                          className="p-1.5 rounded-lg bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 border border-amber-400/25 transition-colors"
+                          title="View Manager Details"
+                        >
+                          <Info className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleEdit(s)}
                         className="p-1.5 rounded-lg bg-surface-2 text-info hover:bg-info/20 transition-colors"
@@ -920,6 +1432,26 @@ const Staff = () => {
         onSuccess={() => {
           setUnavailableStaff(null);
           fetchData();
+        }}
+      />
+
+      {/* Branch Manager Details Modal */}
+      <BranchManagerDetailsModal
+        manager={selectedManagerDetails}
+        totalSalonStaff={
+          selectedManagerDetails
+            ? getSalonStaffCount(
+                selectedManagerDetails.salon_id?._id ||
+                  selectedManagerDetails.salon_id ||
+                  selectedManagerDetails.salon
+              )
+            : 0
+        }
+        isOpen={Boolean(selectedManagerDetails)}
+        onClose={() => setSelectedManagerDetails(null)}
+        onEdit={(mgr) => {
+          setSelectedManagerDetails(null);
+          handleEdit(mgr);
         }}
       />
     </div>
