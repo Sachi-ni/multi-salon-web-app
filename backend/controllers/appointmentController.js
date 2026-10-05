@@ -984,11 +984,34 @@ export const confirmAppointment = async (req, res) => {
       return res.status(404).json({ message: "Appointment not found" });
     }
 
-    if (
-      req.user.role !== "super-admin" &&
-      String(appointment.salon_id?._id ?? appointment.salon_id) !== String(req.user.salon_id)
-    ) {
-      return res.status(403).json({ message: "You do not have permission to confirm this appointment" });
+    const userRole = String(req.user.role || "").toLowerCase();
+    const isSuperAdmin = userRole === "super-admin";
+    const isManager = userRole === "manager" || userRole === "staff-admin";
+    const isStaff = userRole === "staff";
+
+    if (!isSuperAdmin) {
+      const appSalonId = String(appointment.salon_id?._id ?? appointment.salon_id);
+      const userSalonId = String(req.user.salon_id || "");
+      if (userSalonId && appSalonId !== userSalonId) {
+        return res.status(403).json({ message: "You do not have permission to confirm this appointment" });
+      }
+
+      // If regular staff member, ensure the appointment is assigned to them
+      if (isStaff) {
+        const isPrimaryStaff = String(appointment.staff_id?._id ?? appointment.staff_id) === String(req.user.id);
+        let isMultiStaff = false;
+        if (!isPrimaryStaff) {
+          const apptService = await AppointmentService.findOne({
+            appointment_id: appointment._id,
+            staff_id: req.user.id
+          });
+          if (apptService) isMultiStaff = true;
+        }
+
+        if (!isPrimaryStaff && !isMultiStaff) {
+          return res.status(403).json({ message: "You can only accept appointments assigned to you" });
+        }
+      }
     }
 
     if (appointment.status !== "pending") {
@@ -1063,9 +1086,47 @@ export const confirmAppointment = async (req, res) => {
       }
     }
 
-    // 6. Update appointment status
+    // 6. Resolve confirmer identity & update appointment status
+    let confirmerName = "Staff";
+    let confirmerModel = "Staff";
+    let displayRole = "Staff";
+
+    if (isSuperAdmin) {
+      const adminUser = await Admin.findById(req.user.id).select("full_name username role");
+      confirmerName = adminUser?.full_name || adminUser?.username || "Super Admin";
+      confirmerModel = "Admin";
+      displayRole = "Super Admin";
+    } else if (isManager) {
+      const adminUser = await Admin.findById(req.user.id).select("full_name username role");
+      if (adminUser) {
+        confirmerName = adminUser.full_name || adminUser.username || "Branch Manager";
+        confirmerModel = "Admin";
+      } else {
+        const staffUser = await Staff.findById(req.user.id).select("full_name first_name last_name role");
+        confirmerName = staffUser?.full_name || `${staffUser?.first_name || ""} ${staffUser?.last_name || ""}`.trim() || "Branch Manager";
+        confirmerModel = "Staff";
+      }
+      displayRole = "Branch Manager";
+    } else {
+      // Regular staff
+      const staffUser = await Staff.findById(req.user.id).select("full_name first_name last_name role");
+      if (staffUser) {
+        confirmerName = staffUser.full_name || `${staffUser.first_name || ""} ${staffUser.last_name || ""}`.trim() || "Staff Member";
+        confirmerModel = "Staff";
+      } else {
+        const adminUser = await Admin.findById(req.user.id).select("full_name username role");
+        confirmerName = adminUser?.full_name || adminUser?.username || "Staff Member";
+        confirmerModel = "Admin";
+      }
+      displayRole = "Staff";
+    }
+
     appointment.status = "confirmed";
     appointment.confirmed_at = new Date();
+    appointment.confirmed_by = req.user.id;
+    appointment.confirmed_by_model = confirmerModel;
+    appointment.confirmed_by_name = confirmerName;
+    appointment.confirmed_by_role = displayRole;
     await appointment.save();
 
     // NOTIFICATION: Notify the customer
@@ -1074,7 +1135,7 @@ export const confirmAppointment = async (req, res) => {
         recipient_id: appointment.customer_id,
         recipient_model: "Customer",
         title: "Booking Confirmed",
-        message: `Your booking for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed.`,
+        message: `Your booking for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed by ${confirmerName} (${displayRole}).`,
         appointment_id: appointment._id
       });
 
@@ -1088,21 +1149,36 @@ export const confirmAppointment = async (req, res) => {
         salon_id: appointment.salon_id
       });
       
-      const adminNotifs = adminsToNotify.map(admin => ({
-        recipient_id: admin._id,
-        recipient_model: "Admin",
-        title: "Booking Confirmed",
-        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed.`,
-        appointment_id: appointment._id
-      }));
+      const adminNotifs = adminsToNotify
+        .filter(admin => String(admin._id) !== String(req.user.id))
+        .map(admin => ({
+          recipient_id: admin._id,
+          recipient_model: "Admin",
+          title: "Booking Confirmed",
+          message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed by ${confirmerName} (${displayRole}).`,
+          appointment_id: appointment._id
+        }));
       
-      const staffNotifs = managersToNotify.map(staff => ({
-        recipient_id: staff._id,
-        recipient_model: "Staff",
-        title: "Booking Confirmed",
-        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed.`,
-        appointment_id: appointment._id
-      }));
+      const staffNotifs = managersToNotify
+        .filter(staff => String(staff._id) !== String(req.user.id))
+        .map(staff => ({
+          recipient_id: staff._id,
+          recipient_model: "Staff",
+          title: "Booking Confirmed",
+          message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed by ${confirmerName} (${displayRole}).`,
+          appointment_id: appointment._id
+        }));
+
+      // If confirmed by manager or super-admin, also notify the assigned staff
+      if (String(req.user.id) !== String(appointment.staff_id)) {
+        staffNotifs.push({
+          recipient_id: appointment.staff_id,
+          recipient_model: "Staff",
+          title: "Booking Confirmed",
+          message: `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} was confirmed by ${confirmerName} (${displayRole}).`,
+          appointment_id: appointment._id
+        });
+      }
       
       const notifications = [...adminNotifs, ...staffNotifs];
       if (notifications.length > 0) {

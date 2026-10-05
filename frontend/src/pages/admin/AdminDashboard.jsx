@@ -443,7 +443,14 @@ const AdminDashboard = () => {
                         <p className="font-semibold text-white">{a.appointment_date}</p>
                         <p className="text-2xs text-neutral-400">{a.start_time}</p>
                       </Table.Td>
-                      <Table.Td>{getStatusBadge(a.status)}</Table.Td>
+                      <Table.Td>
+                        {getStatusBadge(a.status)}
+                        {a.status === "confirmed" && a.confirmed_by_name && (
+                          <span className="block text-[0.65rem] text-emerald-400 mt-1 font-semibold">
+                            By {a.confirmed_by_name} ({a.confirmed_by_role || "Staff"})
+                          </span>
+                        )}
+                      </Table.Td>
                       <Table.Td align="right" className="text-amber-400 font-black text-xs">
                         LKR {totalPrice.toLocaleString()}
                       </Table.Td>
