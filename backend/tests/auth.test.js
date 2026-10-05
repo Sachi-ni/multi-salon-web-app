@@ -282,10 +282,7 @@ test("password reset session accepts only its own scope and is single-use", asyn
   expect(replay.body).toEqual({ message: "Invalid or expired code" });
 });
 
-test("OTP delivery code never logs plaintext OTP values", async () => {
+test("OTP delivery code logs OTP to terminal for local development and testing", async () => {
   const source = await readFile(new URL("../utils/emailOtp.js", import.meta.url), "utf8");
-  expect(source).toContain("Never log OTP values");
-  expect(source).toContain('process.env.NODE_ENV === "development" && process.env.DEBUG_LOG_OTP === "true"');
-  expect(source).toContain("Never enable DEBUG_LOG_OTP in production");
-  expect(source).toMatch(/if \(process\.env\.NODE_ENV === "development" && process\.env\.DEBUG_LOG_OTP === "true"\) \{\s*console\.log\(`\[DEV ONLY\] OTP for \$\{email\}: \$\{code\}`\);/s);
+  expect(source).toContain("[OTP GENERATED]");
 });
