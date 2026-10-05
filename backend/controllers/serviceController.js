@@ -1,6 +1,8 @@
 import Service from "../models/Service.js";
 import ServiceCategory from "../models/ServiceCategory.js";
 import Salon from "../models/Salon.js";
+import Appointment from "../models/Appointment.js";
+import Staff from "../models/Staff.js";
 
 // ── Services CRUD ──
 
@@ -10,6 +12,20 @@ export const createService = async (req, res) => {
     const salonId = req.user.role === "super-admin" ? (req.body.salonId || req.body.salon_id) : req.user.salon_id;
     if (!service_name || base_price === undefined || duration === undefined || !salonId) {
       return res.status(400).json({ message: "service_name, base_price, duration, and salon are required." });
+    }
+    if (base_price !== undefined && (
+      (typeof base_price !== "number" && typeof base_price !== "string") ||
+      (typeof base_price === "string" && !base_price.trim()) ||
+      !Number.isFinite(Number(base_price))
+    )) {
+      return res.status(400).json({ message: "Price must be a number." });
+    }
+    if (duration !== undefined && (
+      (typeof duration !== "number" && typeof duration !== "string") ||
+      (typeof duration === "string" && !duration.trim()) ||
+      !Number.isFinite(Number(duration))
+    )) {
+      return res.status(400).json({ message: "Duration must be a number." });
     }
     if (base_price !== undefined && Number(base_price) < 0) {
       return res.status(400).json({ message: "Price cannot be a negative value." });
@@ -59,11 +75,28 @@ export const getServices = async (req, res) => {
 export const updateService = async (req, res) => {
   try {
     const { service_name, base_price, description, duration, category_id, status } = req.body;
+    if (base_price !== undefined && (
+      (typeof base_price !== "number" && typeof base_price !== "string") ||
+      (typeof base_price === "string" && !base_price.trim()) ||
+      !Number.isFinite(Number(base_price))
+    )) {
+      return res.status(400).json({ message: "Price must be a number." });
+    }
+    if (duration !== undefined && (
+      (typeof duration !== "number" && typeof duration !== "string") ||
+      (typeof duration === "string" && !duration.trim()) ||
+      !Number.isFinite(Number(duration))
+    )) {
+      return res.status(400).json({ message: "Duration must be a number." });
+    }
     if (base_price !== undefined && Number(base_price) < 0) {
       return res.status(400).json({ message: "Price cannot be a negative value." });
     }
     if (duration !== undefined && Number(duration) <= 0) {
       return res.status(400).json({ message: "Duration must be greater than 0." });
+    }
+    if (status !== undefined && !["Active", "Inactive"].includes(status)) {
+      return res.status(400).json({ message: "Status must be either Active or Inactive." });
     }
 
     const existing = await Service.findById(req.params.id);
@@ -119,6 +152,16 @@ export const deleteService = async (req, res) => {
     ) {
       return res.status(403).json({ message: "Not authorized for this salon" });
     }
+    if (
+      await Appointment.exists({
+        $or: [{ service_id: existing._id }, { service_ids: existing._id }],
+      }) ||
+      await Staff.exists({ services: existing._id })
+    ) {
+      return res.status(409).json({
+        message: "Cannot delete service: it has linked appointments or staff",
+      });
+    }
     await Service.findByIdAndDelete(req.params.id);
     res.json({ message: "Service deleted successfully" });
   } catch (error) {
@@ -140,6 +183,9 @@ export const getCategories = async (req, res) => {
 export const createCategory = async (req, res) => {
   try {
     const { category_name } = req.body;
+    if (typeof category_name !== "string" || !category_name.trim()) {
+      return res.status(400).json({ message: "Category name is required." });
+    }
     const category = await ServiceCategory.create({ category_name });
     res.status(201).json(category);
   } catch (error) {

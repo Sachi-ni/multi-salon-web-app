@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import Salon from "../models/Salon.js";
 import Staff from "../models/Staff.js";
+import Service from "../models/Service.js";
 import Salary from "../models/Salary.js";
 import Feedback from "../models/Feedback.js";
 import Appointment from "../models/Appointment.js";
@@ -108,9 +109,23 @@ export const createSalon = async (req, res) => {
       close_time,
     } = req.body;
 
+    if (typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({ message: "Salon name is required." });
+    }
+
     if (!managerName || !managerEmail || !managerPassword) {
       return res.status(400).json({
         message: "Manager name, email and password are required.",
+      });
+    }
+
+    const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+    if (
+      (open_time !== undefined && (typeof open_time !== "string" || !timePattern.test(open_time))) ||
+      (close_time !== undefined && (typeof close_time !== "string" || !timePattern.test(close_time)))
+    ) {
+      return res.status(400).json({
+        message: "Opening and closing times must use HH:MM in 24-hour format.",
       });
     }
 
@@ -374,7 +389,7 @@ export const getSalonById = async (req, res) => {
 export const updateSalon = async (req, res) => {
   try {
     // Whitelist salon metadata so this endpoint cannot alter account ownership or credentials.
-    const allowedFields = ["name", "address", "location", "phone", "email", "timezone"];
+    const allowedFields = ["name", "address", "location", "phone", "email", "timezone", "open_time", "close_time", "capacity"];
     const salonData = Object.fromEntries(
       allowedFields
         .filter((field) => req.body[field] !== undefined)
@@ -383,11 +398,95 @@ export const updateSalon = async (req, res) => {
 
     if (salonData.phone !== undefined) {
       salonData.phone = normalizePhone(salonData.phone);
-      if (!SRI_LANKAN_PHONE_PATTERN.test(salonData.phone)) {
+      if (salonData.phone && !SRI_LANKAN_PHONE_PATTERN.test(salonData.phone)) {
         return res.status(400).json({
           message: "Enter a valid Sri Lankan phone number (for example, 0771234567 or +94771234567).",
         });
       }
+    }
+
+    if (salonData.open_time !== undefined || salonData.close_time !== undefined) {
+      const storedSalon = await Salon.findById(req.params.id).select("open_time close_time");
+      const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+      if (
+        (salonData.open_time !== undefined && !timePattern.test(salonData.open_time)) ||
+        (salonData.close_time !== undefined && !timePattern.test(salonData.close_time))
+      ) {
+        return res.status(400).json({
+          message: "Opening and closing times must use HH:MM in 24-hour format.",
+        });
+      }
+
+      const openTime = salonData.open_time ?? storedSalon?.open_time;
+      const closeTime = salonData.close_time ?? storedSalon?.close_time;
+      if (openTime && closeTime && openTime >= closeTime) {
+        return res.status(400).json({
+          message: "Opening time must be earlier than closing time.",
+        });
+      }
+    }
+
+    if (salonData.capacity !== undefined) {
+      salonData.capacity = Number(salonData.capacity);
+      if (!Number.isInteger(salonData.capacity) || salonData.capacity < 1) {
+        return res.status(400).json({
+          message: "Capacity must be a whole number of at least 1.",
+        });
+      }
+    }
+
+    let managerToUpdate;
+    if (req.body.managerName !== undefined || req.body.managerEmail !== undefined) {
+      managerToUpdate = await Staff.findOne({
+        role: "manager",
+        salon_id: req.params.id,
+      });
+      if (!managerToUpdate) {
+        return res.status(404).json({ message: "Salon manager not found." });
+      }
+
+      if (req.body.managerName !== undefined) {
+        if (typeof req.body.managerName !== "string" || !req.body.managerName.trim()) {
+          return res.status(400).json({ message: "Manager name is required." });
+        }
+        const { firstName, lastName } = getManagerNameParts(req.body.managerName);
+        managerToUpdate.full_name = req.body.managerName;
+        managerToUpdate.first_name = firstName;
+        managerToUpdate.last_name = lastName;
+      }
+
+      if (req.body.managerEmail !== undefined) {
+        if (typeof req.body.managerEmail !== "string" || !req.body.managerEmail.trim()) {
+          return res.status(400).json({ message: "Enter a valid manager email address." });
+        }
+        const validation = validateManagerContact({ email: req.body.managerEmail });
+        if (validation.message) {
+          return res.status(400).json({ message: validation.message });
+        }
+
+        const emailFilter = {
+          email: {
+            $regex: `^${escapeRegex(validation.normalizedEmail)}$`,
+            $options: "i",
+          },
+        };
+        const existingStaff = await Staff.findOne({
+          ...emailFilter,
+          _id: { $ne: managerToUpdate._id },
+        }).select("_id");
+        const { default: Admin } = await import("../models/Admin.js");
+        const existingAdmin = await Admin.findOne(emailFilter).select("_id");
+        if (existingStaff || existingAdmin) {
+          return res.status(409).json({
+            message: "That manager email is already in use.",
+          });
+        }
+
+        managerToUpdate.email = validation.normalizedEmail;
+      }
+
+      await managerToUpdate.validate();
     }
 
     if (req.file) {
@@ -409,6 +508,10 @@ export const updateSalon = async (req, res) => {
       });
     }
 
+    if (managerToUpdate) {
+      await managerToUpdate.save();
+    }
+
     res.json({
       salon,
     });
@@ -423,13 +526,25 @@ export const updateSalon = async (req, res) => {
 
 export const deleteSalon = async (req, res) => {
   try {
-    const salon = await Salon.findByIdAndDelete(req.params.id);
+    const salon = await Salon.findById(req.params.id);
 
     if (!salon) {
       return res.status(404).json({
         message: "Salon not found",
       });
     }
+
+    if (
+      await Staff.exists({ salon_id: salon._id }) ||
+      await Service.exists({ salon_id: salon._id }) ||
+      await Appointment.exists({ salon_id: salon._id })
+    ) {
+      return res.status(409).json({
+        message: "Cannot delete salon: it has linked staff, services or appointments",
+      });
+    }
+
+    await Salon.findByIdAndDelete(req.params.id);
 
     res.json({
       message: "Salon deleted successfully",
