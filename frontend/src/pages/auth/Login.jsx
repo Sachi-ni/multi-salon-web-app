@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import { Eye, EyeOff, X } from "lucide-react";
 import { API_URL } from "../../config";
 import useFormValidation from "../../hooks/useFormValidation";
-import { validateEmail } from "../../utils/validation";
 import { GENERIC_API_ERROR_MESSAGE, readJsonResponse } from "../../utils/apiResponse";
 
 const readResponse = async (response) => {
@@ -25,7 +24,13 @@ const Login = () => {
         navigate("/customer/dashboard", { replace: true });
       } else if (user.role === "super-admin") {
         navigate("/superAdminDashboard", { replace: true });
-      } else if (user.role === "manager" || user.role === "staff") {
+      } else if (user.role === "manager" || user.role === "staff-admin") {
+        if (user.salon_id) {
+          navigate(`/salon-admin/${user.salon_id}/adminDashboard`, { replace: true });
+        } else {
+          navigate("/", { replace: true });
+        }
+      } else if (user.role === "staff") {
         navigate("/staff/dashboard", { replace: true });
       }
     }
@@ -46,9 +51,27 @@ const Login = () => {
   const [resendTimer, setResendTimer] = useState(0);
   const [resending, setResending] = useState(false);
   const [otpInfoMsg, setOtpInfoMsg] = useState("");
+  const validateLoginIdentifier = (value) => {
+    const val = String(value || "").trim();
+    if (!val) {
+      return { valid: false, message: "Email or username is required." };
+    }
+    if (val.includes("@")) {
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(val)) {
+        return { valid: false, message: "Please enter a valid email address." };
+      }
+      return { valid: true, message: "" };
+    }
+    if (val.length < 3) {
+      return { valid: false, message: "Username must be at least 3 characters." };
+    }
+    return { valid: true, message: "" };
+  };
+
   const loginValues = { email, password };
   const { errors: loginErrors, handleBlur: handleLoginBlur, isValid: loginIsValid, fieldMessages } = useFormValidation(loginValues, {
-    email: (value) => validateEmail(value, { enforceProviderRules: false }),
+    email: validateLoginIdentifier,
     password: (value) => value
       ? { valid: true, message: "" }
       : { valid: false, message: "Password is required." },
@@ -70,11 +93,14 @@ const Login = () => {
     setError("");
     setLoading(true);
     try {
+      const trimmed = email.trim();
+      const payloadIdentifier = trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
+
       // Try admin login first
       let res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: payloadIdentifier, password }),
       });
 
       let data = await readResponse(res);
@@ -85,7 +111,7 @@ const Login = () => {
         res = await fetch(`${API_URL}/staff/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email: payloadIdentifier, password }),
         });
         data = await readResponse(res);
       }
@@ -95,7 +121,7 @@ const Login = () => {
         res = await fetch(`${API_URL}/customers/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email: payloadIdentifier, password }),
         });
         data = await readResponse(res);
       }
@@ -137,7 +163,7 @@ const Login = () => {
       } else if (data.role === "customer") {
         navigate("/");
       } else if (userData.salon_id) {
-        if (data.role === "manager") {
+        if (data.role === "manager" || data.role === "staff-admin") {
           navigate(`/salon-admin/${userData.salon_id}/adminDashboard`);
         } else {
           navigate(`/staff/dashboard`);
@@ -405,14 +431,14 @@ const Login = () => {
         ) : (
           /* Standard Email & Password Form */
           <form onSubmit={handleSubmit} noValidate>
-            {/* Email */}
+            {/* Email or Username */}
             <div className="mb-3.5">
               <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-                Email
+                Email or Username
               </label>
               <input
-                type="email"
-                placeholder="Enter your email"
+                type="text"
+                placeholder="Enter your email or username"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
@@ -420,7 +446,7 @@ const Login = () => {
                 }}
                 onBlur={() => handleLoginBlur("email")}
                 className={`w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30 ${loginErrors.email ? "border-red-500/50 focus:border-red-500" : ""}`}
-                autoComplete="new-email"
+                autoComplete="username"
               />
               {loginErrors.email && <span className="text-xs text-red-400 mt-1 block font-medium">{loginErrors.email}</span>}
               {!loginErrors.email && fieldMessages.email && <span className="text-xs text-muted-2 mt-1 block font-medium">{fieldMessages.email}</span>}
