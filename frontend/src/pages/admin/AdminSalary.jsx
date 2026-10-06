@@ -945,6 +945,7 @@ const Salary = () => {
           return {
             _id: `${FALLBACK_PREFIX}${staff._id}`,
             staff_id: staff,
+            salon_id: staff.salon_id,
             staff_name: staff.full_name || "",
             workingAmount: 0,
             rate: staff.commission_rate ?? 0,

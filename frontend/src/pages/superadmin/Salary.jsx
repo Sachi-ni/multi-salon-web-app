@@ -121,16 +121,18 @@ const isPeriodEnded = (frequency, currentDateStr, salonCloseTime) => {
     closingTime.setHours(hours, minutes, 0, 0);
     return today >= closingTime;
   }
-  today.setHours(23, 59, 59, 999);
+  const [hours, minutes] = /^\d{2}:\d{2}$/.test(salonCloseTime || "")
+    ? salonCloseTime.split(":").map(Number)
+    : [17, 0];
   if (frequency === "weekly") {
     const range = getWeekRange(currentDateStr);
     const weekEnd = new Date(range.end);
-    weekEnd.setHours(23, 59, 59, 999);
+    weekEnd.setHours(hours, minutes, 0, 0);
     return today >= weekEnd;
   }
   const range = getMonthRange(currentDateStr);
   const monthEnd = new Date(range.end);
-  monthEnd.setHours(23, 59, 59, 999);
+  monthEnd.setHours(hours, minutes, 0, 0);
   return today >= monthEnd;
 };
 
@@ -983,6 +985,7 @@ const Salary = () => {
           return {
             _id: `${FALLBACK_PREFIX}${staff._id}`,
             staff_id: staff,
+            salon_id: staff.salon_id,
             staff_name: staff.full_name || "",
             workingAmount: 0,
             rate: staff.commission_rate ?? 0,

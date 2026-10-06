@@ -1287,7 +1287,7 @@ export const getStaffSalaryList = async (req, res) => {
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     })
       .select("full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id services createdAt salaryCalculationEnabled")
-      .populate("salon_id", "name")
+      .populate("salon_id", "name close_time")
       .populate("services", "service_name base_price duration")
       .sort({ full_name: 1 })
       .lean();
