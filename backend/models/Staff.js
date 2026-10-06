@@ -7,6 +7,7 @@ const staffSchema = new mongoose.Schema({
   phone:           { type: String, default: "" },
   email:           { type: String, required: true, unique: true },
   password_hash:   { type: String, default: "" },
+  passwordChangedAt: { type: Date, default: null },
   role:            { type: String, required: true },
   specification:   { type: String, default: "" },
   commission_rate: { type: Number, default: 0 },

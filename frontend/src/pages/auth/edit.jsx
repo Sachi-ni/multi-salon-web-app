@@ -21,6 +21,7 @@ const Edit = () => {
   const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [username, setUsername] = useState(user?.username || "");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -69,7 +70,10 @@ const Edit = () => {
       formData.append("email", email.trim().toLowerCase());
       formData.append("phone", normalizedPhone);
       formData.append("username", username);
-      if (password) formData.append("password", password);
+      if (password) {
+        formData.append("currentPassword", currentPassword);
+        formData.append("password", password);
+      }
       if (image) formData.append("image", image);
 
       const res = await axios.put(
@@ -237,9 +241,24 @@ const Edit = () => {
             {errors.phone && <p className="mt-1 text-xs text-red-300">{errors.phone}</p>}
           </div>
 
+          {password && (
           <div className="mb-3.5">
             <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
-              Password
+              Current Password
+            </label>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30"
+            />
+          </div>
+          )}
+
+          <div className="mb-3.5">
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">
+              New Password
             </label>
             <div className="relative">
               <input

@@ -1,8 +1,10 @@
 import express from "express";
 import dotenv from "dotenv";
-import cors from "cors";
 import dns from "dns";
 import connectDB from "./config/db.js";
+import { createCorsMiddleware } from "./middleware/corsMiddleware.js";
+import requestSizeErrorHandler from "./middleware/requestSizeErrorHandler.js";
+import securityHeaders from "./middleware/securityHeaders.js";
 
 // Force IPv4 first to prevent ENETUNREACH in cloud containers (Render, Docker, AWS)
 dns.setDefaultResultOrder("ipv4first");
@@ -29,32 +31,12 @@ import utilsRoutes from "./routes/utilsRoutes.js";
 
 
 dotenv.config();
-connectDB();
+await connectDB();
 
 const app = express();
-
-const allowedOrigins = [
-  "http://localhost:3000",
-  ...(process.env.FRONTEND_URL
-    ? process.env.FRONTEND_URL.split(",").map((url) => url.trim().replace(/\/+$/, ""))
-    : [])
-];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
-    if (
-      allowedOrigins.includes(origin) ||
-      origin.endsWith(".vercel.app")
-    ) {
-      return callback(null, true);
-    }
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
-  },
-  credentials: true
-}));
-app.use(express.json());
+app.use(securityHeaders);
+app.use(createCorsMiddleware());
+app.use(express.json({ limit: "10kb" }));
 app.use("/uploads", express.static("uploads"));
 
 // API Routes
@@ -81,6 +63,8 @@ app.use("/api/utils", utilsRoutes);
 app.get("/", (req, res) => {
   res.send("Salon Management API Running");
 });
+
+app.use(requestSizeErrorHandler);
 
 // Server startup
 const PORT = process.env.PORT || 5000;

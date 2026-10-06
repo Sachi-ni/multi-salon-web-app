@@ -31,7 +31,7 @@ export const getTeam = (salonId, serviceId) => {
     params.append("serviceId", serviceId);
   }
 
-  return API.get(`/team?${params.toString()}`);
+  return API.get(`/team/public?${params.toString()}`);
 };
 
 export const createStaff = (data) =>

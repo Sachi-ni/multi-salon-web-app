@@ -2,11 +2,16 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
 const generateToken = (user) => {
+  const issuedAt = user?.passwordChangedAt
+    ? Math.max(Math.floor(Date.now() / 1000), Math.ceil(new Date(user.passwordChangedAt).getTime() / 1000))
+    : undefined;
+
   return jwt.sign(
     {
       id: user?._id || user,
       role: user?.role,
       salon_id: user?.salon_id,
+      ...(issuedAt === undefined ? {} : { iat: issuedAt }),
     },
     process.env.JWT_SECRET,
     { expiresIn: "30d" }

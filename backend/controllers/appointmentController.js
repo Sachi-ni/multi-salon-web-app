@@ -885,13 +885,6 @@ export const getSalonAppointments = async (req, res) => {
     if (status) filter.status = status;
     if (date) filter.appointment_date = date;
 
-    console.log("=== GET SALON APPOINTMENTS DEBUG ===");
-    console.log("req.query:", req.query);
-    console.log("req.user.role:", req.user.role);
-    console.log("req.user.salon_id:", req.user.salon_id);
-    console.log("computed salon_id:", salon_id);
-    console.log("filter object:", filter);
-
     const rawAppointments = await Appointment.find(filter)
       .populate("service_id", "service_name base_price duration description")
       .populate("service_ids", "service_name base_price duration description")
@@ -2220,9 +2213,20 @@ export const deleteAppointment = async (req, res) => {
       return res.status(404).json({ message: "Appointment not found" });
     }
 
-    // Allow admins to delete any appointment, but customers can only delete their own
-    const isAdmin = ["super-admin", "manager", "staff-admin"].includes(req.user.role);
-    if (!isAdmin && appointment.customer_id?.toString() !== req.user.id) {
+    const userRole = req.user.role?.toLowerCase();
+    const isSuperAdmin = userRole === "super-admin";
+    const isSalonAdmin = ["manager", "staff-admin"].includes(userRole);
+
+    if (isSalonAdmin) {
+      const appointmentSalonId = appointment.salon_id?.toString();
+      const userSalonId = req.user.salon_id?.toString();
+      if (!appointmentSalonId || !userSalonId || appointmentSalonId !== userSalonId) {
+        return res.status(403).json({ message: "Not authorized to delete appointments for another salon" });
+      }
+    }
+
+    // Customers can delete only their own finalized appointments.
+    if (!isSuperAdmin && !isSalonAdmin && appointment.customer_id?.toString() !== req.user.id) {
       return res.status(403).json({ message: "Not authorized to delete this appointment" });
     }
 

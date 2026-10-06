@@ -7,6 +7,7 @@ const adminSchema = new mongoose.Schema({
 phone:     { type: String },
   image:     { type: String, default: "" },
   password:  { type: String, required: true },
+  passwordChangedAt: { type: Date, default: null },
   role: {
     type: String,
     enum: ["super-admin", "manager", "user"],

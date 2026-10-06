@@ -203,7 +203,7 @@ The frontend contains `vercel.json` with SPA rewrites configured for smooth Reac
    ```env
    FRONTEND_URL=https://multi-salon-web-app.vercel.app
    ```
-   *(If you have custom domains or preview URLs, you can provide comma-separated values, e.g., `https://multi-salon-web-app.vercel.app,https://salonhub.com`)*
+   *(For a custom domain or a specific preview deployment, add its exact origin as a comma-separated value. Do not add a wildcard; for example: `https://multi-salon-web-app.vercel.app,https://your-approved-preview.vercel.app`.)*
 5. Click **Save Changes**. Render will automatically trigger a zero-downtime redeploy.
 
 ---
@@ -241,7 +241,7 @@ Render free services spin down after 15 minutes of inactivity, causing the first
 
 ### 2. CORS Errors in Browser Console
 * **Symptom**: `Access to fetch at ... from origin ... has been blocked by CORS policy`.
-* **Fix**: Ensure `FRONTEND_URL` on Render matches your exact Vercel domain without trailing slashes. Note that `server.js` already automatically permits any `*.vercel.app` subdomain!
+* **Fix**: Ensure `FRONTEND_URL` on Render lists each trusted origin exactly, without trailing slashes. Specific preview deployments may be added as comma-separated origins; other `*.vercel.app` hosts are rejected.
 
 ### 3. MongoDB Connection Failures (`ENETUNREACH`)
 * **Symptom**: `MongooseServerSelectionError: connect ENETUNREACH`.

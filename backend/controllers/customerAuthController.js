@@ -17,12 +17,12 @@ export const loginCustomer = async (req, res) => {
       ]
     });
     if (!customer) {
-      return res.status(404).json({ message: "Customer not found" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     const isMatch = await bcrypt.compare(password, customer.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid password" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     res.status(200).json({
@@ -31,7 +31,7 @@ export const loginCustomer = async (req, res) => {
       email: customer.email,
       phone: customer.phone,
       role:  customer.role,
-      token: generateToken(customer._id)
+      token: generateToken(customer)
     });
 
   } catch (error) {

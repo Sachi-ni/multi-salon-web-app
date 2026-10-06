@@ -26,6 +26,10 @@ const COMMON_EMAIL_DOMAINS = new Set([
 const SRI_LANKAN_PHONE_PATTERN = /^(?:\+94|0)\d{9}$/;
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const normalizePhone = (phone) => phone?.trim().replace(/[\s()\-]/g, "");
+const canViewManagerContact = (req, salonId) => {
+  const role = String(req.user?.role || "").toLowerCase();
+  return role === "super-admin" || (role === "manager" && req.user.salon_id === String(salonId));
+};
 
 const validateManagerContact = ({ email, phone, password }) => {
   const normalizedEmail = email?.trim().toLowerCase();
@@ -145,11 +149,6 @@ export const createSalon = async (req, res) => {
       return res.status(400).json({ message: validation.message });
     }
 
-    console.log("createSalon requested", {
-      salonName: name,
-      managerEmail: validation.normalizedEmail,
-    });
-
     const existingManager = await Staff.findOne({
       email: {
         $regex: `^${escapeRegex(validation.normalizedEmail)}$`,
@@ -228,12 +227,6 @@ export const createSalon = async (req, res) => {
     salon.staffCount = 1;
     await salon.save();
 
-    console.log("createSalon completed", {
-      salonId: salon._id,
-      salonName: salon.name,
-      managerEmail: manager.email,
-    });
-
     res.status(201).json({
       message: "Salon and manager created successfully.",
       salon: {
@@ -302,8 +295,13 @@ export const getSalons = async (req, res) => {
 
         // Manager information
         obj.managerName = manager?.full_name || "";
-        obj.managerEmail = manager?.email || "";
-        obj.managerPhone = manager?.phone || "";
+        if (canViewManagerContact(req, s._id)) {
+          obj.managerEmail = manager?.email || "";
+          obj.managerPhone = manager?.phone || "";
+        } else {
+          delete obj.managerEmail;
+          delete obj.managerPhone;
+        }
 
         // Other information
         obj.staffCount = actualStaffCount;
@@ -358,12 +356,22 @@ export const getSalonById = async (req, res) => {
     // Add manager details to response
     if (manager) {
       salonObj.managerName = manager.full_name || "";
-      salonObj.managerEmail = manager.email || "";
-      salonObj.managerPhone = manager.phone || "";
+      if (canViewManagerContact(req, salon._id)) {
+        salonObj.managerEmail = manager.email || "";
+        salonObj.managerPhone = manager.phone || "";
+      } else {
+        delete salonObj.managerEmail;
+        delete salonObj.managerPhone;
+      }
     } else {
       salonObj.managerName = "";
-      salonObj.managerEmail = "";
-      salonObj.managerPhone = "";
+      if (canViewManagerContact(req, salon._id)) {
+        salonObj.managerEmail = "";
+        salonObj.managerPhone = "";
+      } else {
+        delete salonObj.managerEmail;
+        delete salonObj.managerPhone;
+      }
     }
 
     // Compute average rating from feedback
@@ -373,8 +381,6 @@ export const getSalonById = async (req, res) => {
 
     salonObj.rating = rating;
     salonObj.ratingCount = ratingCount;
-
-    console.log("Salon Edit Response:", salonObj);
 
     res.json(salonObj);
   } catch (error) {
