@@ -214,6 +214,21 @@ export const isSalaryPeriodEnded = (salaryRecord) => {
   return periodEnd < today;
 };
 
+// Salary dates and salon hours are entered in Sri Lankan local time. Build the
+// cutoff as an absolute instant so the result is identical on local machines
+// and hosted servers whose process timezone may be UTC.
+const SRI_LANKA_OFFSET_MINUTES = 5 * 60 + 30;
+
+const getSriLankaCutoff = (date, hours, minutes) => {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  return new Date(
+    Date.UTC(year, month, day, hours, minutes, 0, 0) -
+      SRI_LANKA_OFFSET_MINUTES * 60 * 1000
+  );
+};
+
 // A salary becomes payable at salon closing time on the period's final day.
 const canPaySalaryPeriod = (salaryRecord, closeTime = "17:00") => {
   if (salaryRecord?.isTransitioned) return true;
@@ -222,8 +237,7 @@ const canPaySalaryPeriod = (salaryRecord, closeTime = "17:00") => {
   const [hours, minutes] = /^\d{2}:\d{2}$/.test(closeTime || "")
     ? closeTime.split(":").map(Number)
     : [17, 0];
-  endDate.setHours(hours, minutes, 0, 0);
-  return new Date() >= endDate;
+  return new Date() >= getSriLankaCutoff(endDate, hours, minutes);
 };
 
 export const calculateDaySalary = (
