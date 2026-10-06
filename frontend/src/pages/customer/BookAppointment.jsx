@@ -55,8 +55,8 @@ export default function BookAppointment() {
       const staff = location.state.staff;
       setBooking(prev => ({
         ...prev,
-        salonId: staff.salon_id?._id || "",
-        salonName: staff.salon_id?.name || "",
+        salonId: staff.salon?._id || staff.salon_id?._id || "",
+        salonName: staff.salon?.name || staff.salon_id?.name || "",
         staffId: staff._id,
         staffName: staff.name,
         staffSpecification: staff.specification || "",

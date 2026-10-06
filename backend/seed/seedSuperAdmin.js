@@ -59,6 +59,7 @@ export const seedSuperAdmin = async () => {
       hardeningUpdates.username = email.split("@")[0];
       const salt = await bcrypt.genSalt(10);
       hardeningUpdates.password = await bcrypt.hash(initialPassword, salt);
+      hardeningUpdates.passwordChangedAt = new Date();
       hardeningUpdates.mustChangePassword = true;
       hardeningUpdates.mfaEnrolled = false;
       console.log(`Updating Super Admin account to handover email: ${email}`);

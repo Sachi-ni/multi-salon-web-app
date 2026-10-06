@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Star, MapPin, Briefcase } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { getUploadUrl } from '../../../config';
 
 export default function StaffCard({ member, index }) {
@@ -42,52 +42,7 @@ export default function StaffCard({ member, index }) {
           {/* Salon */}
           <div className="flex items-center gap-2 text-sm">
             <MapPin className="w-4 h-4 text-muted flex-shrink-0" />
-            <span className="text-muted-2 truncate">{member.salon_id?.name || member.salonName || "Unknown"}</span>
-          </div>
-
-          {/* Services */}
-          <div className="flex items-start gap-2 text-sm">
-            <Briefcase className="w-4 h-4 text-muted flex-shrink-0 mt-0.5" />
-            {member.services?.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {member.services.slice(0, 3).map((service) => (
-                  <span
-                    key={service._id || service}
-                    className="px-2 py-1 rounded-md bg-accent-dim border border-accent-muted text-[0.65rem] font-bold text-accent"
-                  >
-                    {service.service_name || service}
-                  </span>
-                ))}
-                {member.services.length > 3 && (
-                  <span className="px-2 py-1 rounded-md bg-surface-2 border border-border text-[0.65rem] font-bold text-white/70">
-                    +{member.services.length - 3} more
-                  </span>
-                )}
-              </div>
-            ) : (
-              <span className="text-muted-2">No services assigned</span>
-            )}
-          </div>
-        </div>
-
-        {/* Footer: Rating */}
-        <div className="w-full flex items-center justify-between pb-4">
-          <div className="flex items-center gap-1.5">
-            <div className="flex items-center gap-0.5">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className={`w-4 h-4 ${
-                    star <= Math.round(parseFloat(member.rating) || 0)
-                      ? "fill-accent text-accent"
-                      : "text-border"
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="text-xs font-bold text-muted-2">
-              {member.rating || "0.0"}
-            </span>
+            <span className="text-muted-2 truncate">{member.salon?.name || "Unknown"}</span>
           </div>
         </div>
 

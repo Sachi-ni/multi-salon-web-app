@@ -2,6 +2,7 @@ import Admin from "../models/Admin.js";
 import Staff from "../models/Staff.js";
 import Customer from "../models/Customer.js";
 import Salon from "../models/Salon.js";
+import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import generateToken, {
@@ -57,6 +58,19 @@ const validateProfileFields = ({ email, phone, password, username }) => {
   return { normalizedEmail, normalizedPhone };
 };
 
+const verifyCurrentPassword = async (user, currentPassword) => {
+  if (typeof currentPassword !== "string" || !currentPassword) {
+    return { status: 400, message: "Current password is required to change your password" };
+  }
+
+  const passwordHash = user.password_hash || user.password;
+  if (!(await bcrypt.compare(currentPassword, passwordHash))) {
+    return { status: 401, message: "Current password is incorrect" };
+  }
+
+  return null;
+};
+
 export const getProfile = async (req, res) => {
   try {
     let user = await Admin.findById(req.user.id).select("-password");
@@ -90,6 +104,13 @@ export const getProfile = async (req, res) => {
 export const registerCustomer = async (req, res) => {
   try {
     const { fullName, email, phone, password, preferredSalonId, role } = req.body;
+    if (typeof fullName !== "string" || !fullName.trim()) {
+      return res.status(400).json({ message: "Full name is required" });
+    }
+    if (typeof password !== "string" || !password) {
+      return res.status(400).json({ message: "Password is required" });
+    }
+
     const normalizedPhone = phone?.replace(/[\s()-]/g, "");
 
     // This public route can only create customers; privileged roles must never be self-registered.
@@ -100,6 +121,17 @@ export const registerCustomer = async (req, res) => {
 
     const validation = validateProfileFields({ email, phone: normalizedPhone, password });
     if (validation.message) return res.status(400).json(validation);
+
+    const hasPreferredSalon = preferredSalonId !== undefined && preferredSalonId !== null && preferredSalonId !== "";
+    if (hasPreferredSalon) {
+      if (typeof preferredSalonId !== "string" || !mongoose.isObjectIdOrHexString(preferredSalonId)) {
+        return res.status(400).json({ message: "Preferred salon is invalid or does not exist" });
+      }
+      const preferredSalon = await Salon.findById(preferredSalonId);
+      if (!preferredSalon) {
+        return res.status(400).json({ message: "Preferred salon is invalid or does not exist" });
+      }
+    }
 
     const existingCustomer = await Customer.findOne({ email: validation.normalizedEmail });
     // A generic response prevents attackers from discovering registered email addresses.
@@ -112,7 +144,7 @@ export const registerCustomer = async (req, res) => {
       name: fullName,
       email: validation.normalizedEmail,
       phone: normalizedPhone,
-      preferredSalonId: preferredSalonId || null,
+      preferredSalonId: hasPreferredSalon ? preferredSalonId : null,
       password_hash,
       role: "customer",
     });
@@ -142,12 +174,12 @@ export const loginAdmin = async (req, res) => {
       ]
     });
     if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     const isMatch = await bcrypt.compare(password, admin.password);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid password" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // SuperAdmin requires 2FA via Email OTP
@@ -337,6 +369,7 @@ export const changePassword = async (req, res) => {
   }
 
   account.user[account.passwordField] = await bcrypt.hash(password, 12);
+  account.user.passwordChangedAt = new Date();
   account.user.mustChangePassword = false;
   if (account.passwordField === "password") account.user.mfaEnrolled = true;
   await account.user.save();
@@ -488,6 +521,7 @@ export const resetPassword = async (req, res) => {
     }
 
     account.user[account.passwordField] = await bcrypt.hash(newPassword, 12);
+    account.user.passwordChangedAt = new Date();
     account.user.passwordResetSessionHash = null;
     // Completing an email-verified reset also replaces the temporary
     // password for any account type, so it must not lead to a second forced
@@ -507,25 +541,26 @@ export const loginStaff = async (req, res) => {
     const { email, password } = req.body;
     const identifier = String(email || "").trim();
     const cleanIdentifierPhone = identifier.replace(/[\s()-]/g, "");
+    const escapedIdentifierPhone = cleanIdentifierPhone.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     // Search staff by email, full_name, OR phone number
     const staff = await Staff.findOne({
       $or: [
         { email: { $regex: `^${identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } },
         { full_name: { $regex: `^${identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } },
-        ...(cleanIdentifierPhone ? [{ phone: { $regex: `${cleanIdentifierPhone}$` } }] : [])
+        ...(cleanIdentifierPhone ? [{ phone: { $regex: `${escapedIdentifierPhone}$` } }] : [])
       ]
     });
 
     if (!staff) {
-      return res.status(404).json({ message: "Staff not found" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // Phone may identify the account, but it is never a password substitute.
     const isPasswordMatch = await bcrypt.compare(password, staff.password_hash);
 
     if (!isPasswordMatch) {
-      return res.status(401).json({ message: "Invalid password" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     if (staff.salon_id && staff.role !== "super-admin") {
@@ -586,7 +621,7 @@ export const updateProfile = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to edit this profile" });
     }
 
-    const { full_name, email, phone, username, password } = req.body;
+    const { full_name, email, phone, username, password, currentPassword } = req.body;
     const validation = validateProfileFields({ email, phone, password, username });
     if (validation.message) return res.status(400).json(validation);
 
@@ -612,6 +647,11 @@ export const updateProfile = async (req, res) => {
       user = await Customer.findById(id);
       if (!user) return res.status(404).json({ message: "User not found" });
 
+      if (password) {
+        const passwordError = await verifyCurrentPassword(user, currentPassword);
+        if (passwordError) return res.status(passwordError.status).json({ message: passwordError.message });
+      }
+
       user.name = full_name || user.name;
       user.email = normalizedEmail || user.email;
       user.phone = normalizedPhone || user.phone;
@@ -620,6 +660,7 @@ export const updateProfile = async (req, res) => {
       if (password) {
         const salt = await bcrypt.genSalt(10);
         user.password_hash = await bcrypt.hash(password, salt);
+        user.passwordChangedAt = new Date();
       }
 
       await user.save();
@@ -640,6 +681,11 @@ export const updateProfile = async (req, res) => {
       // maybe it's staff?
       user = await Staff.findById(id);
       if (!user) return res.status(404).json({ message: "User not found" });
+
+      if (password) {
+        const passwordError = await verifyCurrentPassword(user, currentPassword);
+        if (passwordError) return res.status(passwordError.status).json({ message: passwordError.message });
+      }
       
       user.full_name = full_name || user.full_name;
       user.email = normalizedEmail || user.email;
@@ -649,6 +695,7 @@ export const updateProfile = async (req, res) => {
       if (password) {
         const salt = await bcrypt.genSalt(10);
         user.password_hash = await bcrypt.hash(password, salt);
+        user.passwordChangedAt = new Date();
       }
 
       await user.save();
@@ -665,6 +712,11 @@ export const updateProfile = async (req, res) => {
       });
     }
 
+    if (password) {
+      const passwordError = await verifyCurrentPassword(user, currentPassword);
+      if (passwordError) return res.status(passwordError.status).json({ message: passwordError.message });
+    }
+
     user.full_name = full_name || user.full_name;
     user.email = normalizedEmail || user.email;
     user.phone = normalizedPhone || user.phone;
@@ -675,6 +727,7 @@ export const updateProfile = async (req, res) => {
     if (password) {
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(password, salt);
+      user.passwordChangedAt = new Date();
     }
 
     await user.save();

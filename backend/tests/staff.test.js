@@ -20,6 +20,65 @@ test("manager cannot move created staff to another salon", async () => {
   expect((await Staff.findOne({ email: "staff-a@gmail.com" })).salon_id.toString()).toBe(salonA._id.toString());
 });
 
+test("public team endpoint returns only fields needed by public pages", async () => {
+  const salon = await Salon.create({ name: "Public Team Salon" });
+  const manager = await Staff.create({
+    full_name: "Team Manager", first_name: "Team", last_name: "Manager",
+    email: "team-manager@example.com", password_hash: "unused", role: "manager", salon_id: salon._id,
+  });
+  await Staff.create({
+    full_name: "Public Stylist", first_name: "Public", last_name: "Stylist",
+    email: "public-stylist@example.com", phone: "0771234567", password_hash: "private-hash",
+    passwordResetOtpCodeHash: "otp-hash", passwordResetSessionHash: "session-hash",
+    salary_payment_frequency: "monthly", salary_payment_count_per_day: 5000,
+    role: "staff", salon_id: salon._id,
+  });
+
+  const response = await request(app).get("/api/team/public");
+
+  expect(response.status).toBe(200);
+  expect(response.body).toHaveLength(1);
+  expect(response.body[0]).toMatchObject({
+    name: "Public Stylist",
+    role: "staff",
+    image: "",
+    salon: { _id: String(salon._id), name: "Public Team Salon" },
+  });
+  expect(Object.keys(response.body[0]).sort()).toEqual(["_id", "image", "name", "role", "salon"].sort());
+
+  const protectedRoute = await request(app).get("/api/team");
+  expect(protectedRoute.status).toBe(401);
+});
+
+test("staff management endpoint omits credential and password-reset fields", async () => {
+  const salon = await Salon.create({ name: "Managed Team Salon" });
+  const manager = await Staff.create({
+    full_name: "Management Manager", first_name: "Management", last_name: "Manager",
+    email: "management-manager@example.com", password_hash: "unused", role: "manager", salon_id: salon._id,
+  });
+  await Staff.create({
+    full_name: "Managed Stylist", first_name: "Managed", last_name: "Stylist",
+    email: "managed-stylist@example.com", phone: "0771234567", password_hash: "private-hash",
+    passwordResetOtpCodeHash: "otp-hash", passwordResetSessionHash: "session-hash",
+    role: "staff", salon_id: salon._id,
+  });
+
+  const response = await request(app)
+    .get("/api/staff")
+    .set("Authorization", `Bearer ${generateToken(manager)}`);
+
+  expect(response.status).toBe(200);
+  const stylist = response.body.find((member) => member.name === "Managed Stylist");
+  expect(stylist).toMatchObject({
+    name: "Managed Stylist",
+    email: "managed-stylist@example.com",
+    salon_id: { _id: String(salon._id), name: "Managed Team Salon" },
+  });
+  expect(stylist).not.toHaveProperty("password_hash");
+  expect(stylist).not.toHaveProperty("passwordResetOtpCodeHash");
+  expect(stylist).not.toHaveProperty("passwordResetSessionHash");
+});
+
 test("manager cannot create a privileged staff role", async () => {
   const salon = await Salon.create({ name: "A", staffCount: 0 });
   const manager = await Staff.create({ full_name: "Manager A", first_name: "Manager", last_name: "A", email: "manager-b@gmail.com", password_hash: "unused", role: "manager", salon_id: salon._id });

@@ -314,15 +314,42 @@ export const getStaff = async (req, res) => {
       }
     }
 
+    const canViewManagementFields = ["manager", "super-admin"].includes(userRole);
+    const staffFields = canViewManagementFields
+      ? "full_name first_name last_name role image specification status email phone salon_id services commission_rate salaryCalculationEnabled salary_payment_frequency salary_payment_count_per_day"
+      : "full_name role image specification salon_id services";
     const staff = await Staff.find(filter)
-      .select("-password_hash")
+      .select(staffFields)
       .populate("salon_id", "name")
       .populate("services", "service_name");
 
-let formattedStaff = staff.map((member) => ({
-      ...member.toObject(),
-      name: member.full_name,
-    }));
+    let formattedStaff = staff.map((member) => {
+      const profile = {
+        _id: member._id,
+        name: member.full_name,
+        role: member.role,
+        image: member.image,
+        specification: member.specification,
+        salon_id: member.salon_id ? { _id: member.salon_id._id, name: member.salon_id.name } : null,
+        services: member.services.map((service) => ({ _id: service._id, service_name: service.service_name })),
+      };
+
+      if (!canViewManagementFields) return profile;
+
+      return {
+        ...profile,
+        full_name: member.full_name,
+        first_name: member.first_name,
+        last_name: member.last_name,
+        status: member.status,
+        email: member.email,
+        phone: member.phone,
+        commission_rate: member.commission_rate,
+        salaryCalculationEnabled: member.salaryCalculationEnabled,
+        salary_payment_frequency: member.salary_payment_frequency,
+        salary_payment_count_per_day: member.salary_payment_count_per_day,
+      };
+    });
 
     // Attach average staff rating from Feedback collection (super-admin & manager views)
     formattedStaff = await attachRatings(formattedStaff);
@@ -335,36 +362,56 @@ let formattedStaff = staff.map((member) => ({
   }
 };
 
+const getActiveTeamFilter = async ({ salonId, serviceId }) => {
+  const activeSalonIds = await Salon.find({
+    status: { $not: /^deactivated$/i },
+    isPaused: { $ne: true },
+  }).distinct("_id");
+  const filter = {
+    status: "Active",
+    role: { $not: /^(manager|super-admin)$/i },
+    salon_id: { $in: activeSalonIds },
+  };
+
+  if (salonId) filter.salon_id = { $eq: salonId, $in: activeSalonIds };
+  if (serviceId) filter.services = serviceId;
+  return filter;
+};
+
+export const getPublicTeam = async (req, res) => {
+  try {
+    const filter = await getActiveTeamFilter(req.query);
+    const staff = await Staff.find(filter)
+      .select("full_name role image salon_id")
+      .populate("salon_id", "name");
+
+    res.json(staff.map((member) => ({
+      _id: member._id,
+      name: member.full_name,
+      role: member.role,
+      image: member.image,
+      salon: member.salon_id ? { _id: member.salon_id._id, name: member.salon_id.name } : null,
+    })));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export const getTeam = async (req, res) => {
   try {
-    const { salonId, serviceId } = req.query;
-
-    // The public customer team page must only expose service professionals,
-    // not salon-management accounts.
-    const filter = {
-      status: "Active",
-      role: { $not: /^(manager|super-admin)$/i },
-      salon_id: { $in: await Salon.find({ status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).distinct("_id") },
-    };
-
-    if (salonId) {
-      filter.salon_id = {
-        $eq: salonId,
-        $in: await Salon.find({ status: { $not: /^deactivated$/i }, isPaused: { $ne: true } }).distinct("_id"),
-      };
-    }
-    if (serviceId) {
-      filter.services = serviceId;
-    }
-
-const staff = await Staff.find(filter)
-      .select("-password_hash")
+    const filter = await getActiveTeamFilter(req.query);
+    const staff = await Staff.find(filter)
+      .select("full_name role image salon_id services")
       .populate("salon_id", "name")
       .populate("services", "service_name");
 
     let formattedStaff = staff.map((member) => ({
-      ...member.toObject(),
+      _id: member._id,
       name: member.full_name,
+      role: member.role,
+      image: member.image,
+      salon_id: member.salon_id ? { _id: member.salon_id._id, name: member.salon_id.name } : null,
+      services: member.services.map((service) => ({ _id: service._id, service_name: service.service_name })),
     }));
 
     // Attach average staff rating from Feedback collection (customer team page)
@@ -507,6 +554,7 @@ export const updateStaff = async (req, res) => {
       if (passwordError) return res.status(400).json({ message: passwordError });
       const salt = await bcrypt.genSalt(10);
       updateData.password_hash = await bcrypt.hash(req.body.password, salt);
+      updateData.passwordChangedAt = new Date();
 
       // A super-admin may choose to make an administrator-set replacement
       // password temporary. Managers cannot alter this security state.

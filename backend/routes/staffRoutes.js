@@ -3,6 +3,7 @@ import multer from "multer";
 import { protect } from "../middleware/authMiddleware.js";
 import { authorizeRoles } from "../middleware/roleMiddleware.js";
 import { loginStaff } from "../controllers/authController.js";
+import { createLoginRateLimiters } from "../utils/rateLimiter.js";
 import {
 	createStaff,
 	getStaff,
@@ -15,9 +16,10 @@ const router = express.Router();
 
 // Configure multer for simple disk storage
 const upload = multer({ dest: "uploads/" });
+const [loginIpLimiter, loginAccountLimiter] = createLoginRateLimiters();
 
 // Customers can view staff — only admins can create/edit/delete
-router.post("/login", loginStaff);
+router.post("/login", loginIpLimiter, loginAccountLimiter, loginStaff);
 router.get("/dashboard", protect, getStaffDashboard);
 router.get("/", protect, getStaff);
 router.post(
