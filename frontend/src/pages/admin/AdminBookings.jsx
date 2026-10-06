@@ -16,7 +16,7 @@ import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import { 
-  Calendar, Clock, User, Search, LayoutGrid, 
+  Calendar, Clock, User, UserCheck, Search, LayoutGrid, 
   List, CheckCircle2, AlertCircle, Trash2, 
   Check, X, Plus, Hash, Edit2,
   Receipt, FileText
@@ -396,7 +396,15 @@ export default function AdminBookings() {
                     </span>
                   </div>
 
-                  <div>{getStatusBadge(a.status)}</div>
+                  <div className="flex items-center gap-2">
+                    {a.status?.toLowerCase() === "confirmed" && a.confirmed_by_name && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-2xs font-bold">
+                        <UserCheck className="w-3 h-3 text-emerald-400" />
+                        Accepted by: {a.confirmed_by_name} ({a.confirmed_by_role || "Staff"})
+                      </span>
+                    )}
+                    {getStatusBadge(a.status)}
+                  </div>
                 </div>
 
                 {/* Customer Information Row */}
@@ -514,6 +522,8 @@ export default function AdminBookings() {
                 <div className="flex items-center justify-between pt-3 border-t border-border/80 text-xs">
                   <span className="text-neutral-500 text-2xs">
                     Booked on {new Date(a.createdAt).toLocaleDateString()}
+                    {a.confirmed_at && ` · Accepted on ${new Date(a.confirmed_at).toLocaleDateString()}`}
+                    {a.confirmed_by_name && ` by ${a.confirmed_by_name} (${a.confirmed_by_role || "Staff"})`}
                   </span>
 
                   <div className="flex items-center gap-2">

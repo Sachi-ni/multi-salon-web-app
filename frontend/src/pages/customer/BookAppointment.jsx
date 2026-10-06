@@ -10,21 +10,68 @@ import CustomerDashboardBackground from "../../components/ui/CustomerDashboardBa
 const STEPS = ["Salon", "Date", "Services", "Staff & Time", "Confirm"];
 
 export default function BookAppointment() {
-  const [step, setStep] = useState(0);
+  const [booking, setBooking] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("appointment_booking_draft");
+      return saved ? JSON.parse(saved) : {
+        salonId: "", salonName: "",
+        date: "",
+        services: [],
+        serviceId: "", serviceName: "", serviceDuration: 0, servicePrice: 0,
+        totalDuration: 0, totalPrice: 0,
+        staffId: "", staffName: "", staffSpecification: "",
+        startTime: "", endTime: "",
+      };
+    } catch {
+      return {
+        salonId: "", salonName: "",
+        date: "",
+        services: [],
+        serviceId: "", serviceName: "", serviceDuration: 0, servicePrice: 0,
+        totalDuration: 0, totalPrice: 0,
+        staffId: "", staffName: "", staffSpecification: "",
+        startTime: "", endTime: "",
+      };
+    }
+  });
+
+  const [step, setStep] = useState(() => {
+    try {
+      const savedStep = sessionStorage.getItem("appointment_booking_step");
+      const stepNum = savedStep ? parseInt(savedStep, 10) : 0;
+      return isNaN(stepNum) ? 0 : stepNum;
+    } catch {
+      return 0;
+    }
+  });
+
   const [salons, setSalons] = useState([]);
   const [salonError, setSalonError] = useState("");
-  const [booking, setBooking] = useState({
-    salonId: "", salonName: "",
-    date: "",
-    services: [],  // array of { serviceId, serviceName, serviceDuration, servicePrice }
-    serviceId: "", serviceName: "", serviceDuration: 0, servicePrice: 0,
-    totalDuration: 0, totalPrice: 0,
-    staffId: "", staffName: "", staffSpecification: "",
-    startTime: "", endTime: "",
-  });
 
   const location = useLocation();
   const dateInputRef = useRef(null);
+
+  // Persist draft and step state to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("appointment_booking_draft", JSON.stringify(booking));
+      sessionStorage.setItem("appointment_booking_step", String(step));
+    } catch {
+      // Ignore quota errors
+    }
+  }, [booking, step]);
+
+  // Validate step state against booking data on reload/step change
+  // If required state is missing, gracefully fallback to step 0 (initial process)
+  useEffect(() => {
+    if (step > 0 && !booking.salonId) {
+      setStep(0);
+    } else if (step > 1 && !booking.date) {
+      setStep(0);
+    } else if ((step === 3 || step === 4) && (!booking.services || booking.services.length === 0)) {
+      setStep(0);
+    }
+  }, [step, booking.salonId, booking.date, booking.services]);
 
   const openDatePicker = () => {
     const dateInput = dateInputRef.current;

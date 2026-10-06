@@ -1,5 +1,6 @@
 import Staff from "../models/Staff.js";
 import Salon from "../models/Salon.js";
+import Service from "../models/Service.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import Salary from "../models/Salary.js";
@@ -602,6 +603,25 @@ export const updateStaff = async (req, res) => {
       updateData.salon_id = req.body.salonId;
     }
 
+    if (services !== undefined) {
+      const targetSalonId = updateData.salon_id || existing.salon_id;
+      const uniqueServiceIds = [...new Set(services)];
+      const serviceDocuments = await Service.find({
+        _id: { $in: uniqueServiceIds },
+      }).select("_id salon_id");
+
+      if (
+        serviceDocuments.length !== uniqueServiceIds.length ||
+        serviceDocuments.some(
+          (service) => service.salon_id?.toString() !== targetSalonId?.toString()
+        )
+      ) {
+        return res.status(403).json({
+          message: "One or more services do not belong to this staff member's salon",
+        });
+      }
+    }
+
     if (req.body.status !== undefined) {
       updateData.status = req.body.status;
       // Inactive staff retain the salary already accrued, but no later page
@@ -935,6 +955,12 @@ export const deleteStaff = async (req, res) => {
     ) {
       return res.status(403).json({
         message: "Forbidden: cannot delete staff for another salon",
+      });
+    }
+
+    if (await Appointment.exists({ staff_id: staff._id })) {
+      return res.status(409).json({
+        message: "Cannot delete staff: it has linked appointments",
       });
     }
 

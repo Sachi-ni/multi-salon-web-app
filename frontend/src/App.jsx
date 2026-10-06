@@ -71,7 +71,7 @@ const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
   const { user } = useAuth();
 
   if (!user) {
-    return <Navigate to="/" />;
+    return <Navigate to="/login" replace />;
   }
 
   // Normal sessions are never issued while password hardening is pending;

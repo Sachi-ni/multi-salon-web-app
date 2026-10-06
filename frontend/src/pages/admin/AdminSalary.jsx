@@ -366,7 +366,7 @@ const Salary = () => {
     } finally {
       setLoading(false);
     }
-  }, [salonId, frequency, getPeriod, dailyDate, weeklyDate, monthlyDate]);
+  }, [salonId, frequency, getPeriod, dailyDate, weeklyDate, monthlyDate, selectedMonthlyDateKey]);
 
   useEffect(() => {
     loadSalaries();
@@ -926,7 +926,6 @@ const Salary = () => {
           return true;
         })
         .map((staff) => {
-          const joinDate = getStaffJoinDateStr(staff);
           const perDayAmount = Number(staff.salary_payment_count_per_day || 0);
           const employmentStartKey = staff.createdAt ? toDateKey(staff.createdAt) : "";
           const selectedDateKey =

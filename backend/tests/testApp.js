@@ -12,6 +12,7 @@ import serviceRoutes from "../routes/serviceRoutes.js";
 import reviewRoutes from "../routes/reviewRoutes.js";
 import salaryRoutes from "../routes/salaryRoutes.js";
 import teamRoutes from "../routes/teamRoutes.js";
+import revenueRoutes from "../routes/revenueRoutes.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -28,5 +29,6 @@ app.use("/api/services", serviceRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/team", teamRoutes);
+app.use("/api/revenue", revenueRoutes);
 app.use(requestSizeErrorHandler);
 export default app;

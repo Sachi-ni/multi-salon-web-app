@@ -175,6 +175,12 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, onToggleStatus, index }) =
                     >
                       <Pencil className="w-3.5 h-3.5 text-info" /> Edit Salon
                     </button>
+                    <button
+                      onClick={() => { setOpenMenu(false); onToggleStatus(salon); }}
+                      className="w-full px-3.5 py-2 text-left text-xs font-bold flex items-center gap-2.5 transition-colors hover:bg-white/[0.04] text-neutral-300 hover:text-white"
+                    >
+                      <Power className="w-3.5 h-3.5 text-amber-400" /> {isActive ? "Deactivate Salon" : "Activate Salon"}
+                    </button>
                     <div className="my-1 border-t border-border" />
                     <button
                       onClick={() => { setOpenMenu(false); onDelete(salon._id); }}
@@ -254,19 +260,6 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, onToggleStatus, index }) =
           <span>Dashboard</span>
           <ExternalLink className="w-3 h-3" />
         </button>
-        <button
-          onClick={() => onToggleStatus(salon)}
-          title={isActive ? "Deactivate Salon" : "Activate Salon"}
-          className={clsx(
-            "px-3 py-1.5 rounded-lg text-2xs font-black uppercase tracking-wider transition-all flex items-center gap-1",
-            isActive
-              ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
-              : "bg-neutral-800 border border-neutral-700 text-neutral-400 hover:bg-neutral-700"
-          )}
-        >
-          <Power className="w-3 h-3" />
-          {isActive ? "Active" : "Deactivated"}
-        </button>
       </div>
     </motion.div>
   );
@@ -302,7 +295,6 @@ const Salons = () => {
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [statusSalon, setStatusSalon] = useState(null);
-  const [statusReason, setStatusReason] = useState("");
   const [deactivationType, setDeactivationType] = useState("temporary");
   const [statusLoading, setStatusLoading] = useState(false);
   const [success, setSuccess] = useState("");
@@ -463,6 +455,8 @@ const handleEditOpen = async (id) => {
     try {
       await deleteSalon(deleteId);
       setDeleteId(null);
+      setSuccess("Salon deleted successfully.");
+      window.setTimeout(() => setSuccess(""), 3500);
       await fetchSalons();
     } catch (err) {
       console.error(err);
@@ -474,7 +468,6 @@ const handleEditOpen = async (id) => {
 
   const handleToggleStatus = (salon) => {
     setStatusSalon(salon);
-    setStatusReason("");
     setDeactivationType("temporary");
   };
 
@@ -486,10 +479,10 @@ const handleEditOpen = async (id) => {
     try {
       await updateSalonStatus(statusSalon._id, {
         status: isActivating ? "active" : "deactivated",
-        ...(isActivating ? {} : { deactivationType, reason: statusReason }),
+        ...(isActivating ? {} : { deactivationType }),
       });
       setStatusSalon(null);
-      setSuccess(`${statusSalon.name} ${isActivating ? "activated" : "deactivated"} successfully.`);
+      setSuccess(`Salon ${isActivating ? "activated" : "deactivated"} successfully.`);
       await fetchSalons();
       window.setTimeout(() => setSuccess(""), 3500);
     } catch (err) {
@@ -498,6 +491,8 @@ const handleEditOpen = async (id) => {
       setStatusLoading(false);
     }
   };
+
+
 
   const handleSortByName = () => {
     setSortAsc(!sortAsc);
@@ -521,7 +516,7 @@ const handleEditOpen = async (id) => {
     return list;
   }, [salonList, searchTerm, sortAsc]);
 
-  const activeSalonCount = salonList.filter((salon) => salon.status === "active").length;
+  const activeSalonCount = salonList.filter((salon) => salon.status !== "deactivated").length;
   const deactivatedSalonCount = salonList.filter((salon) => salon.status === "deactivated").length;
   const totalStaffCount = salonList.reduce((sum, salon) => sum + (salon.staffCount || 0), 0);
 
@@ -728,13 +723,6 @@ const handleEditOpen = async (id) => {
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => setDeleteId(salon._id)}
-                      className="p-1.5 rounded-lg bg-surface-2 text-danger hover:bg-danger/20 transition-colors"
-                      title="Delete Salon"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                    <button
                       onClick={() => handleToggleStatus(salon)}
                       className={clsx(
                         "p-1.5 rounded-lg transition-colors",
@@ -745,6 +733,13 @@ const handleEditOpen = async (id) => {
                       title={salon.status === "deactivated" ? "Activate Salon" : "Deactivate Salon"}
                     >
                       <Power className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteId(salon._id)}
+                      className="p-1.5 rounded-lg bg-surface-2 text-danger hover:bg-danger/20 transition-colors"
+                      title="Delete Salon"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </Table.Td>
@@ -925,6 +920,8 @@ const handleEditOpen = async (id) => {
         </form>
       </Modal>
 
+
+
       {/* Activate/Deactivate Confirmation Modal */}
       <Modal
         isOpen={!!statusSalon}
@@ -935,7 +932,7 @@ const handleEditOpen = async (id) => {
         <p className="text-xs text-neutral-300 leading-relaxed">
           {statusSalon?.status === "deactivated"
             ? `Reactivate ${statusSalon?.name}? Customers will be able to book again.`
-            : `Deactivate ${statusSalon?.name}? Customers will no longer be able to view or book this salon.`}
+            : `Deactivate ${statusSalon?.name}? It will be hidden from customers${deactivationType === "temporary" ? " and can be re-activated later" : ""}.`}
         </p>
 
         {statusSalon?.status !== "deactivated" && (
@@ -955,21 +952,6 @@ const handleEditOpen = async (id) => {
           </div>
         )}
 
-        {statusSalon?.status !== "deactivated" && (
-          <div className="mt-4">
-            <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
-              Reason <span className="text-neutral-500 normal-case font-medium">(optional)</span>
-            </label>
-            <textarea
-              value={statusReason}
-              onChange={(e) => setStatusReason(e.target.value)}
-              rows={3}
-              placeholder="Why is this salon being deactivated?"
-              className="w-full bg-surface-2 border border-border rounded-xl px-3.5 py-2.5 text-sm text-white outline-none focus:border-amber-400 resize-none"
-            />
-          </div>
-        )}
-
         <Modal.Actions className="justify-center">
           <Button variant="ghost" size="sm" onClick={() => setStatusSalon(null)} disabled={statusLoading}>
             Cancel
@@ -979,6 +961,7 @@ const handleEditOpen = async (id) => {
             size="sm"
             onClick={handleStatusSubmit}
             loading={statusLoading}
+            disabled={statusLoading}
           >
             {statusSalon?.status === "deactivated" ? "Activate Salon" : "Deactivate Salon"}
           </Button>
