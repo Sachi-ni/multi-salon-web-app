@@ -105,25 +105,32 @@ const Login = () => {
 
       let data = await readResponse(res);
 
-      // Only try another account type when this email is not an Admin; a bad
-      // SuperAdmin password must never silently become a customer session.
-      if (res.status === 404) {
-        res = await fetch(`${API_URL}/staff/login`, {
+      // Try staff login if admin login was not successful
+      if (!res.ok) {
+        const staffRes = await fetch(`${API_URL}/staff/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: payloadIdentifier, password }),
         });
-        data = await readResponse(res);
-      }
+        const staffData = await readResponse(staffRes);
 
-      // Only try customer login when the email is not an Admin or Staff.
-      if (res.status === 404) {
-        res = await fetch(`${API_URL}/customers/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: payloadIdentifier, password }),
-        });
-        data = await readResponse(res);
+        if (staffRes.ok) {
+          res = staffRes;
+          data = staffData;
+        } else {
+          // Try customer login if staff login was also not successful
+          const customerRes = await fetch(`${API_URL}/customers/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: payloadIdentifier, password }),
+          });
+          const customerData = await readResponse(customerRes);
+
+          if (customerRes.ok) {
+            res = customerRes;
+            data = customerData;
+          }
+        }
       }
 
       if (!res.ok) {

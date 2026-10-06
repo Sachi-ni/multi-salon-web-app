@@ -5,8 +5,17 @@ import generateToken from "../utils/generateToken.js";
 export const loginCustomer = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const identifier = String(email || "").trim();
+    const normalizedEmail = identifier.toLowerCase();
+    const cleanPhone = identifier.replace(/[\s()-]/g, "");
 
-    const customer = await Customer.findOne({ email });
+    const customer = await Customer.findOne({
+      $or: [
+        { email: normalizedEmail },
+        { email: identifier },
+        ...(cleanPhone ? [{ phone: cleanPhone }] : [])
+      ]
+    });
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
     }
