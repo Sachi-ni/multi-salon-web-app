@@ -737,6 +737,15 @@ export default function Appointments() {
                       {a.status?.toLowerCase() === "pending" && (
                         <>
                           <button
+                            onClick={() => setEditingAppointment(a)}
+                            disabled={isActionLoading}
+                            className="px-3 py-1.5 rounded-lg bg-surface-2 text-amber-400 border border-border hover:bg-amber-400 hover:text-black transition-colors text-2xs font-extrabold disabled:opacity-40 flex items-center gap-1"
+                            title="Edit appointment before accepting"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            Edit
+                          </button>
+                          <button
                             onClick={() => handleConfirm(a._id)}
                             disabled={isActionLoading}
                             className="px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-extrabold text-2xs hover:bg-emerald-400 transition-colors"
