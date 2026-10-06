@@ -941,7 +941,14 @@ const Salary = () => {
   // ─── Build display rows (salaries + staff without records) ──────────────
 
   const displayRows = useMemo(() => {
-    let rows = [...salaries];
+    let rows = salaries.filter((row) => {
+      if (frequency !== "daily") return true;
+      const changedDate =
+        row.salaryFrequencyChangedDate ||
+        row.staff_id?.salaryFrequencyChangedDate ||
+        "";
+      return !changedDate || toDateKey(row.period) >= toDateKey(changedDate);
+    });
 
     // Always show every staff member of the salon under this frequency tab.
     // Staff that do not have a salary record for the selected period yet are
@@ -959,6 +966,13 @@ const Salary = () => {
       const pendingRows = fallbackStaff
         .filter((staff) => {
           if (recordedStaffIds.has(String(staff._id))) return false;
+          if (
+            frequency === "daily" &&
+            staff.salaryFrequencyChangedDate &&
+            dailyDate < staff.salaryFrequencyChangedDate
+          ) {
+            return false;
+          }
           const joinDate = getStaffJoinDateStr(staff);
           if (joinDate && periodEndStr && periodEndStr < joinDate) {
             return false;
@@ -978,6 +992,7 @@ const Salary = () => {
                 );
           const fallbackTotalSalary =
             staff.salaryCalculationEnabled === false ||
+            (staff.salaryCalculationStartDate && selectedDateKey < staff.salaryCalculationStartDate) ||
             (employmentStartKey && selectedDateKey < employmentStartKey)
               ? 0
               : selectedDateKey;
