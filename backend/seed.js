@@ -30,6 +30,12 @@ const addHours = (timeStr, hours) => {
 
 const seed = async () => {
   try {
+    const seedAdminEmail = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
+    const seedAdminPassword = process.env.SUPERADMIN_INITIAL_PASSWORD;
+    if (!seedAdminEmail || !seedAdminPassword) {
+      throw new Error("SUPERADMIN_EMAIL and SUPERADMIN_INITIAL_PASSWORD must be set before running the seed.");
+    }
+
     console.log("Connecting to database...");
     const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/multi_salon_db";
     await mongoose.connect(mongoUri);
@@ -54,9 +60,9 @@ const seed = async () => {
     console.log("Database cleared.");
 
     // Generate password hash
-    console.log("Generating common password hash for testing ('123456')...");
+    console.log("Generating SuperAdmin password hash...");
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash("123456", salt);
+    const passwordHash = await bcrypt.hash(seedAdminPassword, salt);
     console.log("Password hash generated.");
 
     // 1. 10 Service Categories
@@ -217,14 +223,14 @@ const seed = async () => {
     const adminsData = [
       {
         full_name: "Super Admin Officer",
-        username: "superadmin",
-        email: "superadmin@salon.com",
+        username: seedAdminEmail.split("@")[0],
+        email: seedAdminEmail.trim().toLowerCase(),
         phone: "0771110000",
         password: passwordHash,
         role: "super-admin",
         salon_id: null,
-        mustChangePassword: false,
-        mfaEnrolled: true
+        mustChangePassword: true,
+        mfaEnrolled: false
       },
       ...salons.map((salon, idx) => {
         const slug = salon.name.split(" ")[0].toLowerCase();

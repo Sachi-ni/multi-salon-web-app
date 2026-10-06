@@ -7,6 +7,9 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "seed:superadmin": "node seed/seedSuperAdmin.js",
+    "migrate:salon-status": "node migrations/20260909_add_salon_status.js",
+    "migrate:salary-cycles": "node migrations/20260916_add_salary_cycles.js",
+    "migrate:staff-password-hardening": "node migrations/20260919_add_staff_must_change_password.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
   },
   "keywords": [],
@@ -19,6 +22,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^7.5.0",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.5.0",
     "multer": "^2.1.1",

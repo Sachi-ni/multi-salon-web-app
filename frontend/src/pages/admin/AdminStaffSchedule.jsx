@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getStaffAppointments } from "../../services/appointmentService";
 import api from "../../services/api";
+import { getStaffUnavailability } from "../../services/staffService";
 
 const STATUS_COLORS = {
   pending:   "bg-warning-dim text-warning border-warning-border",
@@ -21,6 +22,7 @@ export default function AdminStaffSchedule() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading]         = useState(false);
   const [staffLoading, setStaffLoading] = useState(true);
+  const [unavailability, setUnavailability] = useState([]);
 
   // Fetch staff for this salon
   useEffect(() => {
@@ -32,6 +34,10 @@ export default function AdminStaffSchedule() {
   // Fetch appointments when staff or date changes
   useEffect(() => {
     if (!selectedStaff) return;
+    getStaffUnavailability({
+      staffId: selectedStaff,
+      ...(date ? { start: `${date}T00:00:00`, end: `${date}T23:59:59` } : {}),
+    }).then(res => setUnavailability(res.data || [])).catch(() => setUnavailability([]));
     setLoading(true);
     getStaffAppointments(selectedStaff, "", date)
       .then(res => setAppointments(res.data))
@@ -109,12 +115,20 @@ export default function AdminStaffSchedule() {
 
       {selectedStaff && !loading && appointments.length === 0 && (
         <div className="bg-surface border border-border rounded-2xl p-10 text-center">
+          {unavailability.length > 0 && (
+            <p className="mb-3 text-danger text-xs font-bold">Staff Unavailable{unavailability[0].reason ? `: ${unavailability[0].reason}` : ""}</p>
+          )}
           <p className="text-muted-2 text-sm">No appointments found for this staff member{date ? ` on ${date}` : ""}.</p>
         </div>
       )}
 
       {selectedStaff && !loading && appointments.length > 0 && (
         <div className="space-y-3">
+          {unavailability.length > 0 && (
+            <div className="rounded-xl border border-danger-border bg-danger-dim px-4 py-3 text-xs font-bold text-danger">
+              Staff Unavailable for the selected period{unavailability[0].reason ? `: ${unavailability[0].reason}` : ""}
+            </div>
+          )}
           {appointments.map(a => {
             const durationHours = Math.ceil((a.duration || 60) / 60);
             return (

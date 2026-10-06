@@ -3,14 +3,16 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import './App.css';
 
 import ChatWidget from "./components/chatbot/ChatWidget";
+import ScrollToTop from "./components/layout/ScrollToTop";
 
 import { AuthProvider } from "./context/AuthContext";
+import { ToastProvider } from "./context/ToastContext";
+import { AlertProvider } from "./context/AlertContext";
 
 // General Pages
 import Login from "./pages/auth/Login.jsx";
-import Signup from "./pages/auth/register.jsx";
 import Edit from "./pages/auth/edit.jsx";
-//import Main from "./pages/dashboard.jsx";
+import ProfileDetails from "./pages/auth/ProfileDetails.jsx";
 import Unauthorized from "./pages/Unauthorized.jsx";
 
 //customer pages
@@ -63,12 +65,19 @@ import AdminAddStaff from "./pages/admin/AddStaff.jsx";
 import { useAuth } from "./context/AuthContext";
 import CustomerRegister from "./pages/auth/CustomerRegister.jsx";
 import SuperAdminHardening from "./pages/auth/SuperAdminHardening.jsx";
+import ForgotPassword from "./pages/auth/ForgotPassword.jsx";
 
 const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
   const { user } = useAuth();
 
   if (!user) {
-    return <Navigate to="/" />;
+    return <Navigate to="/login" replace />;
+  }
+
+  // Normal sessions are never issued while password hardening is pending;
+  // retain this guard as a defence for any stale client-side state.
+  if (user.mustChangePassword === true) {
+    return <Navigate to="/login" replace />;
   }
 
   if (requireSalonAccess && user.role !== "super-admin" && !user.salon_id) {
@@ -86,7 +95,10 @@ const ProtectedRoute = ({ children, allowedRoles, requireSalonAccess }) => {
 function App() {
   return (
     <AuthProvider>
+    <AlertProvider>
+    <ToastProvider>
     <BrowserRouter>
+      <ScrollToTop />
       {/* All Routes MUST be inside this container */}
       <Routes>
         <Route path="/" element={<Landing />} />
@@ -100,11 +112,14 @@ function App() {
         <Route path="/terms" element={<TermsOfService />} />
 
         <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/editProfile" element={<Edit />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/editProfile" element={
+          <ProtectedRoute>
+            <Edit />
+          </ProtectedRoute>
+        } />
         <Route path="/unauthorized" element={<Unauthorized />} />
-        <Route path="/register" element={<Signup />} />
-        <Route path="/customer/register" element={<CustomerRegister />} />
+        <Route path="/register" element={<CustomerRegister />} />
         <Route path="/super-admin-hardening" element={<SuperAdminHardening />} />
 
        <Route
@@ -293,7 +308,13 @@ function App() {
 
         <Route path="/customer/profile" element={
           <ProtectedRoute allowedRoles={["customer", "user"]}>
-            <Edit />
+            <CustomerLayout><ProfileDetails /></CustomerLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/account/profile" element={
+          <ProtectedRoute>
+            <AdminSalonLayout><ProfileDetails /></AdminSalonLayout>
           </ProtectedRoute>
         } />
 
@@ -364,6 +385,8 @@ function App() {
       </Routes>
       <ChatWidget />
     </BrowserRouter>
+    </ToastProvider>
+    </AlertProvider>
     </AuthProvider>
   );
 }

@@ -1,19 +1,48 @@
 import express from "express";
 import multer from "multer";
-import { loginAdmin, registerAdmin, getProfile, updateProfile, changePassword, setupMfa } from "../controllers/authController.js";
+import {
+  loginAdmin,
+  registerCustomer,
+  getProfile,
+  updateProfile,
+  changePassword,
+  setupMfa,
+  forgotPassword,
+  resetPassword,
+  verifyPasswordResetOtp,
+  verifySuperAdminOtp,
+  resendSuperAdminOtp,
+} from "../controllers/authController.js";
 import { protect, protectHardening } from "../middleware/authMiddleware.js";
-import rateLimit from "express-rate-limit";
+import { createJsonRateLimiter, createLoginRateLimiters } from "../utils/rateLimiter.js";
 
 
 const router = express.Router();
 
 // Configure multer for simple disk storage (profile pictures)
-const upload = multer({ dest: "uploads/" });
-const registrationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });
+const upload = multer({ dest: "uploads/", limits: { fileSize: 5 * 1024 * 1024 } });
+const registrationLimiter = createJsonRateLimiter({ windowMs: 15 * 60 * 1000, max: 5 });
+const passwordResetLimiter = createJsonRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
+const passwordResetOtpLimiter = createJsonRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
+});
+const passwordResetCompletionLimiter = createJsonRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
+});
+const [loginIpLimiter, loginAccountLimiter] = createLoginRateLimiters();
 
 // Customer-only by contract; admin, manager, and staff creation must never be added here.
-router.post("/register", registrationLimiter, registerAdmin);
-router.post("/login", loginAdmin);
+router.post("/register", registrationLimiter, registerCustomer);
+router.post("/forgot-password", passwordResetLimiter, forgotPassword);
+router.post("/verify-password-reset-otp", passwordResetOtpLimiter, verifyPasswordResetOtp);
+router.post("/reset-password", passwordResetCompletionLimiter, resetPassword);
+router.post("/login", loginIpLimiter, loginAccountLimiter, loginAdmin);
+router.post("/verify-superadmin-otp", verifySuperAdminOtp);
+router.post("/resend-superadmin-otp", resendSuperAdminOtp);
 router.get("/profile", protect, getProfile);
 router.put("/user/:id", protect, upload.single("image"), updateProfile);
 router.post("/change-password", protectHardening("change-password"), changePassword);

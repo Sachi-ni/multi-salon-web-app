@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { getSalons, getSalon, updateSalon, deleteSalon } from "../../services/salonService";
+import { getSalons, getSalon, updateSalon, updateSalonStatus, deleteSalon } from "../../services/salonService";
 import {
   Plus, ArrowUpDown, Store, Search, LayoutGrid, List,
   MapPin, User, Users, Coins, ExternalLink, MoreVertical,
-  Pencil, Trash2, UserPlus, Scissors, Building2, Phone
+  Pencil, Trash2, UserPlus, Scissors, Building2, Phone, Power, CheckCircle2, XCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageHeader from "../../components/ui/PageHeader";
@@ -16,6 +16,8 @@ import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import clsx from "clsx";
 import { API_BASE } from "../../config";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail, validatePassword, validatePhoneSriLankan } from "../../utils/validation";
 
 const TIME_SLOTS = [];
 for (let i = 0; i < 24; i++) {
@@ -60,14 +62,13 @@ const validateManagerDetails = ({ email, phone, password }) => {
 
   if (password) {
     const isComplex =
-      password.length >= 8 &&
+      password.length >= 6 &&
       /[A-Z]/.test(password) &&
       /[a-z]/.test(password) &&
-      /\d/.test(password) &&
-      /[!@#$%^&*]/.test(password);
+      /[^A-Za-z]/.test(password);
 
     if (!isComplex || COMMON_PASSWORDS.has(password.toLowerCase())) {
-      return "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
+      return "Password must be at least 6 characters and include uppercase, lowercase, and a number or special character.";
     }
   }
 
@@ -95,7 +96,8 @@ const SalonLogo = ({ salon, className = "w-full h-full object-cover" }) => {
 };
 
 /* ── Salon Card Component ── */
-const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
+const SalonCard = ({ salon, onView, onEdit, onDelete, onToggleStatus, index }) => {
+  const isActive = salon.status !== "deactivated";
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState(false);
   const menuRef = useRef(null);
@@ -133,6 +135,9 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
                 <h3 className="text-base font-extrabold text-white truncate leading-tight group-hover:text-amber-400 transition-colors">
                   {salon.name}
                 </h3>
+                <Badge variant={!isActive ? "danger" : salon.isPaused ? "warning" : "success"} dot={true}>
+                  {!isActive ? "Deactivated" : salon.isPaused ? "Paused" : "Active"}
+                </Badge>
                 <p className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5 truncate">
                   <MapPin className="w-3 h-3 text-amber-400 flex-shrink-0" />
                   <span className="truncate">{salon.location || "No address listed"}</span>
@@ -169,6 +174,12 @@ const SalonCard = ({ salon, onView, onEdit, onDelete, index }) => {
                       className="w-full px-3.5 py-2 text-left text-xs font-bold flex items-center gap-2.5 transition-colors hover:bg-white/[0.04] text-neutral-300 hover:text-white"
                     >
                       <Pencil className="w-3.5 h-3.5 text-info" /> Edit Salon
+                    </button>
+                    <button
+                      onClick={() => { setOpenMenu(false); onToggleStatus(salon); }}
+                      className="w-full px-3.5 py-2 text-left text-xs font-bold flex items-center gap-2.5 transition-colors hover:bg-white/[0.04] text-neutral-300 hover:text-white"
+                    >
+                      <Power className="w-3.5 h-3.5 text-amber-400" /> {isActive ? "Deactivate Salon" : "Activate Salon"}
                     </button>
                     <div className="my-1 border-t border-border" />
                     <button
@@ -268,13 +279,25 @@ const Salons = () => {
 
   const [editSalon, setEditSalon] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const optional = (validator) => (value) => value ? validator(value) : { valid: true, message: "" };
+  const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateEdit, isValid: editIsValid, fieldMessages } = useFormValidation(editForm, {
+    phone: optional(validatePhoneSriLankan),
+    managerEmail: optional(validateEmail),
+    managerPhone: optional(validatePhoneSriLankan),
+    managerPassword: optional(validatePassword),
+  });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
+  const [editEmailSubmitError, setEditEmailSubmitError] = useState("");
   const [editLogo, setEditLogo] = useState(null);
   const [editLogoPreview, setEditLogoPreview] = useState("");
 
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [statusSalon, setStatusSalon] = useState(null);
+  const [deactivationType, setDeactivationType] = useState("temporary");
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [success, setSuccess] = useState("");
 
   const fetchSalons = async () => {
     try {
@@ -323,6 +346,7 @@ const handleEditOpen = async (id) => {
     setEditLogo(null);
     setEditLogoPreview("");
     setEditError("");
+    setEditEmailSubmitError("");
   } catch (err) {
     console.error(err);
     setError("Failed to load salon details for editing");
@@ -331,6 +355,7 @@ const handleEditOpen = async (id) => {
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
+    if (name === "managerEmail") setEditEmailSubmitError("");
     setEditForm((prev) => {
       const nextForm = { ...prev, [name]: value };
       if (name === "managerFirstName" || name === "managerLastName") {
@@ -357,6 +382,7 @@ const handleEditOpen = async (id) => {
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
+    if (!validateEdit()) return;
 
     const validationError = validateManagerDetails({
       email: editForm.managerEmail || "",
@@ -365,13 +391,8 @@ const handleEditOpen = async (id) => {
     });
 
     if (validationError) {
-      setEditError(validationError);
-      return;
-    }
-
-    const salonPhoneError = validatePhone(editForm.phone || "", "salon");
-    if (salonPhoneError) {
-      setEditError(salonPhoneError);
+      if (/email/i.test(validationError)) setEditEmailSubmitError(validationError);
+      else setEditError(validationError);
       return;
     }
 
@@ -421,10 +442,9 @@ const handleEditOpen = async (id) => {
     } catch (err) {
       console.error(err);
 
-      setEditError(
-        err.response?.data?.message ||
-        "Failed to update salon"
-      );
+      const message = err.response?.data?.message || "Failed to update salon";
+      if (/email/i.test(message)) setEditEmailSubmitError(message);
+      else setEditError(message);
     } finally {
       setEditLoading(false);
     }
@@ -435,6 +455,8 @@ const handleEditOpen = async (id) => {
     try {
       await deleteSalon(deleteId);
       setDeleteId(null);
+      setSuccess("Salon deleted successfully.");
+      window.setTimeout(() => setSuccess(""), 3500);
       await fetchSalons();
     } catch (err) {
       console.error(err);
@@ -443,6 +465,34 @@ const handleEditOpen = async (id) => {
       setDeleteLoading(false);
     }
   };
+
+  const handleToggleStatus = (salon) => {
+    setStatusSalon(salon);
+    setDeactivationType("temporary");
+  };
+
+  const handleStatusSubmit = async () => {
+    if (!statusSalon) return;
+    const isActivating = statusSalon.status === "deactivated";
+    setStatusLoading(true);
+    setError("");
+    try {
+      await updateSalonStatus(statusSalon._id, {
+        status: isActivating ? "active" : "deactivated",
+        ...(isActivating ? {} : { deactivationType }),
+      });
+      setStatusSalon(null);
+      setSuccess(`Salon ${isActivating ? "activated" : "deactivated"} successfully.`);
+      await fetchSalons();
+      window.setTimeout(() => setSuccess(""), 3500);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to update salon status");
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
+
 
   const handleSortByName = () => {
     setSortAsc(!sortAsc);
@@ -466,9 +516,9 @@ const handleEditOpen = async (id) => {
     return list;
   }, [salonList, searchTerm, sortAsc]);
 
-  const totalStaffCount = useMemo(() => {
-    return salonList.reduce((sum, s) => sum + (s.staffCount || 0), 0);
-  }, [salonList]);
+  const activeSalonCount = salonList.filter((salon) => salon.status !== "deactivated").length;
+  const deactivatedSalonCount = salonList.filter((salon) => salon.status === "deactivated").length;
+  const totalStaffCount = salonList.reduce((sum, salon) => sum + (salon.staffCount || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -485,6 +535,11 @@ const handleEditOpen = async (id) => {
           <button onClick={() => setError("")} className="text-danger hover:text-white text-lg leading-none">&times;</button>
         </div>
       )}
+      {success && (
+        <div className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400 font-semibold">
+          {success}
+        </div>
+      )}
 
       {/* Stats Bar */}
       {!loading && salonList.length > 0 && (
@@ -493,6 +548,16 @@ const handleEditOpen = async (id) => {
             <Building2 className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-semibold text-neutral-400">Registered Salons:</span>
             <span className="text-sm font-black text-white">{salonList.length}</span>
+          </div>
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-semibold text-neutral-400">Active Salons:</span>
+            <span className="text-sm font-black text-emerald-400">{activeSalonCount}</span>
+          </div>
+          <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
+            <XCircle className="w-4 h-4 text-neutral-500" />
+            <span className="text-xs font-semibold text-neutral-400">Deactivated Salons:</span>
+            <span className="text-sm font-black text-neutral-400">{deactivatedSalonCount}</span>
           </div>
           <div className="bg-surface border border-border rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
             <Users className="w-4 h-4 text-blue-400" />
@@ -589,6 +654,7 @@ const handleEditOpen = async (id) => {
               onView={handleView}
               onEdit={handleEditOpen}
               onDelete={setDeleteId}
+              onToggleStatus={handleToggleStatus}
             />
           ))}
         </div>
@@ -600,6 +666,7 @@ const handleEditOpen = async (id) => {
             <Table.Th>Location & Phone</Table.Th>
             <Table.Th>Manager Details</Table.Th>
             <Table.Th>Staff Count</Table.Th>
+            <Table.Th>Status</Table.Th>
             <Table.Th align="right">Est. Revenue</Table.Th>
             <Table.Th align="right">Actions</Table.Th>
           </Table.Head>
@@ -631,6 +698,11 @@ const handleEditOpen = async (id) => {
                   )}
                 </Table.Td>
                 <Table.Td className="text-xs text-neutral-300">{salon.staffCount || 0} Staff</Table.Td>
+                <Table.Td>
+                  <Badge variant={salon.status === "deactivated" ? "danger" : salon.isPaused ? "warning" : "success"} dot={true}>
+                    {salon.status === "deactivated" ? "Deactivated" : salon.isPaused ? "Paused" : "Active"}
+                  </Badge>
+                </Table.Td>
                 <Table.Td align="right" className="text-amber-400 font-extrabold text-xs">
                   LKR {salon.revenue ? Number(salon.revenue).toLocaleString() : "0"}
                 </Table.Td>
@@ -651,6 +723,18 @@ const handleEditOpen = async (id) => {
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={() => handleToggleStatus(salon)}
+                      className={clsx(
+                        "p-1.5 rounded-lg transition-colors",
+                        salon.status === "deactivated"
+                          ? "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+                          : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                      )}
+                      title={salon.status === "deactivated" ? "Activate Salon" : "Deactivate Salon"}
+                    >
+                      <Power className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => setDeleteId(salon._id)}
                       className="p-1.5 rounded-lg bg-surface-2 text-danger hover:bg-danger/20 transition-colors"
                       title="Delete Salon"
@@ -667,7 +751,7 @@ const handleEditOpen = async (id) => {
 
       {/* Edit Modal */}
       <Modal isOpen={!!editSalon} onClose={() => setEditSalon(null)} title="Edit Salon Details" maxWidth="max-w-md">
-        <form onSubmit={handleEditSubmit} autoComplete="off" className="space-y-4 pt-1">
+        <form onSubmit={handleEditSubmit} autoComplete="off" noValidate className="space-y-4 pt-1">
           {editError && (
             <div className="px-3 py-2.5 rounded-xl bg-danger-dim border border-danger-border text-xs text-danger font-semibold">
               {editError}
@@ -684,9 +768,11 @@ const handleEditOpen = async (id) => {
 
           <Input
             label="Phone Number"
-            name="phone"
+                  name="phone"
             value={editForm.phone || ""}
             onChange={handleEditChange}
+                  onBlur={() => handleEditBlur("phone")}
+                  error={editErrors.phone}
                 pattern="(?:\\+94|0)[0-9]{9}"
                 title="Use 0771234567 or +94771234567"
           />
@@ -794,6 +880,8 @@ const handleEditOpen = async (id) => {
                 name="managerPhone"
                 value={editForm.managerPhone || ""}
                 onChange={handleEditChange}
+                  onBlur={() => handleEditBlur("managerPhone")}
+                  error={editErrors.managerPhone}
                 placeholder="Enter manager phone number"
                 pattern="(?:\\+94|0)[0-9]{9}"
                 title="Use 0771234567 or +94771234567"
@@ -805,6 +893,9 @@ const handleEditOpen = async (id) => {
                 type="email"
                 value={editForm.managerEmail || ""}
                 onChange={handleEditChange}
+                  onBlur={() => handleEditBlur("managerEmail")}
+                  error={editErrors.managerEmail || editEmailSubmitError}
+                helper={fieldMessages.managerEmail}
                 placeholder="Enter manager email"
               />
 
@@ -815,6 +906,8 @@ const handleEditOpen = async (id) => {
                 placeholder="Leave blank to keep current password"
                 value={editForm.managerPassword || ""}
                 onChange={handleEditChange}
+                  onBlur={() => handleEditBlur("managerPassword")}
+                  error={editErrors.managerPassword}
                 minLength={8}
               />
             </div>
@@ -822,9 +915,57 @@ const handleEditOpen = async (id) => {
 
           <Modal.Actions>
             <Button variant="ghost" type="button" onClick={() => setEditSalon(null)} disabled={editLoading}>Cancel</Button>
-            <Button variant="primary" type="submit" loading={editLoading}>Save Changes</Button>
+            <Button variant="primary" type="submit" loading={editLoading} disabled={editLoading || !editIsValid}>Save Changes</Button>
           </Modal.Actions>
         </form>
+      </Modal>
+
+
+
+      {/* Activate/Deactivate Confirmation Modal */}
+      <Modal
+        isOpen={!!statusSalon}
+        onClose={() => setStatusSalon(null)}
+        title={statusSalon?.status === "deactivated" ? "Activate Salon" : "Deactivate Salon"}
+        maxWidth="max-w-sm"
+      >
+        <p className="text-xs text-neutral-300 leading-relaxed">
+          {statusSalon?.status === "deactivated"
+            ? `Reactivate ${statusSalon?.name}? Customers will be able to book again.`
+            : `Deactivate ${statusSalon?.name}? It will be hidden from customers${deactivationType === "temporary" ? " and can be re-activated later" : ""}.`}
+        </p>
+
+        {statusSalon?.status !== "deactivated" && (
+          <div className="mt-4">
+            <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">Deactivation Type</label>
+            <select
+              value={deactivationType}
+              onChange={(e) => setDeactivationType(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-xl px-3.5 py-2.5 text-sm text-white outline-none focus:border-amber-400"
+            >
+              <option value="temporary">Temporary</option>
+              <option value="permanent">Permanent</option>
+            </select>
+            {deactivationType === "permanent" && (
+              <p className="mt-2 text-xs text-danger">Warning: all future bookings will be cancelled and customers notified.</p>
+            )}
+          </div>
+        )}
+
+        <Modal.Actions className="justify-center">
+          <Button variant="ghost" size="sm" onClick={() => setStatusSalon(null)} disabled={statusLoading}>
+            Cancel
+          </Button>
+          <Button
+            variant={statusSalon?.status === "deactivated" ? "primary" : "danger"}
+            size="sm"
+            onClick={handleStatusSubmit}
+            loading={statusLoading}
+            disabled={statusLoading}
+          >
+            {statusSalon?.status === "deactivated" ? "Activate Salon" : "Deactivate Salon"}
+          </Button>
+        </Modal.Actions>
       </Modal>
 
       {/* Delete Confirmation Modal */}

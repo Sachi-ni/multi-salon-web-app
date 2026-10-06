@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getMyAppointments, cancelAppointment } from "../../services/appointmentService";
+import { getMyAppointments, cancelAppointment, confirmAppointmentUpdate, requestDifferentTime } from "../../services/appointmentService";
+import { formatDuration } from "../../utils/formatDuration";
 
 const STATUS_COLORS = {
   pending:   "bg-warning-dim text-warning border-warning-border",
@@ -21,6 +22,7 @@ export default function MyAppointments() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading]           = useState(true);
   const [cancelling, setCancelling]     = useState("");
+  const [responding, setResponding]     = useState("");
 
   const fetchAppointments = () => {
     setLoading(true);
@@ -29,7 +31,16 @@ export default function MyAppointments() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchAppointments(); }, []);
+  useEffect(() => {
+    fetchAppointments();
+    const refreshOnFocus = () => fetchAppointments();
+    const refreshInterval = window.setInterval(fetchAppointments, 30000);
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, []);
 
   const handleCancel = async (id) => {
     if (!window.confirm("Are you sure you want to cancel this appointment?")) return;
@@ -41,6 +52,22 @@ export default function MyAppointments() {
       alert(err.response?.data?.message || "Failed to cancel appointment.");
     } finally {
       setCancelling("");
+    }
+  };
+
+  const handleUpdateResponse = async (id, response) => {
+    setResponding(id);
+    try {
+      if (response === "confirm") {
+        await confirmAppointmentUpdate(id);
+      } else {
+        await requestDifferentTime(id);
+      }
+      fetchAppointments();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to respond to appointment update.");
+    } finally {
+      setResponding("");
     }
   };
 
@@ -93,6 +120,11 @@ export default function MyAppointments() {
                     <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border ${STATUS_COLORS[a.status]}`}>
                       {STATUS_ICONS[a.status]} {a.status.toUpperCase()}
                     </span>
+                    {a.needsCustomerConfirmation && (
+                      <span className="ml-2 px-2.5 py-1 rounded-lg text-xs font-extrabold border bg-accent/10 text-accent border-accent/30">
+                        ✎ UPDATED
+                      </span>
+                    )}
                   </div>
 
                   {/* Service details */}
@@ -161,6 +193,13 @@ export default function MyAppointments() {
                     )}
                   </div>
 
+                  <div className="flex items-center justify-between text-xs text-muted-2 mb-3">
+                    <span>Total Duration:</span>
+                    <span className="text-white font-semibold">
+                      {formatDuration(a.duration || (a.appointment_services || []).reduce((sum, svc) => sum + (svc.service_id?.duration || 0), 0))}
+                    </span>
+                  </div>
+
                   {/* Footer — Actions */}
                   <div className="flex items-center justify-between pt-3 border-t border-border">
                     <p className="text-muted-2 text-xs">
@@ -174,6 +213,24 @@ export default function MyAppointments() {
                       >
                         {cancelling === a._id ? "Cancelling..." : "Cancel Booking"}
                       </button>
+                    )}
+                    {a.needsCustomerConfirmation && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleUpdateResponse(a._id, "confirm")}
+                          disabled={responding === a._id}
+                          className="px-4 py-1.5 bg-success-dim text-success border border-success-border text-xs font-extrabold rounded-lg hover:bg-success/20 transition-all duration-200 disabled:opacity-40"
+                        >
+                          {responding === a._id ? "Saving..." : "Confirm New Time"}
+                        </button>
+                        <button
+                          onClick={() => handleUpdateResponse(a._id, "request")}
+                          disabled={responding === a._id}
+                          className="px-4 py-1.5 bg-warning-dim text-warning border border-warning-border text-xs font-extrabold rounded-lg hover:bg-warning/20 transition-all duration-200 disabled:opacity-40"
+                        >
+                          Request Different Time
+                        </button>
+                      </div>
                     )}
                     {a.status === "confirmed" && (
                       <span className="text-success text-xs font-bold flex items-center gap-1">

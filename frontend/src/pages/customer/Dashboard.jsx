@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import CustomerDashboardBackground from "../../components/ui/CustomerDashboardBackground";
+import { formatDuration } from "../../utils/formatDuration";
 
 const STATUS_COLORS = {
   pending:   "text-warning bg-warning/10 border-warning/30",
@@ -44,7 +45,16 @@ export default function CustomerDashboard() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchAppointments(); }, []);
+  useEffect(() => {
+    fetchAppointments();
+    const refreshOnFocus = () => fetchAppointments();
+    const refreshInterval = window.setInterval(fetchAppointments, 30000);
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, []);
 
   const handleCancel = async (id) => {
     if (!window.confirm("Are you sure you want to cancel this appointment?")) return;
@@ -317,13 +327,7 @@ export default function CustomerDashboard() {
                               <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/5 shadow-inner">
                                 <span className="text-muted-2 text-sm font-medium">Total Duration:</span>
                                 <span className="text-white/90 text-sm font-semibold">
-                                  {(() => {
-                                    const mins = a.appointment_services?.length > 0 
-                                      ? a.appointment_services.reduce((sum, s) => sum + (s.service_id?.duration || 0), 0)
-                                      : (a.duration || 60);
-                                    const hrs = Math.ceil(mins / 60);
-                                    return `${hrs} ${hrs === 1 ? 'hr' : 'hrs'}`;
-                                  })()}
+                                  {formatDuration(a.duration)}
                                 </span>
                               </div>
                             </div>

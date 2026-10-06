@@ -7,9 +7,12 @@ const staffSchema = new mongoose.Schema({
   phone:           { type: String, default: "" },
   email:           { type: String, required: true, unique: true },
   password_hash:   { type: String, default: "" },
+  passwordChangedAt: { type: Date, default: null },
   role:            { type: String, required: true },
   specification:   { type: String, default: "" },
   commission_rate: { type: Number, default: 0 },
+  // Newly added staff and managers accrue salary from their added date.
+  salaryCalculationEnabled: { type: Boolean, default: true },
   salary_payment_frequency: {
     type: String,
     enum: ["daily", "weekly", "monthly"],
@@ -20,6 +23,7 @@ const staffSchema = new mongoose.Schema({
     default: 1,
     min: 1
   },
+  salary_cycle_id: { type: String, default: null },
 
   status:{ 
     type: String,
@@ -32,8 +36,19 @@ const staffSchema = new mongoose.Schema({
     ref: "Salon",
     required: true
   },
+  // Match Admin's undefined default so legacy documents remain unaffected
+  // during a staged deployment. Every supported new-account creation path
+  // sets this to true explicitly; the migration marks legacy accounts false.
+  mustChangePassword: { type: Boolean, default: undefined },
+  resetPasswordTokenHash: { type: String, default: null },
+  resetPasswordExpires: { type: Date, default: null },
+  passwordResetOtpCodeHash: { type: String, default: null },
+  passwordResetOtpExpires: { type: Date, default: null },
+  passwordResetOtpAttempts: { type: Number, default: 0 },
+  passwordResetOtpLastSentAt: { type: Date, default: null },
+  passwordResetSessionHash: { type: String, default: null },
   image:    { type: String, default: "" },
   services: [{ type: mongoose.Schema.Types.ObjectId, ref: "Service" }] // ← new
-});
+}, { timestamps: true });
 
 export default mongoose.model("Staff", staffSchema);

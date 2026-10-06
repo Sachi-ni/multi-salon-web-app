@@ -7,7 +7,15 @@ name:              { type: String, required: true },
   image:             { type: String, default: "" },
   registration_date: { type: Date, default: Date.now },
   password_hash:     { type: String, required: true },
+  passwordChangedAt: { type: Date, default: null },
   role:              { type: String, default: "customer" },
+  resetPasswordTokenHash: { type: String, default: null },
+  resetPasswordExpires: { type: Date, default: null },
+  passwordResetOtpCodeHash: { type: String, default: null },
+  passwordResetOtpExpires: { type: Date, default: null },
+  passwordResetOtpAttempts: { type: Number, default: 0 },
+  passwordResetOtpLastSentAt: { type: Date, default: null },
+  passwordResetSessionHash: { type: String, default: null },
   // Non-binding UI metadata only; never use this field for booking authorization.
   preferredSalonId:  { type: mongoose.Schema.Types.ObjectId, ref: "Salon", required: false, default: null }
 });

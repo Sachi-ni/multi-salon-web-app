@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { MapPin, Clock, Phone, Star, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { mediaUrl } from '../../../utils/mediaUrl';
 import { getUploadUrl } from '../../../config';
 
 export default function SalonCard({ branch, index }) {
@@ -67,7 +66,7 @@ export default function SalonCard({ branch, index }) {
         <div className="flex flex-col gap-3 mt-auto">
           <button 
             onClick={handleBookClick}
-            className="w-full py-3 bg-accent text-primary rounded-xl font-bold hover:bg-accent-hover transition-all duration-300 shadow-glow"
+            className="w-full py-3 bg-accent text-primary rounded-xl font-bold hover:bg-accent-hover active:scale-[0.98] transition-all duration-300 shadow-glow whitespace-nowrap touch-manipulation transform-gpu"
           >
             Book Appointment
           </button>

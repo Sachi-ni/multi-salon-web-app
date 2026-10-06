@@ -5,6 +5,7 @@ import AppointmentService from "../models/AppointmentService.js";
 import Salon from "../models/Salon.js";
 import Service from "../models/Service.js";
 import mongoose from "mongoose";
+import SalaryFrequencyChange from "../models/SalaryFrequencyChange.js";
 
 // ─── Safe helpers ───────────────────────────────────────────────────────────
 
@@ -44,7 +45,54 @@ const getEffectiveRate = (salaryRecord, staffCommissionRate = 0) => {
     return savedRate;
   }
 
+  // commission_rate is the period snapshot for older records whose rate was
+  // left at the schema default. Preserve an explicit zero instead of reading
+  // the staff's newer profile rate into a historical period.
+  const savedCommissionRate = safeNumber(salaryRecord?.commission_rate, NaN);
+  if (Number.isFinite(savedCommissionRate) && savedCommissionRate > 0) {
+    return savedCommissionRate;
+  }
+
   return safeNumber(staffCommissionRate, 0);
+};
+
+// ─── Helper: get staff join date (YYYY-MM-DD) ──────────────────────────────
+// Uses staff_join_date, createdAt, joined_date, or extracts timestamp from MongoDB ObjectId.
+const getStaffJoinDate = (staffOrRecord) => {
+  if (!staffOrRecord) return "";
+
+  if (staffOrRecord.staff_join_date) {
+    return normalizeSalaryDate(staffOrRecord.staff_join_date);
+  }
+
+  const staffObj =
+    staffOrRecord.staff_id && typeof staffOrRecord.staff_id === "object"
+      ? staffOrRecord.staff_id
+      : staffOrRecord;
+
+  if (staffObj?.staff_join_date) {
+    return normalizeSalaryDate(staffObj.staff_join_date);
+  }
+  if (staffObj?.createdAt) {
+    return normalizeSalaryDate(staffObj.createdAt);
+  }
+  if (staffObj?.joined_date) {
+    return normalizeSalaryDate(staffObj.joined_date);
+  }
+
+  const id = staffObj?._id || staffOrRecord.staff_id || staffOrRecord;
+  try {
+    if (id && typeof id === "object" && typeof id.getTimestamp === "function") {
+      return normalizeSalaryDate(id.getTimestamp());
+    }
+    if (typeof id === "string" && mongoose.Types.ObjectId.isValid(id)) {
+      return normalizeSalaryDate(new mongoose.Types.ObjectId(id).getTimestamp());
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
 };
 // ─── Helper: scope salary records to the requesting user's salon ───────────
 // Super-admins operate on every salon; managers only their own.
@@ -90,11 +138,105 @@ const getDaysInMonth = (year, month) => {
   return new Date(year, month, 0).getDate();
 };
 
-const calculateDaySalary = (
+// ─── Overdue (carry-forward) helpers ───────────────────────────────────────
+// An unpaid salary record in an ENDED period keeps appearing in the Overdue
+// balance. Overdue is intentionally NOT reset when a new day/week/month is
+// opened: it carries forward until each salary is paid (a paid record is
+// simply excluded from the balance).
+
+// Parse a "YYYY-MM-DD" string as a LOCAL day (avoids the UTC shift that
+// `new Date("2026-07-24")` introduces in timezones west of UTC).
+const parseLocalDateStr = (value) => {
+  if (typeof value === "string" && /^(\d{4})-(\d{2})-(\d{2})$/.test(value)) {
+    const [, y, m, d] = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+// Return a Date for the END of a salary record's period (inclusive of that
+// calendar day). Uses dateRange.end when present, otherwise derives it from
+// the period key (daily "2026-07-24", weekly "2026-W30", monthly "2026-07").
+const getSalaryPeriodEndDate = (salaryRecord) => {
+  const dateRangeEnd = salaryRecord?.dateRange?.end;
+  const rangeParsed = dateRangeEnd ? parseLocalDateStr(dateRangeEnd) : null;
+  if (rangeParsed) return rangeParsed;
+
+  const period = String(salaryRecord?.period || "");
+
+  // Daily: the period itself is the day.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(period)) {
+    return parseLocalDateStr(period);
+  }
+
+  // Weekly: the period covers Monday..Sunday of that ISO week.
+  const weeklyMatch = /^(\d{4})-W(\d{2})$/.exec(period);
+  if (weeklyMatch) {
+    const weekDates = getWeekDates(
+      Number(weeklyMatch[1]),
+      Number(weeklyMatch[2])
+    );
+    if (weekDates && weekDates.length === 7) {
+      return parseLocalDateStr(weekDates[6]); // Sunday
+    }
+    return null;
+  }
+
+  // Monthly: the period covers the whole month.
+  const monthlyMatch = /^(\d{4})-(\d{2})$/.exec(period);
+  if (monthlyMatch) {
+    const year = Number(monthlyMatch[1]);
+    const month = Number(monthlyMatch[2]);
+    const daysInMonth = getDaysInMonth(year, month);
+    return parseLocalDateStr(
+      `${year}-${String(month).padStart(2, "0")}-${daysInMonth}`
+    );
+  }
+
+  return null;
+};
+
+// A period is "over" once its last day has fully PASSED (strictly before
+// today). Only over periods contribute to the Overdue balance: the running
+// day/week/month is still pending, and once it is over its unpaid salary
+// carries forward until paid.
+export const isSalaryPeriodEnded = (salaryRecord) => {
+  if (salaryRecord?.isTransitioned) return true;
+
+  const periodEnd = getSalaryPeriodEndDate(salaryRecord);
+  if (!periodEnd) return false;
+
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  periodEnd.setHours(23, 59, 59, 999);
+
+  return periodEnd < today;
+};
+
+// A salary becomes payable at salon closing time on the period's final day.
+const canPaySalaryPeriod = (salaryRecord, closeTime = "17:00") => {
+  if (salaryRecord?.isTransitioned) return true;
+  const endDate = getSalaryPeriodEndDate(salaryRecord);
+  if (!endDate) return false;
+  const [hours, minutes] = /^\d{2}:\d{2}$/.test(closeTime || "")
+    ? closeTime.split(":").map(Number)
+    : [17, 0];
+  endDate.setHours(hours, minutes, 0, 0);
+  return new Date() >= endDate;
+};
+
+export const calculateDaySalary = (
   workRate,
   salaryPaymentCountPerDay = 0,
-  isAbsent = false
+  isAbsent = false,
+  isBeforeJoinDate = false
 ) => {
+  // Days before the staff member joined earn no salary.
+  if (isBeforeJoinDate) {
+    return 0;
+  }
+
   // A day manually marked absent by a manager earns nothing, even when the
   // staff member has a fixed salary-per-day amount.
   if (isAbsent) {
@@ -121,6 +263,27 @@ const toLocalDateStr = (date) => {
   return `${y}-${m}-${d}`;
 };
 
+const getNextSalaryDate = (dateKey) => {
+  const date = parseLocalDateStr(dateKey);
+  if (!date) return "";
+  date.setDate(date.getDate() + 1);
+  return toLocalDateStr(date);
+};
+
+const getEmploymentStartDate = (salaryRecord) =>
+  normalizeSalaryDate(
+    salaryRecord.employmentStartDate || salaryRecord.staff_id?.createdAt
+  );
+
+const isInactiveSalaryDate = (salaryRecord, date) => {
+  const key = normalizeSalaryDate(date);
+  return (salaryRecord.inactiveRanges || []).some((range) => {
+    const start = normalizeSalaryDate(range.start);
+    const end = normalizeSalaryDate(range.end);
+    return start && key >= start && (!end || key <= end);
+  });
+};
+
 // Monday-based week start that is ISO-correct for every year.
 // Jan 4 always belongs to ISO week 1, so the Monday of that week plus
 // (weekNum - 1) * 7 days gives the exact ISO week range. This keeps
@@ -143,12 +306,32 @@ const getWeekDates = (year, weekNum) => {
   return dates;
 };
 
+// Daily rows are rate snapshots. When a row is first materialized later, use
+// the closest known rate on or before that date so a newer rate cannot flow
+// backward into an earlier day. The nearest later row is only a fallback for
+// dates before the first stored snapshot.
+const getRateForSalaryDate = (records, date, fallbackRate) => {
+  const datedRecords = (records || [])
+    .map((record) => record.toObject ? record.toObject() : record)
+    .filter((record) => record.rate !== undefined && record.rate !== null)
+    .map((record) => ({ ...record, date: normalizeSalaryDate(record.date) }))
+    .filter((record) => record.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const previous = datedRecords.filter((record) => record.date <= date).pop();
+  if (previous) return safeNumber(previous.rate, fallbackRate);
+
+  const next = datedRecords.find((record) => record.date > date);
+  return next ? safeNumber(next.rate, fallbackRate) : safeNumber(fallbackRate, 0);
+};
+
 // ─── Helper: ensure ALL days in a period have a daily record ──────────────
 const ensureAllDaysInPeriod = (
   salaryRecord,
   effectiveRate,
   salaryPaymentCountPerDay,
-  upToDate
+  upToDate,
+  joinDate
 ) => {
   if (!salaryRecord.dateRange?.start || !salaryRecord.dateRange?.end) {
     return;
@@ -163,23 +346,32 @@ const ensureAllDaysInPeriod = (
     safeNumber(salaryRecord.rate, 0)
   );
 
+  // Keep the original snapshots available while filling any missing dates.
+  const rateSnapshots = salaryRecord.dailyRecords.map((record) =>
+    record.toObject ? record.toObject() : record
+  );
+
   // Normalize all existing records.
   salaryRecord.dailyRecords = salaryRecord.dailyRecords.map((record) => ({
     ...record,
     date: normalizeSalaryDate(record.date),
     workingAmount: safeNumber(record.workingAmount, 0),
 
-    // Keep the staff rate even when there are no appointments.
-    rate:
-      record.rate !== undefined &&
-      record.rate !== null &&
-      Number(record.rate) > 0
-        ? safeNumber(record.rate)
-        : validRate,
+    // Zero is a valid rate snapshot; only missing values use another date's
+    // known rate or the current period rate.
+    rate: record.rate !== undefined && record.rate !== null
+      ? safeNumber(record.rate, validRate)
+      : getRateForSalaryDate(rateSnapshots, normalizeSalaryDate(record.date), validRate),
 
     workRate: safeNumber(record.workRate, 0),
     daySalary: safeNumber(record.daySalary, 0),
     totalSalary: safeNumber(record.totalSalary, 0),
+    // This is a date-level snapshot.  Do not replace it with the current
+    // staff setting when the staff salary is edited later in the period.
+    salaryPaymentCountPerDay: safeNumber(
+      record.salaryPaymentCountPerDay,
+      safeNumber(salaryPaymentCountPerDay, 0)
+    ),
     status: record.status || "Not Paid",
 
     // Preserve the manager-marked absence (recalcWeeklyMonthlyTotals applies
@@ -222,15 +414,17 @@ const ensureAllDaysInPeriod = (
         // applies (applied by recalcWeeklyMonthlyTotals below).
         workingAmount: 0,
 
-        // Important: keep the staff commission rate.
-        rate: validRate,
+        // Use the rate in effect on this date, not the latest period rate.
+        rate: getRateForSalaryDate(rateSnapshots, date, validRate),
 
         workRate: 0,
         daySalary: 0,
         totalSalary: 0,
+        salaryPaymentCountPerDay: safeNumber(salaryPaymentCountPerDay, 0),
         status: "Not Paid",
         isAbsent: false,
         absentMarkedAt: null,
+        isBeforeJoinDate: Boolean(joinDate && date < joinDate),
       });
 
       existingDates.add(date);
@@ -242,10 +436,15 @@ const ensureAllDaysInPeriod = (
   salaryRecord.dailyRecords.sort((a, b) =>
     a.date.localeCompare(b.date)
   );
+
+  // Do not discard days before calculationStart here. A frequency change can
+  // begin in the middle of a week/month and those earlier calendar days are
+  // useful for a complete period view. recalcWeeklyMonthlyTotals keeps them
+  // at zero, while calculationStart prevents them from being paid.
 };
 
 // ─── Recalculate weekly/monthly totals from daily records ─────────────────
-const recalcWeeklyMonthlyTotals = (salaryRecord) => {
+export const recalcWeeklyMonthlyTotals = (salaryRecord) => {
   if (!Array.isArray(salaryRecord.dailyRecords)) {
     salaryRecord.dailyRecords = [];
   }
@@ -255,28 +454,62 @@ const recalcWeeklyMonthlyTotals = (salaryRecord) => {
     0
   );
 
+  const staffJoinDate = normalizeSalaryDate(getStaffJoinDate(salaryRecord));
+
   // Make sure all daily values are valid numbers.
   salaryRecord.dailyRecords = salaryRecord.dailyRecords.map((record) => {
-    const workingAmount = safeNumber(record.workingAmount, 0);
-    const rate = safeNumber(record.rate, 0);
+    // Mongoose subdocuments are not reliably spreadable. Normalize the
+    // current map item once, then use that same item for every preserved
+    // field below.
+    const rec = record.toObject ? record.toObject() : record;
+
+    const recordDate = normalizeSalaryDate(rec.date);
+    const calculationStart = normalizeSalaryDate(salaryRecord.calculationStartDate);
+
+    const isBeforeJoinDate = Boolean(
+      staffJoinDate && recordDate && recordDate < staffJoinDate
+    );
+
+    const isBeforeCalculationStart = Boolean(
+      calculationStart && recordDate && recordDate < calculationStart
+    );
+
+    // A record may have been created for the period before the staff member
+    // was added or before the calculation period started.
+    // It must not retain appointment value or salary.
+    const workingAmount =
+      isBeforeJoinDate || isBeforeCalculationStart
+        ? 0
+        : safeNumber(rec.workingAmount, 0);
+
+    const rate = safeNumber(rec.rate, 0);
+    const countedWorkingAmount = workingAmount;
 
     const workRate =
-      workingAmount > 0 && rate > 0
-        ? workingAmount * (rate / 100)
+      countedWorkingAmount > 0 && rate > 0
+        ? countedWorkingAmount * (rate / 100)
         : 0;
 
-    const isAbsent = Boolean(record.isAbsent);
+    const isAbsent = Boolean(rec.isAbsent);
+    // Weekly records created before the per-day snapshot was reliably stored
+    // can contain the schema default (1). Use the weekly record's configured
+    // salary-per-day value for its rollup; monthly calculations keep their
+    // existing per-date snapshot behavior.
+    const recordSalaryPerDay = salaryRecord.frequency === "weekly"
+      ? salaryPaymentCountPerDay
+      : safeNumber(rec.salaryPaymentCountPerDay, salaryPaymentCountPerDay);
 
     const daySalary = calculateDaySalary(
       workRate,
-      salaryPaymentCountPerDay,
-      isAbsent
+      recordSalaryPerDay,
+      isAbsent || isInactiveSalaryDate(salaryRecord, recordDate),
+      isBeforeJoinDate || isBeforeCalculationStart
     );
 
     return {
-      ...record,
-      date: normalizeSalaryDate(record.date),
-      workingAmount,
+      ...rec,
+      date: recordDate,
+      workingAmount: countedWorkingAmount,
       rate,
       workRate,
       daySalary,
@@ -284,6 +517,11 @@ const recalcWeeklyMonthlyTotals = (salaryRecord) => {
       status: record.status || "Not Paid",
       isAbsent,
       absentMarkedAt: record.absentMarkedAt || null,
+      salaryPaymentCountPerDay: safeNumber(
+        recordSalaryPerDay,
+        salaryPaymentCountPerDay
+      ),
+      isBeforeJoinDate: isBeforeJoinDate || isBeforeCalculationStart,
     };
   });
 
@@ -313,15 +551,14 @@ const recalcWeeklyMonthlyTotals = (salaryRecord) => {
       0
     );
 
-  salaryRecord.daySalary =
-    countedRecords.reduce(
-      (total, record) =>
-        total + safeNumber(record.daySalary, 0),
-      0
-    );
-
-  // Final weekly/monthly salary.
-  salaryRecord.totalSalary = salaryRecord.daySalary;
+  // Keep the period total as its own accumulation of every daily salary.
+  // `daySalary` on the table is a single date's value; it must never be used
+  // as the weekly/monthly total.
+  salaryRecord.totalSalary = countedRecords.reduce(
+    (total, record) => total + safeNumber(record.daySalary, 0),
+    0
+  );
+  salaryRecord.daySalary = salaryRecord.totalSalary;
 };
 
 // ─── Refresh salary records so they follow the salary-per-day rules ────────
@@ -329,7 +566,23 @@ const recalcWeeklyMonthlyTotals = (salaryRecord) => {
 // amount, weekly/monthly records cover every day up to today, and all totals
 // are recalculated before the records are returned to the frontend. Paid
 // records keep their historical values.
-const refreshSalaryRecord = (salaryRecord) => {
+export const refreshSalaryRecord = (salaryRecord) => {
+  const employmentStartDate = getEmploymentStartDate(salaryRecord);
+  const recordPeriodDate = normalizeSalaryDate(salaryRecord.period);
+
+  if (
+    salaryRecord.frequency === "daily" &&
+    employmentStartDate &&
+    recordPeriodDate &&
+    recordPeriodDate < employmentStartDate
+  ) {
+    salaryRecord.workingAmount = 0;
+    salaryRecord.workRate = 0;
+    salaryRecord.daySalary = 0;
+    salaryRecord.totalSalary = 0;
+    return true;
+  }
+
   // Backfill the per-day amount snapshot from the staff when it is missing.
   const staffPerDay = safeNumber(
     salaryRecord.staff_id?.salary_payment_count_per_day,
@@ -345,6 +598,11 @@ const refreshSalaryRecord = (salaryRecord) => {
     salaryRecord,
     salaryRecord.commission_rate
   );
+
+  const staffJoinDate = normalizeSalaryDate(getStaffJoinDate(salaryRecord));
+  if (staffJoinDate && !salaryRecord.staff_join_date) {
+    salaryRecord.staff_join_date = staffJoinDate;
+  }
 
   const before = {
     rate: safeNumber(salaryRecord.rate, 0),
@@ -374,10 +632,13 @@ const refreshSalaryRecord = (salaryRecord) => {
     const workingAmount = safeNumber(salaryRecord.workingAmount, 0);
     const workRate =
       workingAmount > 0 ? workingAmount * (effectiveRate / 100) : 0;
+    const periodDate = normalizeSalaryDate(salaryRecord.period);
+    const isBeforeJoinDate = Boolean(staffJoinDate && periodDate && periodDate < staffJoinDate);
     const daySalary = calculateDaySalary(
       workRate,
       perDay,
-      Boolean(salaryRecord.isAbsent)
+      Boolean(salaryRecord.isAbsent) || isInactiveSalaryDate(salaryRecord, periodDate),
+      isBeforeJoinDate
     );
 
     salaryRecord.workRate = workRate;
@@ -390,7 +651,8 @@ const refreshSalaryRecord = (salaryRecord) => {
       salaryRecord,
       effectiveRate,
       perDay,
-      toLocalDateStr(new Date())
+      toLocalDateStr(new Date()),
+      staffJoinDate
     );
     recalcWeeklyMonthlyTotals(salaryRecord);
   }
@@ -415,24 +677,107 @@ const refreshSalaryRecord = (salaryRecord) => {
   return JSON.stringify(before) !== JSON.stringify(after);
 };
 
+// Refresh unpaid salary records and persist the recomputed values.
+// IMPORTANT: the input array may contain lean objects (plain JS from .lean()
+// queries). Lean objects do not have .save(), so we re-fetch each record as a
+// real Mongoose document before mutating + saving it. Paid records are still
+// skipped so history never changes. The returned array still contains the
+// original (lean) objects for callers that only read fields from them.
 const refreshSalariesForResponse = async (salaries) => {
-  const changed = [];
+  const toPersist = [];
 
   for (const salaryRecord of salaries) {
+    // Inactive staff stay visible with their accrued history, but their
+    // records must not be refreshed (which would accrue more days).
+    if (salaryRecord.staff_id?.salaryCalculationEnabled === false) continue;
     // Paid records keep their historical values.
     if ((salaryRecord.status || "") === "Paid") continue;
 
     try {
-      if (refreshSalaryRecord(salaryRecord)) {
-        changed.push(salaryRecord);
+      // Only refresh if the lean object looks like it still needs it. We check
+      // the fields used by refreshSalaryRecord so we do not re-fetch records
+      // that are already consistent.
+      const currentPerDay = safeNumber(
+        salaryRecord.salary_payment_count_per_day,
+        0
+      );
+      const staffPerDay = safeNumber(
+        salaryRecord.staff_id?.salary_payment_count_per_day,
+        0
+      );
+      const effectiveRate = getEffectiveRate(
+        salaryRecord,
+        salaryRecord.commission_rate
+      );
+
+      if (salaryRecord.frequency === "daily") {
+        const workingAmount = safeNumber(salaryRecord.workingAmount, 0);
+        const workRate =
+          workingAmount > 0 ? workingAmount * (effectiveRate / 100) : 0;
+        const daySalary = calculateDaySalary(
+          workRate,
+          currentPerDay || staffPerDay,
+          Boolean(salaryRecord.isAbsent)
+        );
+
+        if (
+          safeNumber(salaryRecord.workRate, 0) === workRate &&
+          safeNumber(salaryRecord.daySalary, 0) === daySalary &&
+          safeNumber(salaryRecord.totalSalary, 0) === daySalary &&
+          safeNumber(salaryRecord.salary_payment_count_per_day, 0) ===
+            currentPerDay &&
+          safeNumber(salaryRecord.rate, 0) === effectiveRate
+        ) {
+          continue;
+        }
+      } else {
+        // weekly/monthly: if the record already has day rows up to today,
+        // assume it is already refreshed. Otherwise we must re-fetch and
+        // re-run ensureAllDaysInPeriod + recalcWeeklyMonthlyTotals.
+        if (
+          Array.isArray(salaryRecord.dailyRecords) &&
+          salaryRecord.dailyRecords.length > 0
+        ) {
+          const todayKey = toLocalDateStr(new Date());
+          const latestDate = salaryRecord.dailyRecords
+            .map((r) => normalizeSalaryDate(r.date))
+            .filter(Boolean)
+            .sort()
+            .slice(-1)[0];
+          if (latestDate && latestDate >= todayKey) {
+            continue;
+          }
+        }
       }
+
+      // Re-fetch the real document, refresh it, then schedule a save.
+      const fresh = await Salary.findById(salaryRecord._id);
+      if (!fresh) continue;
+
+      refreshSalaryRecord(fresh);
+      const refreshedValues = fresh.toObject();
+      const populatedStaff = salaryRecord.staff_id;
+      const populatedSalon = salaryRecord.salon_id;
+      Object.assign(salaryRecord, refreshedValues);
+      if (populatedStaff) salaryRecord.staff_id = populatedStaff;
+      if (populatedSalon) salaryRecord.salon_id = populatedSalon;
+      toPersist.push(fresh);
+
+      // Copy refreshed values back to salaryRecord so the current response has up-to-date data
+      salaryRecord.workingAmount = fresh.workingAmount;
+      salaryRecord.rate = fresh.rate;
+      salaryRecord.workRate = fresh.workRate;
+      salaryRecord.daySalary = fresh.daySalary;
+      salaryRecord.totalSalary = fresh.totalSalary;
+      salaryRecord.dailyRecords = fresh.dailyRecords;
+      salaryRecord.salary_payment_count_per_day = fresh.salary_payment_count_per_day;
     } catch (err) {
       console.error("Salary refresh failed:", err);
     }
   }
 
   await Promise.all(
-    changed.map((record) =>
+    toPersist.map((record) =>
       record.save().catch((err) => {
         console.error("Failed to persist refreshed salary record:", err.message);
       })
@@ -446,9 +791,17 @@ const refreshSalariesForResponse = async (salaries) => {
 
 export const updateSalaryOnAppointmentCompletion = async (appointmentId) => {
   try {
-    const appointment = await Appointment.findById(appointmentId)
-      .populate("staff_id", "full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id")
-      .populate("salon_id", "name");
+    // Accept either an ObjectId / string or a pre-loaded Mongoose document.
+    let appointment;
+    if (appointmentId && typeof appointmentId === "object" && appointmentId._id) {
+      appointment = await Appointment.findById(appointmentId._id)
+        .populate("staff_id", "full_name role status salaryCalculationEnabled commission_rate salary_payment_frequency salary_payment_count_per_day salary_cycle_id salon_id createdAt")
+        .populate("salon_id", "name");
+    } else {
+      appointment = await Appointment.findById(appointmentId)
+        .populate("staff_id", "full_name role status salaryCalculationEnabled commission_rate salary_payment_frequency salary_payment_count_per_day salary_cycle_id salon_id createdAt")
+        .populate("salon_id", "name");
+    }
 
     if (!appointment || appointment.status !== "completed") {
       return { success: false, message: "Appointment not completed" };
@@ -460,7 +813,7 @@ export const updateSalaryOnAppointmentCompletion = async (appointmentId) => {
     // Get appointment services
     const apptServices = await AppointmentService.find({
       appointment_id: appointment._id,
-    }).populate("staff_id", "full_name role commission_rate salary_payment_frequency salary_payment_count_per_day");
+    }).populate("staff_id", "full_name role status salaryCalculationEnabled commission_rate salary_payment_frequency salary_payment_count_per_day salary_cycle_id createdAt");
 
     // If no AppointmentService records, use the main appointment data
     if (!apptServices || apptServices.length === 0) {
@@ -479,7 +832,7 @@ export const updateSalaryOnAppointmentCompletion = async (appointmentId) => {
         if (staff && !staff._id && mongoose.isValidObjectId(staff)) {
           try {
             const fetched = await Staff.findById(staff).select(
-              "full_name commission_rate salary_payment_frequency salary_payment_count_per_day role"
+              "full_name role status salaryCalculationEnabled commission_rate salary_payment_frequency salary_payment_count_per_day salary_cycle_id"
             );
             if (fetched) staff = fetched;
           } catch (e) {
@@ -515,6 +868,15 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
   let weekNumber = 0;
 
   const normalizedAppointmentDate = normalizeSalaryDate(appointmentDate);
+  const employmentStartDate = getStaffJoinDate(staff);
+
+  if (
+    employmentStartDate &&
+    normalizedAppointmentDate &&
+    normalizedAppointmentDate < employmentStartDate
+  ) {
+    return;
+  }
 
   // Determine period from appointment date and frequency
   let period;
@@ -548,13 +910,18 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
     staff_id: staffId,
     period,
     frequency,
+    ...(staff.salary_cycle_id
+      ? { cycleId: staff.salary_cycle_id }
+      : { cycleId: null }),
   });
 
   if (!salaryRecord) {
     salaryRecord = new Salary({
       salon_id: salonId,
       staff_id: staffId,
+      employmentStartDate,
       frequency,
+      cycleId: staff.salary_cycle_id || null,
       period,
       staff_name: staffName,
       staff_role: staff.role || "",
@@ -569,9 +936,31 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
       year,
       month,
       weekNumber,
+      calculationStartDate: periodStart,
       dateRange: { start: periodStart, end: periodEnd },
       dailyRecords: [],
     });
+  }
+
+  // The transition row owns the edit date; the new cycle starts the next day.
+  if (
+    salaryRecord.calculationStartDate &&
+    normalizedAppointmentDate < normalizeSalaryDate(salaryRecord.calculationStartDate)
+  ) {
+    return;
+  }
+
+  // Appointment completion can create a salary row before the staff record is
+  // populated. Persist the employment boundary so later refreshes cannot
+  // calculate salary for dates before the staff member was added.
+  if (!salaryRecord.employmentStartDate) {
+    salaryRecord.employmentStartDate = employmentStartDate;
+  }
+  if (
+    frequency !== "daily" &&
+    !salaryRecord.calculationStartDate
+  ) {
+    salaryRecord.calculationStartDate = periodStart;
   }
 
   const effectiveRate = getEffectiveRate(
@@ -612,14 +1001,17 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
 
     // Normalize all stored dates before searching.
     salaryRecord.dailyRecords =
-      salaryRecord.dailyRecords.map((record) => ({
-        ...record,
-        date: normalizeSalaryDate(record.date),
+      salaryRecord.dailyRecords.map((record) => {
+        const rec = record.toObject ? record.toObject() : record;
+        return {
+          ...rec,
+          date: normalizeSalaryDate(rec.date),
 
-        // Preserve the manager-marked absence.
-        isAbsent: Boolean(record.isAbsent),
-        absentMarkedAt: record.absentMarkedAt || null,
-      }));
+          // Preserve the manager-marked absence.
+          isAbsent: Boolean(rec.isAbsent),
+          absentMarkedAt: rec.absentMarkedAt || null,
+        };
+      });
 
     // Find the current appointment date.
     let dailyRecord =
@@ -630,7 +1022,7 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
 
     // If the date does not exist, create it.
     if (!dailyRecord) {
-      dailyRecord = {
+      salaryRecord.dailyRecords.push({
         date: normalizedAppointmentDate,
         workingAmount: 0,
 
@@ -643,9 +1035,8 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
         status: "Not Paid",
         isAbsent: false,
         absentMarkedAt: null,
-      };
-
-      salaryRecord.dailyRecords.push(dailyRecord);
+      });
+      dailyRecord = salaryRecord.dailyRecords[salaryRecord.dailyRecords.length - 1];
     }
 
     // Add only the new completed appointment amount.
@@ -653,13 +1044,17 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
       safeNumber(dailyRecord.workingAmount, 0) +
       safeNumber(amount, 0);
 
-    // Keep the rate for the current day.
-    dailyRecord.rate = effectiveRate;
+    // Keep the rate snapshot already saved for this date. Reprocessing an
+    // appointment later must not apply today's rate to an earlier day.
+    const dailyRate = dailyRecord.rate !== undefined && dailyRecord.rate !== null
+      ? safeNumber(dailyRecord.rate, effectiveRate)
+      : effectiveRate;
+    dailyRecord.rate = dailyRate;
 
     // Calculate only the current day's salary.
     dailyRecord.workRate =
       dailyRecord.workingAmount *
-      (effectiveRate / 100);
+      (dailyRate / 100);
 
     dailyRecord.daySalary =
       calculateDaySalary(
@@ -684,20 +1079,11 @@ const accrueStaffSalaryForFrequency = async (staff, salonId, appointmentDate, am
 // Dispatcher: accrues the salary amount for a single staff member when an
 // appointment is completed.
 const updateSingleStaffSalary = async (staff, salonId, appointmentDate, amount) => {
-  if (!staff) return;
+  if (!staff || staff.status === "Inactive" || staff.salaryCalculationEnabled === false) return;
 
-  // Managers do not earn salaries. (Matches the role filtering applied by
-  // every salary listing endpoint; otherwise completing an appointment for a
-  // manager creates orphan records that never appear in lists but still
-  // inflate summaries.)
-  const role = (staff.role || "").toLowerCase();
-  if (role === "manager") return;
-
-  // Managers accrue salary exactly like regular staff on the admin/salary
-  // page: only in the frequency configured on their profile
-  // (salary_payment_frequency). The super-admin manager salary page therefore
-  // shows one record per manager per period just like the admin page shows one
-  // record per staff member.
+  // Managers are included here because the super-admin salary page has a
+  // dedicated manager view. Use each staff member's configured frequency so
+  // completed service amounts appear in that manager's salary period.
   await accrueStaffSalaryForFrequency(
     staff,
     salonId,
@@ -729,7 +1115,7 @@ const salaryRoleIncludes = (mode, staffRole) => {
 
 export const getSalaries = async (req, res) => {
   try {
-    const { salonId, frequency, period, staffId, role: roleFilter } = req.query;
+    const { salonId, frequency, period, staffId, role: roleFilter, includeDeleted } = req.query;
 
     const filter = {};
 
@@ -744,8 +1130,8 @@ export const getSalaries = async (req, res) => {
     if (staffId) filter.staff_id = staffId;
 
     let salaries = await Salary.find(filter)
-      .populate("staff_id", "full_name email phone role salary_payment_frequency salary_payment_count_per_day commission_rate image")
-      .populate("salon_id", "name location phone email")
+      .populate("staff_id", "full_name email phone role status salaryCalculationEnabled salary_payment_frequency salary_payment_count_per_day commission_rate image")
+      .populate("salon_id", "name location phone email close_time")
       .sort({ "staff_name": 1 });
 
     // Role scoping: the super-admin salary page asks for salon managers only;
@@ -762,13 +1148,53 @@ export const getSalaries = async (req, res) => {
     if (frequency) {
       salaries = salaries.filter(s => {
         if (!s.staff_id) return true; // keep if staff data missing (edge case)
-        return s.staff_id.salary_payment_frequency === frequency;
+        return s.frequency === frequency;
       });
     }
 
     // Apply the salary-per-day rules (days without completed appointments
     // still earn the salary-per-day amount) before responding.
     salaries = await refreshSalariesForResponse(salaries);
+
+    // Return computed values, not whatever the stored document happened to hold
+    // before the refresh above. This keeps both admin salary pages consistent
+    // with the current staff config / current completed appointments / current
+    // date, even for salary records that were created earlier and have not been
+    // touched since.
+    salaries = salaries.map(s => ({
+      ...s,
+      _id: s._id,
+      staff_id: s.staff_id,
+      salon_id: s.salon_id,
+      staff_name: s.staff_name,
+      staff_role: s.staff_role,
+      frequency: s.frequency,
+      period: s.period,
+      year: s.year,
+      month: s.month,
+      weekNumber: s.weekNumber,
+      dateRange: s.dateRange,
+      commission_rate: s.commission_rate,
+      salary_payment_count_per_day: s.salary_payment_count_per_day,
+      cycleId: s.cycleId,
+      calculationStartDate: s.calculationStartDate,
+      status: s.status,
+      paidTotal: s.paidTotal,
+      paidAt: s.paidAt,
+      isTransitioned: Boolean(s.isTransitioned),
+      transitionedAt: s.transitionedAt,
+      staffDeleted: Boolean(s.staffDeleted),
+      staffDeletedAt: s.staffDeletedAt,
+      updatedAt: s.updatedAt,
+      isAbsent: Boolean(s.isAbsent),
+      absentMarkedAt: s.absentMarkedAt,
+      workingAmount: s.workingAmount,
+      rate: s.rate,
+      workRate: s.workRate,
+      daySalary: s.daySalary,
+      totalSalary: s.totalSalary,
+      dailyRecords: s.dailyRecords,
+    }));
 
     res.json({ success: true, salaries });
   } catch (error) {
@@ -793,8 +1219,8 @@ export const getSalarySummary = async (req, res) => {
     // Fetch with staff role info so totals match what lists display
     // (manager records are excluded everywhere else).
     let salaryDocs = await Salary.find(match)
-      .populate("staff_id", "role")
-      .select("status totalSalary paidTotal workingAmount staff_role")
+      .populate("staff_id", "role salary_payment_frequency salary_payment_count_per_day")
+      .select("status totalSalary paidTotal workingAmount staff_role period dateRange commission_rate salary_payment_count_per_day workRate daySalary totalSalary dailyRecords isTransitioned transitionedAt")
       .lean();
 
     const roleMode = resolveSalaryRole(roleFilter);
@@ -802,12 +1228,21 @@ export const getSalarySummary = async (req, res) => {
       salaryRoleIncludes(roleMode, s.staff_id?.role || s.staff_role)
     );
 
+    // Recompute totals for any unpaid records so the summary always reflects
+    // the current staff config / current date / current completed appointments,
+    // including days with no appointments yet (salary-per-day floor).
+    salaryDocs = await refreshSalariesForResponse(salaryDocs);
+
     const summary = {
       totalPending: 0,
       totalPaid: 0,
       pendingCount: 0,
       paidCount: 0,
       totalWorkingAmount: 0,
+      // Carry-forward overdue: unpaid salaries from every ENDED period. This
+      // does not reset when a new day/week/month is opened and it drops only
+      // when a salary record is actually paid.
+      overdue: 0,
     };
     for (const s of salaryDocs) {
       if (s.status === "Paid") {
@@ -816,6 +1251,9 @@ export const getSalarySummary = async (req, res) => {
       } else {
         summary.totalPending += safeNumber(s.totalSalary, 0);
         summary.pendingCount += 1;
+        if (isSalaryPeriodEnded(s)) {
+          summary.overdue += safeNumber(s.totalSalary, 0);
+        }
       }
       summary.totalWorkingAmount += safeNumber(s.workingAmount, 0);
     }
@@ -848,7 +1286,7 @@ export const getStaffSalaryList = async (req, res) => {
       role: { $not: { $regex: /manager/i } },
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     })
-      .select("full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id services")
+      .select("full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id services createdAt salaryCalculationEnabled")
       .populate("salon_id", "name")
       .populate("services", "service_name base_price duration")
       .sort({ full_name: 1 })
@@ -876,6 +1314,17 @@ export const markAsPaid = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "You do not have permission to update this salary record",
+      });
+    }
+
+    const salarySalonId = salary.salon_id?._id ?? salary.salon_id;
+    const salon = salarySalonId
+      ? await Salon.findById(salarySalonId).select("close_time")
+      : null;
+    if (!canPaySalaryPeriod(salary, salon?.close_time)) {
+      return res.status(400).json({
+        success: false,
+        message: "Salary can be paid after the salon closes on the period end date",
       });
     }
 
@@ -940,6 +1389,14 @@ export const createAndMarkPaid = async (req, res) => {
       });
     }
 
+    const salon = await Salon.findById(salon_id).select("close_time");
+    if (!canPaySalaryPeriod({ frequency, period }, salon?.close_time)) {
+      return res.status(400).json({
+        success: false,
+        message: "Salary can be paid after the salon closes on the period end date",
+      });
+    }
+
     let salaryRecord = await Salary.findOne({
       salon_id,
       staff_id: staffId,
@@ -982,6 +1439,7 @@ export const createAndMarkPaid = async (req, res) => {
       salaryRecord = new Salary({
         salon_id,
         staff_id: staff._id,
+        employmentStartDate: getStaffJoinDate(staff),
         frequency,
         period,
         staff_name: staff.full_name || "",
@@ -1068,22 +1526,20 @@ const applyAbsenceToRecord = (salaryRecord, dateKey, isAbsent) => {
     throw new Error("A valid date is required to mark an absent day");
   }
 
-  // Normalize stored dates before searching.
-  salaryRecord.dailyRecords = salaryRecord.dailyRecords.map((record) => ({
-    ...record,
-    date: normalizeSalaryDate(record.date),
-    isAbsent: Boolean(record.isAbsent),
-    absentMarkedAt: record.absentMarkedAt || null,
-  }));
+  // Normalize stored dates in place so the update targets the persisted
+  // Mongoose subdocument rather than a detached object from map().
+  salaryRecord.dailyRecords.forEach((record) => {
+    record.date = normalizeSalaryDate(record.date);
+    record.isAbsent = Boolean(record.isAbsent);
+    record.absentMarkedAt = record.absentMarkedAt || null;
+  });
 
-  let dailyRecord = salaryRecord.dailyRecords.find(
-    (record) => record.date === normalizedDate
-  );
+  let dailyRecord = salaryRecord.dailyRecords.find((record) => record.date === normalizedDate);
 
   // Create the day record when missing so absences can be recorded even for
   // days without completed appointments.
   if (!dailyRecord) {
-    dailyRecord = {
+    salaryRecord.dailyRecords.push({
       date: normalizedDate,
       workingAmount: 0,
       rate: effectiveRate,
@@ -1093,8 +1549,8 @@ const applyAbsenceToRecord = (salaryRecord, dateKey, isAbsent) => {
       status: "Not Paid",
       isAbsent: false,
       absentMarkedAt: null,
-    };
-    salaryRecord.dailyRecords.push(dailyRecord);
+    });
+    dailyRecord = salaryRecord.dailyRecords[salaryRecord.dailyRecords.length - 1];
   }
 
   dailyRecord.isAbsent = isAbsent;
@@ -1333,6 +1789,7 @@ export const markStaffDayAbsent = async (req, res) => {
       salaryRecord = new Salary({
         salon_id,
         staff_id: staff._id,
+        employmentStartDate: getStaffJoinDate(staff),
         frequency,
         period,
         staff_name: staff.full_name || "",
@@ -1408,8 +1865,48 @@ export const getStaffWithSalaries = async (req, res) => {
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     }).lean();
 
+    let periodEnd = "";
+    if (period) {
+      if (frequency === "daily") {
+        periodEnd = period;
+      } else if (frequency === "weekly") {
+        const parts = period.split("-W");
+        const y = parseInt(parts[0], 10);
+        const w = parseInt(parts[1], 10);
+        if (!isNaN(y) && !isNaN(w)) {
+          const dates = getWeekDates(y, w);
+          periodEnd = dates[6];
+        }
+      } else if (frequency === "monthly") {
+        const parts = period.split("-");
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (!isNaN(y) && !isNaN(m)) {
+          const days = getDaysInMonth(y, m);
+          periodEnd = `${y}-${String(m).padStart(2, "0")}-${days}`;
+        }
+      }
+    }
+
+    // Attach join date and filter out staff who had not yet joined when this period ended
+    const enrichedStaffList = staffList
+      .map((st) => {
+        const joinDate = getStaffJoinDate(st);
+        return {
+          ...st,
+          createdAt: st.createdAt || (st._id ? new mongoose.Types.ObjectId(st._id).getTimestamp() : null),
+          joined_date: joinDate,
+        };
+      })
+      .filter((st) => {
+        if (!periodEnd) return true;
+        const joinDate = st.joined_date || getStaffJoinDate(st);
+        if (!joinDate) return true;
+        return periodEnd >= joinDate;
+      });
+
     if (!period) {
-      return res.json({ success: true, staff: staffList, salaries: [] });
+      return res.json({ success: true, staff: enrichedStaffList, salaries: [] });
     }
 
     // Get salary records for this period
@@ -1417,17 +1914,33 @@ export const getStaffWithSalaries = async (req, res) => {
       ...salonFilter,
       frequency,
       period,
+      staffDeleted: { $ne: true },
     };
 
     let salaries = await Salary.find(salaryFilter)
-      .populate("staff_id", "full_name email phone role salary_payment_frequency salary_payment_count_per_day commission_rate image")
+      .populate("staff_id", "full_name email phone role status salaryCalculationEnabled salary_payment_frequency salary_payment_count_per_day commission_rate image")
       .lean();
 
     salaries = salaries.filter((s) =>
       salaryRoleIncludes(roleMode, s.staff_id?.role || s.staff_role)
     );
 
-    res.json({ success: true, staff: staffList, salaries });
+    // Filter out any unpaid zero-work records for staff who had not joined yet
+    if (periodEnd) {
+      salaries = salaries.filter((s) => {
+        if (s.status === "Paid") return true;
+        if (safeNumber(s.workingAmount, 0) > 0) return true;
+        const joinDate = getStaffJoinDate(s);
+        if (joinDate && periodEnd < joinDate) return false;
+        return true;
+      });
+    }
+
+    // Recompute unpaid records so the staff-with-salary view used by both
+    // salary pages always shows current values, not just whatever was stored.
+    salaries = await refreshSalariesForResponse(salaries);
+
+    res.json({ success: true, staff: enrichedStaffList, salaries });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -1466,6 +1979,10 @@ export const generatePayroll = async (req, res) => {
       ...roleMatch,
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     }).lean();
+
+    const payableStaffList = staffList.filter(
+      (staff) => staff.salaryCalculationEnabled !== false
+    );
 
     let periodStart, periodEnd;
     let year, month, weekNumber = 0;
@@ -1506,13 +2023,22 @@ export const generatePayroll = async (req, res) => {
     };
 
     const completedAppointments = await Appointment.find(appointmentFilter)
-      .populate("staff_id", "full_name role commission_rate salary_payment_frequency salary_payment_count_per_day")
+      .populate("staff_id", "full_name role commission_rate salary_payment_frequency salary_payment_count_per_day createdAt")
       .lean();
 
     // Process each staff member
     for (const staff of staffList) {
       const commissionRate = staff.commission_rate || 0;
       const salaryPaymentCountPerDay = staff.salary_payment_count_per_day || 1;
+
+      const latestFrequencyChange = staff.salary_cycle_id
+        ? await SalaryFrequencyChange.findOne({ staff_id: staff._id })
+            .sort({ changed_date: -1 })
+            .lean()
+        : null;
+      const salaryBoundary = latestFrequencyChange?.changed_date
+        ? getNextSalaryDate(latestFrequencyChange.changed_date)
+        : getStaffJoinDate(staff);
 
       // Find completed appointments for this staff
       const staffAppointments = completedAppointments.filter(
@@ -1532,6 +2058,13 @@ export const generatePayroll = async (req, res) => {
       const dailyMap = {};
 
       for (const appt of staffAppointments) {
+        if (
+          salaryBoundary &&
+          normalizeSalaryDate(appt.appointment_date) < salaryBoundary
+        ) {
+          continue;
+        }
+
         // Check if this appointment has AppointmentService records for this staff
         const staffServices = apptServices.filter(
           (as) => as.appointment_id.toString() === appt._id.toString()
@@ -1559,16 +2092,23 @@ export const generatePayroll = async (req, res) => {
         staff_id: staff._id,
         period,
         frequency,
+        ...(staff.salary_cycle_id
+          ? { cycleId: staff.salary_cycle_id }
+          : { cycleId: null }),
       });
 
       if (!salaryRecord) {
         salaryRecord = new Salary({
           salon_id: salonFilter.salon_id || req.user.salon_id,
           staff_id: staff._id,
+          employmentStartDate: getStaffJoinDate(staff),
           frequency,
+          cycleId: staff.salary_cycle_id || null,
+          calculationStartDate: salaryBoundary,
           period,
           staff_name: staff.full_name || "",
           staff_role: staff.role || "",
+          staff_join_date: staffJoinDate,
           commission_rate: commissionRate,
           salary_payment_count_per_day: salaryPaymentCountPerDay,
           workingAmount: 0,
@@ -1580,14 +2120,18 @@ export const generatePayroll = async (req, res) => {
           year,
           month,
           weekNumber,
-          dateRange: { start: periodStart, end: periodEnd },
+          dateRange: { start: salaryBoundary || periodStart, end: periodEnd },
           dailyRecords: [],
         });
+      } else if (!salaryRecord.staff_join_date && staffJoinDate) {
+        salaryRecord.staff_join_date = staffJoinDate;
       }
 
       // Update snapshot
       salaryRecord.staff_name = staff.full_name || "";
-      salaryRecord.commission_rate = commissionRate;
+      if (salaryRecord.commission_rate === undefined || salaryRecord.commission_rate === null) {
+        salaryRecord.commission_rate = commissionRate;
+      }
       salaryRecord.salary_payment_count_per_day = salaryPaymentCountPerDay;
       salaryRecord.dateRange = { start: periodStart, end: periodEnd };
 
@@ -1599,10 +2143,12 @@ export const generatePayroll = async (req, res) => {
       if (frequency === "daily") {
         salaryRecord.workingAmount = totalWorkingAmount;
         salaryRecord.workRate = totalWorkingAmount * (effectiveRate / 100);
+        const isBeforeJoinDate = Boolean(staffJoinDate && period < staffJoinDate);
         salaryRecord.daySalary = calculateDaySalary(
           salaryRecord.workRate,
           salaryPaymentCountPerDay,
-          Boolean(salaryRecord.isAbsent)
+          Boolean(salaryRecord.isAbsent),
+          isBeforeJoinDate
         );
         salaryRecord.totalSalary = salaryRecord.daySalary;
       } else {
@@ -1616,13 +2162,18 @@ export const generatePayroll = async (req, res) => {
           const newAmount = dailyMap[dr.date] || 0;
           if (newAmount > 0) {
             dr.workingAmount = (dr.workingAmount || 0) + newAmount;
-            const dailyWorkRate = dr.workingAmount * (effectiveRate / 100);
+            const dailyRate = dr.rate !== undefined && dr.rate !== null
+              ? safeNumber(dr.rate, effectiveRate)
+              : getRateForSalaryDate(salaryRecord.dailyRecords, dr.date, effectiveRate);
+            const dailyWorkRate = dr.workingAmount * (dailyRate / 100);
             dr.workRate = dailyWorkRate;
-            dr.rate = effectiveRate;
+            dr.rate = dailyRate;
+            const isBeforeJoinDate = Boolean(staffJoinDate && dr.date < staffJoinDate);
             dr.daySalary = calculateDaySalary(
               dailyWorkRate,
               salaryPaymentCountPerDay,
-              Boolean(dr.isAbsent)
+              Boolean(dr.isAbsent),
+              isBeforeJoinDate
             );
             dr.totalSalary = dr.daySalary;
           }
@@ -1631,17 +2182,20 @@ export const generatePayroll = async (req, res) => {
         // Add new daily entries
         for (const [date, amount] of dateEntries) {
           if (!existingDates.has(date)) {
-            const dailyWorkRate = amount * (effectiveRate / 100);
+            const dailyRate = getRateForSalaryDate(salaryRecord.dailyRecords, date, effectiveRate);
+            const dailyWorkRate = amount * (dailyRate / 100);
+            const isBeforeJoinDate = Boolean(staffJoinDate && date < staffJoinDate);
             salaryRecord.dailyRecords.push({
               date,
               workingAmount: amount,
-              rate: effectiveRate,
+              rate: dailyRate,
               workRate: dailyWorkRate,
-              daySalary: calculateDaySalary(dailyWorkRate, salaryPaymentCountPerDay),
-              totalSalary: calculateDaySalary(dailyWorkRate, salaryPaymentCountPerDay),
+              daySalary: calculateDaySalary(dailyWorkRate, salaryPaymentCountPerDay, false, isBeforeJoinDate),
+              totalSalary: calculateDaySalary(dailyWorkRate, salaryPaymentCountPerDay, false, isBeforeJoinDate),
               status: "Not Paid",
               isAbsent: false,
               absentMarkedAt: null,
+              isBeforeJoinDate,
             });
           }
         }
@@ -1657,7 +2211,8 @@ export const generatePayroll = async (req, res) => {
           salaryRecord,
           effectiveRate,
           salaryPaymentCountPerDay,
-          toLocalDateStr(new Date())
+          toLocalDateStr(new Date()),
+          staffJoinDate
         );
         // Recalculate totals after filling missing days
         recalcWeeklyMonthlyTotals(salaryRecord);
@@ -1672,7 +2227,7 @@ export const generatePayroll = async (req, res) => {
       frequency,
       period,
     })
-      .populate("staff_id", "full_name email phone role salary_payment_frequency salary_payment_count_per_day commission_rate image")
+      .populate("staff_id", "full_name email phone role salary_payment_frequency salary_payment_count_per_day commission_rate image createdAt")
       .sort({ staff_name: 1 })
       .lean();
 
@@ -1711,6 +2266,13 @@ export const getSalaryDetails = async (req, res) => {
         success: false,
         message: "You do not have permission to view this salary record",
       });
+    }
+
+    // Recompute the period totals for unpaid records so the PDF/details view
+    // always matches the current date / staff config, including days with no
+    // completed appointments yet.
+    if ((salary.status || "") !== "Paid") {
+      refreshSalaryRecord(salary);
     }
 
     const servicesData = Array.isArray(salary.staff_id?.services)
@@ -1796,6 +2358,10 @@ export const initializeSalaries = async (req, res) => {
     for (const staff of staffList) {
       const commissionRate = staff.commission_rate || 0;
       const salaryPaymentCountPerDay = staff.salary_payment_count_per_day || 1;
+      const employmentStartDate = getStaffJoinDate(staff);
+      const calculationStartDate = employmentStartDate && employmentStartDate > periodStart
+        ? employmentStartDate
+        : periodStart;
 
       // Check if already exists
       const existing = await Salary.findOne({
@@ -1803,14 +2369,20 @@ export const initializeSalaries = async (req, res) => {
         staff_id: staff._id,
         period,
         frequency,
+        ...(staff.salary_cycle_id
+          ? { cycleId: staff.salary_cycle_id }
+          : { cycleId: null }),
       });
 
       if (!existing) {
         const newSalary = await Salary.create({
           salon_id: salonFilter.salon_id || req.user.salon_id,
           staff_id: staff._id,
+          employmentStartDate,
           frequency,
           period,
+          cycleId: staff.salary_cycle_id || null,
+          calculationStartDate,
           staff_name: staff.full_name || "",
           staff_role: staff.role || "",
           commission_rate: commissionRate,
@@ -1824,7 +2396,7 @@ export const initializeSalaries = async (req, res) => {
           year,
           month,
           weekNumber,
-          dateRange: { start: periodStart, end: periodEnd },
+          dateRange: { start: calculationStartDate, end: periodEnd },
           dailyRecords: [],
         });
         created.push(newSalary);
@@ -1846,7 +2418,7 @@ export const initializeSalaries = async (req, res) => {
 export const updateRate = async (req, res) => {
   try {
     const { salaryId } = req.params;
-    const { rate } = req.body;
+    const { rate, effectiveDate: requestedEffectiveDate } = req.body;
 
     if (rate === undefined || rate === null || isNaN(rate)) {
       return res.status(400).json({ success: false, message: "Rate is required and must be a number" });
@@ -1869,20 +2441,65 @@ export const updateRate = async (req, res) => {
     if (numericRate < 0) {
       return res.status(400).json({ success: false, message: "Rate cannot be negative" });
     }
-    salary.rate = numericRate;
+    const effectiveDate =
+      normalizeSalaryDate(requestedEffectiveDate) || toLocalDateStr(new Date());
+    const isEffectiveForDailyRecord =
+      salary.frequency !== "daily" ||
+      normalizeSalaryDate(salary.period) >= effectiveDate;
+
+    // Materialize the current period with its saved rate before changing the
+    // period rate. Otherwise dates that have not been materialized yet would
+    // inherit the new rate when the record is refreshed later.
+    if (salary.frequency !== "daily" && salary.status !== "Paid") {
+      refreshSalaryRecord(salary);
+    }
+
+    // Keep the staff profile in sync so salary periods created after this one
+    // start with the newly selected rate. Existing daily snapshots below keep
+    // their original rate when they precede the effective date.
+    await Staff.findByIdAndUpdate(salary.staff_id, {
+      commission_rate: numericRate,
+    });
+
+    if (isEffectiveForDailyRecord) {
+      salary.rate = numericRate;
+      salary.commission_rate = numericRate;
+    }
+    salary.employmentStartDate = getEmploymentStartDate(salary);
 
     // Recalculate work rate and total salary
     if (salary.frequency === "daily") {
-      salary.workRate = salary.workingAmount * (numericRate / 100);
-      salary.daySalary = calculateDaySalary(
-        salary.workRate,
-        salary.salary_payment_count_per_day,
-        Boolean(salary.isAbsent)
-      );
-      salary.totalSalary = salary.daySalary;
+      if (
+        salary.employmentStartDate &&
+        salary.period < salary.employmentStartDate
+      ) {
+        salary.workingAmount = 0;
+        salary.workRate = 0;
+        salary.daySalary = 0;
+        salary.totalSalary = 0;
+        await salary.save();
+        return res.json({ success: true, message: "Rate updated successfully", salary });
+      }
+      if (isEffectiveForDailyRecord) {
+        salary.workRate = salary.workingAmount * (numericRate / 100);
+        salary.daySalary = calculateDaySalary(
+          salary.workRate,
+          salary.salary_payment_count_per_day,
+          Boolean(salary.isAbsent)
+        );
+        salary.totalSalary = salary.daySalary;
+      }
     } else {
-      // Weekly or monthly - recalculate each daily record
+      // Keep earlier days at their saved rate. The new rate applies starting
+      // on the change date and carries forward for the rest of this period.
+      if (salary.employmentStartDate) {
+        salary.dailyRecords = salary.dailyRecords.filter(
+          (record) => normalizeSalaryDate(record.date) >= salary.employmentStartDate
+        );
+      }
       for (const dr of salary.dailyRecords) {
+        const recordDate = normalizeSalaryDate(dr.date);
+        if (recordDate < effectiveDate) continue;
         dr.rate = numericRate;
         dr.workRate = dr.workingAmount * (numericRate / 100);
         dr.daySalary = calculateDaySalary(
@@ -1908,7 +2525,7 @@ export const updateRate = async (req, res) => {
 export const updateStaffRate = async (req, res) => {
   try {
     const { staffId } = req.params;
-    const { rate, frequency, period } = req.body;
+    const { rate, frequency, period, effectiveDate: requestedEffectiveDate } = req.body;
 
     const numericRate = Number(rate);
     if (rate === undefined || rate === null || isNaN(numericRate)) {
@@ -1920,6 +2537,8 @@ export const updateStaffRate = async (req, res) => {
     if (!frequency || !period) {
       return res.status(400).json({ success: false, message: "Frequency and period are required" });
     }
+    const effectiveDate =
+      normalizeSalaryDate(requestedEffectiveDate) || toLocalDateStr(new Date());
 
     const staff = await Staff.findById(staffId);
     if (!staff) {
@@ -1934,12 +2553,18 @@ export const updateStaffRate = async (req, res) => {
       });
     }
 
+    const previousCommissionRate = safeNumber(staff.commission_rate, numericRate);
+
     // Persist the rate on the staff so future periods pick it up automatically.
     // Use findByIdAndUpdate (not staff.save()) because older staff documents may
     // be missing newly-required schema fields (e.g. first_name/last_name); a full
     // document save would fail validation even though only the rate changed.
-    await Staff.findByIdAndUpdate(staff._id, { commission_rate: numericRate });
+    await Staff.findByIdAndUpdate(staff._id, {
+      commission_rate: numericRate,
+      salaryCalculationEnabled: true,
+    });
     staff.commission_rate = numericRate;
+    staff.salaryCalculationEnabled = true;
 
     const salaryPaymentCountPerDay = staff.salary_payment_count_per_day || 1;
 
@@ -1985,14 +2610,15 @@ export const updateStaffRate = async (req, res) => {
         createdSalary = await Salary.create({
           salon_id: staff.salon_id,
           staff_id: staff._id,
+          employmentStartDate: getStaffJoinDate(staff),
           frequency,
           period,
           staff_name: staff.full_name || "",
           staff_role: staff.role || "",
-          commission_rate: numericRate,
+          commission_rate: previousCommissionRate,
           salary_payment_count_per_day: salaryPaymentCountPerDay,
           workingAmount: 0,
-          rate: numericRate,
+          rate: previousCommissionRate,
           workRate: 0,
           daySalary: 0,
           totalSalary: 0,
@@ -2017,26 +2643,83 @@ export const updateStaffRate = async (req, res) => {
         }
         throw createErr;
       }
+
+      refreshSalaryRecord(createdSalary);
+      // Materialize the old rate through the days before the change, then
+      // apply the new snapshot from the selected date onward.
+      createdSalary.rate = numericRate;
+      createdSalary.commission_rate = numericRate;
+      if (frequency === "daily") {
+        if (normalizeSalaryDate(createdSalary.period) >= effectiveDate) {
+          createdSalary.rate = numericRate;
+          createdSalary.workRate =
+            safeNumber(createdSalary.workingAmount, 0) * (numericRate / 100);
+          createdSalary.daySalary = calculateDaySalary(
+            createdSalary.workRate,
+            createdSalary.salary_payment_count_per_day,
+            Boolean(createdSalary.isAbsent)
+          );
+          createdSalary.totalSalary = createdSalary.daySalary;
+        }
+      } else {
+        for (const record of createdSalary.dailyRecords || []) {
+          if (normalizeSalaryDate(record.date) < effectiveDate) continue;
+          record.rate = numericRate;
+          record.workRate = safeNumber(record.workingAmount, 0) * (numericRate / 100);
+          record.daySalary = calculateDaySalary(
+            record.workRate,
+            createdSalary.salary_payment_count_per_day,
+            Boolean(record.isAbsent)
+          );
+          record.totalSalary = record.daySalary;
+        }
+        recalcWeeklyMonthlyTotals(createdSalary);
+      }
+      await createdSalary.save();
       const salary = createdSalary;
 
       return res.json({ success: true, message: "Rate saved successfully", salary });
     }
 
-    // Existing record - apply the new rate and recalculate
-    salary.rate = numericRate;
-    salary.commission_rate = numericRate;
+    // Existing record - apply the new rate from the selected effective date
+    // forward while retaining earlier daily snapshots in this period.
+    salary.employmentStartDate = getStaffJoinDate(staff);
+    if (salary.frequency !== "daily" && salary.status !== "Paid") {
+      refreshSalaryRecord(salary);
+    }
+    const isEffectiveForDailyRecord =
+      salary.frequency !== "daily" ||
+      normalizeSalaryDate(salary.period) >= effectiveDate;
+    if (isEffectiveForDailyRecord) {
+      salary.rate = numericRate;
+      salary.commission_rate = numericRate;
+    }
 
     if (salary.frequency === "daily") {
-      salary.workRate = salary.workingAmount * (numericRate / 100);
-      salary.daySalary = calculateDaySalary(
-        salary.workRate,
-        salary.salary_payment_count_per_day,
-        Boolean(salary.isAbsent)
-      );
-      salary.totalSalary = salary.daySalary;
+      if (salary.period < salary.employmentStartDate) {
+        salary.workingAmount = 0;
+        salary.workRate = 0;
+        salary.daySalary = 0;
+        salary.totalSalary = 0;
+        await salary.save();
+        return res.json({ success: true, message: "Rate updated successfully", salary });
+      }
+      if (isEffectiveForDailyRecord) {
+        salary.workRate = salary.workingAmount * (numericRate / 100);
+        salary.daySalary = calculateDaySalary(
+          salary.workRate,
+          salary.salary_payment_count_per_day,
+          Boolean(salary.isAbsent)
+        );
+        salary.totalSalary = salary.daySalary;
+      }
     } else {
-      // Weekly or monthly - recalculate each daily record
+      // Weekly or monthly - recalculate only today and future daily records.
+      salary.dailyRecords = salary.dailyRecords.filter(
+        (record) => normalizeSalaryDate(record.date) >= salary.employmentStartDate
+      );
       for (const dr of salary.dailyRecords) {
+        if (normalizeSalaryDate(dr.date) < effectiveDate) continue;
         dr.rate = numericRate;
         dr.workRate = dr.workingAmount * (numericRate / 100);
         dr.daySalary = calculateDaySalary(
@@ -2056,4 +2739,113 @@ export const updateStaffRate = async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
+};
+
+// Close the old frequency at the moment a staff member changes frequency.
+// The old record remains pending so the caller can ask whether to pay it.
+export const transitionSalaryFrequency = async (
+  staff,
+  previousFrequency,
+  changedAt = new Date(),
+  changedBy = null
+) => {
+  if (!staff || !previousFrequency || !changedBy) return null;
+
+  const changedDate = toLocalDateStr(changedAt);
+
+  if (
+    getStaffJoinDate(staff) &&
+    changedDate < getStaffJoinDate(staff)
+  ) {
+    return null;
+  }
+
+  const dateObj = new Date(`${changedDate}T00:00:00`);
+  const year = dateObj.getFullYear();
+  const month = dateObj.getMonth() + 1;
+  let period;
+  let periodStart;
+  let periodEnd;
+  let weekNumber = 0;
+
+  if (previousFrequency === "daily") {
+    period = changedDate;
+    periodStart = changedDate;
+    periodEnd = changedDate;
+  } else if (previousFrequency === "weekly") {
+    weekNumber = getISOWeek(changedDate);
+    period = `${year}-W${String(weekNumber).padStart(2, "0")}`;
+    const dates = getWeekDates(year, weekNumber);
+    periodStart = dates[0];
+    periodEnd = changedDate;
+  } else {
+    period = `${year}-${String(month).padStart(2, "0")}`;
+    periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+    periodEnd = changedDate;
+  }
+
+  let salary = await Salary.findOne({
+    salon_id: staff.salon_id,
+    staff_id: staff._id,
+    period,
+    frequency: previousFrequency,
+  });
+
+  if (!salary) {
+    salary = new Salary({
+      salon_id: staff.salon_id,
+      staff_id: staff._id,
+      employmentStartDate: getStaffJoinDate(staff),
+      frequency: previousFrequency,
+      period,
+      staff_name: staff.full_name || "",
+      staff_role: staff.role || "",
+      commission_rate: staff.commission_rate || 0,
+      salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+      year,
+      month,
+      weekNumber,
+      dateRange: { start: periodStart, end: periodEnd },
+      dailyRecords: [],
+    });
+  }
+
+  salary.employmentStartDate = getStaffJoinDate(staff);
+  salary.dateRange = { start: periodStart, end: periodEnd };
+  if (Array.isArray(salary.dailyRecords)) {
+    salary.dailyRecords = salary.dailyRecords.filter(
+      (record) =>
+        normalizeSalaryDate(record.date) <= changedDate &&
+        normalizeSalaryDate(record.date) >= salary.employmentStartDate
+    );
+  }
+  refreshSalaryRecord(salary);
+  const amountPaid = safeNumber(salary.totalSalary, safeNumber(salary.paidTotal, 0));
+  salary.dailyRecords = (salary.dailyRecords || []).map((record) => ({
+    ...record,
+    status: "Paid",
+    paidAt: changedAt,
+  }));
+  salary.paidTotal = amountPaid;
+  salary.status = "Paid";
+  salary.paidAt = changedAt;
+  salary.isTransitioned = true;
+  salary.transitionedAt = changedAt;
+  await salary.save();
+
+  await SalaryFrequencyChange.findOneAndUpdate(
+    { staff_id: staff._id, changed_date: changedDate },
+    {
+      salon_id: staff.salon_id,
+      staff_id: staff._id,
+      old_frequency: previousFrequency,
+      new_frequency: staff.salary_payment_frequency,
+      changed_by: changedBy,
+      changed_date: changedDate,
+      amount_paid: amountPaid,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  return salary;
 };

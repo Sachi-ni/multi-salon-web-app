@@ -1,3 +1,9 @@
 /* App.css — Minimal overrides (Tailwind handles everything via index.css) */
 /* This file is kept for backward compatibility with customer-facing pages */
 /* All admin dashboard styling is now handled by Tailwind utility classes */
+
+/* The appointment form uses its own visible calendar button. */
+.appointment-date-input::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  pointer-events: none;
+}

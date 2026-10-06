@@ -5,6 +5,7 @@ const serviceSchema = new mongoose.Schema({
   base_price:   { type: Number, required: true },
   description:  { type: String, default: "" },
   duration:     { type: Number, required: true }, // in minutes
+  status:       { type: String, enum: ["Active", "Inactive"], default: "Active" },
   category_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "ServiceCategory"

@@ -7,7 +7,7 @@ import {
   getCategories,
   createCategory,
 } from "../controllers/serviceController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, optionalProtect } from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
@@ -17,7 +17,7 @@ router.get("/categories", getCategories);
 router.post("/categories", protect, requireRole(["super-admin", "manager"]), createCategory);
 
 // Service CRUD
-router.get("/", getServices);
+router.get("/", optionalProtect, getServices);
 router.post("/", protect, requireRole(["super-admin", "manager"]), createService);
 router.put("/:id", protect, requireRole(["super-admin", "manager"]), updateService);
 router.delete("/:id", protect, requireRole(["super-admin", "manager"]), deleteService);

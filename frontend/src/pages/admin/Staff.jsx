@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getStaff, deleteStaff, updateStaff } from "../../services/staffService";
 import { getServices } from "../../services/serviceService";
+import useFormValidation from "../../hooks/useFormValidation";
+import { validateEmail } from "../../utils/validation";
+import StaffUnavailableModal from "../../components/booking/StaffUnavailableModal";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
@@ -51,6 +54,7 @@ const ActionsMenu = ({
   onEdit,
   onToggleStatus,
   onDelete,
+  onMarkUnavailable,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -116,6 +120,18 @@ const ActionsMenu = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                onMarkUnavailable(staff);
+                setOpen(false);
+              }}
+              className="w-full px-3.5 py-2 text-left text-xs font-semibold flex items-center gap-2.5 transition-colors duration-150 hover:bg-danger-dim text-danger"
+            >
+              <Power className="w-3.5 h-3.5" />
+              Mark Unavailable
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
                 onDelete(staff._id);
                 setOpen(false);
               }}
@@ -138,8 +154,10 @@ const StaffCard = ({
   onEdit,
   onToggleStatus,
   onDelete,
+  onMarkUnavailable,
 }) => {
-  const isInactive = staff.status === "Inactive";
+  const isActive = staff.status === "Active";
+  const isInactive = !isActive;
 
   const maxVisible = 3;
   const visibleServices =
@@ -236,6 +254,7 @@ const StaffCard = ({
               onEdit={onEdit}
               onToggleStatus={onToggleStatus}
               onDelete={onDelete}
+              onMarkUnavailable={onMarkUnavailable}
             />
           </div>
 
@@ -327,6 +346,30 @@ const StaffCard = ({
           </div>
         </div>
       </div>
+
+      {/* Footer Bar */}
+      <div className="px-5 py-3 bg-surface-2/30 border-t border-border flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+          <span className="text-xs font-extrabold text-white">
+            {staff.rating || "0.0"}
+          </span>
+        </div>
+
+        <button
+          onClick={() => onToggleStatus(staff)}
+          title={isActive ? "Deactivate Staff" : "Activate Staff"}
+          className={clsx(
+            "px-3 py-1.5 rounded-lg text-[0.65rem] font-extrabold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5",
+            isActive
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20"
+              : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-700"
+          )}
+        >
+          <Power className="w-3 h-3" />
+          {isActive ? "Active" : "Inactive"}
+        </button>
+      </div>
     </motion.div>
   );
 };
@@ -349,11 +392,17 @@ export default function AdminStaffPage() {
 
   const [editStaff, setEditStaff] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [editEmailSubmitError, setEditEmailSubmitError] = useState("");
+  const { errors: editErrors, handleBlur: handleEditBlur, validateAll: validateStaffEdit, isValid: staffEditIsValid, fieldMessages } = useFormValidation(editForm, { email: validateEmail });
   const [editPicture, setEditPicture] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
+  const editSubmitInFlight = useRef(false);
+  const [unavailableStaff, setUnavailableStaff] = useState(null);
 
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deletePaymentConfirmation, setDeletePaymentConfirmation] = useState(null);
+  const [frequencyConfirmation, setFrequencyConfirmation] = useState(null);
 
   const fetchStaffData = useCallback(async () => {
     try {
@@ -454,6 +503,18 @@ export default function AdminStaffPage() {
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
+    if (!validateStaffEdit()) return;
+
+    const oldFrequency = editStaff.salary_payment_frequency || "monthly";
+    const newFrequency = editForm.paymentFrequency || "monthly";
+    if (oldFrequency !== newFrequency && !frequencyConfirmation) {
+      setFrequencyConfirmation({
+        name: editStaff.full_name || `${editForm.firstName} ${editForm.lastName}`.trim(),
+        oldFrequency,
+        newFrequency,
+      });
+      return;
+    }
 
     setEditLoading(true);
     setError("");
@@ -504,62 +565,54 @@ export default function AdminStaffPage() {
         err.response?.data
       );
 
-      setError(
-        err.response?.data?.message ||
-          "Failed to update staff"
-      );
+      const message = err.response?.data?.message || "Failed to update staff";
+      if (/email/i.test(message)) setEditEmailSubmitError(message);
+      else setError(message);
     } finally {
       setEditLoading(false);
+      editSubmitInFlight.current = false;
     }
   };
 
-  const handleDelete = async () => {
+  const confirmFrequencyChange = async () => {
+    setFrequencyConfirmation(null);
+    await handleEditSubmit({ preventDefault: () => {} });
+  };
+
+  const handleDelete = async (settlePending = false) => {
     setDeleteLoading(true);
 
     try {
-      await deleteStaff(deleteId);
+      await deleteStaff(deleteId, { settlePending });
 
       setDeleteId(null);
+      setDeletePaymentConfirmation(null);
 
       fetchStaffData();
     } catch (err) {
       console.error(err);
-
-      setError(
-        err.response?.data?.message ||
-          "Failed to delete staff member"
-      );
+      if (err.response?.data?.requiresSalarySettlement) {
+        setDeletePaymentConfirmation({
+          pendingCount: err.response.data.pendingCount,
+          pendingTotal: err.response.data.pendingTotal,
+        });
+      } else {
+        setError(err.response?.data?.message || "Failed to delete staff member");
+      }
     } finally {
       setDeleteLoading(false);
     }
   };
 
   const filteredStaff = useMemo(() => {
-    if (!searchTerm) {
-      return staffList;
-    }
-
+    if (!searchTerm) return staffList;
     const term = searchTerm.toLowerCase();
-
     return staffList.filter((s) => {
-      const name =
-        (s.full_name || "").toLowerCase();
-
-      const spec =
-        (s.specification || "").toLowerCase();
-
-      const email =
-        (s.email || "").toLowerCase();
-
-      const phone =
-        (s.phone || "").toLowerCase();
-
-      return (
-        name.includes(term) ||
-        spec.includes(term) ||
-        email.includes(term) ||
-        phone.includes(term)
-      );
+      const name = (s.full_name || "").toLowerCase();
+      const spec = (s.specification || "").toLowerCase();
+      const email = (s.email || "").toLowerCase();
+      const phone = (s.phone || "").toLowerCase();
+      return name.includes(term) || spec.includes(term) || email.includes(term) || phone.includes(term);
     });
   }, [staffList, searchTerm]);
 
@@ -573,11 +626,7 @@ export default function AdminStaffPage() {
         <Button
           variant="primary"
           icon={Plus}
-          onClick={() =>
-            navigate(
-              `/salon-admin/${salonId}/AddStaff`
-            )
-          }
+          onClick={() => navigate(`/salon-admin/${salonId}/AddStaff`)}
         >
           Add Staff Member
         </Button>
@@ -684,6 +733,7 @@ export default function AdminStaffPage() {
               onEdit={() => handleEditOpen(staff)}
               onToggleStatus={handleToggleStatus}
               onDelete={setDeleteId}
+              onMarkUnavailable={setUnavailableStaff}
             />
           ))}
         </div>
@@ -820,6 +870,8 @@ export default function AdminStaffPage() {
                 firstName: e.target.value,
               })
             }
+            onBlur={() => handleEditBlur("email")}
+            error={editErrors.email}
             required
           />
 
@@ -841,12 +893,16 @@ export default function AdminStaffPage() {
             label="Email"
             type="email"
             value={editForm.email || ""}
-            onChange={(e) =>
+            onChange={(e) => {
+              setEditEmailSubmitError("");
               setEditForm({
                 ...editForm,
                 email: e.target.value,
-              })
-            }
+              });
+            }}
+            onBlur={() => handleEditBlur("email")}
+            error={editErrors.email || editEmailSubmitError}
+            helper={fieldMessages.email}
             required
           />
 
@@ -999,13 +1055,19 @@ export default function AdminStaffPage() {
           </div>
 
           <div className="mb-3.5">
-            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Profile Picture <span className="text-accent/60 lowercase tracking-widest ml-1 font-bold">(required)</span></label>
+            <label className="block text-[0.68rem] font-extrabold text-muted-2 tracking-wider uppercase mb-1.5">Profile Picture</label>
+            {editStaff?.image && (
+              <img
+                src={buildImageUrl(editStaff.image)}
+                alt="Current staff profile"
+                className="mb-2 h-16 w-16 rounded-xl object-cover border border-border"
+              />
+            )}
             <input
               type="file"
               accept="image/*"
               onChange={(e) => handlePictureChange(e.target.files?.[0] || null)}
               className="w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-accent file:text-primary file:cursor-pointer"
-              required
             />
           </div>
           <Modal.Actions>
@@ -1013,7 +1075,7 @@ export default function AdminStaffPage() {
               variant="ghost"
               type="button"
               onClick={() => setEditStaff(null)}
-              disabled={editLoading}
+              disabled={editLoading || !staffEditIsValid}
             >
               Cancel
             </Button>
@@ -1029,23 +1091,56 @@ export default function AdminStaffPage() {
         </form>
       </Modal>
 
+      <Modal
+        isOpen={Boolean(frequencyConfirmation)}
+        onClose={() => setFrequencyConfirmation(null)}
+        title="Confirm Payment Frequency Change"
+        maxWidth="max-w-md"
+      >
+        {frequencyConfirmation && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-1">
+              You are changing <strong className="text-white">{frequencyConfirmation.name}</strong>'s payment frequency from <strong className="text-white">{frequencyConfirmation.oldFrequency}</strong> to <strong className="text-white">{frequencyConfirmation.newFrequency}</strong>.
+            </p>
+            <p className="text-sm text-muted-1">
+              This will mark all pending salary under the current frequency as <strong className="text-white">Paid up to today ({new Date().toLocaleDateString()})</strong>.
+            </p>
+            <p className="text-sm text-muted-1">Do you want to continue?</p>
+            <Modal.Actions className="justify-end">
+              <Button variant="ghost" onClick={() => setFrequencyConfirmation(null)}>Cancel</Button>
+              <Button variant="primary" onClick={confirmFrequencyChange}>Pay &amp; Update Frequency</Button>
+            </Modal.Actions>
+          </div>
+        )}
+      </Modal>
+
+      <StaffUnavailableModal
+        staff={unavailableStaff}
+        onClose={() => setUnavailableStaff(null)}
+        onSuccess={() => {
+          setUnavailableStaff(null);
+          fetchStaffData();
+        }}
+      />
+
       {/* Delete Modal */}
       <Modal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
-        title="🗑️ Delete Staff Member?"
+        title={deletePaymentConfirmation ? "Pending Salary Payment" : "🗑️ Delete Staff Member?"}
         maxWidth="max-w-sm"
       >
         <p className="text-xs text-neutral-300 py-3 text-center leading-relaxed">
-          Are you sure you want to delete this staff member?
-          This action cannot be undone.
+          {deletePaymentConfirmation
+            ? `This staff member has ${deletePaymentConfirmation.pendingCount} pending salary record(s), totaling LKR ${Number(deletePaymentConfirmation.pendingTotal || 0).toLocaleString()}. Do you want to mark it as paid and delete the staff member?`
+            : "Are you sure you want to delete this staff member? Pending salary will be checked before deletion."}
         </p>
 
         <Modal.Actions className="justify-center">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setDeleteId(null)}
+            onClick={() => { setDeleteId(null); setDeletePaymentConfirmation(null); }}
             disabled={deleteLoading}
           >
             Cancel
@@ -1054,10 +1149,10 @@ export default function AdminStaffPage() {
           <Button
             variant="danger"
             size="sm"
-            onClick={handleDelete}
+            onClick={() => handleDelete(Boolean(deletePaymentConfirmation))}
             loading={deleteLoading}
           >
-            Delete Staff
+            {deletePaymentConfirmation ? "Pay & Delete" : "Continue"}
           </Button>
         </Modal.Actions>
       </Modal>

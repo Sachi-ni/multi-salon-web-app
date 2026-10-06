@@ -536,10 +536,80 @@
   .customer-page .hero { grid-template-columns: 1fr; }
   .customer-page .hero-right { display: none; }
   .customer-page .hero-title { font-size: 5rem; }
+  .customer-page .hero-left { padding: 60px 40px; }
   .customer-page .page-wrap { padding: 40px 24px; }
   .customer-page .two-col { grid-template-columns: 1fr; }
   .customer-page .form-grid { grid-template-columns: 1fr; }
   .customer-page .branches-grid { grid-template-columns: 1fr; }
   .customer-page .service-grid { grid-template-columns: 1fr; }
   .customer-page .staff-grid { grid-template-columns: 1fr; }
+  .customer-page .services-strip { padding: 14px 24px; gap: 24px; }
+  .customer-page .summary-card { padding: 24px; }
+  .customer-page .ty-title { font-size: 3rem; letter-spacing: 4px; }
+}
+
+@media (max-width: 480px) {
+  .customer-page nav { padding: 12px 16px; }
+  .customer-page .logo { font-size: 1.6rem; letter-spacing: 4px; }
+  .customer-page .nav-links { gap: 16px; }
+  .customer-page .hero-left { padding: 40px 20px; }
+  .customer-page .hero-title { font-size: 3.5rem; letter-spacing: 2px; }
+  .customer-page .hero-sub { font-size: 0.9rem; margin: 16px 0 32px; max-width: 100%; }
+  .customer-page .hero-btns { flex-direction: column; gap: 12px; }
+  .customer-page .btn-primary,
+  .customer-page .btn-outline { width: 100%; text-align: center; padding: 14px 24px; font-size: 0.8rem; }
+  .customer-page .page-wrap { padding: 24px 16px; }
+  .customer-page .page-title { font-size: 2.5rem; letter-spacing: 2px; }
+  .customer-page .page-sub { font-size: 0.82rem; margin-bottom: 32px; }
+  .customer-page .branch-card { padding: 24px; }
+  .customer-page .branch-name { font-size: 1.6rem; letter-spacing: 2px; }
+  .customer-page .step-bar { flex-wrap: wrap; gap: 4px; }
+  .customer-page .step-label { font-size: 0.65rem; letter-spacing: 0.5px; }
+  .customer-page .step-line { min-width: 20px; }
+  .customer-page .time-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .customer-page .time-btn { padding: 10px 8px; font-size: 0.78rem; }
+  .customer-page .summary-card { padding: 20px 16px; }
+  .customer-page .summary-table td,
+  .customer-page .summary-table th { font-size: 0.78rem; padding: 10px 0; }
+  .customer-page .total-label { font-size: 1.1rem; }
+  .customer-page .total-amount { font-size: 1.6rem; }
+  .customer-page .detail-row { flex-direction: column; gap: 4px; }
+  .customer-page .detail-key { font-size: 0.7rem; }
+  .customer-page .detail-val { font-size: 0.82rem; }
+  .customer-page .btn-row { flex-direction: column; gap: 12px; }
+  .customer-page .btn-back,
+  .customer-page .btn-next { width: 100%; text-align: center; }
+  .customer-page .services-strip { padding: 12px 16px; gap: 16px; }
+  .customer-page .strip-item { font-size: 0.9rem; letter-spacing: 3px; }
+  .customer-page .ty-title { font-size: 2.5rem; letter-spacing: 3px; }
+  .customer-page .ty-sub { font-size: 0.9rem; }
+  .customer-page .ty-icon { width: 80px; height: 80px; font-size: 2rem; }
+  .customer-page .thankyou-center { padding: 24px 16px; min-height: 60vh; }
+  .customer-page .svc-tag { font-size: 0.68rem; padding: 3px 10px; }
+  .customer-page .btn-nav { padding: 8px 20px; font-size: 0.75rem; }
+  .customer-page .cat-item { padding: 12px 16px; font-size: 0.82rem; letter-spacing: 1px; }
+  .customer-page .service-card { padding: 16px; }
+  .customer-page .staff-card { padding: 14px; gap: 10px; }
+  .customer-page .gender-btn { padding: 10px; font-size: 0.8rem; }
+  .customer-page input, .customer-page select { padding: 12px 14px; font-size: 0.85rem; }
+}
+
+@media (max-width: 360px) {
+  .customer-page .hero-title { font-size: 2.8rem; letter-spacing: 1px; }
+  .customer-page .hero-sub { font-size: 0.85rem; }
+  .customer-page .page-wrap { padding: 20px 12px; }
+  .customer-page .page-title { font-size: 2rem; letter-spacing: 1px; }
+  .customer-page .branch-card { padding: 20px; }
+  .customer-page .branch-name { font-size: 1.4rem; }
+  .customer-page .step-label { display: none; }
+  .customer-page .step-num { width: 28px; height: 28px; font-size: 0.7rem; }
+  .customer-page .time-grid { grid-template-columns: 1fr; }
+  .customer-page .summary-card { padding: 16px 12px; }
+  .customer-page .ty-title { font-size: 2rem; letter-spacing: 2px; }
+  .customer-page .btn-primary,
+  .customer-page .btn-outline { padding: 12px 20px; font-size: 0.78rem; letter-spacing: 2px; }
+  .customer-page .btn-back,
+  .customer-page .btn-next { padding: 12px 20px; font-size: 0.78rem; }
+  .customer-page nav { padding: 10px 12px; }
+  .customer-page .logo { font-size: 1.4rem; letter-spacing: 3px; }
 }

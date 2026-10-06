@@ -38,10 +38,35 @@ const appointmentSchema = new mongoose.Schema({
   },
   total_price: { type: Number, default: 0 },
   notes: { type: String, default: "" },
+  customer_note: { type: String, default: "" },
   confirmed_at: { type: Date, default: null },
+  confirmed_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: "confirmed_by_model",
+    default: null
+  },
+  confirmed_by_model: {
+    type: String,
+    enum: ["Admin", "Staff"],
+    default: null
+  },
+  confirmed_by_name: { type: String, default: "" },
+  confirmed_by_role: { type: String, default: "" },
   rejected_at: { type: Date, default: null },
   cancelled_at: { type: Date, default: null },
   feedback_submitted: { type: Boolean, default: false },
+  needsCustomerConfirmation: { type: Boolean, default: false },
+  last_update_summary: { type: String, default: "" },
+  last_updated_by: { type: mongoose.Schema.Types.ObjectId, refPath: "last_updated_by_model", default: null },
+  last_updated_by_model: { type: String, enum: ["Admin", "Staff"], default: "Admin" },
+  last_updated_at: { type: Date, default: null },
+  edit_history: [{
+    summary: { type: String, required: true },
+    changes: { type: mongoose.Schema.Types.Mixed, default: {} },
+    changed_by: { type: mongoose.Schema.Types.ObjectId, refPath: "edit_history.changed_by_model" },
+    changed_by_model: { type: String, enum: ["Admin", "Staff", "Customer"] },
+    changed_at: { type: Date, default: Date.now }
+  }],
 }, { timestamps: true });
 
 // Compound index for fast conflict detection queries

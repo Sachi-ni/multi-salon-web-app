@@ -15,7 +15,7 @@ export default function StepSelectStaff({ booking, onNext, onBack }) {
 
     getAvailableStaff(booking.date, serviceIds, booking.salonId)
       .then(res => setStaffList(res.data))
-      .catch(() => setError("Failed to load available staff."))
+      .catch(err => setError(err?.response?.data?.message || "Failed to load available staff."))
       .finally(() => setLoading(false));
   }, [booking.date, booking.services, booking.serviceId, booking.salonId]);
 

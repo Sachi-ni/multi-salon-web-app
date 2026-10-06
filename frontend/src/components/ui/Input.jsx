@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import clsx from "clsx";
+import { Eye, EyeOff } from "lucide-react";
 
 const Input = ({
   label,
@@ -10,6 +11,7 @@ const Input = ({
   containerClassName = "",
   ...props
 }) => {
+  const [showPassword, setShowPassword] = useState(false);
   const baseInput =
     "w-full bg-surface-2 border border-border rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-all duration-200 placeholder:text-muted focus:border-accent focus:bg-accent-dim/30 focus:ring-1 focus:ring-accent/20";
 
@@ -22,20 +24,32 @@ const Input = ({
       )}
       {type === "textarea" ? (
         <textarea
-          className={clsx(baseInput, "resize-y min-h-[80px]", className)}
+          className={clsx(baseInput, "resize-y min-h-[80px]", error && "border-danger focus:border-danger focus:ring-danger/20", className)}
           {...props}
         />
       ) : type === "select" ? (
-        <select className={clsx(baseInput, "cursor-pointer", className)} {...props}>
+        <select className={clsx(baseInput, "cursor-pointer", error && "border-danger focus:border-danger focus:ring-danger/20", className)} {...props}>
           {props.children}
         </select>
       ) : (
-        <input
-          type={type}
-          className={clsx(baseInput, className)}
-          autoComplete={props.autoComplete || "new-password"}
-          {...props}
-        />
+        <div className="relative">
+          <input
+            type={type === "password" && showPassword ? "text" : type}
+            className={clsx(baseInput, type === "password" && "pr-10", error && "border-danger focus:border-danger focus:ring-danger/20", className)}
+            autoComplete={props.autoComplete || "new-password"}
+            {...props}
+          />
+          {type === "password" && (
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-2 hover:text-white transition-colors"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
       )}
       {error && (
         <p className="mt-1 text-xs text-danger font-medium">{error}</p>

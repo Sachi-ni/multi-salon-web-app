@@ -12,10 +12,18 @@ import {
   LogOut,
   BarChart2,
   Image,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import clsx from "clsx";
 
-const AdminSidebar = ({ isOpen = true, onClose, basePath = "" }) => {
+const AdminSidebar = ({
+  isOpen = false,
+  onClose,
+  basePath = "",
+  isCollapsed = false,
+  onToggleCollapse,
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -74,6 +82,11 @@ items: [
     navigate("/");
   };
 
+  const handleNav = (path) => {
+    navigate(path);
+    if (onClose) onClose();
+  };
+
   return (
     <>
       {isOpen && (
@@ -85,19 +98,31 @@ items: [
 
       <aside
         className={clsx(
-          "fixed top-header bottom-0 left-0 z-[150] w-sidebar bg-surface border-r border-border flex flex-col overflow-y-auto transition-transform duration-300 ease-in-out",
-          "lg:translate-x-0",
+          "fixed top-header bottom-0 left-0 z-[150] bg-surface border-r border-border flex flex-col transition-all duration-300 ease-in-out select-none",
+          isCollapsed ? "lg:w-[72px] w-sidebar" : "w-sidebar",
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {/* Navigation */}
-        <nav className="flex-1 py-2">
-          {navItems.map((group) => (
-            <div key={group.group}>
-              {/* Group Label */}
-              <div className="px-3 pt-4 pb-1 text-[0.58rem] font-extrabold text-muted tracking-[0.14em] uppercase">
-                {group.group}
-              </div>
+        <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden space-y-1">
+          {navItems.map((group, groupIdx) => (
+            <div key={group.group} className="space-y-1">
+              {/* Group Label / Divider */}
+              {isCollapsed ? (
+                groupIdx > 0 && (
+                  <div className="hidden lg:block my-2 mx-3 border-t border-border/50" />
+                )
+              ) : (
+                <div className="px-3.5 pt-3 pb-1 text-[0.58rem] font-extrabold text-muted tracking-[0.14em] uppercase">
+                  {group.group}
+                </div>
+              )}
+
+              {isCollapsed && (
+                <div className="lg:hidden px-3.5 pt-3 pb-1 text-[0.58rem] font-extrabold text-muted tracking-[0.14em] uppercase">
+                  {group.group}
+                </div>
+              )}
 
               {/* Items */}
               {group.items.map((item) => {
@@ -105,19 +130,38 @@ items: [
                 const active = isActive(item.path);
 
                 return (
-                  <button
-                    key={item.path}
-                    onClick={() => navigate(basePath ? `${basePath}${item.path}` : item.path)}
-                    className={clsx(
-                      "w-[calc(100%-16px)] mx-2 flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[0.82rem] font-medium transition-all duration-150 text-left",
-                      active
-                        ? "bg-accent-dim text-accent border border-accent/20 font-semibold"
-                        : "text-muted-2 hover:bg-white/[0.04] hover:text-white border border-transparent"
+                  <div key={item.path} className="relative group">
+                    <button
+                      onClick={() => handleNav(basePath ? `${basePath}${item.path}` : item.path)}
+                      title={item.label}
+                      className={clsx(
+                        "transition-all duration-150 flex items-center text-left rounded-xl font-medium",
+                        isCollapsed
+                          ? "lg:w-11 lg:h-11 lg:mx-auto lg:p-0 lg:justify-center w-[calc(100%-16px)] mx-2 px-3 py-2.5 gap-3 text-[0.82rem]"
+                          : "w-[calc(100%-16px)] mx-2 px-3 py-2.5 gap-3 text-[0.82rem]",
+                        active
+                          ? "bg-accent-dim text-accent border border-accent/30 font-semibold shadow-sm shadow-accent/5"
+                          : "text-muted-2 hover:bg-white/[0.05] hover:text-white border border-transparent"
+                      )}
+                    >
+                      <Icon className={clsx("w-5 h-5 flex-shrink-0 transition-transform duration-150 group-hover:scale-105", active && "text-accent")} />
+                      <span
+                        className={clsx(
+                          "flex-1 truncate",
+                          isCollapsed && "lg:hidden"
+                        )}
+                      >
+                        {item.label}
+                      </span>
+                    </button>
+
+                    {/* Floating Tooltip (desktop collapsed only) */}
+                    {isCollapsed && (
+                      <div className="hidden lg:block absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1 bg-[#18181b] text-white text-xs font-semibold rounded-lg shadow-2xl border border-white/10 whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 z-[250]">
+                        {item.label}
+                      </div>
                     )}
-                  >
-                    <Icon className={clsx("w-4 h-4 flex-shrink-0", active && "text-accent")} />
-                    <span className="flex-1">{item.label}</span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -125,31 +169,81 @@ items: [
         </nav>
 
         {/* Bottom Section */}
-        <div className="p-3 mt-auto">
-          {user?.role === "super-admin" && (
+        <div className="p-3 mt-auto border-t border-border/50 space-y-2">
+          {/* Quick Collapse Toggle inside Sidebar on Desktop */}
+          {onToggleCollapse && (
             <button
-              onClick={() => navigate("/superAdminDashboard")}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-[0.82rem] font-bold text-black bg-amber-400 hover:bg-amber-500 transition-all duration-150 mb-2 shadow-sm"
+              type="button"
+              onClick={onToggleCollapse}
+              title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className={clsx(
+                "hidden lg:flex items-center text-muted-2 hover:text-white hover:bg-white/[0.05] rounded-xl transition-all duration-150",
+                isCollapsed
+                  ? "w-11 h-11 mx-auto justify-center"
+                  : "w-full px-3 py-2 gap-2.5 text-xs font-semibold"
+              )}
             >
-              <LayoutDashboard className="w-4 h-4" />
-              Back to Hub
+              {isCollapsed ? (
+                <ChevronRight className="w-4 h-4 text-accent" />
+              ) : (
+                <>
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Collapse Menu</span>
+                </>
+              )}
             </button>
           )}
 
-          {/* System Status */}
-          <div className="bg-surface-2 border border-border rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-xs mb-2">
-            <span className="w-2 h-2 rounded-full bg-success flex-shrink-0 animate-pulse-dot" />
-            <span className="text-muted-2">System Online</span>
-          </div>
+          {user?.role === "super-admin" && (
+            <div className="relative group">
+              <button
+                onClick={() => handleNav("/superAdminDashboard")}
+                title="Back to Hub"
+                className={clsx(
+                  "flex items-center justify-center font-bold text-black bg-amber-400 hover:bg-amber-500 transition-all duration-150 rounded-xl shadow-sm",
+                  isCollapsed
+                    ? "lg:w-11 lg:h-11 lg:mx-auto lg:p-0 w-full px-3 py-2.5 gap-2 text-[0.82rem]"
+                    : "w-full px-3 py-2.5 gap-2 text-[0.82rem]"
+                )}
+              >
+                <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
+                <span className={clsx("truncate", isCollapsed && "lg:hidden")}>
+                  Back to Hub
+                </span>
+              </button>
+
+              {isCollapsed && (
+                <div className="hidden lg:block absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1 bg-[#18181b] text-amber-400 text-xs font-semibold rounded-lg shadow-2xl border border-white/10 whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 z-[250]">
+                  Back to Hub
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[0.82rem] font-semibold text-danger border border-danger/20 hover:bg-danger-dim transition-all duration-150"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </button>
+          <div className="relative group">
+            <button
+              onClick={handleLogout}
+              title="Logout"
+              className={clsx(
+                "flex items-center font-semibold text-danger border border-danger/25 hover:bg-danger-dim transition-all duration-150 rounded-xl",
+                isCollapsed
+                  ? "lg:w-11 lg:h-11 lg:mx-auto lg:p-0 lg:justify-center w-full px-3 py-2.5 gap-2.5 text-[0.82rem]"
+                  : "w-full px-3 py-2.5 gap-2.5 text-[0.82rem]"
+              )}
+            >
+              <LogOut className="w-5 h-5 flex-shrink-0" />
+              <span className={clsx("flex-1 truncate text-left", isCollapsed && "lg:hidden")}>
+                Logout
+              </span>
+            </button>
+
+            {isCollapsed && (
+              <div className="hidden lg:block absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1 bg-[#18181b] text-rose-400 text-xs font-semibold rounded-lg shadow-2xl border border-white/10 whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 z-[250]">
+                Logout
+              </div>
+            )}
+          </div>
         </div>
       </aside>
     </>

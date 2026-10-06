@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import LandingNavbar from "./landing-sections/LandingNavbar";
 import Footer from "./landing-sections/Footer";
 
@@ -11,6 +11,10 @@ const sections = [
 ];
 
 export default function PrivacyPolicy() {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="min-h-screen bg-primary font-sans text-white">
       <LandingNavbar />

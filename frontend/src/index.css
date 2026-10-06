@@ -35,6 +35,13 @@
   input, select, textarea {
     font-family: inherit;
   }
+
+  /* Hide Edge's built-in password reveal control. Password fields use the
+     app's Lucide eye button, so users see one consistent white toggle. */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none;
+  }
 }
 
 /* ─── Component Layer ─── */

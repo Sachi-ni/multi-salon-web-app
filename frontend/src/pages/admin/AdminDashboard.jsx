@@ -24,8 +24,9 @@ import {
 
 import { motion } from "framer-motion";
 import {
-  AreaChart,
+  ComposedChart,
   Area,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -37,7 +38,6 @@ import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
-import { API_BASE as _API_BASE } from "../../config";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -56,7 +56,7 @@ const AdminDashboard = () => {
   const [reportData, setReportData] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [_error, setError] = useState("");
+  const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState("");
 
   const fetchDashboardData = useCallback(async () => {
@@ -68,8 +68,16 @@ const AdminDashboard = () => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(today.getDate() - 30);
 
-      const startStr = thirtyDaysAgo.toISOString().split("T")[0];
-      const endStr = today.toISOString().split("T")[0];
+      const startStr = [
+        thirtyDaysAgo.getFullYear(),
+        String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0'),
+        String(thirtyDaysAgo.getDate()).padStart(2, '0')
+      ].join('-');
+      const endStr = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0')
+      ].join('-');
 
       const [salonRes, apptRes, staffRes, feedbackRes, reportRes] = await Promise.allSettled([
         getSalon(salonId),
@@ -107,7 +115,7 @@ const AdminDashboard = () => {
   // Total Projected Revenue (Completed + Confirmed)
   const totalRevenue = useMemo(() => {
     if (reportData?.totalProjectedRevenue) return reportData.totalProjectedRevenue;
-    const valid = appointments.filter(a => ["completed", "confirmed"].includes(a.status));
+    const valid = appointments.filter(a => ["completed", "confirmed"].includes(a.status?.toLowerCase()));
     return valid.reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
   }, [appointments, reportData]);
 
@@ -116,13 +124,17 @@ const AdminDashboard = () => {
     const last7Days = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split("T")[0];
+      return [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, '0'),
+        String(d.getDate()).padStart(2, '0')
+      ].join('-');
     });
 
     return last7Days.map((dateStr) => {
       const dayAppts = appointments.filter((a) => a.appointment_date === dateStr);
       const dayRevenue = dayAppts
-        .filter((a) => ["completed", "confirmed"].includes(a.status))
+        .filter((a) => ["completed"].includes(a.status?.toLowerCase()))
         .reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
 
       const label = new Date(dateStr).toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
@@ -206,6 +218,12 @@ const AdminDashboard = () => {
           New Appointment
         </Button>
       </PageHeader>
+
+      {error && (
+        <div className="p-4 bg-danger/10 border border-danger/20 text-danger rounded-xl text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Salon Branch Banner */}
       <div className="bg-surface border border-border rounded-2xl p-5 shadow-card flex flex-wrap items-center justify-between gap-4">
@@ -323,7 +341,7 @@ const AdminDashboard = () => {
 
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
@@ -334,18 +352,20 @@ const AdminDashboard = () => {
                   <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+              <CartesianGrid strokeDasharray="4 4" stroke="#525252" vertical={false} />
               <XAxis dataKey="date" stroke="#737373" fontSize={11} tickLine={false} />
-              <YAxis stroke="#737373" fontSize={11} tickLine={false} />
+              <YAxis yAxisId="left" stroke="#737373" fontSize={11} tickLine={false} />
+              <YAxis yAxisId="right" orientation="right" stroke="#737373" fontSize={11} tickLine={false} />
               <Tooltip
                 contentStyle={{ backgroundColor: "#171717", borderColor: "#404040", borderRadius: "12px", color: "#fff", fontSize: "12px" }}
               />
-              <Area type="monotone" dataKey="revenue" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#revenueGradient)" name="Revenue (LKR)" />
-              <Area type="monotone" dataKey="bookings" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#bookingsGradient)" name="Bookings" />
-            </AreaChart>
+              <Area yAxisId="left" type="monotone" dataKey="revenue" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#revenueGradient)" name="Revenue (LKR)" />
+              <Bar yAxisId="right" dataKey="bookings" fill="url(#bookingsGradient)" radius={[4, 4, 0, 0]} maxBarSize={40} name="Bookings" />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
+
 
       {/* Quick Actions & Recent Appointments Split */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -423,7 +443,14 @@ const AdminDashboard = () => {
                         <p className="font-semibold text-white">{a.appointment_date}</p>
                         <p className="text-2xs text-neutral-400">{a.start_time}</p>
                       </Table.Td>
-                      <Table.Td>{getStatusBadge(a.status)}</Table.Td>
+                      <Table.Td>
+                        {getStatusBadge(a.status)}
+                        {a.status === "confirmed" && a.confirmed_by_name && (
+                          <span className="block text-[0.65rem] text-emerald-400 mt-1 font-semibold">
+                            By {a.confirmed_by_name} ({a.confirmed_by_role || "Staff"})
+                          </span>
+                        )}
+                      </Table.Td>
                       <Table.Td align="right" className="text-amber-400 font-black text-xs">
                         LKR {totalPrice.toLocaleString()}
                       </Table.Td>

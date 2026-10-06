@@ -7,6 +7,7 @@ const adminSchema = new mongoose.Schema({
 phone:     { type: String },
   image:     { type: String, default: "" },
   password:  { type: String, required: true },
+  passwordChangedAt: { type: Date, default: null },
   role: {
     type: String,
     enum: ["super-admin", "manager", "user"],
@@ -18,7 +19,18 @@ phone:     { type: String },
     default: null // null for super-admin since they oversee all salons
   },
   mustChangePassword: { type: Boolean, default: undefined },
-  mfaEnrolled: { type: Boolean, default: undefined }
+  mfaEnrolled: { type: Boolean, default: undefined },
+  resetPasswordTokenHash: { type: String, default: null },
+  resetPasswordExpires: { type: Date, default: null },
+  otpCodeHash: { type: String, default: null },
+  otpExpires: { type: Date, default: null },
+  otpAttempts: { type: Number, default: 0 },
+  otpLastSentAt: { type: Date, default: null },
+  passwordResetOtpCodeHash: { type: String, default: null },
+  passwordResetOtpExpires: { type: Date, default: null },
+  passwordResetOtpAttempts: { type: Number, default: 0 },
+  passwordResetOtpLastSentAt: { type: Date, default: null },
+  passwordResetSessionHash: { type: String, default: null }
 }, { timestamps: true });
 
 export default mongoose.model("Admin", adminSchema);
