@@ -53,12 +53,16 @@ const CustomerRegister = () => {
     const normalizedPhone = normalizePhone(phone);
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/auth/register`, {
+      const res = await axios.post(`${API_URL}/auth/register`, {
         fullName: name,
         email: email.trim().toLowerCase(),
         phone: normalizedPhone,
         password,
       });
+      if (res.status === 202) {
+        setEmailSubmitError("An account with this email already exists. Please sign in or reset your password.");
+        return;
+      }
       setFormSuccess("success");
       setTimeout(() => navigate("/login"), 1800);
     } catch (err) {
