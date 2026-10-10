@@ -173,6 +173,7 @@ export default function AppointmentEditWorkflowModal({ appointment, salonId, onC
     }
   };
 
+<<<<<<< HEAD
   const bookingCode = appointment._id ? `#APT-${String(appointment._id).slice(-6).toUpperCase()}` : "";
   const customerName = appointment.customer_id?.name || appointment.guest_name || "Guest";
 

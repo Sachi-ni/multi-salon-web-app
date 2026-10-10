@@ -214,6 +214,21 @@ export const isSalaryPeriodEnded = (salaryRecord) => {
   return periodEnd < today;
 };
 
+// Salary dates and salon hours are entered in Sri Lankan local time. Build the
+// cutoff as an absolute instant so the result is identical on local machines
+// and hosted servers whose process timezone may be UTC.
+const SRI_LANKA_OFFSET_MINUTES = 5 * 60 + 30;
+
+const getSriLankaCutoff = (date, hours, minutes) => {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  return new Date(
+    Date.UTC(year, month, day, hours, minutes, 0, 0) -
+      SRI_LANKA_OFFSET_MINUTES * 60 * 1000
+  );
+};
+
 // A salary becomes payable at salon closing time on the period's final day.
 const canPaySalaryPeriod = (salaryRecord, closeTime = "17:00") => {
   if (salaryRecord?.isTransitioned) return true;
@@ -222,8 +237,7 @@ const canPaySalaryPeriod = (salaryRecord, closeTime = "17:00") => {
   const [hours, minutes] = /^\d{2}:\d{2}$/.test(closeTime || "")
     ? closeTime.split(":").map(Number)
     : [17, 0];
-  endDate.setHours(hours, minutes, 0, 0);
-  return new Date() >= endDate;
+  return new Date() >= getSriLankaCutoff(endDate, hours, minutes);
 };
 
 export const calculateDaySalary = (
@@ -1152,6 +1166,26 @@ export const getSalaries = async (req, res) => {
       });
     }
 
+    const salaryStaffIds = salaries
+      .map((salary) => salary.staff_id?._id || salary.staff_id)
+      .filter(Boolean);
+    const dailyFrequencyChanges = frequency === "daily"
+      ? await SalaryFrequencyChange.find({
+          staff_id: { $in: salaryStaffIds },
+          new_frequency: "daily",
+        })
+          .sort({ changed_date: -1, createdAt: -1 })
+          .select("staff_id changed_date")
+          .lean()
+      : [];
+    const dailyChangeDateByStaff = new Map();
+    for (const change of dailyFrequencyChanges) {
+      const staffKey = String(change.staff_id);
+      if (!dailyChangeDateByStaff.has(staffKey)) {
+        dailyChangeDateByStaff.set(staffKey, change.changed_date);
+      }
+    }
+
     // Apply the salary-per-day rules (days without completed appointments
     // still earn the salary-per-day amount) before responding.
     salaries = await refreshSalariesForResponse(salaries);
@@ -1193,6 +1227,10 @@ export const getSalaries = async (req, res) => {
       workRate: s.workRate,
       daySalary: s.daySalary,
       totalSalary: s.totalSalary,
+      salaryFrequencyChangedDate:
+        dailyChangeDateByStaff.get(
+          String(s.staff_id?._id || s.staff_id || "")
+        ) || "",
       dailyRecords: s.dailyRecords,
     }));
 
@@ -1287,12 +1325,49 @@ export const getStaffSalaryList = async (req, res) => {
       ...(frequency ? { salary_payment_frequency: frequency } : {}),
     })
       .select("full_name role commission_rate salary_payment_frequency salary_payment_count_per_day salon_id services createdAt salaryCalculationEnabled")
-      .populate("salon_id", "name")
+      .populate("salon_id", "name close_time")
       .populate("services", "service_name base_price duration")
       .sort({ full_name: 1 })
       .lean();
 
-    res.json({ success: true, staff: staffList });
+    const staffIds = staffList.map((staff) => staff._id);
+    const frequencyChanges = await SalaryFrequencyChange.find({
+      staff_id: { $in: staffIds },
+      ...(frequency ? { new_frequency: frequency } : {}),
+    })
+      .sort({ changed_date: -1, createdAt: -1 })
+      .select("staff_id changed_date")
+      .lean();
+
+    const nextCalculationDate = (changedDate) => {
+      const date = parseLocalDateStr(changedDate);
+      if (!date) return "";
+      date.setDate(date.getDate() + 1);
+      return normalizeSalaryDate(date);
+    };
+
+    const calculationStartByStaff = new Map();
+    const changedDateByStaff = new Map();
+    for (const change of frequencyChanges) {
+      const staffKey = String(change.staff_id);
+      if (!calculationStartByStaff.has(staffKey)) {
+        changedDateByStaff.set(staffKey, change.changed_date);
+        calculationStartByStaff.set(
+          staffKey,
+          nextCalculationDate(change.changed_date)
+        );
+      }
+    }
+
+    const staffWithCalculationDates = staffList.map((staff) => ({
+      ...staff,
+      salaryCalculationStartDate:
+        calculationStartByStaff.get(String(staff._id)) || "",
+      salaryFrequencyChangedDate:
+        changedDateByStaff.get(String(staff._id)) || "",
+    }));
+
+    res.json({ success: true, staff: staffWithCalculationDates });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -1905,8 +1980,30 @@ export const getStaffWithSalaries = async (req, res) => {
         return periodEnd >= joinDate;
       });
 
+    const staffIds = enrichedStaffList.map((staff) => staff._id);
+    const frequencyChanges = await SalaryFrequencyChange.find({
+      staff_id: { $in: staffIds },
+      ...(frequency ? { new_frequency: frequency } : {}),
+    })
+      .sort({ changed_date: -1, createdAt: -1 })
+      .select("staff_id changed_date")
+      .lean();
+    const changedDateByStaff = new Map();
+    for (const change of frequencyChanges) {
+      const staffKey = String(change.staff_id);
+      if (!changedDateByStaff.has(staffKey)) {
+        changedDateByStaff.set(staffKey, change.changed_date);
+      }
+    }
+
+    const staffWithFrequencyDates = enrichedStaffList.map((staff) => ({
+      ...staff,
+      salaryFrequencyChangedDate:
+        changedDateByStaff.get(String(staff._id)) || "",
+    }));
+
     if (!period) {
-      return res.json({ success: true, staff: enrichedStaffList, salaries: [] });
+      return res.json({ success: true, staff: staffWithFrequencyDates, salaries: [] });
     }
 
     // Get salary records for this period
@@ -1940,7 +2037,7 @@ export const getStaffWithSalaries = async (req, res) => {
     // salary pages always shows current values, not just whatever was stored.
     salaries = await refreshSalariesForResponse(salaries);
 
-    res.json({ success: true, staff: enrichedStaffList, salaries });
+    res.json({ success: true, staff: staffWithFrequencyDates, salaries });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -121,16 +121,18 @@ const isPeriodEnded = (frequency, currentDateStr, salonCloseTime) => {
     closingTime.setHours(hours, minutes, 0, 0);
     return today >= closingTime;
   }
-  today.setHours(23, 59, 59, 999);
+  const [hours, minutes] = /^\d{2}:\d{2}$/.test(salonCloseTime || "")
+    ? salonCloseTime.split(":").map(Number)
+    : [17, 0];
   if (frequency === "weekly") {
     const range = getWeekRange(currentDateStr);
     const weekEnd = new Date(range.end);
-    weekEnd.setHours(23, 59, 59, 999);
+    weekEnd.setHours(hours, minutes, 0, 0);
     return today >= weekEnd;
   }
   const range = getMonthRange(currentDateStr);
   const monthEnd = new Date(range.end);
-  monthEnd.setHours(23, 59, 59, 999);
+  monthEnd.setHours(hours, minutes, 0, 0);
   return today >= monthEnd;
 };
 
@@ -939,7 +941,14 @@ const Salary = () => {
   // ─── Build display rows (salaries + staff without records) ──────────────
 
   const displayRows = useMemo(() => {
-    let rows = [...salaries];
+    let rows = salaries.filter((row) => {
+      if (frequency !== "daily") return true;
+      const changedDate =
+        row.salaryFrequencyChangedDate ||
+        row.staff_id?.salaryFrequencyChangedDate ||
+        "";
+      return !changedDate || toDateKey(row.period) >= toDateKey(changedDate);
+    });
 
     // Always show every staff member of the salon under this frequency tab.
     // Staff that do not have a salary record for the selected period yet are
@@ -957,6 +966,13 @@ const Salary = () => {
       const pendingRows = fallbackStaff
         .filter((staff) => {
           if (recordedStaffIds.has(String(staff._id))) return false;
+          if (
+            frequency === "daily" &&
+            staff.salaryFrequencyChangedDate &&
+            dailyDate < staff.salaryFrequencyChangedDate
+          ) {
+            return false;
+          }
           const joinDate = getStaffJoinDateStr(staff);
           if (joinDate && periodEndStr && periodEndStr < joinDate) {
             return false;
@@ -976,6 +992,7 @@ const Salary = () => {
                 );
           const fallbackTotalSalary =
             staff.salaryCalculationEnabled === false ||
+            (staff.salaryCalculationStartDate && selectedDateKey < staff.salaryCalculationStartDate) ||
             (employmentStartKey && selectedDateKey < employmentStartKey)
               ? 0
               : selectedDateKey;
@@ -983,6 +1000,7 @@ const Salary = () => {
           return {
             _id: `${FALLBACK_PREFIX}${staff._id}`,
             staff_id: staff,
+            salon_id: staff.salon_id,
             staff_name: staff.full_name || "",
             workingAmount: 0,
             rate: staff.commission_rate ?? 0,
