@@ -597,6 +597,19 @@ export const refreshSalaryRecord = (salaryRecord) => {
     return true;
   }
 
+  if (
+    salaryRecord.frequency === "daily" &&
+    salaryRecord.calculationStartDate &&
+    recordPeriodDate &&
+    recordPeriodDate < normalizeSalaryDate(salaryRecord.calculationStartDate)
+  ) {
+    salaryRecord.workingAmount = 0;
+    salaryRecord.workRate = 0;
+    salaryRecord.daySalary = 0;
+    salaryRecord.totalSalary = 0;
+    return true;
+  }
+
   // Backfill the per-day amount snapshot from the staff when it is missing.
   const staffPerDay = safeNumber(
     salaryRecord.staff_id?.salary_payment_count_per_day,
@@ -1144,7 +1157,7 @@ export const getSalaries = async (req, res) => {
     if (staffId) filter.staff_id = staffId;
 
     let salaries = await Salary.find(filter)
-      .populate("staff_id", "full_name email phone role status salaryCalculationEnabled salary_payment_frequency salary_payment_count_per_day commission_rate image")
+      .populate("staff_id", "full_name email phone role status salaryCalculationEnabled salary_payment_frequency salary_payment_count_per_day salary_cycle_id commission_rate image")
       .populate("salon_id", "name location phone email close_time")
       .sort({ "staff_name": 1 });
 

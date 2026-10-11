@@ -910,6 +910,45 @@ export const updateStaff = async (req, res) => {
           { upsert: true, new: true }
         );
 
+        if (frequencyChanged && frequency === "daily") {
+          await Salary.findOneAndUpdate(
+            {
+              salon_id: salonId,
+              staff_id: staff._id,
+              period: statusDate,
+              frequency: "daily",
+              cycleId,
+            },
+            {
+              $setOnInsert: {
+                salon_id: salonId,
+                staff_id: staff._id,
+                employmentStartDate: getEmploymentStartDate(staff),
+                frequency: "daily",
+                period: statusDate,
+                cycleId,
+                calculationStartDate: yyyymmdd,
+                staff_name: staff.full_name || "",
+                staff_role: staff.role || "",
+                commission_rate: staff.commission_rate || 0,
+                salary_payment_count_per_day: staff.salary_payment_count_per_day || 1,
+                workingAmount: 0,
+                rate: staff.commission_rate || 0,
+                workRate: 0,
+                daySalary: 0,
+                totalSalary: 0,
+                status: "Not Paid",
+                year: now.getFullYear(),
+                month: now.getMonth() + 1,
+                weekNumber: 0,
+                dateRange: { start: statusDate, end: statusDate },
+                dailyRecords: [],
+              },
+            },
+            { upsert: true, new: true }
+          );
+        }
+
         res.locals.salaryTransition = previousSalary;
       }
     } catch (e) {
