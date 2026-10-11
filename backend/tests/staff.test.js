@@ -162,6 +162,48 @@ test("changing frequency closes the old salary and opens the new salary from tod
   expect(response.body.salaryTransition.salaryId).toBe(String(oldSalary._id));
 });
 
+test("changing weekly or monthly frequency to daily keeps the edit date at zero", async () => {
+  const salon = await Salon.create({ name: "Daily Transition", staffCount: 0 });
+  const manager = await Staff.create({ full_name: "Manager Transition", first_name: "Manager", last_name: "Transition", email: "manager-transition@gmail.com", password_hash: "unused", role: "manager", salon_id: salon._id });
+  const staff = await Staff.create({ full_name: "Staff Transition", first_name: "Staff", last_name: "Transition", email: "staff-transition@gmail.com", password_hash: "unused", role: "staff", salon_id: salon._id, salary_payment_frequency: "monthly" });
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  const monthKey = todayKey.slice(0, 7);
+
+  await Salary.create({
+    salon_id: salon._id,
+    staff_id: staff._id,
+    frequency: "monthly",
+    period: monthKey,
+    staff_name: staff.full_name,
+    dateRange: { start: `${monthKey}-01`, end: todayKey },
+    dailyRecords: [],
+    status: "Not Paid",
+  });
+
+  const response = await request(app)
+    .put(`/api/staff/${staff._id}`)
+    .set("Authorization", `Bearer ${generateToken(manager)}`)
+    .send({ salaryPaymentFrequency: "daily" });
+
+  expect(response.status).toBe(200);
+  const editDateSalary = await Salary.findOne({ staff_id: staff._id, frequency: "daily", period: todayKey });
+  const nextDateSalary = await Salary.findOne({ staff_id: staff._id, frequency: "daily", period: tomorrowKey });
+  expect(editDateSalary.totalSalary).toBe(0);
+  expect(editDateSalary.calculationStartDate).toBe(tomorrowKey);
+  expect(nextDateSalary.totalSalary).toBe(0);
+  expect(nextDateSalary.calculationStartDate).toBe(tomorrowKey);
+
+  const dailyResponse = await request(app)
+    .get(`/api/salary?frequency=daily&period=${todayKey}`)
+    .set("Authorization", `Bearer ${generateToken(manager)}`);
+  expect(dailyResponse.status).toBe(200);
+  expect(dailyResponse.body.salaries.find((salary) => String(salary.staff_id?._id) === String(staff._id)).totalSalary).toBe(0);
+});
+
 test("editing daily salary preserves working amount and recalculates the active total", async () => {
   const salon = await Salon.create({ name: "Daily Edit", staffCount: 0 });
   const manager = await Staff.create({ full_name: "Manager Daily", first_name: "Manager", last_name: "Daily", email: "manager-daily-edit@gmail.com", password_hash: "unused", role: "manager", salon_id: salon._id });

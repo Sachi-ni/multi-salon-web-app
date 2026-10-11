@@ -334,7 +334,9 @@ const Salary = () => {
         frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate;
       const data = period
         ? allRecords.filter(
-            (s) => s.period === period && isSalaryVisibleOnDate(s, selectedDate)
+            (s) => s.period === period &&
+              (!s.staff_id?.salary_cycle_id || s.cycleId === s.staff_id.salary_cycle_id) &&
+              isSalaryVisibleOnDate(s, selectedDate)
           )
         : allRecords;
       setSalaries(data);
@@ -1284,7 +1286,7 @@ const Salary = () => {
                   const workingAmt = frequency === "monthly"
                     ? (selectedDailyRecord?.workingAmount || 0)
                     : frequency === "weekly"
-                      ? weeklyCalculation.workingAmount
+                      ? (selectedWeeklyRecord?.workingAmount || 0)
                       : (row.workingAmount || 0);
                   const currentRate = editingRates[row._id] !== undefined
                     ? editingRates[row._id]
@@ -1293,7 +1295,7 @@ const Salary = () => {
                   const workRate = frequency === "monthly"
                     ? (selectedDailyRecord?.workRate || 0)
                     : frequency === "weekly"
-                      ? weeklyCalculation.workRate
+                      ? (selectedWeeklyRecord?.workRate || 0)
                       : (row.workRate || 0);
                   const fallbackPerDay = isFallback
                     ? Number(staff.salary_payment_count_per_day || 0)

@@ -364,7 +364,9 @@ const Salary = () => {
         frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate;
       const periodRows = period
         ? allRecords.filter(
-            (s) => s.period === period && isSalaryVisibleOnDate(s, selectedDate)
+            (s) => s.period === period &&
+              (!s.staff_id?.salary_cycle_id || s.cycleId === s.staff_id.salary_cycle_id) &&
+              isSalaryVisibleOnDate(s, selectedDate)
           )
         : allRecords;
       // A manager has one visible row per selected period. This also keeps
@@ -1294,6 +1296,13 @@ const Salary = () => {
                     frequency === "weekly" && Array.isArray(row.dailyRecords)
                       ? row.dailyRecords.find((dr) => toDateKey(dr.date) === weeklyDate)
                       : null;
+                  const weeklyRange = frequency === "weekly" ? getWeekRange(weeklyDate) : null;
+                  const weeklyRecords = frequency === "weekly" && Array.isArray(row.dailyRecords)
+                    ? row.dailyRecords.filter((dr) => {
+                        const date = toDateKey(dr.date);
+                        return date >= weeklyRange.start && date <= weeklyRange.end && date <= today;
+                      })
+                    : [];
                   const selectedDailyRecord = monthlyDayRecord || null;
                   const workingAmt = frequency === "monthly"
                     ? (selectedDailyRecord?.workingAmount || 0)
@@ -1350,7 +1359,9 @@ const Salary = () => {
                               : sum;
                           }, 0)
                         : (row.totalSalary || 0))
-                    : (row.totalSalary || 0);
+                    : frequency === "weekly" && weeklyRecords.length > 0
+                      ? weeklyRecords.reduce((sum, dr) => sum + (Number(dr.daySalary) || 0), 0)
+                      : (row.totalSalary || 0);
                   const status = frequency === "monthly"
                     ? (selectedDailyRecord?.status || row.status || "Not Paid")
                     : (row.status || "Not Paid");
