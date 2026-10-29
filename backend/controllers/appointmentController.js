@@ -37,17 +37,9 @@ const generateSlotTimes = (startTime, endTime) => {
   return slots;
 };
 
-// ─── Helper: check if two time ranges overlap ───────────────────────────────
-const timesOverlap = (s1, e1, s2, e2) => {
-  return s1 < e2 && s2 < e1;
-};
-
-const normalizePhone = (phone) => phone?.replace(/[\s()-]/g, "") || "";
-const PHONE_PATTERN = /^\+?[0-9]{10}$/;
-
 // ─── Helper: normalize any time string to a zero-padded "HH:MM" ──────────────
-// Used by the appointment-edit flow (available-staff window filter, available-slots
-// ignore-appointment logic and staff reassignment). Handles "9:00", "09:00",
+// Used by slot conflict checking, available-staff window filter, available-slots
+// ignore-appointment logic and staff reassignment. Handles "9:00", "09:00",
 // ISO strings like "2026-01-01T09:00:00.000Z" and Date objects.
 const toHHMM = (t) => {
   if (!t) return "";
@@ -58,6 +50,18 @@ const toHHMM = (t) => {
   if (e) return `${String(Number(e[1])).padStart(2, "0")}:${e[2]}`;
   return s;
 };
+
+// ─── Helper: check if two time ranges overlap ───────────────────────────────
+const timesOverlap = (s1, e1, s2, e2) => {
+  const normS1 = toHHMM(s1);
+  const normE1 = toHHMM(e1);
+  const normS2 = toHHMM(s2);
+  const normE2 = toHHMM(e2);
+  return normS1 < normE2 && normS2 < normE1;
+};
+
+const normalizePhone = (phone) => phone?.replace(/[\s()-]/g, "") || "";
+const PHONE_PATTERN = /^\+?[0-9]{10}$/;
 
 const addMinutesToTime = (time, minutes) => {
   const [hours, mins] = time.split(":").map(Number);
@@ -171,8 +175,14 @@ export const getAvailableStaff = async (req, res) => {
         if (!occupiedByStaff[key]) occupiedByStaff[key] = [];
         occupiedByStaff[key].push({ start: toHHMM(start), end: toHHMM(end) });
       };
+
+      const apptIdsWithServices = new Set(
+        serviceAssignments.map(asv => asv.appointment_id.toString())
+      );
       for (const appt of apptsOnDate) {
-        addRange(appt.staff_id, appt.start_time, appt.end_time);
+        if (!apptIdsWithServices.has(appt._id.toString())) {
+          addRange(appt.staff_id, appt.start_time, appt.end_time);
+        }
       }
       for (const asv of serviceAssignments) {
         addRange(asv.staff_id, asv.service_start_time, asv.service_end_time);
@@ -207,8 +217,8 @@ export const getAvailableStaff = async (req, res) => {
       const close = (salon && salon.close_time) ? salon.close_time : "17:00";
 
       // 4. Filter — a staff is available at [tStart, tEnd) only if:
-      //    - no existing booking overlaps the window, AND
-      //    - (if an availability record exists) the window fits within one free slot,
+      //    - no existing booking overlaps the window (checked per service via AppointmentService), AND
+      //    - (if an availability record exists) the window fits within their working slots,
       //    - otherwise the window fits within salon working hours.
       result = result.filter(staff => {
         const key = staff.staff_id.toString();
@@ -223,11 +233,6 @@ export const getAvailableStaff = async (req, res) => {
           return availDoc.slots.some(slot => {
             const s = toHHMM(slot.start_time);
             const e = toHHMM(slot.end_time);
-            const isCurrentAppointmentSlot = ignoredAppointment &&
-              ignoredStaffIds.has(key) &&
-              s >= toHHMM(ignoredAppointment.start_time) &&
-              e <= toHHMM(ignoredAppointment.end_time);
-            if (slot.is_booked && !isCurrentAppointmentSlot) return false;
             return s <= tStart && tEnd <= e;
           });
         }
@@ -336,54 +341,80 @@ export const getAvailableSlots = async (req, res) => {
       end_date_time: { $gt: queryDate }
     }).lean();
 
-    let ignoredAppointment = null;
-    let staffHasIgnoredAppointment = false;
-    if (ignoreAppointmentId) {
-      ignoredAppointment = await Appointment.findById(ignoreAppointmentId).lean();
-      staffHasIgnoredAppointment = ignoredAppointment?.staff_id?.toString() === staffId;
-      if (!staffHasIgnoredAppointment) {
-        staffHasIgnoredAppointment = await AppointmentService.exists({
-          appointment_id: ignoreAppointmentId,
-          staff_id: staffId
-        });
-      }
-    }
-
-    // 4.5 Build list of occupied time ranges from confirmed appointments and services
+    // 4.5 Build list of occupied time ranges for this staff from AppointmentService
     const occupiedRanges = [];
-
-    // Add from parent appointments if this staff is the primary staff
-    // (skip the appointment being edited, since this slot query is for reassignment)
-    for (const appt of validAppointments) {
-      if (ignoreAppointmentId && appt._id.toString() === ignoreAppointmentId) continue;
-      if (appt.staff_id && appt.staff_id.toString() === staffId) {
-        occupiedRanges.push({ start: appt.start_time, end: appt.end_time });
-      }
-    }
 
     // Add from specific AppointmentService entries for this staff
     for (const svc of staffServices) {
       if (ignoreAppointmentId && svc.appointment_id && svc.appointment_id.toString() === ignoreAppointmentId) continue;
       if (svc.service_start_time && svc.service_end_time) {
-        occupiedRanges.push({ start: svc.service_start_time, end: svc.service_end_time });
+        occupiedRanges.push({ start: toHHMM(svc.service_start_time), end: toHHMM(svc.service_end_time) });
       }
     }
 
-    // 5. Filter available slots — not booked and not overlapping with confirmed appointments
-    const freeSlots = availability.slots.filter(slot => {
-      const isCurrentAppointmentSlot = ignoredAppointment &&
-        staffHasIgnoredAppointment &&
-        toHHMM(slot.start_time) >= toHHMM(ignoredAppointment.start_time) &&
-        toHHMM(slot.end_time) <= toHHMM(ignoredAppointment.end_time);
-      if (slot.is_booked && !isCurrentAppointmentSlot) return false;
+    // Only add from parent appointment if this appointment has NO AppointmentService records at all (pure legacy fallback)
+    const apptsWithServices = new Set(
+      (await AppointmentService.find({ appointment_id: { $in: validApptIds } }).distinct("appointment_id")).map(String)
+    );
+    for (const appt of validAppointments) {
+      if (ignoreAppointmentId && appt._id.toString() === ignoreAppointmentId) continue;
+      if (apptsWithServices.has(appt._id.toString())) continue; // Handled accurately by AppointmentService!
+      if (appt.staff_id && appt.staff_id.toString() === staffId) {
+        occupiedRanges.push({ start: toHHMM(appt.start_time), end: toHHMM(appt.end_time) });
+      }
+    }
 
-      // Check if this slot overlaps with any confirmed appointment
+    // 4.6 Check customer's existing appointments on this date (customer cannot book overlapping appointments)
+    const customerId = req.user?.id || req.query.customerId;
+    const guestPhone = req.query.guestPhone;
+    const customerOccupiedRanges = [];
+    if (customerId || guestPhone) {
+      const custFilter = {
+        appointment_date: date,
+        status: { $in: ["confirmed", "pending"] },
+        ...(ignoreAppointmentId ? { _id: { $ne: ignoreAppointmentId } } : {})
+      };
+      if (customerId && guestPhone) {
+        custFilter.$or = [{ customer_id: customerId }, { guest_phone: guestPhone }];
+      } else if (customerId) {
+        custFilter.customer_id = customerId;
+      } else {
+        custFilter.guest_phone = guestPhone;
+      }
+
+      const custAppts = await Appointment.find(custFilter).select("start_time end_time").lean();
+
+      for (const ca of custAppts) {
+        if (ca.start_time && ca.end_time) {
+          customerOccupiedRanges.push({ start: toHHMM(ca.start_time), end: toHHMM(ca.end_time) });
+        }
+      }
+    }
+
+    // 5. Filter available slots — staff not occupied, customer not occupied, and within working hours
+    const freeSlots = availability.slots.filter(slot => {
+      const slotStart = toHHMM(slot.start_time);
+      const slotEnd = toHHMM(slot.end_time);
+
+      // Check if this slot overlaps with any active booking for this staff from AppointmentService
       for (const range of occupiedRanges) {
-        if (timesOverlap(slot.start_time, slot.end_time, range.start, range.end)) {
+        if (timesOverlap(slotStart, slotEnd, range.start, range.end)) {
           return false;
         }
       }
-      if (overlapsUnavailability(unavailability, date, slot.start_time, slot.end_time)) return false;
+
+      // Check if this slot overlaps with any of the customer's existing appointments on this date
+      for (const crange of customerOccupiedRanges) {
+        if (timesOverlap(slotStart, slotEnd, crange.start, crange.end)) {
+          return false;
+        }
+      }
+
+      // Check if staff has unavailability record
+      if (overlapsUnavailability(unavailability, date, slotStart, slotEnd)) {
+        return false;
+      }
+
       return true;
     });
 
@@ -421,6 +452,9 @@ export const getAvailableSlots = async (req, res) => {
       if (consecutive) {
         const startTime = filteredSlots[i].start_time;
         const endTime = filteredSlots[i + requiredSlots - 1].end_time;
+
+        const overlapsCust = customerOccupiedRanges.some(crange => timesOverlap(startTime, endTime, crange.start, crange.end));
+        if (overlapsCust) continue;
 
         validStartTimes.push({
           start_time: startTime,
@@ -565,27 +599,33 @@ export const createAppointment = async (req, res) => {
         });
       }
 
-      // Conflict check for this staff on this date (checking BOTH parent and AppointmentService records)
+      // Conflict check for this staff on this date (prioritizing AppointmentService records)
       const validAppointments = await Appointment.find({
         appointment_date,
         status: { $in: ["confirmed", "pending"] }
-      });
+      }).lean();
       const validApptIds = validAppointments.map(a => a._id);
 
       const staffServices = await AppointmentService.find({
         staff_id: entry.staff_id,
         appointment_id: { $in: validApptIds }
-      });
+      }).lean();
+
+      // Only fall back to parent appointment if this appointment has NO AppointmentService records at all (pure legacy fallback)
+      const apptsWithServices = new Set(
+        (await AppointmentService.find({ appointment_id: { $in: validApptIds } }).distinct("appointment_id")).map(String)
+      );
 
       const occupiedRanges = [];
       for (const appt of validAppointments) {
+        if (apptsWithServices.has(appt._id.toString())) continue;
         if (appt.staff_id && appt.staff_id.toString() === entry.staff_id) {
-          occupiedRanges.push({ start: appt.start_time, end: appt.end_time });
+          occupiedRanges.push({ start: toHHMM(appt.start_time), end: toHHMM(appt.end_time) });
         }
       }
       for (const svc of staffServices) {
         if (svc.service_start_time && svc.service_end_time) {
-          occupiedRanges.push({ start: svc.service_start_time, end: svc.service_end_time });
+          occupiedRanges.push({ start: toHHMM(svc.service_start_time), end: toHHMM(svc.service_end_time) });
         }
       }
 
@@ -627,7 +667,39 @@ export const createAppointment = async (req, res) => {
       });
     }
 
-    // Create parent Appointment
+    // Customer double-booking check: prevent booking overlapping appointments on the same day
+    const customerFilter = {
+      appointment_date,
+      status: { $in: ["confirmed", "pending"] }
+    };
+    if (customer_id && normalizedGuestPhone) {
+      customerFilter.$or = [
+        { customer_id: customer_id },
+        { guest_phone: normalizedGuestPhone }
+      ];
+    } else if (customer_id) {
+      customerFilter.customer_id = customer_id;
+    } else if (normalizedGuestPhone) {
+      customerFilter.guest_phone = normalizedGuestPhone;
+    }
+
+    if (customer_id || normalizedGuestPhone) {
+      const existingCustomerAppts = await Appointment.find(customerFilter)
+        .select("start_time end_time status")
+        .lean();
+
+      for (const ex of existingCustomerAppts) {
+        for (const svc of resolvedServices) {
+          if (timesOverlap(svc.start_time, svc.end_time, ex.start_time, ex.end_time)) {
+            return res.status(409).json({
+              message: `You already have an appointment scheduled on ${appointment_date} between ${ex.start_time} and ${ex.end_time}. You cannot book overlapping appointments on the same day.`
+            });
+          }
+        }
+      }
+    }
+
+    // Create parent Appointment (staff_id is omitted per requirement: tracked via AppointmentService)
     const appointment = await Appointment.create({
       customer_id,
       guest_name: guest_name || "",
@@ -635,7 +707,7 @@ export const createAppointment = async (req, res) => {
       salon_id,
       service_id: resolvedServices[0].service_id,
       service_ids: resolvedServices.map(s => s.service_id),
-      staff_id: resolvedServices[0].staff_id,
+      staff_id: null,
       appointment_date,
       start_time: overallStart,
       end_time: overallEnd,
@@ -672,45 +744,86 @@ export const createAppointment = async (req, res) => {
     const result = populated.toObject();
     result.appointment_services = apptServices;
 
-    // NOTIFICATION: Notify super-admins and managers of this salon
+    // NOTIFICATIONS:
+    // 1. All staff assigned to services in AppointmentService
+    // 2. Salon managers / staff-admins (Staff model)
+    // 3. Salon admins and Super Admins (Admin model)
     try {
+      const customerName = populated.customer_id?.name || appointment.guest_name || 'Guest';
+      const allServiceNames = resolvedServices.map(s => s.service_name).join(', ');
+      const notificationsToCreate = [];
+      const notifiedRecipientIds = new Set();
+
+      // 1. Group services by assigned staff member and notify each staff
+      const staffServiceMap = new Map();
+      for (const s of resolvedServices) {
+        const sid = s.staff_id?.toString();
+        if (!sid) continue;
+        if (!staffServiceMap.has(sid)) staffServiceMap.set(sid, []);
+        staffServiceMap.get(sid).push(s);
+      }
+
+      for (const [staffId, assignedSvcs] of staffServiceMap.entries()) {
+        const staffSvcDesc = assignedSvcs
+          .map(s => `${s.service_name} (${s.start_time} - ${s.end_time})`)
+          .join(', ');
+
+        notificationsToCreate.push({
+          recipient_id: staffId,
+          recipient_model: "Staff",
+          title: "New Appointment Assigned",
+          message: `You have been assigned to an appointment for ${staffSvcDesc} on ${appointment_date} (Customer: ${customerName}).`,
+          appointment_id: appointment._id
+        });
+        notifiedRecipientIds.add(staffId);
+      }
+
+      // 2. Notify Salon Managers / Staff-Admins (Staff model)
+      const managersToNotify = await Staff.find({
+        salon_id: salon_id,
+        role: { $in: ["manager", "staff-admin"] },
+        status: "Active"
+      });
+      for (const mgr of managersToNotify) {
+        const mid = mgr._id.toString();
+        if (!notifiedRecipientIds.has(mid)) {
+          notificationsToCreate.push({
+            recipient_id: mgr._id,
+            recipient_model: "Staff",
+            title: "New Booking Received",
+            message: `A new booking was made by ${customerName} for ${allServiceNames} on ${appointment_date} at ${overallStart}.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipientIds.add(mid);
+        }
+      }
+
+      // 3. Notify Salon Admins and Super Admins (Admin model)
       const adminsToNotify = await Admin.find({
         $or: [
           { role: "super-admin" },
-          { role: "manager", salon_id: salon_id }
+          { role: { $in: ["manager", "staff-admin"] }, salon_id: salon_id }
         ]
       });
+      for (const admin of adminsToNotify) {
+        const aid = admin._id.toString();
+        if (!notifiedRecipientIds.has(aid)) {
+          notificationsToCreate.push({
+            recipient_id: admin._id,
+            recipient_model: "Admin",
+            title: admin.role === "super-admin" ? "New Booking (Super Admin)" : "New Booking Received",
+            message: `A new booking was made by ${customerName} for ${allServiceNames} on ${appointment_date} at ${overallStart}.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipientIds.add(aid);
+        }
+      }
 
-      const managersToNotify = await Staff.find({
-        role: "manager",
-        salon_id: salon_id
-      });
-
-      const serviceNames = resolvedServices.map(s => s.service_name).join(', ');
-      
-      const adminNotifications = adminsToNotify.map(admin => ({
-        recipient_id: admin._id,
-        recipient_model: "Admin",
-        title: "New Booking Received",
-        message: `A new booking was made by ${populated.customer_id?.name || appointment.guest_name || 'Guest'} for ${serviceNames}.`,
-        appointment_id: appointment._id
-      }));
-
-      const staffNotifications = managersToNotify.map(staff => ({
-        recipient_id: staff._id,
-        recipient_model: "Staff", // or whatever model Staff uses if different
-        title: "New Booking Received",
-        message: `A new booking was made by ${populated.customer_id?.name || appointment.guest_name || 'Guest'} for ${serviceNames}.`,
-        appointment_id: appointment._id
-      }));
-
-      const allNotifications = [...adminNotifications, ...staffNotifications];
-
-      if (allNotifications.length > 0) {
-        await Notification.insertMany(allNotifications);
+      if (notificationsToCreate.length > 0) {
+        await Notification.insertMany(notificationsToCreate);
       }
     } catch (notifErr) {
-      console.error("Failed to send admin notifications:", notifErr);
+      console.error("Failed to send booking notifications:", notifErr);
     }
 
     res.status(201).json(result);
@@ -1013,73 +1126,98 @@ export const confirmAppointment = async (req, res) => {
       });
     }
 
-    // 1. Calculate required slots
-    const requiredSlots = Math.ceil(appointment.duration / 60);
-    const slotStartTimes = generateSlotTimes(appointment.start_time, appointment.end_time);
+    // 1. Fetch all AppointmentService records for this appointment
+    const currentServices = await AppointmentService.find({ appointment_id: appointment._id });
 
-    // 2. Get staff availability for the date
+    // 2. Check for conflicts with other confirmed appointments on this date
+    const validOtherAppointments = await Appointment.find({
+      _id: { $ne: appointment._id },
+      appointment_date: appointment.appointment_date,
+      status: { $in: ["confirmed", "pending"] }
+    }).select("_id start_time end_time staff_id");
+    const otherApptIds = validOtherAppointments.map(a => a._id);
+
+    const otherServicesOnDate = otherApptIds.length > 0
+      ? await AppointmentService.find({ appointment_id: { $in: otherApptIds } })
+      : [];
+
     const queryDate = new Date(appointment.appointment_date);
     queryDate.setHours(0, 0, 0, 0);
     const nextDay = new Date(queryDate);
     nextDay.setDate(nextDay.getDate() + 1);
 
-    const availability = await StaffAvailability.findOne({
-      staff_id: appointment.staff_id,
-      available_date: { $gte: queryDate, $lt: nextDay }
-    });
+    // Verify staff availability & overlap for each assigned service via AppointmentService
+    for (const svc of currentServices) {
+      if (!svc.staff_id) continue;
+      const svcStart = toHHMM(svc.service_start_time || appointment.start_time);
+      const svcEnd = toHHMM(svc.service_end_time || appointment.end_time);
 
-    if (availability) {
-      // 3. Verify each required slot is available (not booked)
-      for (const startTime of slotStartTimes) {
-        const slot = availability.slots.find(s => s.start_time === startTime);
-        if (!slot) {
-          return res.status(409).json({
-            message: `Unable to confirm. Required time slot ${startTime} does not exist in staff availability.`
-          });
+      // Check StaffAvailability if record exists
+      const availability = await StaffAvailability.findOne({
+        staff_id: svc.staff_id,
+        available_date: { $gte: queryDate, $lt: nextDay }
+      });
+      if (availability) {
+        const slotTimes = generateSlotTimes(svcStart, svcEnd);
+        for (const st of slotTimes) {
+          const slot = availability.slots.find(s => toHHMM(s.start_time) === st);
+          if (!slot) {
+            return res.status(409).json({
+              message: `Unable to confirm. Required time slot ${st} does not exist in staff availability.`
+            });
+          }
+          if (slot.is_booked) {
+            return res.status(409).json({
+              message: "Unable to confirm. Required consecutive time slots are no longer available for the assigned staff."
+            });
+          }
         }
-        if (slot.is_booked) {
-          return res.status(409).json({
-            message: "Unable to confirm. Required consecutive time slots are no longer available."
-          });
-        }
+      }
+
+      // Check conflict against other AppointmentService records
+      const conflictSvc = otherServicesOnDate.find(other =>
+        String(other.staff_id) === String(svc.staff_id) &&
+        timesOverlap(svcStart, svcEnd, other.service_start_time, other.service_end_time)
+      );
+      if (conflictSvc) {
+        return res.status(409).json({
+          message: "Unable to confirm. An assigned staff member has a conflicting booking at this time."
+        });
+      }
+
+      // Check conflict against legacy appointment records
+      const legacyConflict = validOtherAppointments.find(a =>
+        a.staff_id &&
+        String(a.staff_id) === String(svc.staff_id) &&
+        timesOverlap(svcStart, svcEnd, a.start_time, a.end_time)
+      );
+      if (legacyConflict) {
+        return res.status(409).json({
+          message: "Unable to confirm. An assigned staff member has a conflicting booking at this time."
+        });
       }
     }
 
-    // 4. Check for overlapping confirmed appointments
-    const overlapping = await Appointment.findOne({
-      _id: { $ne: appointment._id },
-      staff_id: appointment.staff_id,
-      appointment_date: appointment.appointment_date,
-      status: "confirmed",
-      $or: [
-        {
-          start_time: { $lt: appointment.end_time },
-          end_time: { $gt: appointment.start_time }
-        }
-      ]
-    });
+    // 3. Mark slots as booked in StaffAvailability for each assigned staff
+    for (const svc of currentServices) {
+      if (!svc.staff_id) continue;
+      const svcStart = toHHMM(svc.service_start_time || appointment.start_time);
+      const svcEnd = toHHMM(svc.service_end_time || appointment.end_time);
+      const slotTimes = generateSlotTimes(svcStart, svcEnd);
 
-    if (overlapping) {
-      return res.status(409).json({
-        message: "Unable to confirm. Required consecutive time slots are no longer available."
-      });
-    }
-
-    // 5. All checks passed — mark slots as booked
-    if (availability) {
-      for (const startTime of slotStartTimes) {
+      for (const st of slotTimes) {
         await StaffAvailability.updateOne(
           {
-            staff_id: appointment.staff_id,
+            staff_id: svc.staff_id,
             available_date: { $gte: queryDate, $lt: nextDay },
-            "slots.start_time": startTime
+            "slots.start_time": st
           },
           { $set: { "slots.$.is_booked": true } }
         );
       }
     }
 
-    // 6. Resolve confirmer identity & update appointment status
+    // 4. Resolve confirmer identity & update appointment status
     let confirmerName = "Staff";
     let confirmerModel = "Staff";
     let displayRole = "Staff";
@@ -1122,60 +1260,79 @@ export const confirmAppointment = async (req, res) => {
     appointment.confirmed_by_role = displayRole;
     await appointment.save();
 
-    // NOTIFICATION: Notify the customer
+    // NOTIFICATION: Notify customer, all assigned staff, salon managers, and super-admins
     try {
-      await Notification.create({
-        recipient_id: appointment.customer_id,
-        recipient_model: "Customer",
-        title: "Booking Confirmed",
-        message: `Your booking for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed by ${confirmerName} (${displayRole}).`,
-        appointment_id: appointment._id
-      });
-
-      // Notify the salon manager
-      const adminsToNotify = await Admin.find({
-        role: "manager",
-        salon_id: appointment.salon_id
-      });
-      const managersToNotify = await Staff.find({
-        role: "manager",
-        salon_id: appointment.salon_id
-      });
-      
-      const adminNotifs = adminsToNotify
-        .filter(admin => String(admin._id) !== String(req.user.id))
-        .map(admin => ({
-          recipient_id: admin._id,
-          recipient_model: "Admin",
+      if (appointment.customer_id) {
+        await Notification.create({
+          recipient_id: appointment.customer_id,
+          recipient_model: "Customer",
           title: "Booking Confirmed",
-          message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed by ${confirmerName} (${displayRole}).`,
-          appointment_id: appointment._id
-        }));
-      
-      const staffNotifs = managersToNotify
-        .filter(staff => String(staff._id) !== String(req.user.id))
-        .map(staff => ({
-          recipient_id: staff._id,
-          recipient_model: "Staff",
-          title: "Booking Confirmed",
-          message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed by ${confirmerName} (${displayRole}).`,
-          appointment_id: appointment._id
-        }));
-
-      // If confirmed by manager or super-admin, also notify the assigned staff
-      if (String(req.user.id) !== String(appointment.staff_id)) {
-        staffNotifs.push({
-          recipient_id: appointment.staff_id,
-          recipient_model: "Staff",
-          title: "Booking Confirmed",
-          message: `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} was confirmed by ${confirmerName} (${displayRole}).`,
+          message: `Your booking for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed by ${confirmerName} (${displayRole}).`,
           appointment_id: appointment._id
         });
       }
-      
-      const notifications = [...adminNotifs, ...staffNotifs];
-      if (notifications.length > 0) {
-        await Notification.insertMany(notifications);
+
+      const confirmedNotifs = [];
+      const confirmedNotifRecipients = new Set([String(req.user.id)]);
+
+      // Notify all staff assigned in AppointmentService
+      for (const svc of currentServices) {
+        if (!svc.staff_id) continue;
+        const sid = svc.staff_id.toString();
+        if (!confirmedNotifRecipients.has(sid)) {
+          confirmedNotifs.push({
+            recipient_id: svc.staff_id,
+            recipient_model: "Staff",
+            title: "Booking Confirmed",
+            message: `Your appointment for ${appointment.appointment_date} at ${svc.service_start_time || appointment.start_time} was confirmed by ${confirmerName} (${displayRole}).`,
+            appointment_id: appointment._id
+          });
+          confirmedNotifRecipients.add(sid);
+        }
+      }
+
+      // Notify salon managers (Staff)
+      const managersToNotify = await Staff.find({
+        role: { $in: ["manager", "staff-admin"] },
+        salon_id: appointment.salon_id
+      });
+      for (const staff of managersToNotify) {
+        const sid = staff._id.toString();
+        if (!confirmedNotifRecipients.has(sid)) {
+          confirmedNotifs.push({
+            recipient_id: staff._id,
+            recipient_model: "Staff",
+            title: "Booking Confirmed",
+            message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed by ${confirmerName} (${displayRole}).`,
+            appointment_id: appointment._id
+          });
+          confirmedNotifRecipients.add(sid);
+        }
+      }
+
+      // Notify salon managers & super admins (Admin)
+      const adminsToNotify = await Admin.find({
+        $or: [
+          { role: "super-admin" },
+          { role: { $in: ["manager", "staff-admin"] }, salon_id: appointment.salon_id }
+        ]
+      });
+      for (const admin of adminsToNotify) {
+        const aid = admin._id.toString();
+        if (!confirmedNotifRecipients.has(aid)) {
+          confirmedNotifs.push({
+            recipient_id: admin._id,
+            recipient_model: "Admin",
+            title: "Booking Confirmed",
+            message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been confirmed by ${confirmerName} (${displayRole}).`,
+            appointment_id: appointment._id
+          });
+          confirmedNotifRecipients.add(aid);
+        }
+      }
+
+      if (confirmedNotifs.length > 0) {
+        await Notification.insertMany(confirmedNotifs);
       }
     } catch (notifErr) {
       console.error("Failed to send customer/admin notification:", notifErr);
@@ -1247,15 +1404,37 @@ export const rejectAppointment = async (req, res) => {
     appointment.rejected_at = new Date();
     await appointment.save();
 
-    // NOTIFICATION: Notify the customer
+    // NOTIFICATION: Notify customer, assigned staff, salon managers, and admins
     try {
-      await Notification.create({
-        recipient_id: appointment.customer_id,
-        recipient_model: "Customer",
-        title: "Booking Rejected",
-        message: `Your booking for ${appointment.appointment_date} at ${appointment.start_time} has been rejected by the salon.`,
-        appointment_id: appointment._id
-      });
+      if (appointment.customer_id) {
+        await Notification.create({
+          recipient_id: appointment.customer_id,
+          recipient_model: "Customer",
+          title: "Booking Rejected",
+          message: `Your booking for ${appointment.appointment_date} at ${appointment.start_time} has been rejected by the salon.`,
+          appointment_id: appointment._id
+        });
+      }
+
+      const currentServices = await AppointmentService.find({ appointment_id: appointment._id });
+      const rejectNotifs = [];
+      const notifiedRecipients = new Set([String(req.user.id)]);
+
+      // Notify all assigned staff
+      for (const svc of currentServices) {
+        if (!svc.staff_id) continue;
+        const sid = svc.staff_id.toString();
+        if (!notifiedRecipients.has(sid)) {
+          rejectNotifs.push({
+            recipient_id: svc.staff_id,
+            recipient_model: "Staff",
+            title: "Booking Rejected",
+            message: `An appointment for ${appointment.appointment_date} at ${svc.service_start_time || appointment.start_time} has been rejected.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipients.add(sid);
+        }
+      }
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
@@ -1267,25 +1446,36 @@ export const rejectAppointment = async (req, res) => {
         salon_id: appointment.salon_id
       });
       
-      const adminNotifs = adminsToNotify.map(admin => ({
-        recipient_id: admin._id,
-        recipient_model: "Admin",
-        title: "Booking Rejected",
-        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been rejected.`,
-        appointment_id: appointment._id
-      }));
+      for (const admin of adminsToNotify) {
+        const aid = admin._id.toString();
+        if (!notifiedRecipients.has(aid)) {
+          rejectNotifs.push({
+            recipient_id: admin._id,
+            recipient_model: "Admin",
+            title: "Booking Rejected",
+            message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been rejected.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipients.add(aid);
+        }
+      }
       
-      const staffNotifs = managersToNotify.map(staff => ({
-        recipient_id: staff._id,
-        recipient_model: "Staff",
-        title: "Booking Rejected",
-        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been rejected.`,
-        appointment_id: appointment._id
-      }));
+      for (const staff of managersToNotify) {
+        const sid = staff._id.toString();
+        if (!notifiedRecipients.has(sid)) {
+          rejectNotifs.push({
+            recipient_id: staff._id,
+            recipient_model: "Staff",
+            title: "Booking Rejected",
+            message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been rejected.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipients.add(sid);
+        }
+      }
       
-      const notifications = [...adminNotifs, ...staffNotifs];
-      if (notifications.length > 0) {
-        await Notification.insertMany(notifications);
+      if (rejectNotifs.length > 0) {
+        await Notification.insertMany(rejectNotifs);
       }
     } catch (notifErr) {
       console.error("Failed to send customer/admin notification:", notifErr);
@@ -1324,15 +1514,37 @@ export const completeAppointment = async (req, res) => {
       console.error("Failed to process salary:", salaryErr);
     }
 
-    // NOTIFICATION: Notify the customer
+    // NOTIFICATION: Notify the customer, assigned staff, and managers
     try {
-      await Notification.create({
-        recipient_id: appointment.customer_id,
-        recipient_model: "Customer",
-        title: "Appointment Completed",
-        message: `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} has been marked as completed. Thank you for visiting!`,
-        appointment_id: appointment._id
-      });
+      if (appointment.customer_id) {
+        await Notification.create({
+          recipient_id: appointment.customer_id,
+          recipient_model: "Customer",
+          title: "Appointment Completed",
+          message: `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} has been marked as completed. Thank you for visiting!`,
+          appointment_id: appointment._id
+        });
+      }
+
+      const currentServices = await AppointmentService.find({ appointment_id: appointment._id });
+      const completeNotifs = [];
+      const notifiedRecipients = new Set([String(req.user.id)]);
+
+      // Notify all assigned staff
+      for (const svc of currentServices) {
+        if (!svc.staff_id) continue;
+        const sid = svc.staff_id.toString();
+        if (!notifiedRecipients.has(sid)) {
+          completeNotifs.push({
+            recipient_id: svc.staff_id,
+            recipient_model: "Staff",
+            title: "Appointment Completed",
+            message: `Your appointment service on ${appointment.appointment_date} at ${svc.service_start_time || appointment.start_time} has been marked as completed.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipients.add(sid);
+        }
+      }
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
@@ -1344,25 +1556,36 @@ export const completeAppointment = async (req, res) => {
         salon_id: appointment.salon_id
       });
       
-      const adminNotifs = adminsToNotify.map(admin => ({
-        recipient_id: admin._id,
-        recipient_model: "Admin",
-        title: "Booking Completed",
-        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been marked as completed.`,
-        appointment_id: appointment._id
-      }));
+      for (const admin of adminsToNotify) {
+        const aid = admin._id.toString();
+        if (!notifiedRecipients.has(aid)) {
+          completeNotifs.push({
+            recipient_id: admin._id,
+            recipient_model: "Admin",
+            title: "Booking Completed",
+            message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been marked as completed.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipients.add(aid);
+        }
+      }
       
-      const staffNotifs = managersToNotify.map(staff => ({
-        recipient_id: staff._id,
-        recipient_model: "Staff",
-        title: "Booking Completed",
-        message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been marked as completed.`,
-        appointment_id: appointment._id
-      }));
+      for (const staff of managersToNotify) {
+        const sid = staff._id.toString();
+        if (!notifiedRecipients.has(sid)) {
+          completeNotifs.push({
+            recipient_id: staff._id,
+            recipient_model: "Staff",
+            title: "Booking Completed",
+            message: `An appointment for ${appointment.appointment_date} at ${appointment.start_time} has been marked as completed.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipients.add(sid);
+        }
+      }
       
-      const notifications = [...adminNotifs, ...staffNotifs];
-      if (notifications.length > 0) {
-        await Notification.insertMany(notifications);
+      if (completeNotifs.length > 0) {
+        await Notification.insertMany(completeNotifs);
       }
     } catch (notifErr) {
       console.error("Failed to send customer/admin notification:", notifErr);
@@ -1390,37 +1613,79 @@ export const adminCancelAppointment = async (req, res) => {
       });
     }
 
-    // Free up the booked slots in StaffAvailability
-    const slotStartTimes = generateSlotTimes(appointment.start_time, appointment.end_time);
+    // Free up the booked slots in StaffAvailability for all assigned staff in AppointmentService
+    const currentServices = await AppointmentService.find({ appointment_id: appointment._id });
     const queryDate = new Date(appointment.appointment_date);
     queryDate.setHours(0, 0, 0, 0);
     const nextDay = new Date(queryDate);
     nextDay.setDate(nextDay.getDate() + 1);
 
-    for (const startTime of slotStartTimes) {
-      await StaffAvailability.updateOne(
-        {
-          staff_id: appointment.staff_id,
-          available_date: { $gte: queryDate, $lt: nextDay },
-          "slots.start_time": startTime
-        },
-        { $set: { "slots.$.is_booked": false } }
-      );
+    for (const svc of currentServices) {
+      if (!svc.staff_id) continue;
+      const sStart = toHHMM(svc.service_start_time || appointment.start_time);
+      const sEnd = toHHMM(svc.service_end_time || appointment.end_time);
+      const slotStartTimes = generateSlotTimes(sStart, sEnd);
+
+      for (const startTime of slotStartTimes) {
+        await StaffAvailability.updateOne(
+          {
+            staff_id: svc.staff_id,
+            available_date: { $gte: queryDate, $lt: nextDay },
+            "slots.start_time": startTime
+          },
+          { $set: { "slots.$.is_booked": false } }
+        );
+      }
+    }
+
+    if (appointment.staff_id) {
+      const slotStartTimes = generateSlotTimes(appointment.start_time, appointment.end_time);
+      for (const startTime of slotStartTimes) {
+        await StaffAvailability.updateOne(
+          {
+            staff_id: appointment.staff_id,
+            available_date: { $gte: queryDate, $lt: nextDay },
+            "slots.start_time": startTime
+          },
+          { $set: { "slots.$.is_booked": false } }
+        );
+      }
     }
 
     appointment.status = "cancelled";
     appointment.cancelled_at = new Date();
     await appointment.save();
 
-    // NOTIFICATION: Notify the customer
+    // NOTIFICATION: Notify customer, assigned staff, and salon managers
     try {
-      await Notification.create({
-        recipient_id: appointment.customer_id,
-        recipient_model: "Customer",
-        title: "Booking Cancelled",
-        message: `Your confirmed booking for ${appointment.appointment_date} at ${appointment.start_time} has been cancelled by the salon.`,
-        appointment_id: appointment._id
-      });
+      if (appointment.customer_id) {
+        await Notification.create({
+          recipient_id: appointment.customer_id,
+          recipient_model: "Customer",
+          title: "Booking Cancelled",
+          message: `Your confirmed booking for ${appointment.appointment_date} at ${appointment.start_time} has been cancelled by the salon.`,
+          appointment_id: appointment._id
+        });
+      }
+
+      const cancelNotifs = [];
+      const notifiedRecipients = new Set([String(req.user.id)]);
+
+      // Notify all staff assigned in AppointmentService
+      for (const svc of currentServices) {
+        if (!svc.staff_id) continue;
+        const sid = svc.staff_id.toString();
+        if (!notifiedRecipients.has(sid)) {
+          cancelNotifs.push({
+            recipient_id: svc.staff_id,
+            recipient_model: "Staff",
+            title: "Booking Cancelled",
+            message: `A confirmed appointment for ${appointment.appointment_date} at ${svc.service_start_time || appointment.start_time} has been cancelled.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipients.add(sid);
+        }
+      }
 
       // Notify the salon manager
       const adminsToNotify = await Admin.find({
@@ -1432,25 +1697,36 @@ export const adminCancelAppointment = async (req, res) => {
         salon_id: appointment.salon_id
       });
       
-      const adminNotifs = adminsToNotify.map(admin => ({
-        recipient_id: admin._id,
-        recipient_model: "Admin",
-        title: "Booking Cancelled",
-        message: `A confirmed appointment for ${appointment.appointment_date} at ${appointment.start_time} has been cancelled.`,
-        appointment_id: appointment._id
-      }));
+      for (const admin of adminsToNotify) {
+        const aid = admin._id.toString();
+        if (!notifiedRecipients.has(aid)) {
+          cancelNotifs.push({
+            recipient_id: admin._id,
+            recipient_model: "Admin",
+            title: "Booking Cancelled",
+            message: `A confirmed appointment for ${appointment.appointment_date} at ${appointment.start_time} has been cancelled.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipients.add(aid);
+        }
+      }
       
-      const staffNotifs = managersToNotify.map(staff => ({
-        recipient_id: staff._id,
-        recipient_model: "Staff",
-        title: "Booking Cancelled",
-        message: `A confirmed appointment for ${appointment.appointment_date} at ${appointment.start_time} has been cancelled.`,
-        appointment_id: appointment._id
-      }));
+      for (const staff of managersToNotify) {
+        const sid = staff._id.toString();
+        if (!notifiedRecipients.has(sid)) {
+          cancelNotifs.push({
+            recipient_id: staff._id,
+            recipient_model: "Staff",
+            title: "Booking Cancelled",
+            message: `A confirmed appointment for ${appointment.appointment_date} at ${appointment.start_time} has been cancelled.`,
+            appointment_id: appointment._id
+          });
+          notifiedRecipients.add(sid);
+        }
+      }
       
-      const notifications = [...adminNotifs, ...staffNotifs];
-      if (notifications.length > 0) {
-        await Notification.insertMany(notifications);
+      if (cancelNotifs.length > 0) {
+        await Notification.insertMany(cancelNotifs);
       }
     } catch (notifErr) {
       console.error("Failed to send customer/admin notification:", notifErr);
@@ -1469,7 +1745,14 @@ export const getStaffAppointments = async (req, res) => {
     const { staffId } = req.params;
     const { status, date } = req.query;
 
-    const filter = { staff_id: staffId };
+    const apptIds = await AppointmentService.find({ staff_id: staffId }).distinct("appointment_id");
+
+    const filter = {
+      $or: [
+        { _id: { $in: apptIds } },
+        { staff_id: staffId }
+      ]
+    };
     if (status) filter.status = status;
     if (date) filter.appointment_date = date;
 
@@ -1479,7 +1762,20 @@ export const getStaffAppointments = async (req, res) => {
       .populate("service_ids", "service_name base_price duration")
       .populate("staff_id", "full_name specification image")
       .populate("salon_id", "name location")
-      .sort({ appointment_date: 1, start_time: 1 });
+      .sort({ appointment_date: 1, start_time: 1 })
+      .lean();
+
+    const allApptIds = appointments.map(a => a._id);
+    const allApptServices = await AppointmentService.find({ appointment_id: { $in: allApptIds } })
+      .populate("service_id", "service_name base_price duration")
+      .populate("staff_id", "full_name specification image")
+      .lean();
+
+    for (const appt of appointments) {
+      appt.appointment_services = allApptServices.filter(
+        as => as.appointment_id.toString() === appt._id.toString()
+      );
+    }
 
     res.status(200).json(appointments);
   } catch (err) {
@@ -1511,19 +1807,47 @@ export const getDailySchedule = async (req, res) => {
       .populate("service_id", "service_name base_price duration")
       .populate("service_ids", "service_name base_price duration")
       .populate("staff_id", "full_name specification image")
-      .sort({ start_time: 1 });
+      .sort({ start_time: 1 })
+      .lean();
 
-    // Group by staff
+    const apptIds = appointments.map(a => a._id);
+    const allApptServices = await AppointmentService.find({ appointment_id: { $in: apptIds } })
+      .populate("service_id", "service_name base_price duration")
+      .populate("staff_id", "full_name specification image")
+      .lean();
+
+    // Group by staff using AppointmentService
     const grouped = {};
     for (const apt of appointments) {
-      const staffId = apt.staff_id?._id?.toString() || "unknown";
-      if (!grouped[staffId]) {
-        grouped[staffId] = {
-          staff: apt.staff_id,
-          appointments: []
-        };
+      const svcs = allApptServices.filter(as => as.appointment_id.toString() === apt._id.toString());
+      apt.appointment_services = svcs;
+
+      const staffAssigned = [];
+      if (svcs.length > 0) {
+        for (const s of svcs) {
+          if (s.staff_id) staffAssigned.push(s.staff_id);
+        }
+      } else if (apt.staff_id) {
+        staffAssigned.push(apt.staff_id);
       }
-      grouped[staffId].appointments.push(apt);
+
+      if (staffAssigned.length === 0) {
+        const staffKey = "unassigned";
+        if (!grouped[staffKey]) {
+          grouped[staffKey] = { staff: null, appointments: [] };
+        }
+        grouped[staffKey].appointments.push(apt);
+      } else {
+        for (const staff of staffAssigned) {
+          const staffKey = staff._id?.toString() || staff.toString();
+          if (!grouped[staffKey]) {
+            grouped[staffKey] = { staff, appointments: [] };
+          }
+          if (!grouped[staffKey].appointments.some(a => a._id.toString() === apt._id.toString())) {
+            grouped[staffKey].appointments.push(apt);
+          }
+        }
+      }
     }
 
     res.status(200).json({
@@ -1612,6 +1936,9 @@ export const updateAppointmentDetails = async (req, res) => {
       appointment_date: normalizedDate,
       status: { $in: ["confirmed", "pending"] }
     }).distinct("_id");
+    const apptsWithServices = new Set(
+      (await AppointmentService.find({ appointment_id: { $in: otherApptIds } }).distinct("appointment_id")).map(String)
+    );
 
     const normalizedServices = [];
     const changes = {};
@@ -1666,9 +1993,9 @@ export const updateAppointmentDetails = async (req, res) => {
         });
       }
 
-      // Check for conflicts with other appointments
+      // Check for conflicts with legacy appointments without service records
       const conflictingAppointment = await Appointment.findOne({
-        _id: { $ne: appointment._id },
+        _id: { $in: otherApptIds.filter(id => !apptsWithServices.has(id.toString())) },
         staff_id: staff._id,
         appointment_date: normalizedDate,
         status: { $in: ["confirmed", "pending"] },
@@ -1809,7 +2136,7 @@ export const updateAppointmentDetails = async (req, res) => {
     appointment.end_time = overallEnd;
     appointment.duration = totalDuration;
     appointment.total_price = totalPrice;
-    appointment.staff_id = normalizedServices[0].staff_id;
+    appointment.staff_id = null;
     appointment.service_id = normalizedServices[0].service_id;
     appointment.service_ids = normalizedServices.map((s) => s.service_id);
     appointment.last_update_summary = summary;
@@ -1932,6 +2259,9 @@ export const updateStaffAssignment = async (req, res) => {
       appointment_date: appointment.appointment_date,
       status: { $in: ["confirmed", "pending"] }
     }).distinct("_id");
+    const apptsWithServices = new Set(
+      (await AppointmentService.find({ appointment_id: { $in: otherApptIds } }).distinct("appointment_id")).map(String)
+    );
 
     // Validate each service assignment
     const normalizedServices = [];
@@ -2017,9 +2347,9 @@ export const updateStaffAssignment = async (req, res) => {
         });
       }
 
-      // Check for time conflicts with other appointments (excluding this one)
+      // Check for time conflicts with legacy appointments without service records
       const conflictingAppointment = await Appointment.findOne({
-        _id: { $ne: id },
+        _id: { $in: otherApptIds.filter(oId => !apptsWithServices.has(oId.toString())) },
         staff_id: svc.staff_id,
         appointment_date: appointment.appointment_date,
         status: { $in: ["confirmed", "pending"] },
@@ -2113,7 +2443,7 @@ export const updateStaffAssignment = async (req, res) => {
     const overallStart = normalizedServices.reduce((min, s) => s.service_start_time < min ? s.service_start_time : min, normalizedServices[0].service_start_time);
     const overallEnd = normalizedServices.reduce((max, s) => s.service_end_time > max ? s.service_end_time : max, normalizedServices[0].service_end_time);
 
-    appointment.staff_id = firstService.staff_id;
+    appointment.staff_id = null;
     appointment.start_time = overallStart;
     appointment.end_time = overallEnd;
     appointment.service_ids = normalizedServices.map(s => s.service_id);
@@ -2285,6 +2615,9 @@ export const reassignStaff = async (req, res) => {
       appointment_date: appointment.appointment_date,
       status: { $in: ["confirmed", "pending"] },
     }).distinct("_id");
+    const apptsWithServices = new Set(
+      (await AppointmentService.find({ appointment_id: { $in: otherAppointmentIds } }).distinct("appointment_id")).map(String)
+    );
     const normalized = [];
     for (const existing of existingServices) {
       const assignment = assignmentByService.get(String(existing.service_id));
@@ -2311,8 +2644,9 @@ export const reassignStaff = async (req, res) => {
       }).lean();
       if (unavailable) return res.status(409).json({ message: `${staff.full_name} is unavailable at this appointment time` });
 
+      // Check for conflicts with legacy appointments without service records
       const conflictingAppointment = await Appointment.findOne({
-        _id: { $ne: id },
+        _id: { $in: otherAppointmentIds.filter(oId => !apptsWithServices.has(oId.toString())) },
         staff_id: staff._id,
         appointment_date: appointment.appointment_date,
         status: { $in: ["confirmed", "pending"] },
@@ -2353,7 +2687,7 @@ export const reassignStaff = async (req, res) => {
     for (const { existing, staff, sub_price } of normalized) {
       await AppointmentService.updateOne({ _id: existing._id }, { $set: { staff_id: staff._id, sub_price } });
     }
-    appointment.staff_id = normalized[0].staff._id;
+    appointment.staff_id = null;
     appointment.needsCustomerConfirmation = true;
     await appointment.save();
 
@@ -2405,6 +2739,7 @@ export const deleteAppointment = async (req, res) => {
     }
 
     await Appointment.findByIdAndDelete(req.params.id);
+    await AppointmentService.deleteMany({ appointment_id: req.params.id });
 
     res.status(200).json({ message: "Appointment deleted successfully" });
   } catch (err) {

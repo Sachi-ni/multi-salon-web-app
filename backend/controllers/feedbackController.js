@@ -1,5 +1,6 @@
 import Feedback from "../models/Feedback.js";
 import Appointment from "../models/Appointment.js";
+import AppointmentService from "../models/AppointmentService.js";
 import Salon from "../models/Salon.js";
 import Customer from "../models/Customer.js";
 import Service from "../models/Service.js";
@@ -36,12 +37,18 @@ export const submitFeedback = async (req, res) => {
       return res.status(400).json({ message: "Feedback has already been submitted for this appointment." });
     }
 
+    let staffId = appointment.staff_id;
+    if (!staffId) {
+      const asv = await AppointmentService.findOne({ appointment_id });
+      staffId = asv?.staff_id || null;
+    }
+
     const feedback = await Feedback.create({
       appointment_id,
       salon_id: appointment.salon_id,
       customer_id: appointment.customer_id,
       service_id: appointment.service_id,
-      staff_id: appointment.staff_id,
+      staff_id: staffId,
       serviceRating,
       staffRating,
       comment: comment?.trim() || ""
