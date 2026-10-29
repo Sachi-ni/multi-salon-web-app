@@ -210,38 +210,55 @@ export default function BookAppointment() {
                 {salons.map(s => (
                   <div
                     key={s._id}
-                    onClick={() => setBooking(prev => ({ ...prev, salonId: s._id, salonName: s.name }))}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all duration-200
+                    onClick={() => {
+                      setBooking(prev => ({
+                        ...prev,
+                        salonId: s._id,
+                        salonName: s.name,
+                        ...(prev.salonId !== s._id
+                          ? {
+                              services: [],
+                              serviceId: "",
+                              serviceName: "",
+                              serviceDuration: 0,
+                              servicePrice: 0,
+                              totalDuration: 0,
+                              totalPrice: 0,
+                              staffId: "",
+                              staffName: "",
+                              staffSpecification: "",
+                              startTime: "",
+                              endTime: "",
+                            }
+                          : {})
+                      }));
+                      setStep(1);
+                    }}
+                    className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 group
                       ${booking.salonId === s._id
                         ? "border-accent bg-accent-dim shadow-glow-sm"
-                        : "border-border bg-surface-2 hover:border-border-hover"
+                        : "border-border bg-surface-2 hover:border-accent/50 hover:bg-surface-3"
                       }`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-white">{s.name}</p>
+                        <p className="font-bold text-white group-hover:text-accent transition-colors">{s.name}</p>
                         <p className="text-muted-2 text-sm mt-0.5">{s.location}</p>
                         <p className="text-muted text-xs mt-1">{s.open_time} – {s.close_time}</p>
                       </div>
-                      {booking.salonId === s._id && (
-                        <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
-                          <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {booking.salonId === s._id && (
+                          <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
+                            <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+                        <span className="text-xs text-accent font-bold opacity-0 group-hover:opacity-100 transition-opacity">Select →</span>
+                      </div>
                     </div>
                   </div>
                 ))}
-              </div>
-              <div className="flex justify-end mt-6">
-                <button
-                  disabled={!booking.salonId}
-                  onClick={() => setStep(1)}
-                  className="px-6 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-glow"
-                >
-                  Next →
-                </button>
               </div>
             </div>
           )}
