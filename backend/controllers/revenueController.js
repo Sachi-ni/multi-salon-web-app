@@ -5,47 +5,108 @@ import Salary from '../models/Salary.js';
 import Service from '../models/Service.js';
 import mongoose from 'mongoose';
 
-const getPeriodStart = (period) => {
+const getPeriodDateRange = (period) => {
   const now = new Date();
-  if (period === "year") return new Date(now.getFullYear(), 0, 1);
-  if (period === "all") return new Date(0);
-  const days = period === "7days" ? 7 : period === "90days" ? 90 : 30;
-  const start = new Date(now);
-  start.setDate(start.getDate() - days);
-  return start;
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let start;
+  let end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  let prevStart;
+  let prevEnd;
+
+  if (period === "today") {
+    start = todayStart;
+    prevStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    prevEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+  } else if (period === "yesterday") {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+    prevStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+    prevEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2, 23, 59, 59, 999);
+  } else if (period === "7days") {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    prevStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13);
+    prevEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 23, 59, 59, 999);
+  } else if (period === "90days") {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89);
+    prevStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 179);
+    prevEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90, 23, 59, 59, 999);
+  } else if (period === "year") {
+    start = new Date(now.getFullYear(), 0, 1);
+    prevStart = new Date(now.getFullYear() - 1, 0, 1);
+    prevEnd = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+  } else if (period === "all") {
+    start = new Date(0);
+    prevStart = new Date(0);
+    prevEnd = new Date(0);
+  } else {
+    // default: 30days
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+    prevStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 59);
+    prevEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 23, 59, 59, 999);
+  }
+
+  const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  return {
+    start,
+    end,
+    prevStart,
+    prevEnd,
+    startDateStr: toYMD(start),
+    endDateStr: toYMD(end),
+    prevStartDateStr: toYMD(prevStart),
+    prevEndDateStr: toYMD(prevEnd),
+  };
+};
+
+const getPeriodStart = (period) => {
+  return getPeriodDateRange(period).start;
 };
 
 export const getRevenueStats = async (req, res) => {
   try {
     const { period = "30days" } = req.query;
-    const now = new Date();
+    const { start, end, prevStart, prevEnd, startDateStr, endDateStr, prevStartDateStr, prevEndDateStr } = getPeriodDateRange(period);
 
-    let start, prevStart, prevEnd;
-    if (period === "year") {
-      start = new Date(now.getFullYear(), 0, 1); // Jan 1 this year
-      prevStart = new Date(now.getFullYear() - 1, 0, 1); // Jan 1 last year
-      prevEnd = start;
-    } else {
-      start = new Date();
-      start.setDate(start.getDate() - 30);
-      prevStart = new Date();
-      prevStart.setDate(prevStart.getDate() - 60);
-      prevEnd = start;
+    // Gross revenue for the selected period from Bills
+    const billMatch = period === "all" ? {} : { bill_date: { $gte: start, $lte: end } };
+    const recentBills = await Bill.aggregate([
+      { $match: billMatch },
+      { $group: { _id: null, total: { $sum: '$total_amount' } } }
+    ]);
+    let grossRevenue = recentBills[0]?.total || 0;
+
+    // Fallback: if no bills recorded, compute from completed appointments
+    if (grossRevenue === 0) {
+      const apptMatch = { status: "completed" };
+      if (period !== "all") {
+        apptMatch.appointment_date = { $gte: startDateStr, $lte: endDateStr };
+      }
+      const recentAppts = await Appointment.aggregate([
+        { $match: apptMatch },
+        { $group: { _id: null, total: { $sum: '$total_price' } } }
+      ]);
+      grossRevenue = recentAppts[0]?.total || 0;
     }
 
-    // Gross revenue for the selected period
-    const recentBills = await Bill.aggregate([
-      { $match: { bill_date: { $gte: start } } },
-      { $group: { _id: null, total: { $sum: '$total_amount' } } }
-    ]);
-    const grossRevenue = recentBills[0]?.total || 0;
+    // Previous period for growth comparison
+    let prevRevenue = 0;
+    if (period !== "all") {
+      const prevBills = await Bill.aggregate([
+        { $match: { bill_date: { $gte: prevStart, $lte: prevEnd } } },
+        { $group: { _id: null, total: { $sum: '$total_amount' } } }
+      ]);
+      prevRevenue = prevBills[0]?.total || 0;
 
-    // Same-length previous period, for growth comparison
-    const prevBills = await Bill.aggregate([
-      { $match: { bill_date: { $gte: prevStart, $lt: prevEnd } } },
-      { $group: { _id: null, total: { $sum: '$total_amount' } } }
-    ]);
-    const prevRevenue = prevBills[0]?.total || 0;
+      if (prevRevenue === 0) {
+        const prevAppts = await Appointment.aggregate([
+          { $match: { status: "completed", appointment_date: { $gte: prevStartDateStr, $lte: prevEndDateStr } } },
+          { $group: { _id: null, total: { $sum: '$total_price' } } }
+        ]);
+        prevRevenue = prevAppts[0]?.total || 0;
+      }
+    }
+
     const grossGrowth = prevRevenue > 0 ? ((grossRevenue - prevRevenue) / prevRevenue * 100).toFixed(1) : 0;
 
     // Pending payouts & overdue (not period-dependent — these are always "current outstanding")
@@ -76,17 +137,11 @@ export const getRevenueStats = async (req, res) => {
 export const getSalonRevenue = async (req, res) => {
   try {
     const { period = "30days" } = req.query;
-    const now = new Date();
-    let start;
-    if (period === "year") {
-      start = new Date(now.getFullYear(), 0, 1);
-    } else {
-      start = new Date();
-      start.setDate(start.getDate() - 30);
-    }
+    const { start, end, startDateStr, endDateStr } = getPeriodDateRange(period);
 
-    const salonsData = await Bill.aggregate([
-      { $match: { bill_date: { $gte: start } } },
+    const matchStage = period === "all" ? {} : { bill_date: { $gte: start, $lte: end } };
+    let salonsData = await Bill.aggregate([
+      { $match: matchStage },
       {
         $lookup: {
           from: 'appointments',
@@ -117,6 +172,36 @@ export const getSalonRevenue = async (req, res) => {
       { $sort: { revenue: -1 } }
     ]);
 
+    // Fallback: If no bills, aggregate from completed appointments directly
+    if (salonsData.length === 0) {
+      const apptMatch = { status: "completed" };
+      if (period !== "all") {
+        apptMatch.appointment_date = { $gte: startDateStr, $lte: endDateStr };
+      }
+      salonsData = await Appointment.aggregate([
+        { $match: apptMatch },
+        {
+          $lookup: {
+            from: 'salons',
+            localField: 'salon_id',
+            foreignField: '_id',
+            as: 'salon'
+          }
+        },
+        { $unwind: '$salon' },
+        {
+          $group: {
+            _id: '$salon._id',
+            name: { $first: '$salon.name' },
+            status: { $first: '$salon.status' },
+            revenue: { $sum: '$total_price' },
+            transactions: { $sum: 1 }
+          }
+        },
+        { $sort: { revenue: -1 } }
+      ]);
+    }
+
     res.json(salonsData);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -139,11 +224,12 @@ export const getMonthlyRevenue = async (req, res) => {
       { $limit: 12 }
     ]);
 
-    // Simplified: total last month, growth (mock), top month
+    // Calculate total, actual growth, and top month safely
     const total = monthly[0]?.total || 0;
-    const growth = 15; // Calculate properly if more data
-    const topMonth = monthly.reduce((prev, curr) => (curr.total > prev.total ? curr : prev), monthly[0]);
-    const topMonthName = new Date(topMonth._id.year, topMonth._id.month - 1).toLocaleString('default', { month: 'long' });
+    const prevTotal = monthly[1]?.total || 0;
+    const growth = prevTotal > 0 ? Number(((total - prevTotal) / prevTotal * 100).toFixed(1)) : 0;
+    const topMonth = monthly.length > 0 ? monthly.reduce((prev, curr) => (curr.total > prev.total ? curr : prev), monthly[0]) : null;
+    const topMonthName = topMonth ? new Date(topMonth._id.year, topMonth._id.month - 1).toLocaleString('default', { month: 'long' }) : "N/A";
 
     res.json({ total, growth, topMonth: topMonthName });
   } catch (error) {
@@ -153,13 +239,19 @@ export const getMonthlyRevenue = async (req, res) => {
 
 export const getStaffOperationalMetrics = async (req, res) => {
   try {
-    const start = getPeriodStart(req.query.period || "30days");
+    const { period = "30days" } = req.query;
+    const { startDateStr, endDateStr } = getPeriodDateRange(period);
+
+    const matchConditions = {
+      status: { $in: ["completed", "cancelled", "rejected", "pending", "confirmed"] },
+    };
+    if (period !== "all") {
+      matchConditions.appointment_date = { $gte: startDateStr, $lte: endDateStr };
+    }
+
     const metrics = await Appointment.aggregate([
       {
-        $match: {
-          appointment_date: { $gte: start.toISOString().slice(0, 10) },
-          status: { $in: ["completed", "cancelled", "rejected", "pending", "confirmed"] },
-        },
+        $match: matchConditions,
       },
       {
         $lookup: {
@@ -208,7 +300,7 @@ function generateFallbackForecast(targetMonthName, currentMonthName, monthsData 
 
   const baseline = currentRevenue > 0
     ? currentRevenue
-    : (prevRevenue > 0 ? prevRevenue : (avgHistoricalRev > 0 ? avgHistoricalRev : (avgBookings > 0 ? Math.round(avgBookings * 1500) : 15000)));
+    : (prevRevenue > 0 ? prevRevenue : (avgHistoricalRev > 0 ? avgHistoricalRev : (avgBookings > 0 ? Math.round(avgBookings * 1500) : 0)));
 
   let growthRate = 0.08;
   if (prevRevenue > 0 && currentRevenue > 0) {

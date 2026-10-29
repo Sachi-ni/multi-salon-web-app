@@ -327,8 +327,14 @@ const seed = async () => {
       const matchedServices = salonServices.filter(s => s.category_id.equals(targetCatId));
       const assignedServices = matchedServices.length > 0 ? matchedServices : salonServices.slice(0, 3);
 
+      const nameParts = def.full_name.trim().split(/\s+/);
+      const first_name = nameParts[0] || "Staff";
+      const last_name = nameParts.slice(1).join(" ") || "Member";
+
       const staffMember = await Staff.create({
         full_name: def.full_name,
+        first_name,
+        last_name,
         phone: `077${Math.floor(1000000 + Math.random() * 9000000)}`,
         email: `${def.full_name.toLowerCase().replace(/\s+/g, "")}@salon.com`,
         password_hash: passwordHash,

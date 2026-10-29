@@ -27,15 +27,15 @@ const STATUS_COLORS = { Completed: "#22c55e", Pending: "#f5c800", Cancelled: "#e
 
 /* ── Tooltip (shared) ── */
 const tooltipStyle = {
-  backgroundColor: "rgba(10,10,10,0.92)",
+  backgroundColor: "#121217",
   backdropFilter: "blur(16px)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: "12px",
-  boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+  boxShadow: "0 12px 40px rgba(0,0,0,0.7)",
   padding: "10px 14px",
 };
-const tooltipItemStyle = { color: "#e5e5e5", fontSize: "12px" };
-const tooltipLabelStyle = { color: "#fff", fontWeight: 700, fontSize: "12px", marginBottom: "4px" };
+const tooltipItemStyle = { color: "#ffffff", fontSize: "12px" };
+const tooltipLabelStyle = { color: "#ffffff", fontWeight: 800, fontSize: "12px", marginBottom: "6px" };
 
 /* ── Framer Motion ── */
 const stagger = {
@@ -65,9 +65,12 @@ const CustomTooltip = ({ active, payload, label, isCurrency }) => {
     <div style={tooltipStyle}>
       <p style={tooltipLabelStyle}>{label}</p>
       {payload.map((p, i) => (
-        <p key={i} style={{ ...tooltipItemStyle, color: p.color }}>
-          <span style={{ fontWeight: 600 }}>{p.name}: </span>
-          {isCurrency ? `Rs. ${p.value.toLocaleString()}` : p.value}
+        <p key={i} style={{ ...tooltipItemStyle, color: "#ffffff" }} className="flex items-center gap-1.5 my-1">
+          <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: p.color || "#ffffff" }} />
+          <span style={{ fontWeight: 600, color: "#e5e7eb" }}>{p.name}: </span>
+          <span style={{ fontWeight: 800, color: "#ffffff" }}>
+            {isCurrency ? `Rs. ${Number(p.value).toLocaleString()}` : p.value}
+          </span>
         </p>
       ))}
     </div>
@@ -137,41 +140,54 @@ export default function AdminAnalytics() {
   /* ── Derived: Date-Filtered Data ── */
   const filteredData = useMemo(() => {
     const now = new Date();
-    let startDate = new Date(0);
+    const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const todayStr = toYMD(now);
 
-    if (dateRange === "today") startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    else if (dateRange === "yesterday") {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    let startStr = "1970-01-01";
+    let endStr = todayStr;
+
+    if (dateRange === "today") {
+      startStr = todayStr;
+      endStr = todayStr;
+    } else if (dateRange === "yesterday") {
+      const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      startStr = toYMD(yd);
+      endStr = toYMD(yd);
+    } else if (dateRange === "7days") {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      startStr = toYMD(d);
+      endStr = todayStr;
+    } else if (dateRange === "30days") {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+      startStr = toYMD(d);
+      endStr = todayStr;
+    } else if (dateRange === "90days") {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89);
+      startStr = toYMD(d);
+      endStr = todayStr;
+    } else if (dateRange === "year") {
+      startStr = `${now.getFullYear()}-01-01`;
+      endStr = todayStr;
+    } else if (dateRange === "all") {
+      startStr = "1970-01-01";
+      endStr = "2099-12-31";
     }
-    else if (dateRange === "7days") startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    else if (dateRange === "30days") startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    else if (dateRange === "90days") startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    else if (dateRange === "year") startDate = new Date(now.getFullYear(), 0, 1);
-
-    let endDate = null;
-    if (dateRange === "yesterday") {
-      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    }
-
-    const startISO = startDate.toISOString().split("T")[0];
-    const endISO = endDate ? endDate.toISOString().split("T")[0] : null;
 
     const filteredAppointments = appointments.filter(a => {
       const aDate = a.appointment_date || (a.createdAt && a.createdAt.split("T")[0]);
       if (!aDate) return false;
-      if (endISO) return aDate >= startISO && aDate < endISO;
-      return aDate >= startISO;
+      return aDate >= startStr && aDate <= endStr;
     });
 
     const salonCustomerIds = new Set(appointments.filter(a => a.customer_id).map(a => typeof a.customer_id === "object" ? a.customer_id._id : a.customer_id));
     const salonCustomers = allCustomers.filter(c => salonCustomerIds.has(c._id));
 
-    return { filteredAppointments, salonCustomers, startDate, endISO };
+    return { filteredAppointments, salonCustomers, startStr, endStr };
   }, [appointments, allCustomers, dateRange]);
 
   /* ── KPI Calculations ── */
   const kpis = useMemo(() => {
-    const { filteredAppointments, salonCustomers, startDate } = filteredData;
+    const { filteredAppointments, salonCustomers, startStr, endStr } = filteredData;
 
     const totalBookings = filteredAppointments.length;
     const completedBookings = filteredAppointments.filter(a => a.status === "completed").length;
@@ -184,8 +200,11 @@ export default function AdminAnalytics() {
     const avgBookingValue = completedBookings > 0 ? Math.round(totalRevenue / completedBookings) : 0;
 
     const totalCustomers = salonCustomers.length;
-    const newCustomers = salonCustomers.filter(c => c.createdAt && new Date(c.createdAt) >= startDate).length;
-    const returningCustomers = totalCustomers - newCustomers;
+    const newCustomers = salonCustomers.filter(c => {
+      const custDate = c.createdAt ? c.createdAt.split("T")[0] : null;
+      return custDate && custDate >= startStr && custDate <= endStr;
+    }).length;
+    const returningCustomers = Math.max(0, totalCustomers - newCustomers);
 
     const completionRate = totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 0;
 
@@ -236,16 +255,22 @@ export default function AdminAnalytics() {
       ];
     }
 
-    // 2. Staff Performance
+    // 2. Staff Performance (with robust name and ID resolution)
     const staffMap = {};
-    staff.forEach(s => staffMap[s._id] = { _id: s._id, name: s.user_id?.name || s.name || "Unknown", completed: 0, revenue: 0 });
+    staff.forEach(s => {
+      const sId = String(s._id);
+      const resolvedName = s.full_name || s.name || (s.first_name ? `${s.first_name} ${s.last_name || ""}`.trim() : "") || s.user_id?.name || "Stylist";
+      staffMap[sId] = { _id: sId, name: resolvedName, completed: 0, revenue: 0 };
+    });
+
     filteredAppointments.forEach(a => {
       if (a.status === "completed") {
         if (a.appointment_services && a.appointment_services.length > 0) {
           const staffSeenInThisBooking = new Set();
           a.appointment_services.forEach(asv => {
-            const sid = typeof asv?.staff_id === 'object' ? asv.staff_id?._id : asv?.staff_id;
-            if (staffMap[sid]) {
+            const rawId = typeof asv?.staff_id === 'object' ? asv.staff_id?._id : asv?.staff_id;
+            const sid = rawId ? String(rawId) : null;
+            if (sid && staffMap[sid]) {
               if (!staffSeenInThisBooking.has(sid)) {
                 staffMap[sid].completed += 1;
                 staffSeenInThisBooking.add(sid);
@@ -255,8 +280,9 @@ export default function AdminAnalytics() {
             }
           });
         } else if (a.staff_id) {
-          const sid = typeof a.staff_id === 'object' ? a.staff_id._id : a.staff_id;
-          if (staffMap[sid]) {
+          const rawId = typeof a.staff_id === 'object' ? a.staff_id._id : a.staff_id;
+          const sid = rawId ? String(rawId) : null;
+          if (sid && staffMap[sid]) {
             staffMap[sid].completed += 1;
             staffMap[sid].revenue += (a.total_price || 0);
           }
@@ -479,7 +505,7 @@ export default function AdminAnalytics() {
               </div>
               <div className="h-[280px] w-full -mx-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartsData.trendData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                  <ComposedChart data={chartsData.trendData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }}>
                     <defs>
                       <linearGradient id="adminRevGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#a855f7" stopOpacity={0.8} />
@@ -490,11 +516,36 @@ export default function AdminAnalytics() {
                         <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="4 4" stroke="#525252" vertical={true} horizontal={true} />
-                    <XAxis dataKey="date" stroke="#ffffff30" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                    <YAxis yAxisId="left" stroke="#ffffff30" fontSize={10} tickFormatter={v => `Rs.${v / 1000}k`} axisLine={false} tickLine={false} />
-                    <YAxis yAxisId="right" orientation="right" stroke="#ffffff30" fontSize={10} axisLine={false} tickLine={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      stroke="#ffffff"
+                      tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                      tickMargin={10}
+                      axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      yAxisId="left"
+                      stroke="#ffffff"
+                      tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                      tickFormatter={v => `Rs.${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
+                      axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      stroke="#ffffff"
+                      tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                      axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                      tickLine={false}
+                    />
                     <Tooltip content={<CustomTooltip isCurrency />} />
+                    <Legend
+                      formatter={(value) => <span style={{ color: "#ffffff", fontWeight: 700, fontSize: "12px" }}>{value}</span>}
+                      wrapperStyle={{ paddingTop: "10px" }}
+                    />
                     <Area
                       yAxisId="left"
                       type="monotone"
@@ -505,7 +556,7 @@ export default function AdminAnalytics() {
                       fillOpacity={1}
                       fill="url(#adminRevGrad)"
                       dot={{ r: 3, fill: "#a855f7", stroke: "#0a0a0a", strokeWidth: 2 }}
-                      activeDot={{ r: 5, stroke: "#a855f7", strokeWidth: 2, fill: "#0a0a0a" }}
+                      activeDot={{ r: 5, stroke: "#a855f7", strokeWidth: 2, fill: "#ffffff" }}
                     />
                     <Bar
                       yAxisId="right"
@@ -528,12 +579,30 @@ export default function AdminAnalytics() {
                 <SectionHeader icon={BarChart3} title="Booking Analytics" subtitle="Daily breakdown by booking status" />
                 <div className="h-[300px] w-full mt-4 -mx-2">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartsData.trendData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
-                      <XAxis dataKey="date" stroke="#ffffff30" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                      <YAxis stroke="#ffffff30" fontSize={10} allowDecimals={false} axisLine={false} tickLine={false} />
+                    <BarChart data={chartsData.trendData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#ffffff"
+                        tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                        tickMargin={10}
+                        axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        stroke="#ffffff"
+                        tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                        allowDecimals={false}
+                        axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                        tickLine={false}
+                      />
                       <Tooltip content={<CustomTooltip />} />
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ paddingTop: "12px", fontSize: "11px" }} />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        formatter={(value) => <span style={{ color: "#ffffff", fontWeight: 700, fontSize: "12px" }}>{value}</span>}
+                        wrapperStyle={{ paddingTop: "12px" }}
+                      />
                       <Bar dataKey="completed" name="Completed" stackId="bookings" fill="#22c55e" radius={[0, 0, 0, 0]} barSize={16} />
                       <Bar dataKey="pending" name="Pending" stackId="bookings" fill="#f5c800" />
                       <Bar dataKey="cancelled" name="Cancelled" stackId="bookings" fill="#ef4444" radius={[3, 3, 0, 0]} />
@@ -568,12 +637,12 @@ export default function AdminAnalytics() {
                   </ResponsiveContainer>
                 </div>
                 {/* Custom legend */}
-                <div className="flex items-center justify-center gap-5 pt-2 pb-1 border-t border-border mt-auto">
+                <div className="flex items-center justify-center gap-5 pt-3 pb-1 border-t border-border mt-auto">
                   {chartsData.statusData.map(entry => (
                     <div key={entry.name} className="flex items-center gap-2 text-xs">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[entry.name] }}></span>
-                      <span className="text-muted-2 font-medium">{entry.name}</span>
-                      <span className="font-bold text-white">{entry.value}</span>
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[entry.name] }}></span>
+                      <span className="text-white font-bold">{entry.name}</span>
+                      <span className="font-extrabold text-accent">{entry.value}</span>
                     </div>
                   ))}
                 </div>
@@ -590,14 +659,17 @@ export default function AdminAnalytics() {
                   <select
                     value={staffFilter}
                     onChange={(e) => setStaffFilter(e.target.value)}
-                    className="px-2 py-1 text-xs font-semibold rounded-lg bg-surface-2 border border-border text-white focus:outline-none focus:border-accent transition-colors cursor-pointer"
+                    className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-surface-2 border border-border text-white focus:outline-none focus:border-accent transition-colors cursor-pointer"
                   >
                     <option value="all">All Staff</option>
-                    {staff.map(s => (
-                      <option key={s._id} value={s._id}>
-                        {s.user_id?.name || s.name || "Unknown Staff"}
-                      </option>
-                    ))}
+                    {staff.map(s => {
+                      const optName = s.full_name || s.name || (s.first_name ? `${s.first_name} ${s.last_name || ""}`.trim() : "") || s.user_id?.name || "Staff Member";
+                      return (
+                        <option key={s._id} value={s._id}>
+                          {optName}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
                 {chartsData.staffData.length === 0 ? (
@@ -605,13 +677,40 @@ export default function AdminAnalytics() {
                 ) : (
                   <div className="h-[300px] w-full mt-4 -mx-2">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartsData.staffData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
-                        <XAxis dataKey="name" stroke="#ffffff30" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                        <YAxis yAxisId="left" stroke="#ffffff30" fontSize={10} allowDecimals={false} axisLine={false} tickLine={false} />
-                        <YAxis yAxisId="right" orientation="right" stroke="#ffffff30" fontSize={10} tickFormatter={val => `${val / 1000}k`} axisLine={false} tickLine={false} />
+                      <BarChart data={chartsData.staffData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          stroke="#ffffff"
+                          tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                          tickMargin={10}
+                          axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          yAxisId="left"
+                          stroke="#ffffff"
+                          tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                          allowDecimals={false}
+                          axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          stroke="#ffffff"
+                          tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                          tickFormatter={val => `${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`}
+                          axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                          tickLine={false}
+                        />
                         <Tooltip content={<CustomTooltip />} />
-                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ paddingTop: "12px", fontSize: "11px" }} />
+                        <Legend
+                          iconType="circle"
+                          iconSize={8}
+                          formatter={(value) => <span style={{ color: "#ffffff", fontWeight: 700, fontSize: "12px" }}>{value}</span>}
+                          wrapperStyle={{ paddingTop: "12px" }}
+                        />
                         <Bar yAxisId="left" dataKey="completed" name="Completed Bookings" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={18} />
                         <Bar yAxisId="right" dataKey="revenue" name="Revenue Generated" fill="#f472b6" radius={[4, 4, 0, 0]} barSize={18} />
                       </BarChart>

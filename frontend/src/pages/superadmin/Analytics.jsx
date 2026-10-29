@@ -26,15 +26,15 @@ const STATUS_COLORS = { Completed: "#22c55e", Pending: "#f5c800", Cancelled: "#e
 
 /* ── Tooltip (shared) ── */
 const tooltipStyle = {
-  backgroundColor: "rgba(10,10,10,0.92)",
+  backgroundColor: "#121217",
   backdropFilter: "blur(16px)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: "12px",
-  boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+  boxShadow: "0 12px 40px rgba(0,0,0,0.7)",
   padding: "10px 14px",
 };
-const tooltipItemStyle = { color: "#e5e5e5", fontSize: "12px" };
-const tooltipLabelStyle = { color: "#fff", fontWeight: 700, fontSize: "12px", marginBottom: "4px" };
+const tooltipItemStyle = { color: "#ffffff", fontSize: "12px" };
+const tooltipLabelStyle = { color: "#ffffff", fontWeight: 800, fontSize: "12px", marginBottom: "6px" };
 
 /* ── Framer Motion ── */
 const stagger = {
@@ -48,7 +48,7 @@ const fadeUp = {
 
 /* ── KPI config ── */
 const KPI_CONFIG = [
-  { key: "totalRevenue", label: "Total Revenue", icon: DollarSign, color: "#22c55e", isCurrency: true, sub: "vs previous period", hasTrend: true },
+  { key: "totalRevenue", label: "Total Revenue", icon: DollarSign, color: "#22c55e", isCurrency: true, sub: "in selected period", hasTrend: true },
   { key: "totalBookings", label: "Total Bookings", icon: Calendar, color: "#38bdf8", sub: "in selected period" },
   { key: "completedBookings", label: "Completed", icon: CheckCircle, color: "#f5c800", sub: "successfully finished" },
   { key: "totalUsers", label: "Total Users", icon: Users, color: "#a855f7", sub: "lifetime registered" },
@@ -65,9 +65,12 @@ const CustomTooltip = ({ active, payload, label, isCurrency }) => {
     <div style={tooltipStyle}>
       <p style={tooltipLabelStyle}>{label}</p>
       {payload.map((p, i) => (
-        <p key={i} style={{ ...tooltipItemStyle, color: p.color }}>
-          <span style={{ fontWeight: 600 }}>{p.name}: </span>
-          {isCurrency ? `Rs. ${p.value.toLocaleString()}` : p.value}
+        <p key={i} style={{ ...tooltipItemStyle, color: "#ffffff" }} className="flex items-center gap-1.5 my-1">
+          <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: p.color || "#ffffff" }} />
+          <span style={{ fontWeight: 600, color: "#e5e7eb" }}>{p.name}: </span>
+          <span style={{ fontWeight: 800, color: "#ffffff" }}>
+            {isCurrency ? `Rs. ${Number(p.value).toLocaleString()}` : p.value}
+          </span>
         </p>
       ))}
     </div>
@@ -82,19 +85,22 @@ const ForecastTooltip = ({ active, payload, label }) => {
 
   return (
     <div style={tooltipStyle}>
-      <div className="flex items-center gap-1.5 mb-1">
-        {isProj && <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
-        <p style={tooltipLabelStyle} className="mb-0">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        {isProj && <span className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />}
+        <p style={tooltipLabelStyle} className="mb-0 text-white font-black text-sm">
           {label} {isProj ? "• AI Forecast" : ""}
         </p>
       </div>
-      <p style={{ ...tooltipItemStyle, color: isProj ? "#f5c800" : "#a855f7" }}>
-        <span style={{ fontWeight: 600 }}>{isProj ? "Projected Revenue" : "Historical Revenue"}: </span>
-        Rs. {data?.revenue ? data.revenue.toLocaleString() : 0}
+      <p style={{ ...tooltipItemStyle, color: "#ffffff" }} className="flex items-center gap-1.5 my-1">
+        <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: isProj ? "#f5c800" : "#a855f7" }} />
+        <span style={{ fontWeight: 600, color: "#e5e7eb" }}>{isProj ? "Projected Revenue" : "Historical Revenue"}: </span>
+        <span style={{ fontWeight: 800, color: "#ffffff" }}>
+          Rs. {data?.revenue ? Number(data.revenue).toLocaleString() : 0}
+        </span>
       </p>
       {isProj && data?.projectedMin && data?.projectedMax && (
-        <p className="text-[11px] text-muted-2 mt-1 border-t border-border pt-1">
-          Confidence Range: <span className="text-accent font-bold">Rs. {data.projectedMin.toLocaleString()} – Rs. {data.projectedMax.toLocaleString()}</span>
+        <p className="text-[11px] text-gray-300 mt-2 border-t border-white/10 pt-1.5">
+          Confidence Range: <span className="text-accent font-black">Rs. {Number(data.projectedMin).toLocaleString()} – Rs. {Number(data.projectedMax).toLocaleString()}</span>
         </p>
       )}
     </div>
@@ -209,34 +215,49 @@ export default function Analytics() {
   /* ── Derived: Date-Filtered Data ── */
   const filteredData = useMemo(() => {
     const now = new Date();
-    let startDate = new Date(0);
+    const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const todayStr = toYMD(now);
+
+    let startStr = "1970-01-01";
+    let endStr = todayStr;
 
     if (dateRange === "today") {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      startStr = todayStr;
+      endStr = todayStr;
+    } else if (dateRange === "yesterday") {
+      const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      startStr = toYMD(yd);
+      endStr = toYMD(yd);
     } else if (dateRange === "7days") {
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      startStr = toYMD(d);
     } else if (dateRange === "30days") {
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+      startStr = toYMD(d);
     } else if (dateRange === "90days") {
-      startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89);
+      startStr = toYMD(d);
     } else if (dateRange === "year") {
-      startDate = new Date(now.getFullYear(), 0, 1);
+      startStr = `${now.getFullYear()}-01-01`;
+    } else if (dateRange === "all") {
+      startStr = "1970-01-01";
+      endStr = "2099-12-31";
     }
-
-    const startISO = startDate.toISOString().split("T")[0];
 
     const filteredAppointments = appointments.filter(a => {
       const aDate = a.appointment_date || (a.createdAt && a.createdAt.split("T")[0]);
-      return aDate >= startISO;
+      if (!aDate) return false;
+      return aDate >= startStr && aDate <= endStr;
     });
 
     const filteredCustomers = customers.filter(c => {
       const custDate = c.registration_date || c.createdAt;
       if (!custDate) return true;
-      return new Date(custDate) >= startDate;
+      const cDateStr = String(custDate).split("T")[0];
+      return cDateStr >= startStr && cDateStr <= endStr;
     });
 
-    return { filteredAppointments, filteredCustomers };
+    return { filteredAppointments, filteredCustomers, startStr, endStr };
   }, [appointments, customers, dateRange]);
 
   /* ── KPI Calculations ── */
@@ -266,7 +287,7 @@ export default function Analytics() {
       totalBookings,
       completedBookings,
       cancelledBookings,
-      totalRevenue: revenueStats?.grossRevenue || computedRevenue,
+      totalRevenue: computedRevenue > 0 ? computedRevenue : (revenueStats?.grossRevenue || 0),
       monthlyGrowth: revenueStats?.grossGrowth || 0,
       completionRate
     };
@@ -348,6 +369,7 @@ export default function Analytics() {
   /* ── Date Range Options ── */
   const dateRangeOptions = [
     { value: "today", label: "Today" },
+    { value: "yesterday", label: "Yesterday" },
     { value: "7days", label: "7 Days" },
     { value: "30days", label: "30 Days" },
     { value: "90days", label: "90 Days" },
@@ -580,9 +602,22 @@ export default function Analytics() {
                             <stop offset="100%" stopColor="#f5c800" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
-                        <XAxis dataKey="month" stroke="#ffffff30" fontSize={10} tickMargin={8} axisLine={false} tickLine={false} />
-                        <YAxis stroke="#ffffff30" fontSize={10} tickFormatter={v => `Rs.${v / 1000}k`} axisLine={false} tickLine={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" vertical={false} />
+                        <XAxis
+                          dataKey="month"
+                          stroke="#ffffff"
+                          tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                          tickMargin={8}
+                          axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          stroke="#ffffff"
+                          tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                          tickFormatter={v => `Rs.${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
+                          axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                          tickLine={false}
+                        />
                         <Tooltip content={<ForecastTooltip />} />
                         <Area
                           type="monotone"
@@ -691,34 +726,42 @@ export default function Analytics() {
                 <SectionHeader icon={LineChartIcon} title="Revenue Overview" subtitle="Revenue generated from completed appointments" />
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5 text-[0.65rem] text-muted-2">
-                    <span className="w-2 h-2 rounded-full bg-[#a855f7]"></span> Revenue
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#f5c800]"></span> Revenue
                   </div>
                 </div>
               </div>
               <div className="h-[280px] w-full -mx-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartsData.trendData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#a855f7" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
-                    <XAxis dataKey="date" stroke="#ffffff30" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                    <YAxis stroke="#ffffff30" fontSize={10} tickFormatter={v => `Rs.${v / 1000}k`} axisLine={false} tickLine={false} />
+                  <BarChart data={chartsData.trendData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      stroke="#ffffff"
+                      tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                      tickMargin={10}
+                      axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      stroke="#ffffff"
+                      tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                      tickFormatter={v => `Rs.${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
+                      axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                      tickLine={false}
+                    />
                     <Tooltip content={<CustomTooltip isCurrency />} />
-                    <Area
-                      type="monotone"
+                    <Legend
+                      formatter={(value) => <span style={{ color: "#ffffff", fontWeight: 700, fontSize: "12px" }}>{value}</span>}
+                      wrapperStyle={{ paddingTop: "10px" }}
+                    />
+                    <Bar
                       dataKey="revenue"
                       name="Revenue"
-                      stroke="#a855f7"
-                      strokeWidth={2.5}
-                      fill="url(#revGrad)"
-                      dot={{ r: 3, fill: "#a855f7", stroke: "#0a0a0a", strokeWidth: 2 }}
-                      activeDot={{ r: 5, stroke: "#a855f7", strokeWidth: 2, fill: "#0a0a0a" }}
+                      fill="#f5c800"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={48}
                     />
-                  </AreaChart>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             </Card>
@@ -731,15 +774,29 @@ export default function Analytics() {
                 <SectionHeader icon={BarChart3} title="Booking Analytics" subtitle="Daily breakdown by booking status" />
                 <div className="h-[300px] w-full mt-4 -mx-2">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartsData.trendData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
-                      <XAxis dataKey="date" stroke="#ffffff30" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                      <YAxis stroke="#ffffff30" fontSize={10} allowDecimals={false} axisLine={false} tickLine={false} />
+                    <BarChart data={chartsData.trendData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#ffffff"
+                        tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                        tickMargin={10}
+                        axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        stroke="#ffffff"
+                        tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                        allowDecimals={false}
+                        axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                        tickLine={false}
+                      />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend
                         iconType="circle"
                         iconSize={8}
-                        wrapperStyle={{ paddingTop: "12px", fontSize: "11px" }}
+                        formatter={(value) => <span style={{ color: "#ffffff", fontWeight: 700, fontSize: "12px" }}>{value}</span>}
+                        wrapperStyle={{ paddingTop: "12px" }}
                       />
                       <Bar dataKey="completed" name="Completed" stackId="bookings" fill="#22c55e" radius={[0, 0, 0, 0]} barSize={16} />
                       <Bar dataKey="pending" name="Pending" stackId="bookings" fill="#f5c800" />
@@ -774,13 +831,13 @@ export default function Analytics() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                {/* Custom legend below */}
-                <div className="flex items-center justify-center gap-5 pt-2 pb-1 border-t border-border mt-auto">
+                {/* Custom legend below with bright white text */}
+                <div className="flex items-center justify-center gap-5 pt-3 pb-1 border-t border-border mt-auto">
                   {chartsData.statusData.map(entry => (
                     <div key={entry.name} className="flex items-center gap-2 text-xs">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[entry.name] }}></span>
-                      <span className="text-muted-2 font-medium">{entry.name}</span>
-                      <span className="font-bold text-white">{entry.value}</span>
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[entry.name] }}></span>
+                      <span className="text-white font-bold">{entry.name}</span>
+                      <span className="font-extrabold text-accent">{entry.value}</span>
                     </div>
                   ))}
                 </div>
@@ -795,28 +852,36 @@ export default function Analytics() {
                 <SectionHeader icon={UserPlus} title="User Growth" subtitle="New customer registrations over time" />
                 <div className="h-[280px] w-full mt-4 -mx-2">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartsData.userGrowthData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="userGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#6366f1" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
-                      <XAxis dataKey="date" stroke="#ffffff30" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                      <YAxis stroke="#ffffff30" fontSize={10} allowDecimals={false} axisLine={false} tickLine={false} />
+                    <BarChart data={chartsData.userGrowthData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#ffffff"
+                        tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                        tickMargin={10}
+                        axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        stroke="#ffffff"
+                        tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
+                        allowDecimals={false}
+                        axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
+                        tickLine={false}
+                      />
                       <Tooltip content={<CustomTooltip />} />
-                      <Area
-                        type="monotone"
+                      <Legend
+                        formatter={(value) => <span style={{ color: "#ffffff", fontWeight: 700, fontSize: "12px" }}>{value}</span>}
+                        wrapperStyle={{ paddingTop: "10px" }}
+                      />
+                      <Bar
                         dataKey="newUsers"
                         name="New Registrations"
-                        stroke="#6366f1"
-                        strokeWidth={2.5}
-                        fill="url(#userGrad)"
-                        dot={{ r: 3, fill: "#6366f1", stroke: "#0a0a0a", strokeWidth: 2 }}
-                        activeDot={{ r: 5, stroke: "#6366f1", strokeWidth: 2, fill: "#0a0a0a" }}
+                        fill="#f5c800"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={48}
                       />
-                    </AreaChart>
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
