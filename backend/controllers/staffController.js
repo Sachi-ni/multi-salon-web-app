@@ -997,7 +997,11 @@ export const deleteStaff = async (req, res) => {
       });
     }
 
-    if (await Appointment.exists({ staff_id: staff._id })) {
+    const hasLinkedAppointments =
+      (await Appointment.exists({ staff_id: staff._id })) ||
+      (await AppointmentService.exists({ staff_id: staff._id }));
+
+    if (hasLinkedAppointments) {
       return res.status(409).json({
         message: "Cannot delete staff: it has linked appointments",
       });
