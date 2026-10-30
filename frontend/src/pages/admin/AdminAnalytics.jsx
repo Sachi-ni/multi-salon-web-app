@@ -69,7 +69,9 @@ const CustomTooltip = ({ active, payload, label, isCurrency }) => {
           <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: p.color || "#ffffff" }} />
           <span style={{ fontWeight: 600, color: "#e5e7eb" }}>{p.name}: </span>
           <span style={{ fontWeight: 800, color: "#ffffff" }}>
-            {isCurrency ? `Rs. ${Number(p.value).toLocaleString()}` : p.value}
+            {isCurrency && p.dataKey === "revenue"
+              ? `Rs. ${Number(p.value).toLocaleString()}`
+              : Number(p.value).toLocaleString()}
           </span>
         </p>
       ))}
