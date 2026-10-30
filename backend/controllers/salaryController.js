@@ -1168,14 +1168,16 @@ export const getSalaries = async (req, res) => {
       salaryRoleIncludes(roleMode, s.staff_id?.role || s.staff_role)
     );
 
-    // Cross-check: only return salaries where the staff member's
-    // salary_payment_frequency matches the queried frequency. This matches the
-    // admin/salary page, where each person only appears in the tab matching
-    // their configured frequency.
+    // Keep transitioned records in their original frequency tab so changing a
+    // staff member's frequency does not remove that person's previous salary
+    // history from the table.
     if (frequency) {
       salaries = salaries.filter(s => {
         if (!s.staff_id) return true; // keep if staff data missing (edge case)
-        return s.frequency === frequency;
+        return s.frequency === frequency && (
+          s.isTransitioned ||
+          s.staff_id.salary_payment_frequency === frequency
+        );
       });
     }
 

@@ -68,7 +68,8 @@ const isSalaryVisibleOnDate = (salary, selectedDate) => {
   if (salary?.staffDeleted && salary?.staffDeletedAt) {
     return toDateKey(selectedDate) <= toDateKey(salary.staffDeletedAt);
   }
-  if (!salary?.isTransitioned || !salary.dateRange?.end) return true;
+  if (salary?.isTransitioned) return true;
+  if (!salary?.dateRange?.end) return true;
   return toDateKey(selectedDate) <= toDateKey(salary.dateRange.end);
 };
 
@@ -367,7 +368,9 @@ const Salary = () => {
       const periodRows = period
         ? allRecords.filter(
             (s) => s.period === period &&
-              (!s.staff_id?.salary_cycle_id || s.cycleId === s.staff_id.salary_cycle_id) &&
+              (s.isTransitioned ||
+                !s.staff_id?.salary_cycle_id ||
+                s.cycleId === s.staff_id.salary_cycle_id) &&
               isSalaryVisibleOnDate(s, selectedDate)
           )
         : allRecords;
