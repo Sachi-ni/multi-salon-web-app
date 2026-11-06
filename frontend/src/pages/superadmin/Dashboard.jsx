@@ -6,11 +6,6 @@ import {
   ShieldCheck, ChevronRight, UserCheck, Phone, Mail, MapPin, Search
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { 
-  ComposedChart, Area, Bar, XAxis, YAxis, 
-  CartesianGrid, Tooltip, ResponsiveContainer 
-} from "recharts";
-
 import { getSalons } from "../../services/salonService";
 import { getStaff } from "../../services/staffService";
 import { getSalonAppointments } from "../../services/appointmentService";
@@ -114,34 +109,7 @@ export default function Dashboard() {
     }).length;
   }, [appointments]);
 
-  // Chart data calculation (Last 7 Days timeline)
-  const chartData = useMemo(() => {
-    const days = [];
-    const now = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split("T")[0];
-      const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
 
-      const dayAppts = appointments.filter(a => {
-        const aDate = a.appointment_date || (a.createdAt && a.createdAt.split("T")[0]);
-        return aDate === dateStr;
-      });
-
-      const dayRevenue = dayAppts.reduce((sum, a) => {
-        const price = a.total_price || a.service_id?.price || 0;
-        return sum + price;
-      }, 0);
-
-      days.push({
-        day: dayLabel,
-        bookings: dayAppts.length,
-        revenue: dayRevenue
-      });
-    }
-    return days;
-  }, [appointments]);
 
   // Stats definition
   const stats = [
@@ -249,64 +217,79 @@ export default function Dashboard() {
       {/* Main Insights Grid (Chart + Quick Actions & System Health) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Analytics Chart (Takes 2 columns) */}
-        <Card className="lg:col-span-2 flex flex-col justify-between">
-          <Card.Header className="flex items-center justify-between">
+        {/* Recent Appointments Card (Replaces weekly chart) */}
+        <Card className="lg:col-span-2 flex flex-col">
+          <Card.Header className="flex items-center justify-between pb-3 border-b border-border mb-3">
             <div>
-              <Card.Title>Weekly Booking & Revenue Activity</Card.Title>
-              <Card.Subtitle>Overview of daily appointments and earnings over the past 7 days</Card.Subtitle>
+              <Card.Title className="flex items-center gap-2 text-base font-extrabold text-white">
+                <Calendar className="w-5 h-5 text-accent" />
+                Recent Appointments
+              </Card.Title>
+              <Card.Subtitle className="text-xs text-muted-2">
+                Latest customer bookings across all salon branches
+              </Card.Subtitle>
             </div>
-            <Button variant="ghost" size="xs" icon={ArrowRight} onClick={() => navigate("/Analytics")}>
-              Analytics Page
+            <Button variant="ghost" size="xs" icon={ArrowRight} onClick={() => navigate("/Appointments")}>
+              View All
             </Button>
           </Card.Header>
 
-          <div className="p-4 pt-2">
-            {loading ? (
-              <div className="h-[220px] flex items-center justify-center">
-                <Skeleton className="w-full h-full rounded-xl" />
-              </div>
-            ) : (
-              <div className="h-[220px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorBookings" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                    <XAxis dataKey="day" stroke="#a3a3a3" fontSize={11} tickLine={false} />
-                    <YAxis yAxisId="left" stroke="#8b5cf6" fontSize={11} tickLine={false} />
-                    <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={11} tickLine={false} tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: "#171717", borderColor: "#404040", borderRadius: "8px", fontSize: "12px", color: "#ffffff" }}
-                      formatter={(value, name) => [
-                        name === "Est. Income" ? `LKR ${Number(value).toLocaleString()}` : value,
-                        name
-                      ]}
-                    />
-                    <Bar yAxisId="right" dataKey="revenue" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={24} name="Est. Income" />
-                    <Area yAxisId="left" type="monotone" dataKey="bookings" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#colorBookings)" name="Bookings" />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+          {loading ? (
+            <div className="space-y-3 p-4">
+              <Skeleton className="w-full h-11 rounded-xl" />
+              <Skeleton className="w-full h-11 rounded-xl" />
+              <Skeleton className="w-full h-11 rounded-xl" />
+              <Skeleton className="w-full h-11 rounded-xl" />
+            </div>
+          ) : appointments.length === 0 ? (
+            <div className="py-12 text-center text-muted-2 text-xs">No recent appointments found.</div>
+          ) : (
+            <Table className="w-full">
+              <Table.Head>
+                <Table.Th className="w-[28%]">Customer</Table.Th>
+                <Table.Th className="w-[24%]">Salon Branch</Table.Th>
+                <Table.Th className="w-[20%]">Date & Time</Table.Th>
+                <Table.Th className="w-[14%]">Status</Table.Th>
+                <Table.Th align="right" className="w-[14%]">Amount</Table.Th>
+              </Table.Head>
+              <Table.Body>
+                {appointments.slice(0, 6).map((appt, i) => {
+                  const customerName = appt.customer_name || appt.customer_id?.name || appt.guest_name || "Guest";
+                  const salonName = appt.salon_id?.name || appt.salon_name || "Salon Branch";
+                  const price = appt.total_price || appt.service_id?.price || 0;
+                  const apptDate = appt.appointment_date || (appt.createdAt && appt.createdAt.split("T")[0]) || "N/A";
+                  const timeRange = appt.start_time ? `${appt.start_time}${appt.end_time ? ` - ${appt.end_time}` : ""}` : "";
 
-          <div className="grid grid-cols-2 gap-4 border-t border-border pt-4 px-4 pb-2 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span>
-              <span className="text-muted-2">Total Bookings (7 Days):</span>
-              <span className="font-bold text-white">{chartData.reduce((sum, d) => sum + d.bookings, 0)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
-              <span className="text-muted-2">Est. Income (7 Days):</span>
-              <span className="font-bold text-accent">LKR {chartData.reduce((sum, d) => sum + d.revenue, 0).toLocaleString()}</span>
-            </div>
-          </div>
+                  return (
+                    <tr key={appt._id || i} className="hover:bg-surface-2/60 transition-colors">
+                      <Table.Td bold className="text-white w-[28%]">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-accent-dim border border-accent/20 flex items-center justify-center text-accent font-black text-xs uppercase shrink-0">
+                            {customerName.charAt(0)}
+                          </div>
+                          <span className="font-bold text-white text-xs truncate">{customerName}</span>
+                        </div>
+                      </Table.Td>
+                      <Table.Td className="text-muted-2 text-xs font-medium w-[24%]">
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <Store className="w-3.5 h-3.5 text-accent/70 shrink-0" />
+                          <span className="truncate">{salonName}</span>
+                        </span>
+                      </Table.Td>
+                      <Table.Td className="w-[20%]">
+                        <div className="font-semibold text-white text-xs whitespace-nowrap">{apptDate}</div>
+                        {timeRange && <div className="text-[10px] text-muted-2 font-mono whitespace-nowrap">{timeRange}</div>}
+                      </Table.Td>
+                      <Table.Td className="w-[14%] whitespace-nowrap">{getStatusBadge(appt.status)}</Table.Td>
+                      <Table.Td align="right" className="text-accent font-extrabold text-xs w-[14%] whitespace-nowrap">
+                        LKR {Number(price).toLocaleString()}
+                      </Table.Td>
+                    </tr>
+                  );
+                })}
+              </Table.Body>
+            </Table>
+          )}
         </Card>
 
         {/* Quick Actions & System Health */}
@@ -501,121 +484,7 @@ export default function Dashboard() {
         )}
       </Card>
 
-      {/* Dual Tables/Cards Section: Recent Appointments & Top Salons */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Recent Appointments */}
-        <Card>
-          <Card.Header className="flex items-center justify-between">
-            <div>
-              <Card.Title>Recent Appointments</Card.Title>
-              <Card.Subtitle>Latest customer bookings across all salon branches</Card.Subtitle>
-            </div>
-            <Button variant="ghost" size="xs" icon={ArrowRight} onClick={() => navigate("/Appointments")}>
-              View All
-            </Button>
-          </Card.Header>
-
-          {loading ? (
-            <div className="space-y-3">
-              <Skeleton className="w-full h-10 rounded-lg" />
-              <Skeleton className="w-full h-10 rounded-lg" />
-              <Skeleton className="w-full h-10 rounded-lg" />
-            </div>
-          ) : appointments.length === 0 ? (
-            <div className="py-8 text-center text-muted-2 text-xs">No recent appointments found.</div>
-          ) : (
-            <Table>
-              <Table.Head>
-                <Table.Th>Customer</Table.Th>
-                <Table.Th>Salon Branch</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th align="right">Amount</Table.Th>
-              </Table.Head>
-              <Table.Body>
-                {appointments.slice(0, 5).map((appt, i) => {
-                  const customerName = appt.customer_name || appt.customer_id?.name || appt.guest_name || "Guest";
-                  const salonName = appt.salon_id?.name || appt.salon_name || "Salon";
-                  const price = appt.total_price || appt.service_id?.price || 0;
-
-                  return (
-                    <tr key={appt._id || i} className="hover:bg-surface-2/60 transition-colors">
-                      <Table.Td bold>{customerName}</Table.Td>
-                      <Table.Td className="text-muted-2 text-xs">{salonName}</Table.Td>
-                      <Table.Td>{getStatusBadge(appt.status)}</Table.Td>
-                      <Table.Td align="right" className="text-accent font-extrabold text-xs">
-                        LKR {price.toLocaleString()}
-                      </Table.Td>
-                    </tr>
-                  );
-                })}
-              </Table.Body>
-            </Table>
-          )}
-        </Card>
-
-        {/* Top Registered Salons */}
-        <Card>
-          <Card.Header className="flex items-center justify-between">
-            <div>
-              <Card.Title>Registered Salons</Card.Title>
-              <Card.Subtitle>Active salon locations and locations overview</Card.Subtitle>
-            </div>
-            <Button variant="ghost" size="xs" icon={ArrowRight} onClick={() => navigate("/salons")}>
-              Manage Salons
-            </Button>
-          </Card.Header>
-
-          {loading ? (
-            <div className="space-y-3">
-              <Skeleton className="w-full h-12 rounded-xl" />
-              <Skeleton className="w-full h-12 rounded-xl" />
-            </div>
-          ) : salons.length === 0 ? (
-            <div className="py-8 text-center text-muted-2 text-xs">No salons registered yet.</div>
-          ) : (
-            <div className="space-y-3">
-              {salons.slice(0, 4).map((salon) => (
-                <div 
-                  key={salon._id} 
-                  className="flex items-center justify-between p-3.5 bg-surface-2 border border-border rounded-xl hover:border-accent/30 transition-all duration-200"
-                >
-<div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-accent-dim border border-accent/20 flex items-center justify-center text-accent overflow-hidden">
-                      {salon.logo ? (
-                        <img
-                          src={salon.logo.startsWith("http") ? salon.logo : `${API_BASE}/${salon.logo.replace(/\\/g, "/")}`}
-                          alt={`${salon.name} logo`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.style.display = "none"; }}
-                        />
-                      ) : (
-                        <Store className="w-4 h-4" />
-                      )}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">{salon.name}</h4>
-                      <p className="text-xs text-muted-2">{salon.location || "Location specified"}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Badge variant="success">Active</Badge>
-                    <button
-                      onClick={() => navigate(`/salons`)}
-                      className="p-1.5 rounded-lg bg-surface text-muted-2 hover:text-white hover:bg-accent-dim/40 transition-colors"
-                      title="View Salon"
-                    >
-                      <ArrowRight className="w-4 h-4 text-accent" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-      </div>
     </div>
   );
 }

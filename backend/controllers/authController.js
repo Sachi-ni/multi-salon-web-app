@@ -166,11 +166,15 @@ export const registerCustomer = async (req, res) => {
 export const loginAdmin = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const identifier = String(email || "").trim();
+    const normalizedIdentifier = identifier.toLowerCase();
 
     const admin = await Admin.findOne({
       $or: [
-        { email },
-        { username: email }
+        { email: normalizedIdentifier },
+        { email: identifier },
+        { username: normalizedIdentifier },
+        { username: identifier }
       ]
     });
     if (!admin) {
@@ -205,6 +209,15 @@ export const loginAdmin = async (req, res) => {
         message: otpResult?.delivered
           ? "Authentication code sent to your email address"
           : "Authentication code generated. Please check your email or server logs.",
+      });
+    }
+
+    if (admin.mustChangePassword === true) {
+      return res.status(200).json({
+        requiresHardening: true,
+        hardeningStep: "change-password",
+        message: "Please set a new password before proceeding.",
+        token: generateHardeningToken(admin, "change-password"),
       });
     }
 

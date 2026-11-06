@@ -9,7 +9,7 @@ const Footer = () => {
     <footer className="bg-primary pt-20 pb-10 border-t border-border">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-          
+
           {/* Brand */}
           <div className="space-y-6">
             <div className="flex items-center gap-2 text-2xl font-black text-accent tracking-tight">

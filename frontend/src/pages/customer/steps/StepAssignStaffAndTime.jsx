@@ -1,7 +1,25 @@
 import { useEffect, useState, useCallback } from "react";
 import { getAvailableStaff, getAvailableSlots } from "../../../services/appointmentService";
+import { useAuth } from "../../../context/AuthContext";
+
+const toHHMM = (t) => {
+  if (!t) return "";
+  const s = String(t).trim();
+  const d = /^(\d{1,2}):(\d{2})/.exec(s);
+  if (d) return `${String(Number(d[1])).padStart(2, "0")}:${d[2]}`;
+  return s;
+};
+
+const timesOverlap = (s1, e1, s2, e2) => {
+  const normS1 = toHHMM(s1);
+  const normE1 = toHHMM(e1);
+  const normS2 = toHHMM(s2);
+  const normE2 = toHHMM(e2);
+  return normS1 < normE2 && normS2 < normE1;
+};
 
 export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
+  const { user } = useAuth();
   // Each service entry: { serviceId, serviceName, serviceDuration, servicePrice, staffId?, staffName?, staffSpecification?, startTime?, endTime? }
   const [assignments, setAssignments] = useState(() =>
     (booking?.services || []).map(s => ({
@@ -48,15 +66,24 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
     setLoading(true);
     setError("");
     try {
-      const res = await getAvailableSlots(current.staffId, booking.date, [current.serviceId], booking.salonId);
+      const res = await getAvailableSlots(
+        current.staffId,
+        booking.date,
+        [current.serviceId],
+        booking.salonId,
+        {
+          customerId: user?._id || user?.id,
+          guestPhone: booking?.guestPhone
+        }
+      );
       
       // Filter out slots that overlap with previously assigned services
       const previousAssignments = assignments.slice(0, currentIndex).filter(a => a.startTime && a.endTime);
       
-      const validSlots = res.data.filter(slot => {
+      const validSlots = (res.data || []).filter(slot => {
         for (const prev of previousAssignments) {
           // Check if times overlap (start1 < end2 && start2 < end1)
-          if (slot.start_time < prev.endTime && prev.startTime < slot.end_time) {
+          if (timesOverlap(slot.start_time, slot.end_time, prev.startTime, prev.endTime)) {
             return false;
           }
         }
@@ -69,7 +96,7 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
     } finally {
       setLoading(false);
     }
-  }, [booking.date, booking.salonId, current, assignments, currentIndex]);
+  }, [booking.date, booking.salonId, booking?.guestPhone, current, assignments, currentIndex, user]);
 
   useEffect(() => {
     if (phase === "staff") {

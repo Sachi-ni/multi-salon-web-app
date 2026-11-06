@@ -25,7 +25,8 @@ const appointmentSchema = new mongoose.Schema({
   staff_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Staff",
-    required: true
+    required: false,
+    default: null
   },
   appointment_date: { type: String, required: true },   // "2026-07-01"
   start_time: { type: String, required: true },    // "10:00"
@@ -69,7 +70,8 @@ const appointmentSchema = new mongoose.Schema({
   }],
 }, { timestamps: true });
 
-// Compound index for fast conflict detection queries
-appointmentSchema.index({ staff_id: 1, appointment_date: 1, status: 1 });
+// Index for fast conflict detection and date-based queries
+appointmentSchema.index({ appointment_date: 1, status: 1 });
+appointmentSchema.index({ salon_id: 1, appointment_date: 1 });
 
 export default mongoose.model("Appointment", appointmentSchema);

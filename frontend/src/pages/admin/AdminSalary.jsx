@@ -68,7 +68,8 @@ const isSalaryVisibleOnDate = (salary, selectedDate) => {
   if (salary?.staffDeleted && salary?.staffDeletedAt) {
     return toDateKey(selectedDate) <= toDateKey(salary.staffDeletedAt);
   }
-  if (!salary?.isTransitioned || !salary.dateRange?.end) return true;
+  if (salary?.isTransitioned) return true;
+  if (!salary?.dateRange?.end) return true;
   return toDateKey(selectedDate) <= toDateKey(salary.dateRange.end);
 };
 
@@ -334,7 +335,11 @@ const Salary = () => {
         frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate;
       const data = period
         ? allRecords.filter(
-            (s) => s.period === period && isSalaryVisibleOnDate(s, selectedDate)
+            (s) => s.period === period &&
+              (s.isTransitioned ||
+                !s.staff_id?.salary_cycle_id ||
+                s.cycleId === s.staff_id.salary_cycle_id) &&
+              isSalaryVisibleOnDate(s, selectedDate)
           )
         : allRecords;
       setSalaries(data);
@@ -900,7 +905,14 @@ const Salary = () => {
   // ─── Build display rows (salaries + staff without records) ──────────────
 
   const displayRows = useMemo(() => {
-    let rows = [...salaries];
+    let rows = salaries.filter((row) => {
+      if (frequency !== "daily") return true;
+      const changedDate =
+        row.salaryFrequencyChangedDate ||
+        row.staff_id?.salaryFrequencyChangedDate ||
+        "";
+      return !changedDate || toDateKey(row.period) >= toDateKey(changedDate);
+    });
 
     // Always show every staff member of the salon under this frequency tab.
     // Staff that do not have a salary record for the selected period yet are
@@ -918,6 +930,13 @@ const Salary = () => {
       const pendingRows = fallbackStaff
         .filter((staff) => {
           if (recordedStaffIds.has(String(staff._id))) return false;
+          if (
+            frequency === "daily" &&
+            staff.salaryFrequencyChangedDate &&
+            dailyDate < staff.salaryFrequencyChangedDate
+          ) {
+            return false;
+          }
           // If staff joined after this period ended, don't show fallback row for past period
           const joinDate = getStaffJoinDateStr(staff);
           if (joinDate && periodEndStr && periodEndStr < joinDate) {
@@ -938,6 +957,7 @@ const Salary = () => {
                 );
           const fallbackTotalSalary =
             staff.salaryCalculationEnabled === false ||
+            (staff.salaryCalculationStartDate && selectedDateKey < staff.salaryCalculationStartDate) ||
             (employmentStartKey && selectedDateKey < employmentStartKey)
               ? 0
               : selectedDateKey;
@@ -945,6 +965,7 @@ const Salary = () => {
           return {
             _id: `${FALLBACK_PREFIX}${staff._id}`,
             staff_id: staff,
+            salon_id: staff.salon_id,
             staff_name: staff.full_name || "",
             workingAmount: 0,
             rate: staff.commission_rate ?? 0,
@@ -1283,7 +1304,7 @@ const Salary = () => {
                   const workingAmt = frequency === "monthly"
                     ? (selectedDailyRecord?.workingAmount || 0)
                     : frequency === "weekly"
-                      ? weeklyCalculation.workingAmount
+                      ? (selectedWeeklyRecord?.workingAmount || 0)
                       : (row.workingAmount || 0);
                   const currentRate = editingRates[row._id] !== undefined
                     ? editingRates[row._id]
@@ -1292,7 +1313,7 @@ const Salary = () => {
                   const workRate = frequency === "monthly"
                     ? (selectedDailyRecord?.workRate || 0)
                     : frequency === "weekly"
-                      ? weeklyCalculation.workRate
+                      ? (selectedWeeklyRecord?.workRate || 0)
                       : (row.workRate || 0);
                   const fallbackPerDay = isFallback
                     ? Number(staff.salary_payment_count_per_day || 0)

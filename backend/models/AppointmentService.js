@@ -18,4 +18,9 @@ const appointmentServiceSchema = new mongoose.Schema({
   service_end_time: String
 });
 
+// Compound indexes for slot checking and staff lookups
+appointmentServiceSchema.index({ staff_id: 1, appointment_id: 1 });
+appointmentServiceSchema.index({ appointment_id: 1 });
+appointmentServiceSchema.index({ staff_id: 1, service_start_time: 1, service_end_time: 1 });
+
 export default mongoose.model("AppointmentService", appointmentServiceSchema);

@@ -27,12 +27,12 @@ const BookingCTA = () => {
           <p className="text-base sm:text-lg text-white/80 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed">
             Book your appointment today and step into a world of unparalleled luxury, styling, and relaxation. Your premium experience awaits.
           </p>
-          
-          <button 
+
+          <button
             onClick={() => navigate("/book")}
             className="w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 bg-accent text-primary rounded-xl text-base sm:text-lg font-extrabold tracking-widest uppercase hover:bg-accent-hover hover:shadow-glow transition-all duration-300 hover:-translate-y-1 inline-flex items-center justify-center gap-3 group"
           >
-            Book Now 
+            Book Now
             <span className="group-hover:translate-x-1 transition-transform">→</span>
           </button>
         </motion.div>

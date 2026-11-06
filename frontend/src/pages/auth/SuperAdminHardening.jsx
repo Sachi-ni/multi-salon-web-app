@@ -21,7 +21,7 @@ const SuperAdminHardening = () => {
 
   const dashboardFor = (user) => {
     if (user.role === "super-admin") return "/superAdminDashboard";
-    if (user.role === "manager" && user.salon_id) return `/salon-admin/${user.salon_id}/adminDashboard`;
+    if (["manager", "staff-admin"].includes(user.role) && user.salon_id) return `/salon-admin/${user.salon_id}/adminDashboard`;
     if (user.salon_id) return "/staff/dashboard";
     return "/";
   };

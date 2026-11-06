@@ -41,7 +41,7 @@ const LandingNavbar = () => {
 
   const scrollToSection = (href) => {
     setIsMobileMenuOpen(false);
-    
+
     if (href.startsWith("/")) {
       navigate(href);
       return;
@@ -64,11 +64,10 @@ const LandingNavbar = () => {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled
           ? "bg-surface/90 backdrop-blur-glass border-b border-border py-3 shadow-glass"
           : "bg-transparent py-5"
-      }`}
+        }`}
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
         {/* Logo */}

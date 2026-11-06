@@ -59,13 +59,13 @@ const Hero = () => {
               Premium Grooming Studio
             </span>
           </div>
-          
+
           <h1 className="text-3xl sm:text-5xl md:text-7xl font-display font-black leading-[1.1] tracking-tight text-white">
             ELEVATE <br />
             <span className="text-gradient">YOUR STYLE.</span> <br />
             EMBRACE LUXURY.
           </h1>
-          
+
           <p className="text-base sm:text-lg md:text-xl text-white/70 max-w-xl font-light leading-relaxed">
             Experience world-class grooming and beauty services in an atmosphere of pure luxury. Our expert stylists are dedicated to crafting your perfect look.
           </p>

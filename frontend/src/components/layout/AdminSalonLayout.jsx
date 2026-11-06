@@ -16,7 +16,7 @@ const AdminSalonLayout = ({ children }) => {
   });
   const location = useLocation();
   const { user } = useAuth();
-  const isStandardStaff = user?.role && !["super-admin", "manager"].includes(user.role);
+  const isStandardStaff = user?.role && !["super-admin", "manager", "staff-admin"].includes(user.role);
 
   const toggleSidebar = () => {
     if (window.innerWidth >= 1024) {

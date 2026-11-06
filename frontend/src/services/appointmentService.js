@@ -21,6 +21,8 @@ export const getAvailableSlots = (staffId, date, serviceIds, salonId, options = 
       date,
       serviceIds: Array.isArray(serviceIds) ? serviceIds.join(",") : serviceIds,
       salonId,
+      ...(options.customerId ? { customerId: options.customerId } : {}),
+      ...(options.guestPhone ? { guestPhone: options.guestPhone } : {}),
       ...(options.ignoreAppointmentId ? { ignoreAppointmentId: options.ignoreAppointmentId } : {})
     }
   });

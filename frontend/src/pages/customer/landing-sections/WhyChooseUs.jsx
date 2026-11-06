@@ -32,7 +32,7 @@ const WhyChooseUs = () => {
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
 
       <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center relative z-10">
-        
+
         {/* Text Content */}
         <motion.div
           initial={{ opacity: 0, x: -30 }}
@@ -42,12 +42,12 @@ const WhyChooseUs = () => {
         >
           <div className="text-accent font-bold tracking-widest uppercase text-sm mb-3">Why Choose Us</div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-black text-white mb-6">
-            The standard of <br/><span className="text-gradient">excellence.</span>
+            The standard of <br /><span className="text-gradient">excellence.</span>
           </h2>
           <p className="text-white/70 text-lg mb-8 leading-relaxed">
             We don't just offer services; we offer an experience. From the moment you walk through our doors, every detail is tailored to ensure you feel valued, relaxed, and ultimately, look your absolute best.
           </p>
-          
+
           <div className="grid sm:grid-cols-2 gap-8">
             {features.map((feature, index) => (
               <div key={index} className="flex flex-col gap-3">
@@ -71,9 +71,9 @@ const WhyChooseUs = () => {
           transition={{ duration: 0.8 }}
           className="relative h-[600px] rounded-2xl overflow-hidden border border-border shadow-2xl hidden lg:block"
         >
-          <img 
-            src="https://images.unsplash.com/photo-1522337660859-02fbefca4702?q=80&w=2069&auto=format&fit=crop" 
-            alt="Luxury Salon Detail" 
+          <img
+            src="https://images.unsplash.com/photo-1522337660859-02fbefca4702?q=80&w=2069&auto=format&fit=crop"
+            alt="Luxury Salon Detail"
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-primary/20" />

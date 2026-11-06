@@ -126,12 +126,12 @@ const StaffDashboard = () => {
   }, [appointments, filter]);
 
   const completedCount = useMemo(() => {
-    return appointments.filter(a => a.status === "completed").length;
-  }, [appointments]);
+    return filteredAppointments.filter(a => a.status === "completed").length;
+  }, [filteredAppointments]);
 
   const pendingCount = useMemo(() => {
-    return appointments.filter(a => a.status === "pending" || a.status === "confirmed").length;
-  }, [appointments]);
+    return filteredAppointments.filter(a => a.status === "pending" || a.status === "confirmed").length;
+  }, [filteredAppointments]);
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -153,17 +153,17 @@ const StaffDashboard = () => {
     },
     {
       icon: Calendar,
-      label: "Total Bookings",
-      value: loading ? "—" : appointments.length.toString(),
-      trend: `${filteredAppointments.length} ${filter.toLowerCase()}`,
+      label: filter === "All" ? "Total Bookings" : `${filter} Bookings`,
+      value: loading ? "—" : filteredAppointments.length.toString(),
+      trend: filter === "All" ? `${appointments.length} all-time` : `out of ${appointments.length} total`,
       subtitle: "scheduled appointments",
     },
     {
       icon: CheckCircle2,
       label: "Completed",
       value: loading ? "—" : completedCount.toString(),
-      trend: `${pendingCount} upcoming`,
-      subtitle: "fulfilled sessions",
+      trend: `${pendingCount} pending / upcoming`,
+      subtitle: filter === "All" ? "fulfilled sessions" : `fulfilled in ${filter.toLowerCase()}`,
     },
     {
       icon: UserCheck,

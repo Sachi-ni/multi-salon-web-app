@@ -7,8 +7,7 @@ import {
   rejectAppointment,
   completeAppointment,
   adminCancelAppointment,
-  updateAppointmentDuration,
-  deleteAppointment
+  updateAppointmentDuration
 } from "../../services/appointmentService";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
@@ -17,7 +16,7 @@ import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import { 
   Calendar, Clock, User, UserCheck, Search, LayoutGrid, 
-  List, CheckCircle2, AlertCircle, Trash2, 
+  List, CheckCircle2, AlertCircle, 
   Check, X, Plus, Hash, Edit2,
   Receipt, FileText
 } from "lucide-react";
@@ -139,20 +138,6 @@ export default function AdminBookings() {
       fetchAppointments();
     } catch {
       setActionError(`${id}:Failed to cancel appointment.`);
-    } finally {
-      setActionLoading("");
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to permanently delete this appointment? This action cannot be undone.")) return;
-    setActionLoading(id);
-    setActionError("");
-    try {
-      await deleteAppointment(id);
-      fetchAppointments();
-    } catch {
-      setActionError(`${id}:Failed to delete appointment.`);
     } finally {
       setActionLoading("");
     }
@@ -608,16 +593,6 @@ export default function AdminBookings() {
                       </>
                     )}
 
-                    {["completed", "rejected", "cancelled"].includes(a.status) && (
-                      <button
-                        onClick={() => handleDelete(a._id)}
-                        disabled={isActionLoading}
-                        className="px-4 py-2 rounded-xl bg-surface-2 text-rose-400 hover:bg-rose-500 hover:text-white transition-all text-xs font-bold flex items-center gap-1.5 border border-border"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete Booking
-                      </button>
-                    )}
                   </div>
                 </div>
               </motion.div>
@@ -740,16 +715,7 @@ export default function AdminBookings() {
                           )}
                         </>
                       )}
-                      {["completed", "rejected", "cancelled"].includes(a.status) && (
-                        <button
-                          onClick={() => handleDelete(a._id)}
-                          disabled={isActionLoading}
-                          className="p-1.5 rounded-lg bg-surface-2 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors"
-                          title="Delete Appointment"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+
                     </div>
                   </Table.Td>
                 </tr>

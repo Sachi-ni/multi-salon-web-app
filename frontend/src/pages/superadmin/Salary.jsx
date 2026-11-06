@@ -68,7 +68,8 @@ const isSalaryVisibleOnDate = (salary, selectedDate) => {
   if (salary?.staffDeleted && salary?.staffDeletedAt) {
     return toDateKey(selectedDate) <= toDateKey(salary.staffDeletedAt);
   }
-  if (!salary?.isTransitioned || !salary.dateRange?.end) return true;
+  if (salary?.isTransitioned) return true;
+  if (!salary?.dateRange?.end) return true;
   return toDateKey(selectedDate) <= toDateKey(salary.dateRange.end);
 };
 
@@ -121,16 +122,18 @@ const isPeriodEnded = (frequency, currentDateStr, salonCloseTime) => {
     closingTime.setHours(hours, minutes, 0, 0);
     return today >= closingTime;
   }
-  today.setHours(23, 59, 59, 999);
+  const [hours, minutes] = /^\d{2}:\d{2}$/.test(salonCloseTime || "")
+    ? salonCloseTime.split(":").map(Number)
+    : [17, 0];
   if (frequency === "weekly") {
     const range = getWeekRange(currentDateStr);
     const weekEnd = new Date(range.end);
-    weekEnd.setHours(23, 59, 59, 999);
+    weekEnd.setHours(hours, minutes, 0, 0);
     return today >= weekEnd;
   }
   const range = getMonthRange(currentDateStr);
   const monthEnd = new Date(range.end);
-  monthEnd.setHours(23, 59, 59, 999);
+  monthEnd.setHours(hours, minutes, 0, 0);
   return today >= monthEnd;
 };
 
@@ -364,7 +367,11 @@ const Salary = () => {
         frequency === "daily" ? dailyDate : frequency === "weekly" ? weeklyDate : monthlyDate;
       const periodRows = period
         ? allRecords.filter(
-            (s) => s.period === period && isSalaryVisibleOnDate(s, selectedDate)
+            (s) => s.period === period &&
+              (s.isTransitioned ||
+                !s.staff_id?.salary_cycle_id ||
+                s.cycleId === s.staff_id.salary_cycle_id) &&
+              isSalaryVisibleOnDate(s, selectedDate)
           )
         : allRecords;
       // A manager has one visible row per selected period. This also keeps
@@ -939,7 +946,14 @@ const Salary = () => {
   // ─── Build display rows (salaries + staff without records) ──────────────
 
   const displayRows = useMemo(() => {
-    let rows = [...salaries];
+    let rows = salaries.filter((row) => {
+      if (frequency !== "daily") return true;
+      const changedDate =
+        row.salaryFrequencyChangedDate ||
+        row.staff_id?.salaryFrequencyChangedDate ||
+        "";
+      return !changedDate || toDateKey(row.period) >= toDateKey(changedDate);
+    });
 
     // Always show every staff member of the salon under this frequency tab.
     // Staff that do not have a salary record for the selected period yet are
@@ -957,6 +971,13 @@ const Salary = () => {
       const pendingRows = fallbackStaff
         .filter((staff) => {
           if (recordedStaffIds.has(String(staff._id))) return false;
+          if (
+            frequency === "daily" &&
+            staff.salaryFrequencyChangedDate &&
+            dailyDate < staff.salaryFrequencyChangedDate
+          ) {
+            return false;
+          }
           const joinDate = getStaffJoinDateStr(staff);
           if (joinDate && periodEndStr && periodEndStr < joinDate) {
             return false;
@@ -976,6 +997,7 @@ const Salary = () => {
                 );
           const fallbackTotalSalary =
             staff.salaryCalculationEnabled === false ||
+            (staff.salaryCalculationStartDate && selectedDateKey < staff.salaryCalculationStartDate) ||
             (employmentStartKey && selectedDateKey < employmentStartKey)
               ? 0
               : selectedDateKey;
@@ -983,6 +1005,7 @@ const Salary = () => {
           return {
             _id: `${FALLBACK_PREFIX}${staff._id}`,
             staff_id: staff,
+            salon_id: staff.salon_id,
             staff_name: staff.full_name || "",
             workingAmount: 0,
             rate: staff.commission_rate ?? 0,
@@ -1293,6 +1316,13 @@ const Salary = () => {
                     frequency === "weekly" && Array.isArray(row.dailyRecords)
                       ? row.dailyRecords.find((dr) => toDateKey(dr.date) === weeklyDate)
                       : null;
+                  const weeklyRange = frequency === "weekly" ? getWeekRange(weeklyDate) : null;
+                  const weeklyRecords = frequency === "weekly" && Array.isArray(row.dailyRecords)
+                    ? row.dailyRecords.filter((dr) => {
+                        const date = toDateKey(dr.date);
+                        return date >= weeklyRange.start && date <= weeklyRange.end && date <= today;
+                      })
+                    : [];
                   const selectedDailyRecord = monthlyDayRecord || null;
                   const workingAmt = frequency === "monthly"
                     ? (selectedDailyRecord?.workingAmount || 0)
@@ -1349,7 +1379,9 @@ const Salary = () => {
                               : sum;
                           }, 0)
                         : (row.totalSalary || 0))
-                    : (row.totalSalary || 0);
+                    : frequency === "weekly" && weeklyRecords.length > 0
+                      ? weeklyRecords.reduce((sum, dr) => sum + (Number(dr.daySalary) || 0), 0)
+                      : (row.totalSalary || 0);
                   const status = frequency === "monthly"
                     ? (selectedDailyRecord?.status || row.status || "Not Paid")
                     : (row.status || "Not Paid");
