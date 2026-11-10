@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
-  ComposedChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
@@ -495,27 +495,20 @@ export default function AdminAnalytics() {
           <motion.div variants={fadeUp}>
             <Card className="overflow-hidden">
               <div className="flex items-center justify-between mb-4">
-                <SectionHeader icon={LineChartIcon} title="Revenue & Booking Trend" subtitle="Revenue generated from completed appointments" />
+                <SectionHeader icon={LineChartIcon} title="Revenue Trend" subtitle="Revenue generated from completed appointments" />
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5 text-[0.65rem] text-muted-2">
                     <span className="w-2 h-2 rounded-full bg-[#a855f7]"></span> Revenue
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[0.65rem] text-muted-2">
-                    <span className="w-2 h-2 rounded-full bg-[#3b82f6]"></span> Bookings
                   </div>
                 </div>
               </div>
               <div className="h-[280px] w-full -mx-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartsData.trendData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }}>
+                  <AreaChart data={chartsData.trendData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }}>
                     <defs>
                       <linearGradient id="adminRevGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#a855f7" stopOpacity={0.8} />
                         <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="bookingsGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" vertical={false} />
@@ -528,18 +521,9 @@ export default function AdminAnalytics() {
                       tickLine={false}
                     />
                     <YAxis
-                      yAxisId="left"
                       stroke="#ffffff"
                       tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
                       tickFormatter={v => `Rs.${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
-                      axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      stroke="#ffffff"
-                      tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
                       axisLine={{ stroke: "rgba(255,255,255,0.2)" }}
                       tickLine={false}
                     />
@@ -549,7 +533,6 @@ export default function AdminAnalytics() {
                       wrapperStyle={{ paddingTop: "10px" }}
                     />
                     <Area
-                      yAxisId="left"
                       type="monotone"
                       dataKey="revenue"
                       name="Revenue"
@@ -560,15 +543,7 @@ export default function AdminAnalytics() {
                       dot={{ r: 3, fill: "#a855f7", stroke: "#0a0a0a", strokeWidth: 2 }}
                       activeDot={{ r: 5, stroke: "#a855f7", strokeWidth: 2, fill: "#ffffff" }}
                     />
-                    <Bar
-                      yAxisId="right"
-                      dataKey="completed"
-                      name="Bookings"
-                      fill="url(#bookingsGrad)"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={40}
-                    />
-                  </ComposedChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </Card>
