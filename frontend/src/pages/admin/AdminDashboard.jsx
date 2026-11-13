@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getSalon } from "../../services/salonService";
-import { getSalonAppointments, confirmAppointment, completeAppointment } from "../../services/appointmentService";
+import { getSalonAppointments } from "../../services/appointmentService";
 import { getStaff } from "../../services/staffService";
 import { getSalonFeedback } from "../../services/feedbackService";
 import { getDailyReport } from "../../services/billingService";
@@ -15,25 +15,15 @@ import {
   CalendarPlus,
   UserPlus,
   MapPin,
-  TrendingUp,
   ChevronRight,
   Store,
   Coins,
-  MessageSquare
+  MessageSquare,
+  Clock,
+  Scissors
 } from "lucide-react";
 
 import { motion } from "framer-motion";
-import {
-  ComposedChart,
-  Area,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
 
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
@@ -58,7 +48,6 @@ const AdminDashboard = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [actionLoading, setActionLoading] = useState("");
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -120,59 +109,24 @@ const AdminDashboard = () => {
     return valid.reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
   }, [appointments, reportData]);
 
-  // 7-day chart trend data
-  const chartData = useMemo(() => {
-    const last7Days = Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return [
-        d.getFullYear(),
-        String(d.getMonth() + 1).padStart(2, '0'),
-        String(d.getDate()).padStart(2, '0')
-      ].join('-');
-    });
-
-    return last7Days.map((dateStr) => {
-      const dayAppts = appointments.filter((a) => a.appointment_date === dateStr);
-      const dayRevenue = dayAppts
-        .filter((a) => ["completed"].includes(a.status?.toLowerCase()))
-        .reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
-
-      const label = new Date(dateStr).toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
-      return {
-        date: label,
-        revenue: dayRevenue,
-        bookings: dayAppts.length,
-      };
-    });
-  }, [appointments]);
-
   const recentAppointments = useMemo(() => {
-    return appointments.slice(0, 5);
+    return appointments.slice(0, 6);
   }, [appointments]);
 
-  const handleConfirm = async (id) => {
-    setActionLoading(id);
-    try {
-      await confirmAppointment(id);
-      fetchDashboardData();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setActionLoading("");
+  const getServiceSummary = (appt) => {
+    if (appt.appointment_services?.length) {
+      const names = appt.appointment_services
+        .map((s) => s.service_id?.service_name)
+        .filter(Boolean);
+      if (names.length) return names.join(", ");
     }
-  };
-
-  const handleComplete = async (id) => {
-    setActionLoading(id);
-    try {
-      await completeAppointment(id);
-      fetchDashboardData();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setActionLoading("");
+    if (appt.service_ids?.length) {
+      const names = appt.service_ids
+        .map((s) => (typeof s === "object" ? s?.service_name : null))
+        .filter(Boolean);
+      if (names.length) return names.join(", ");
     }
+    return appt.service_id?.service_name || "Salon Service";
   };
 
   const getStatusBadge = (status) => {
@@ -319,196 +273,117 @@ const AdminDashboard = () => {
         </motion.div>
       </div>
 
-      {/* Revenue & Booking Trends Chart */}
+      {/* Recent Appointments Table Card (replaces 7-Day Booking & Revenue Trend) */}
       <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-amber-400" />
-              7-Day Booking & Revenue Trend
+              <Calendar className="w-5 h-5 text-amber-400" />
+              Recent Appointments
             </h3>
-            <p className="text-xs text-neutral-400 mt-0.5">Daily performance overview for your branch</p>
+            <p className="text-xs text-neutral-400 mt-0.5">Latest customer bookings for your branch</p>
           </div>
 
-          <div className="flex items-center gap-4 text-xs font-bold">
-            <span className="flex items-center gap-1.5 text-amber-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> Revenue (LKR)
-            </span>
-            <span className="flex items-center gap-1.5 text-blue-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block" /> Bookings
-            </span>
-          </div>
+          <button
+            onClick={() => navigate(`/salon-admin/${salonId}/adminAppointments`)}
+            className="px-3.5 py-2 rounded-xl bg-surface-2 border border-border text-xs text-amber-400 font-extrabold hover:border-amber-400/40 hover:bg-amber-400/10 transition-all flex items-center gap-1.5"
+          >
+            <span>View All</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }}>
-              <defs>
-                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="bookingsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" vertical={false} />
-              <XAxis
-                dataKey="date"
-                stroke="#ffffff"
-                tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
-                tickLine={false}
-              />
-              <YAxis
-                yAxisId="left"
-                stroke="#ffffff"
-                tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
-                tickLine={false}
-                tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}
-              />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                stroke="#ffffff"
-                tick={{ fill: "#ffffff", fontSize: 11, fontWeight: 600 }}
-                allowDecimals={false}
-                tickLine={false}
-              />
-              <Tooltip
-                contentStyle={{ backgroundColor: "#121217", borderColor: "rgba(255,255,255,0.18)", borderRadius: "10px", color: "#ffffff", fontSize: "12px" }}
-                itemStyle={{ color: "#ffffff" }}
-                labelStyle={{ color: "#ffffff", fontWeight: 700 }}
-                formatter={(value, name) => [
-                  name === "Revenue (LKR)" ? `LKR ${Number(value).toLocaleString()}` : value,
-                  name
-                ]}
-              />
-              <Legend
-                formatter={(value) => <span style={{ color: "#ffffff", fontWeight: 700, fontSize: "12px" }}>{value}</span>}
-                wrapperStyle={{ paddingTop: "8px" }}
-              />
-              <Area yAxisId="left" type="monotone" dataKey="revenue" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#revenueGradient)" name="Revenue (LKR)" />
-              <Bar yAxisId="right" dataKey="bookings" fill="url(#bookingsGradient)" radius={[4, 4, 0, 0]} maxBarSize={40} name="Bookings" />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-
-      {/* Quick Actions & Recent Appointments Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions Grid (1 Col) */}
-        <div className="space-y-3">
-          <h3 className="text-base font-extrabold text-white">Quick Actions</h3>
-          <div className="grid grid-cols-1 gap-3">
-            {[
-              { title: "Create Appointment", desc: "Book new client session", icon: CalendarPlus, path: `/salon-admin/${salonId}/AddAppointment` },
-              { title: "Add Staff Member", desc: "Register new stylist", icon: UserPlus, path: `/salon-admin/${salonId}/adminStaff` },
-              { title: "Financial Report", desc: "View revenue statements", icon: Coins, path: `/salon-admin/${salonId}/adminBilling` },
-              { title: "Customer Reviews", desc: "View branch feedback", icon: MessageSquare, path: `/salon-admin/${salonId}/adminReviews` },
-            ].map((action, idx) => (
-              <button
-                key={idx}
-                onClick={() => navigate(action.path)}
-                className="group p-4 rounded-2xl bg-surface border border-border hover:border-amber-400/40 hover:bg-surface-2 transition-all flex items-center justify-between text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 group-hover:bg-amber-400 group-hover:text-black transition-colors">
-                    <action.icon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-extrabold text-white group-hover:text-amber-400 transition-colors">{action.title}</h4>
-                    <p className="text-2xs text-neutral-400">{action.desc}</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-neutral-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
-              </button>
-            ))}
+        {recentAppointments.length === 0 ? (
+          <div className="p-8 bg-surface-2/50 border border-border rounded-xl text-center text-neutral-400 text-xs">
+            No recent appointments found for this branch.
           </div>
-        </div>
+        ) : (
+          <Table className="w-full">
+            <Table.Head>
+              <Table.Th className="w-[24%]">Customer</Table.Th>
+              <Table.Th className="w-[28%]">Services</Table.Th>
+              <Table.Th className="w-[19%]">Date & Time</Table.Th>
+              <Table.Th className="w-[16%]">Status</Table.Th>
+              <Table.Th align="right" className="w-[13%]">Amount</Table.Th>
+            </Table.Head>
+            <Table.Body>
+              {recentAppointments.map((a) => {
+                const customerName = a.customer_id?.name || a.guest_name || "Guest Customer";
+                const serviceSummary = getServiceSummary(a);
+                const totalPrice = a.total_price || a.service_id?.base_price || 0;
+                const timeRange = a.start_time
+                  ? `${a.start_time}${a.end_time ? ` - ${a.end_time}` : ""}`
+                  : "N/A";
 
-        {/* Recent Appointments Table (2 Cols) */}
-        <div className="lg:col-span-2 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-extrabold text-white">Recent Appointments</h3>
-            <button
-              onClick={() => navigate(`/salon-admin/${salonId}/adminAppointments`)}
-              className="text-xs text-amber-400 font-extrabold hover:underline flex items-center gap-1"
-            >
-              <span>View All</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {recentAppointments.length === 0 ? (
-            <div className="p-8 bg-surface border border-border rounded-2xl text-center text-neutral-400 text-xs">
-              No recent appointments found for this branch.
-            </div>
-          ) : (
-            <Table>
-              <Table.Head>
-                <Table.Th>Customer</Table.Th>
-                <Table.Th>Date & Time</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th align="right">Amount</Table.Th>
-                <Table.Th align="right">Action</Table.Th>
-              </Table.Head>
-              <Table.Body>
-                {recentAppointments.map((a) => {
-                  const customerName = a.customer_id?.name || a.guest_name || "Guest Customer";
-                  const totalPrice = a.total_price || a.service_id?.base_price || 0;
-                  const isActionLoading = actionLoading === a._id;
-
-                  return (
-                    <tr key={a._id} className="hover:bg-surface-2/60 transition-colors">
-                      <Table.Td bold className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-amber-400/10 text-amber-400 font-extrabold text-2xs flex items-center justify-center">
+                return (
+                  <Table.Tr key={a._id} className="hover:bg-surface-2/60 transition-colors">
+                    <Table.Td bold className="w-[24%]">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-extrabold text-xs flex items-center justify-center shrink-0">
                           {customerName.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-white font-extrabold text-xs">{customerName}</span>
-                      </Table.Td>
-                      <Table.Td className="text-xs text-neutral-300">
-                        <p className="font-semibold text-white">{a.appointment_date}</p>
-                        <p className="text-2xs text-neutral-400">{a.start_time}</p>
-                      </Table.Td>
-                      <Table.Td>
-                        {getStatusBadge(a.status)}
-                        {a.status === "confirmed" && a.confirmed_by_name && (
-                          <span className="block text-[0.65rem] text-emerald-400 mt-1 font-semibold">
-                            By {a.confirmed_by_name} ({a.confirmed_by_role || "Staff"})
-                          </span>
-                        )}
-                      </Table.Td>
-                      <Table.Td align="right" className="text-amber-400 font-black text-xs">
-                        LKR {totalPrice.toLocaleString()}
-                      </Table.Td>
-                      <Table.Td align="right">
-                        {a.status === "pending" && (
-                          <button
-                            onClick={() => handleConfirm(a._id)}
-                            disabled={isActionLoading}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-500 text-black font-extrabold text-2xs hover:bg-emerald-400 transition-colors"
-                          >
-                            Accept
-                          </button>
-                        )}
-                        {a.status === "confirmed" && (
-                          <button
-                            onClick={() => handleComplete(a._id)}
-                            disabled={isActionLoading}
-                            className="px-2.5 py-1 rounded-lg bg-blue-500 text-white font-extrabold text-2xs hover:bg-blue-400 transition-colors"
-                          >
-                            Complete
-                          </button>
-                        )}
-                      </Table.Td>
-                    </tr>
-                  );
-                })}
-              </Table.Body>
-            </Table>
-          )}
+                        <span className="text-white font-bold text-xs truncate max-w-[200px]">{customerName}</span>
+                      </div>
+                    </Table.Td>
+                    <Table.Td className="w-[28%] text-xs text-neutral-300">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Scissors className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate max-w-[260px]" title={serviceSummary}>{serviceSummary}</span>
+                      </div>
+                    </Table.Td>
+                    <Table.Td className="w-[19%] text-xs text-neutral-300 whitespace-nowrap">
+                      <div className="font-semibold text-white">{a.appointment_date}</div>
+                      <div className="text-2xs text-neutral-400 flex items-center gap-1 font-mono mt-0.5">
+                        <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                        <span>{timeRange}</span>
+                      </div>
+                    </Table.Td>
+                    <Table.Td className="w-[16%] whitespace-nowrap">
+                      {getStatusBadge(a.status)}
+                      {a.status === "confirmed" && a.confirmed_by_name && (
+                        <span className="block text-[0.65rem] text-emerald-400 mt-1 font-semibold">
+                          By {a.confirmed_by_name} ({a.confirmed_by_role || "Staff"})
+                        </span>
+                      )}
+                    </Table.Td>
+                    <Table.Td align="right" className="w-[13%] text-amber-400 font-black text-xs whitespace-nowrap">
+                      LKR {Number(totalPrice).toLocaleString()}
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })}
+            </Table.Body>
+          </Table>
+        )}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="space-y-3">
+        <h3 className="text-base font-extrabold text-white">Quick Actions</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {[
+            { title: "Create Appointment", desc: "Book new client session", icon: CalendarPlus, path: `/salon-admin/${salonId}/AddAppointment` },
+            { title: "Add Staff Member", desc: "Register new stylist", icon: UserPlus, path: `/salon-admin/${salonId}/adminStaff` },
+            { title: "Add Service", desc: "Manage salon services", icon: Scissors, path: `/salon-admin/${salonId}/adminServices` },
+            { title: "Customer Reviews", desc: "View branch feedback", icon: MessageSquare, path: `/salon-admin/${salonId}/adminReviews` },
+          ].map((action, idx) => (
+            <button
+              key={idx}
+              onClick={() => navigate(action.path)}
+              className="group p-4 rounded-2xl bg-surface border border-border hover:border-amber-400/40 hover:bg-surface-2 transition-all flex items-center justify-between text-left"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 group-hover:bg-amber-400 group-hover:text-black transition-colors shrink-0">
+                  <action.icon className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-sm font-extrabold text-white group-hover:text-amber-400 transition-colors truncate">{action.title}</h4>
+                  <p className="text-2xs text-neutral-400 truncate">{action.desc}</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-neutral-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all shrink-0" />
+            </button>
+          ))}
         </div>
       </div>
     </div>
