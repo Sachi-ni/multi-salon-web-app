@@ -353,15 +353,16 @@ export default function AddAppointment() {
                       return (
                         <div
                           key={c._id}
-                          onClick={() =>
+                          onClick={() => {
                             setBooking((prev) => ({
                               ...prev,
                               customerId: c._id,
                               customerName: c.name,
                               customerEmail: c.email,
                               customerPhone: c.phone,
-                            }))
-                          }
+                            }));
+                            setStep(1);
+                          }}
                           className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-200 flex items-center justify-between
                             ${
                               isSelected
@@ -422,6 +423,10 @@ export default function AddAppointment() {
                     type="text"
                     value={booking.customerPhone}
                     onChange={(e) => setBooking(prev => ({ ...prev, customerPhone: e.target.value }))}
+                    onBlur={() => {
+                      const phone = booking.customerPhone.trim();
+                      if (!phone || /^(?:\+94|0)\d{9}$/.test(phone)) setStep(1);
+                    }}
                     placeholder="Enter guest phone (optional)"
                     className={`w-full bg-surface-2 border ${booking.customerPhone.trim() !== "" && !/^(?:\+94|0)\d{9}$/.test(booking.customerPhone.trim()) ? "border-danger focus:border-danger" : "border-border focus:border-accent"} rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all`}
                   />
@@ -459,13 +464,14 @@ export default function AddAppointment() {
                 return (
                   <div
                     key={s._id}
-                    onClick={() =>
+                    onClick={() => {
                       setBooking((prev) => ({
                         ...prev,
                         salonId: s._id,
                         salonName: s.name,
-                      }))
-                    }
+                      }));
+                      setStep(2);
+                    }}
                     className={`p-4 rounded-xl border cursor-pointer transition-all duration-200
                       ${
                         isSelected
@@ -491,16 +497,9 @@ export default function AddAppointment() {
                 );
               })}
             </div>
-            <div className="flex justify-between mt-6">
+            <div className="flex justify-start mt-6">
               <button onClick={back} className="px-6 py-2.5 bg-surface-2 text-muted-2 text-sm font-bold rounded-lg border border-border hover:border-border-hover transition-all duration-200">
                 ← Back
-              </button>
-              <button
-                disabled={!booking.salonId}
-                onClick={() => setStep(2)}
-                className="px-6 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-glow"
-              >
-                Next →
               </button>
             </div>
           </div>
@@ -517,7 +516,11 @@ export default function AddAppointment() {
                 type="date"
                 value={booking.date}
                 min={new Date().toLocaleDateString('en-CA')}
-                onChange={(e) => setBooking((prev) => ({ ...prev, date: e.target.value }))}
+                onChange={(e) => {
+                  const date = e.target.value;
+                  setBooking((prev) => ({ ...prev, date }));
+                  if (date) setStep(3);
+                }}
                 onClick={openDatePicker}
                 style={{ colorScheme: "dark" }}
                 className="appointment-date-input w-full bg-surface-2 border border-border rounded-xl px-4 py-3 pr-14 text-white text-sm outline-none focus:border-accent focus:bg-accent-dim/20 transition-all duration-200 cursor-pointer"
@@ -527,16 +530,9 @@ export default function AddAppointment() {
                 <CalendarDays className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex justify-between mt-6">
+            <div className="flex justify-start mt-6">
               <button onClick={back} className="px-6 py-2.5 bg-surface-2 text-muted-2 text-sm font-bold rounded-lg border border-border hover:border-border-hover transition-all duration-200">
                 ← Back
-              </button>
-              <button
-                disabled={!booking.date}
-                onClick={() => setStep(3)}
-                className="px-6 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-glow"
-              >
-                Next →
               </button>
             </div>
           </div>
@@ -546,7 +542,7 @@ export default function AddAppointment() {
         {step === 3 && <StepSelectService booking={booking} onNext={next} onBack={back} />}
 
         {/* Step 4 — Staff & Time */}
-        {step === 4 && <StepAssignStaffAndTime booking={booking} onNext={next} onBack={back} />}
+        {step === 4 && <StepAssignStaffAndTime booking={booking} autoAdvance onNext={next} onBack={back} />}
 
         {/* Step 5 — Confirm */}
         {step === 5 && renderConfirm()}

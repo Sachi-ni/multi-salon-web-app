@@ -7,7 +7,7 @@ import StepAssignStaffAndTime from "./steps/StepAssignStaffAndTime";
 import StepBookingConfirm from "./steps/StepBookingConfirm";
 import CustomerDashboardBackground from "../../components/ui/CustomerDashboardBackground";
 
-const STEPS = ["Salon", "Date", "Services", "Staff & Time", "Confirm"];
+const DEFAULT_STEPS = ["Salon", "Date", "Services", "Staff & Time", "Confirm"];
 
 export default function BookAppointment() {
   const [booking, setBooking] = useState(() => {
@@ -50,6 +50,18 @@ export default function BookAppointment() {
 
   const location = useLocation();
   const dateInputRef = useRef(null);
+  const isStaffBooking = Boolean(location.state?.staff);
+  const isSalonBooking = Boolean(location.state?.salon) && !isStaffBooking;
+  const steps = isStaffBooking
+    ? ["Date", "Services", "Time", "Confirm"]
+    : isSalonBooking
+      ? ["Date", "Services", "Staff & Time", "Confirm"]
+      : DEFAULT_STEPS;
+  const displayedStep = isStaffBooking
+    ? step
+    : isSalonBooking
+      ? step - 1
+      : step;
 
   // Persist draft and step state to sessionStorage
   useEffect(() => {
@@ -64,14 +76,20 @@ export default function BookAppointment() {
   // Validate step state against booking data on reload/step change
   // If required state is missing, gracefully fallback to step 0 (initial process)
   useEffect(() => {
-    if (step > 0 && !booking.salonId) {
+    if (isStaffBooking && step > 0 && !booking.salonId) {
+      setStep(0);
+    } else if (isStaffBooking && step > 0 && !booking.date) {
+      setStep(0);
+    } else if (isStaffBooking && step > 1 && (!booking.services || booking.services.length === 0)) {
+      setStep(0);
+    } else if (!isStaffBooking && step > 0 && !booking.salonId) {
       setStep(0);
     } else if (step > 1 && !booking.date) {
       setStep(0);
     } else if ((step === 3 || step === 4) && (!booking.services || booking.services.length === 0)) {
       setStep(0);
     }
-  }, [step, booking.salonId, booking.date, booking.services]);
+  }, [step, booking.salonId, booking.date, booking.services, isStaffBooking]);
 
   const openDatePicker = () => {
     const dateInput = dateInputRef.current;
@@ -102,12 +120,13 @@ export default function BookAppointment() {
       const staff = location.state.staff;
       setBooking(prev => ({
         ...prev,
-        salonId: staff.salon?._id || staff.salon_id?._id || "",
-        salonName: staff.salon?.name || staff.salon_id?.name || "",
-        staffId: staff._id,
-        staffName: staff.name,
+        salonId: staff.salon?._id || staff.salon_id?._id || staff.salonId || "",
+        salonName: staff.salon?.name || staff.salon_id?.name || staff.salonName || "",
+        staffId: staff._id || staff.staff_id,
+        staffName: staff.name || staff.full_name,
         staffSpecification: staff.specification || "",
       }));
+      setStep(0);
     } else if (location.state?.salon) {
       const salon = location.state.salon;
       setBooking(prev => ({
@@ -115,6 +134,7 @@ export default function BookAppointment() {
         salonId: salon._id || "",
         salonName: salon.name || ""
       }));
+      setStep(1);
     }
   }, [location.state, loadSalons]);
 
@@ -124,6 +144,15 @@ export default function BookAppointment() {
   };
 
   const back = () => {
+    if (isStaffBooking) {
+      if (step === 1) {
+        setBooking(prev => ({ ...prev, date: "" }));
+      }
+      if (step === 0) return;
+      setStep(s => s - 1);
+      return;
+    }
+
     // Clear downstream selections when going back
     if (step === 3) {
       // Going back from Staff & Time → clear per-service staff/time
@@ -160,27 +189,27 @@ export default function BookAppointment() {
 
         {/* Step Indicator */}
         <div className="flex items-center mb-6 sm:mb-8">
-          {STEPS.map((label, i) => (
+          {steps.map((label, i) => (
             <div key={i} className="flex items-center flex-1 last:flex-none">
               <div className="flex flex-col items-center">
                 <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-200
-                  ${i < step ? "bg-accent text-primary" : ""}
-                  ${i === step ? "bg-accent text-primary shadow-glow" : ""}
-                  ${i > step ? "bg-surface-2 text-muted-2 border border-border" : ""}
+                  ${i < displayedStep ? "bg-accent text-primary" : ""}
+                  ${i === displayedStep ? "bg-accent text-primary shadow-glow" : ""}
+                  ${i > displayedStep ? "bg-surface-2 text-muted-2 border border-border" : ""}
                 `}>
-                  {i < step ? (
+                  {i < displayedStep ? (
                     <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : i + 1}
                 </div>
                 <span className={`text-2xs mt-1 font-bold tracking-wide hidden sm:block
-                  ${i === step ? "text-accent" : "text-muted-2"}
+                  ${i === displayedStep ? "text-accent" : "text-muted-2"}
                 `}>{label}</span>
               </div>
-              {i < STEPS.length - 1 && (
+              {i < steps.length - 1 && (
                 <div className={`flex-1 h-px mx-1.5 sm:mx-2 mb-0 sm:mb-4 transition-all duration-300
-                  ${i < step ? "bg-accent" : "bg-border"}
+                  ${i < displayedStep ? "bg-accent" : "bg-border"}
                 `} />
               )}
             </div>
@@ -191,7 +220,7 @@ export default function BookAppointment() {
         <div className="bg-surface border border-border rounded-2xl p-4 sm:p-6 shadow-card animate-fade-up">
 
           {/* Step 0 — Salon */}
-          {step === 0 && (
+          {!isStaffBooking && step === 0 && (
             <div>
               <h2 className="text-lg font-extrabold text-white mb-1">Select a Salon</h2>
               <p className="text-muted-2 text-sm mb-5">Choose the salon you'd like to visit</p>
@@ -263,8 +292,8 @@ export default function BookAppointment() {
             </div>
           )}
 
-          {/* Step 1 — Date */}
-          {step === 1 && (
+          {/* Date */}
+          {((isStaffBooking && step === 0) || (!isStaffBooking && step === 1)) && (
             <div>
               <h2 className="text-lg font-extrabold text-white mb-1">Select a Date</h2>
               <p className="text-muted-2 text-sm mb-5">Choose the date for your appointment</p>
@@ -274,7 +303,11 @@ export default function BookAppointment() {
                   type="date"
                   value={booking.date}
                   min={new Date().toLocaleDateString('en-CA')}
-                  onChange={e => setBooking(prev => ({ ...prev, date: e.target.value }))}
+                  onChange={e => {
+                    const date = e.target.value;
+                    setBooking(prev => ({ ...prev, date }));
+                    if (date) setStep(isStaffBooking ? 1 : 2);
+                  }}
                   onClick={openDatePicker}
                   style={{ colorScheme: "dark" }}
                   className="appointment-date-input w-full bg-surface-2 border border-border rounded-xl px-4 py-3 pr-14 text-white text-sm outline-none focus:border-accent focus:bg-accent-dim/20 transition-all duration-200 cursor-pointer"
@@ -293,25 +326,37 @@ export default function BookAppointment() {
                 <button onClick={back} className="px-6 py-2.5 bg-surface-2 text-muted-2 text-sm font-bold rounded-lg border border-border hover:border-border-hover transition-all duration-200">
                   ← Back
                 </button>
-                <button
-                  disabled={!booking.date}
-                  onClick={() => setStep(2)}
-                  className="px-6 py-2.5 bg-accent text-primary text-sm font-extrabold rounded-lg hover:bg-accent-hover transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-glow"
-                >
-                  Next →
-                </button>
               </div>
             </div>
           )}
 
+          {/* Staff entry keeps the selected staff fixed. */}
+          {isStaffBooking && step === 1 && (
+            <StepSelectService booking={booking} onNext={next} onBack={back} />
+          )}
+
           {/* Step 2 — Services */}
-          {step === 2 && <StepSelectService booking={booking} onNext={next} onBack={back} />}
+          {!isStaffBooking && step === 2 && <StepSelectService booking={booking} onNext={next} onBack={back} />}
 
           {/* Step 3 — Staff & Time */}
-          {step === 3 && <StepAssignStaffAndTime booking={booking} onNext={next} onBack={back} />}
+          {!isStaffBooking && step === 3 && <StepAssignStaffAndTime booking={booking} autoAdvance onNext={next} onBack={back} />}
+          {isStaffBooking && step === 2 && (
+            <StepAssignStaffAndTime
+              booking={booking}
+              autoAdvance
+              fixedStaff={{
+                staffId: booking.staffId,
+                staffName: booking.staffName,
+                staffSpecification: booking.staffSpecification,
+              }}
+              onNext={next}
+              onBack={back}
+            />
+          )}
 
           {/* Step 4 — Confirm */}
-          {step === 4 && <StepBookingConfirm booking={booking} onBack={back} />}
+          {!isStaffBooking && step === 4 && <StepBookingConfirm booking={booking} onBack={back} />}
+          {isStaffBooking && step === 3 && <StepBookingConfirm booking={booking} onBack={back} />}
         </div>
       </div>
     </div>

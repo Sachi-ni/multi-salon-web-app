@@ -18,22 +18,22 @@ const timesOverlap = (s1, e1, s2, e2) => {
   return normS1 < normE2 && normS2 < normE1;
 };
 
-export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
+export default function StepAssignStaffAndTime({ booking, fixedStaff, autoAdvance = false, onNext, onBack }) {
   const { user } = useAuth();
   // Each service entry: { serviceId, serviceName, serviceDuration, servicePrice, staffId?, staffName?, staffSpecification?, startTime?, endTime? }
   const [assignments, setAssignments] = useState(() =>
     (booking?.services || []).map(s => ({
       ...s,
-      staffId: s.staffId || "",
-      staffName: s.staffName || "",
-      staffSpecification: s.staffSpecification || "",
+      staffId: s.staffId || fixedStaff?.staffId || "",
+      staffName: s.staffName || fixedStaff?.staffName || "",
+      staffSpecification: s.staffSpecification || fixedStaff?.staffSpecification || "",
       startTime: s.startTime || "",
       endTime: s.endTime || "",
     }))
   );
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [phase, setPhase] = useState("staff"); // 'staff' | 'time'
+  const [phase, setPhase] = useState(fixedStaff ? "time" : "staff"); // 'staff' | 'time'
 
   // Data for current step
   const [staffList, setStaffList] = useState([]);
@@ -132,7 +132,9 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
     // Move to next service or show summary
     if (currentIndex < totalServices - 1) {
       setCurrentIndex(currentIndex + 1);
-      setPhase("staff");
+      setPhase(fixedStaff ? "time" : "staff");
+    } else if (autoAdvance) {
+      onNext({ services: updated });
     } else {
       setPhase("done");
     }
@@ -140,6 +142,16 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
 
   const handleBack = () => {
     if (phase === "time") {
+      if (fixedStaff) {
+        if (currentIndex > 0) {
+          setCurrentIndex(currentIndex - 1);
+          setPhase("time");
+        } else {
+          onBack();
+        }
+        return;
+      }
+
       // Go back to staff selection for this service
       const updated = [...assignments];
       updated[currentIndex] = {
@@ -199,7 +211,7 @@ export default function StepAssignStaffAndTime({ booking, onNext, onBack }) {
   if (loading && phase !== "done") return (
     <div>
       <h2 className="text-lg font-extrabold text-white mb-1">
-        Assign Staff & Time
+        {fixedStaff ? "Select Time" : "Assign Staff & Time"}
       </h2>
       <p className="text-muted-2 text-sm mb-5">
         Service {currentIndex + 1} of {totalServices}: {current?.serviceName}
