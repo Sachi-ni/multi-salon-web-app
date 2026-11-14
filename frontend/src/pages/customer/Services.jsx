@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getSalons, getSalonServices } from "../../services/salonService";
 import { Scissors, Star } from "lucide-react";
 import { ServiceIcon } from "../../utils/serviceIcons";
+import { getUploadUrl } from "../../config";
 import LandingNavbar from "./landing-sections/LandingNavbar";
 import Footer from "./landing-sections/Footer";
 
@@ -88,21 +89,33 @@ export default function CustomerServices() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-fade-up" style={{ animationDelay: "200ms" }}>
             {visibleServices.map(s => (
-              <div key={s._id} className="bg-surface border border-border rounded-2xl p-6 shadow-card hover:border-accent/50 hover:shadow-glow transition-all duration-300 group">
-                <div className="w-12 h-12 bg-accent/10 border border-accent/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <ServiceIcon name={s.service_name} category={s.category_id?.category_name} className="w-6 h-6 text-accent" />
-                </div>
-                <h3 className="text-xl text-white font-black mb-2">{s.service_name}</h3>
-                {s.description && <p className="text-muted-2 text-sm mb-6 line-clamp-2">{s.description}</p>}
-                
-                <div className="flex items-center justify-between pt-4 border-t border-border">
-                  <span className="text-white/60 text-sm font-medium">{s.duration} min</span>
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1 text-sm text-white">
-                      <Star className="w-4 h-4 text-accent fill-accent" />
-                      {Number(s.rating || 0).toFixed(1)} ({s.ratingCount || 0})
-                    </span>
-                    <span className="text-accent font-black text-lg">LKR {s.base_price}</span>
+              <div key={s._id} className="bg-surface border border-border rounded-2xl shadow-card hover:border-accent/50 hover:shadow-glow transition-all duration-300 group overflow-hidden">
+                {s.photo ? (
+                  <div className="h-64 w-full overflow-hidden">
+                    <img
+                      src={getUploadUrl(s.photo)}
+                      alt={s.service_name}
+                      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-64 w-full bg-accent/10 flex items-center justify-center">
+                    <ServiceIcon name={s.service_name} category={s.category_id?.category_name} className="w-12 h-12 text-accent" />
+                  </div>
+                )}
+                <div className="p-6">
+                  <h3 className="text-xl text-white font-black mb-2">{s.service_name}</h3>
+                  {s.description && <p className="text-muted-2 text-sm mb-6 line-clamp-2">{s.description}</p>}
+                  
+                  <div className="flex items-center justify-between pt-4 border-t border-border">
+                    <span className="text-white/60 text-sm font-medium">{s.duration} min</span>
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1 text-sm text-white">
+                        <Star className="w-4 h-4 text-accent fill-accent" />
+                        {Number(s.rating || 0).toFixed(1)} ({s.ratingCount || 0})
+                      </span>
+                      <span className="text-accent font-black text-lg">LKR {s.base_price}</span>
+                    </div>
                   </div>
                 </div>
               </div>

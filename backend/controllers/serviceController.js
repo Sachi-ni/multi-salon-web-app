@@ -4,6 +4,7 @@ import Salon from "../models/Salon.js";
 import Appointment from "../models/Appointment.js";
 import Staff from "../models/Staff.js";
 import Feedback from "../models/Feedback.js";
+import { storeMedia } from "../utils/mediaStorage.js";
 
 // ── Services CRUD ──
 
@@ -72,10 +73,10 @@ const attachRatings = async (services) => {
 
 export const createService = async (req, res) => {
   try {
-    const { service_name, base_price, description, duration, category_id } = req.body;
-    const salonId = req.user.role === "super-admin" ? (req.body.salonId || req.body.salon_id) : req.user.salon_id;
-    if (!service_name || base_price === undefined || duration === undefined || !salonId) {
-      return res.status(400).json({ message: "service_name, base_price, duration, and salon are required." });
+    const { service_name, base_price, description, duration, category_id } = req.body || {};
+    const salonId = req.user.role === "super-admin" ? (req.body?.salonId || req.body?.salon_id) : req.user.salon_id;
+    if (!service_name || base_price === undefined || duration === undefined || !salonId || !req.file) {
+      return res.status(400).json({ message: "service_name, base_price, duration, salon, and photo are required." });
     }
     if (base_price !== undefined && (
       (typeof base_price !== "number" && typeof base_price !== "string") ||
@@ -105,7 +106,8 @@ export const createService = async (req, res) => {
       return res.status(404).json({ message: "Service category not found" });
     }
 
-    const service = await Service.create({ service_name, base_price, description, duration, category_id, salon_id: salonId });
+    const photo = await storeMedia(req.file, "salonhub/services");
+    const service = await Service.create({ service_name, base_price, description, duration, category_id, salon_id: salonId, photo });
     res.status(201).json(service);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -139,7 +141,7 @@ export const getServices = async (req, res) => {
 
 export const updateService = async (req, res) => {
   try {
-    const { service_name, base_price, description, duration, category_id, status } = req.body;
+    const { service_name, base_price, description, duration, category_id, status } = req.body || {};
     if (base_price !== undefined && (
       (typeof base_price !== "number" && typeof base_price !== "string") ||
       (typeof base_price === "string" && !base_price.trim()) ||
@@ -179,6 +181,7 @@ export const updateService = async (req, res) => {
     if (service_name !== undefined) updateData.service_name = service_name;
     if (base_price !== undefined) updateData.base_price = base_price;
     if (description !== undefined) updateData.description = description;
+    if (req.file) updateData.photo = await storeMedia(req.file, "salonhub/services");
     if (duration !== undefined) updateData.duration = duration;
     if (category_id !== undefined) {
       if (!(await ServiceCategory.exists({ _id: category_id }))) {
@@ -187,7 +190,7 @@ export const updateService = async (req, res) => {
       updateData.category_id = category_id;
     }
     if (status !== undefined) updateData.status = status;
-    if (req.user.role === "super-admin" && (req.body.salonId !== undefined || req.body.salon_id !== undefined)) {
+    if (req.user.role === "super-admin" && (req.body?.salonId !== undefined || req.body?.salon_id !== undefined)) {
       const salonId = req.body.salonId || req.body.salon_id;
       if (!(await Salon.exists({ _id: salonId }))) {
         return res.status(404).json({ message: "Salon not found" });

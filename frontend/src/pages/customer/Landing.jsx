@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
-import { useLocation, Navigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import LandingNavbar from "./landing-sections/LandingNavbar";
 import Hero from "./landing-sections/Hero";
 import About from "./landing-sections/About";
@@ -11,7 +10,6 @@ import BookingCTA from "./landing-sections/BookingCTA";
 import Footer from "./landing-sections/Footer";
 
 const Landing = () => {
-  const { user } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -30,11 +28,6 @@ const Landing = () => {
       window.scrollTo(0, 0);
     }
   }, [location]);
-
-  // If customer is already logged in, display customer dashboard directly
-  if (user && (user.role === "customer" || user.role === "user")) {
-    return <Navigate to="/customer/dashboard" replace />;
-  }
 
   return (
     <div className="bg-primary min-h-screen font-sans selection:bg-accent selection:text-primary">

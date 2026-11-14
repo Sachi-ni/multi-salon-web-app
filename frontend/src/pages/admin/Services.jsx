@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { getServices, createService, updateService, deleteService } from "../../services/serviceService";
+import { getUploadUrl } from "../../config";
 import PageHeader from "../../components/ui/PageHeader";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
@@ -104,8 +105,12 @@ const ServiceCard = ({ service, index, onEdit, onDelete, onToggleStatus }) => {
 
         <div className="p-5">
           <div className="flex items-start gap-3.5 mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 text-amber-400 group-hover:border-amber-400/50 transition-colors">
-              <Scissors className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-full bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 text-amber-400 group-hover:border-amber-400/50 transition-colors overflow-hidden">
+              {service.photo ? (
+                <img src={getUploadUrl(service.photo)} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <Scissors className="w-6 h-6" />
+              )}
             </div>
 
             <div className="flex-1 min-w-0">
@@ -169,7 +174,7 @@ const ServiceCard = ({ service, index, onEdit, onDelete, onToggleStatus }) => {
 };
 
 /* ─────────── Service Form (Add/Edit modal) ─────────── */
-const ServiceForm = ({ formData, errors, onFieldChange }) => {
+const ServiceForm = ({ formData, errors, onFieldChange, isEditing }) => {
   const inputClassName = (field) => clsx(
     "w-full bg-surface-2 border rounded-xl px-4 py-2.5 text-sm text-white outline-none transition-all duration-200 focus:border-amber-400 focus:shadow-glow-sm placeholder:text-neutral-500 font-medium",
     errors[field] ? "border-danger focus:border-danger" : "border-border"
@@ -227,6 +232,34 @@ const ServiceForm = ({ formData, errors, onFieldChange }) => {
         </div>
       </div>
 
+      {/* Service Photo */}
+      <div>
+        <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
+          Service Photo <span className="text-amber-400/80 lowercase font-medium ml-1">({isEditing ? "optional" : "required"})</span>
+        </label>
+        {formData.photoUrl && (
+          <img src={getUploadUrl(formData.photoUrl)} alt="Current service" className="mb-3 h-28 w-full rounded-xl object-cover border border-border" />
+        )}
+        <div className={clsx(
+          "flex items-center gap-3 rounded-xl border bg-surface-2 p-1.5",
+          errors.photo ? "border-danger" : "border-border"
+        )}>
+          <label htmlFor="admin-service-photo" className="cursor-pointer rounded-lg bg-accent px-4 py-2 text-sm font-extrabold text-primary hover:bg-accent-hover">
+            Browse...
+          </label>
+          <input
+            id="admin-service-photo"
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => onFieldChange("photo", e.target.files?.[0] || null)}
+            aria-invalid={Boolean(errors.photo)}
+          />
+          <span className="truncate text-sm text-neutral-300">{formData.photo?.name || "No file selected."}</span>
+        </div>
+        {errors.photo && <p className="mt-1.5 text-xs font-medium text-danger">{errors.photo}</p>}
+      </div>
+
       {/* Description */}
       <div>
         <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
@@ -269,6 +302,8 @@ export default function AdminServicesPage() {
     service_name: "",
     base_price: "",
     duration: "",
+    photo: null,
+    photoUrl: "",
     description: "",
   }), []);
   const [formData, setFormData] = useState(emptyForm);
@@ -314,6 +349,8 @@ export default function AdminServicesPage() {
       service_name: service.service_name || "",
       base_price: service.base_price || "",
       duration: service.duration || "",
+      photo: null,
+      photoUrl: service.photo || "",
       description: service.description || "",
     });
     setFormErrors({});
@@ -346,19 +383,20 @@ export default function AdminServicesPage() {
     else if (Number(formData.base_price) < 0) validationErrors.base_price = "Price cannot be negative.";
     if (formData.duration === "") validationErrors.duration = "Duration is required.";
     else if (Number(formData.duration) <= 0) validationErrors.duration = "Duration must be greater than 0.";
+    if (!editingService && !formData.photo) validationErrors.photo = "Service photo is required.";
     if (Object.keys(validationErrors).length) {
       setFormErrors(validationErrors);
       setFormError("");
       return;
     }
 
-    const payload = {
-      service_name: formData.service_name,
-      base_price: Number(formData.base_price),
-      duration: Number(formData.duration),
-      description: formData.description,
-      salon_id: salonId,
-    };
+    const payload = new FormData();
+    payload.append("service_name", formData.service_name);
+    payload.append("base_price", String(Number(formData.base_price)));
+    payload.append("duration", String(Number(formData.duration)));
+    payload.append("description", formData.description);
+    payload.append("salon_id", salonId);
+    if (formData.photo) payload.append("photo", formData.photo);
 
     try {
       setSaving(true);
@@ -510,8 +548,12 @@ export default function AdminServicesPage() {
             {filteredServices.map((service) => (
               <tr key={service._id} className="hover:bg-surface-2/60 transition-colors">
                 <Table.Td bold className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs">
-                    <Scissors className="w-4 h-4" />
+                  <div className="w-8 h-8 rounded-full bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs overflow-hidden">
+                    {service.photo ? (
+                      <img src={getUploadUrl(service.photo)} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <Scissors className="w-4 h-4" />
+                    )}
                   </div>
                   <span className="text-white font-extrabold text-sm">{service.service_name}</span>
                 </Table.Td>
@@ -554,7 +596,7 @@ export default function AdminServicesPage() {
         title={editingService ? "✏️ Edit Service Details" : "✨ Add New Service"}
         maxWidth="max-w-xl"
       >
-        <ServiceForm formData={formData} errors={formErrors} onFieldChange={handleFieldChange} />
+        <ServiceForm formData={formData} errors={formErrors} onFieldChange={handleFieldChange} isEditing={Boolean(editingService)} />
         {formError && <p className="mt-4 rounded-lg border border-danger-border bg-danger-dim px-3 py-2 text-sm font-medium text-danger" role="alert">{formError}</p>}
         <Modal.Actions>
           <Button variant="ghost" size="sm" onClick={closeModal}>

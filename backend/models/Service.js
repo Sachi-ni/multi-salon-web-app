@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const serviceSchema = new mongoose.Schema({
   service_name: { type: String, required: true },
   base_price:   { type: Number, required: true },
+  photo:        { type: String, default: "" },
   description:  { type: String, default: "" },
   duration:     { type: Number, required: true }, // in minutes
   status:       { type: String, enum: ["Active", "Inactive"], default: "Active" },

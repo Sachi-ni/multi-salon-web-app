@@ -6,6 +6,7 @@ import {
   deleteService,
 } from "../../services/serviceService";
 import { getSalons } from "../../services/salonService";
+import { getUploadUrl } from "../../config";
 import {
   Plus,
   Search,
@@ -148,8 +149,12 @@ const ServiceCard = ({ service, index, onEdit, onDelete, onToggleStatus }) => {
         <div className="p-5">
           {/* Header Row */}
           <div className="flex items-start gap-3.5 mb-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 group-hover:border-amber-400/50 transition-colors duration-200 text-amber-400">
-              <Scissors className="w-5 h-5" />
+            <div className="w-12 h-12 rounded-full bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 group-hover:border-amber-400/50 transition-colors duration-200 text-amber-400 overflow-hidden">
+              {service.photo ? (
+                <img src={getUploadUrl(service.photo)} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <Scissors className="w-5 h-5" />
+              )}
             </div>
 
             <div className="flex-1 min-w-0">
@@ -228,6 +233,7 @@ const ServiceForm = ({
   salons,
   errors,
   onFieldChange,
+  isEditing,
 }) => {
   const inputClassName = (field) =>
     clsx(
@@ -320,6 +326,34 @@ const ServiceForm = ({
         </div>
       </div>
 
+      {/* Service Photo */}
+      <div>
+        <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
+          Service Photo <span className="text-amber-400/80 lowercase font-medium ml-1">({isEditing ? "optional" : "required"})</span>
+        </label>
+        {formData.photoUrl && (
+          <img src={getUploadUrl(formData.photoUrl)} alt="Current service" className="mb-3 h-28 w-full rounded-xl object-cover border border-border" />
+        )}
+        <div className={clsx(
+          "flex items-center gap-3 rounded-xl border bg-surface-2 p-1.5",
+          errors.photo ? "border-danger" : "border-border"
+        )}>
+          <label htmlFor="superadmin-service-photo" className="cursor-pointer rounded-lg bg-accent px-4 py-2 text-sm font-extrabold text-primary hover:bg-accent-hover">
+            Browse...
+          </label>
+          <input
+            id="superadmin-service-photo"
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => onFieldChange("photo", e.target.files?.[0] || null)}
+            aria-invalid={Boolean(errors.photo)}
+          />
+          <span className="truncate text-sm text-neutral-300">{formData.photo?.name || "No file selected."}</span>
+        </div>
+        {errors.photo && <p className="mt-1.5 text-xs font-medium text-danger">{errors.photo}</p>}
+      </div>
+
       {/* Description */}
       <div>
         <label className="block text-2xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1.5">
@@ -360,6 +394,8 @@ const Services = () => {
     base_price: "",
     duration: "",
     description: "",
+    photo: null,
+    photoUrl: "",
     salon_id: "",
   }), []);
   const [formData, setFormData] = useState(emptyForm);
@@ -417,6 +453,8 @@ const Services = () => {
       base_price: service.base_price || "",
       duration: service.duration || "",
       description: service.description || "",
+      photo: null,
+      photoUrl: service.photo || "",
       salon_id:
         (typeof service.salon_id === "object"
           ? service.salon_id?._id
@@ -445,6 +483,7 @@ const Services = () => {
     else if (Number(formData.base_price) < 0) validationErrors.base_price = "Price cannot be negative.";
     if (formData.duration === "") validationErrors.duration = "Duration is required.";
     else if (Number(formData.duration) <= 0) validationErrors.duration = "Duration must be greater than 0.";
+    if (!editingService && !formData.photo) validationErrors.photo = "Service photo is required.";
 
     if (Object.keys(validationErrors).length) {
       setFormErrors(validationErrors);
@@ -454,13 +493,13 @@ const Services = () => {
 
     try {
       setSaving(true);
-      const payload = {
-        service_name: formData.service_name,
-        base_price: Number(formData.base_price),
-        duration: Number(formData.duration),
-        description: formData.description,
-        salon_id: formData.salon_id,
-      };
+      const payload = new FormData();
+      payload.append("service_name", formData.service_name);
+      payload.append("base_price", String(Number(formData.base_price)));
+      payload.append("duration", String(Number(formData.duration)));
+      payload.append("description", formData.description);
+      payload.append("salon_id", formData.salon_id);
+      if (formData.photo) payload.append("photo", formData.photo);
 
       if (editingService) {
         await updateService(editingService._id, payload);
@@ -678,8 +717,12 @@ const Services = () => {
               return (
                 <tr key={s._id} className="hover:bg-surface-2/60 transition-colors">
                   <Table.Td bold className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs">
-                      <Scissors className="w-4 h-4" />
+                    <div className="w-8 h-8 rounded-full bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 font-extrabold text-xs overflow-hidden">
+                      {s.photo ? (
+                        <img src={getUploadUrl(s.photo)} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <Scissors className="w-4 h-4" />
+                      )}
                     </div>
                     <div>
                       <p className="text-white font-extrabold text-sm">{s.service_name}</p>
@@ -741,6 +784,7 @@ const Services = () => {
           salons={salons}
           errors={formErrors}
           onFieldChange={handleFieldChange}
+          isEditing={Boolean(editingService)}
         />
         {formError && (
           <p className="mt-4 rounded-lg border border-danger-border bg-danger-dim px-3 py-2 text-sm font-medium text-danger" role="alert">
