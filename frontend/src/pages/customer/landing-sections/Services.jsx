@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Scissors, Star } from "lucide-react";
+import { Star } from "lucide-react";
+import { ServiceIcon } from "../../../utils/serviceIcons";
 import { getServices } from "../../../services/serviceService";
 
 const Services = () => {
@@ -26,7 +27,9 @@ const Services = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {services.map((service, index) => (
             <motion.div key={service._id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: index * 0.1 }} className="group glass-card card-accent p-6 hover:-translate-y-2 transition-all duration-300">
-              <div className="text-white mb-5 bg-surface-3 w-12 h-12 rounded-xl flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-primary transition-colors duration-300"><Scissors className="w-8 h-8" /></div>
+              <div className="text-white mb-5 bg-surface-3 w-12 h-12 rounded-xl flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-primary transition-colors duration-300">
+                <ServiceIcon name={service.service_name} category={service.category_id?.category_name} className="w-6 h-6" />
+              </div>
               <p className="text-accent text-xs font-bold uppercase tracking-wider mb-2">{service.category_id?.category_name || service.salon_id?.name || "Salon service"}</p>
               <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-accent transition-colors">{service.service_name}</h3>
               <p className="text-white/60 leading-relaxed min-h-12">{service.description || "No description provided."}</p>

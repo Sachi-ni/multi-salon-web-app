@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getSalons, getSalonServices } from "../../services/salonService";
 import { Scissors, Star } from "lucide-react";
+import { ServiceIcon } from "../../utils/serviceIcons";
 import LandingNavbar from "./landing-sections/LandingNavbar";
 import Footer from "./landing-sections/Footer";
 
@@ -89,7 +90,7 @@ export default function CustomerServices() {
             {visibleServices.map(s => (
               <div key={s._id} className="bg-surface border border-border rounded-2xl p-6 shadow-card hover:border-accent/50 hover:shadow-glow transition-all duration-300 group">
                 <div className="w-12 h-12 bg-accent/10 border border-accent/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Scissors className="w-6 h-6 text-accent" />
+                  <ServiceIcon name={s.service_name} category={s.category_id?.category_name} className="w-6 h-6 text-accent" />
                 </div>
                 <h3 className="text-xl text-white font-black mb-2">{s.service_name}</h3>
                 {s.description && <p className="text-muted-2 text-sm mb-6 line-clamp-2">{s.description}</p>}
