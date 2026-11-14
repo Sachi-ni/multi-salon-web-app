@@ -4,6 +4,16 @@ import { motion } from "framer-motion";
 import { ArrowRight, Star } from "lucide-react";
 import api from "../../../services/api";
 
+/* ─── Local Luxury Salon Background Slides ─────────────────────────── */
+const HERO_IMAGES = [
+  `${process.env.PUBLIC_URL || ""}/hero-slide-1.jpg`,
+  `${process.env.PUBLIC_URL || ""}/hero-slide-2.jpg`,
+  `${process.env.PUBLIC_URL || ""}/hero-slide-3.jpg`,
+  `${process.env.PUBLIC_URL || ""}/hero-slide-4.jpg`,
+];
+
+const SLIDE_INTERVAL_MS = 5000;
+
 const initialStats = {
   happyClients: 0,
   expertStylists: 0,
@@ -11,114 +21,183 @@ const initialStats = {
   yearsExperience: 0,
 };
 
-const formatCount = (count, suffix = "+") =>
-  `${new Intl.NumberFormat("en").format(count)}${count > 0 ? suffix : ""}`;
+const formatCount = (count, suffix = "+") => {
+  const num = Number(count) || 0;
+  return `${new Intl.NumberFormat("en").format(num)}${num > 0 ? suffix : ""}`;
+};
 
 const Hero = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(initialStats);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
+  /* ── 1. Fetch Dynamic Platform Statistics ───────────────────────── */
   useEffect(() => {
     let isMounted = true;
 
-    api.get("/utils/platform-stats")
+    api
+      .get("/utils/platform-stats")
       .then(({ data }) => {
         if (isMounted) setStats({ ...initialStats, ...data });
       })
       .catch((error) => {
-        // Keep the landing page usable if statistics are temporarily unavailable.
         console.error("Unable to load platform statistics:", error);
       });
 
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  /* ── 2. Background Slideshow Logic & Image Preloading ────────────── */
+  useEffect(() => {
+    HERO_IMAGES.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (mediaQuery.matches) return;
+
+    const intervalId = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % HERO_IMAGES.length);
+    }, SLIDE_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   return (
-    <section id="home" className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
-      {/* Background Image / Gradient */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/80 via-primary/60 to-primary z-10" />
-        <img
-          src="https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=2574&auto=format&fit=crop"
-          alt="Premium Salon Background"
-          className="w-full h-full object-cover object-center opacity-40"
-        />
-      </div>
+    <>
+      <section
+        id="home"
+        className="relative min-h-[85vh] lg:min-h-[92vh] flex items-center justify-center pt-24 pb-16 overflow-hidden bg-primary"
+      >
+        {/* ── Background Slideshow Layer (Vibrant, Clear, Smooth 1.5s Fade) ── */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          {HERO_IMAGES.map((src, index) => {
+            const isActive = index === currentIndex;
+            return (
+              <div
+                key={src}
+                className={`absolute inset-0 w-full h-full transition-opacity duration-[1500ms] ease-in-out ${
+                  isActive ? "opacity-100" : "opacity-0"
+                }`}
+                style={{
+                  backgroundImage: `url(${src})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                }}
+                role="img"
+                aria-label={`Luxury Salon Ambiance ${index + 1}`}
+                aria-hidden={!isActive}
+              />
+            );
+          })}
+        </div>
 
-      <div className="relative z-20 max-w-7xl mx-auto px-6 w-full grid lg:grid-cols-2 gap-12 items-center">
-        {/* Text Content */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="flex flex-col gap-6"
-        >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-2/50 backdrop-blur-sm border border-accent/20 w-max">
-            <Star className="text-accent w-4 h-4 fill-accent" />
-            <span className="text-sm font-semibold tracking-wide text-accent uppercase">
-              Premium Grooming Studio
-            </span>
-          </div>
+        {/* ── Subtle Cinematic Overlays (Images Stay Bright and Clear) ── */}
+        {/* Top soft vignette for navigation legibility */}
+        <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/60 via-black/20 to-transparent z-10 pointer-events-none" />
 
-          <h1 className="text-3xl sm:text-5xl md:text-7xl font-display font-black leading-[1.1] tracking-tight text-white">
-            ELEVATE <br />
-            <span className="text-gradient">YOUR STYLE.</span> <br />
-            EMBRACE LUXURY.
-          </h1>
+        {/* Left gentle gradient for text legibility (center/right stay unobstructed) */}
+        <div className="absolute inset-y-0 left-0 w-full md:w-3/5 bg-gradient-to-r from-black/65 via-black/30 to-transparent z-10 pointer-events-none" />
 
-          <p className="text-base sm:text-lg md:text-xl text-white/70 max-w-xl font-light leading-relaxed">
-            Experience world-class grooming and beauty services in an atmosphere of pure luxury. Our expert stylists are dedicated to crafting your perfect look.
-          </p>
+        {/* Bottom smooth blend into stats strip */}
+        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-primary via-primary/50 to-transparent z-10 pointer-events-none" />
 
-          <div className="flex flex-col sm:flex-row gap-4 mt-4 w-full sm:w-auto">
+        {/* ── Clean & Professional Hero Content (Simple & Uncluttered) ── */}
+        <div className="relative z-20 max-w-7xl mx-auto px-6 w-full">
+          <motion.div
+            initial={{ opacity: 0, y: 25 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="flex flex-col gap-5 max-w-2xl"
+          >
+            {/* Elegant Eyebrow Badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/50 backdrop-blur-md border border-accent/30 w-max shadow-lg">
+              <Star className="text-accent w-3.5 h-3.5 fill-accent" />
+              <span className="text-xs font-semibold tracking-wider text-accent uppercase">
+                Premium Grooming Studio
+              </span>
+            </div>
+
+            {/* Clear, Impactful Headline */}
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-display font-black leading-[1.12] tracking-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)]">
+              ELEVATE YOUR STYLE. <br />
+              <span className="text-gradient">EMBRACE LUXURY.</span>
+            </h1>
+
+            {/* Concise Tagline */}
+            <p className="text-base sm:text-lg text-white/90 max-w-lg font-light leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">
+              Experience world-class grooming and beauty services in an atmosphere of pure luxury.
+            </p>
+
+            {/* Clean Action Buttons */}
+            <div className="flex flex-wrap items-center gap-4 pt-2">
+              <button
+                type="button"
+                onClick={() => navigate("/book")}
+                className="px-7 py-3.5 bg-accent text-primary rounded-xl text-base font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-[0_0_25px_rgba(245,200,0,0.6)] active:scale-[0.98] transition-all duration-300 flex items-center gap-2 group shadow-xl"
+              >
+                <span>Book Appointment</span>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/our-services")}
+                className="px-7 py-3.5 bg-black/50 backdrop-blur-md border border-white/20 text-white rounded-xl text-base font-bold hover:bg-white/10 hover:border-accent/50 hover:shadow-[0_0_20px_rgba(245,200,0,0.3)] active:scale-[0.98] transition-all duration-300 shadow-xl"
+              >
+                Explore Services
+              </button>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* ── Slide Progress Indicator Dots (Subtle & Minimal) ─────── */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+          {HERO_IMAGES.map((_, index) => (
             <button
+              key={index}
               type="button"
-              onClick={() => navigate("/book")}
-              className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-accent text-primary rounded-xl text-base font-extrabold tracking-wide hover:bg-accent-hover hover:shadow-[0_0_25px_rgba(245,200,0,0.6)] active:scale-[0.98] transition-all duration-300 sm:hover:-translate-y-1 flex items-center justify-center gap-2 group whitespace-nowrap shrink-0 touch-manipulation transform-gpu"
-            >
-              <span>Book Appointment</span>
-              <ArrowRight className="w-5 h-5 shrink-0 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/our-services")}
-              className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-surface/50 backdrop-blur-md border border-border text-white rounded-xl text-base font-bold hover:bg-surface-2 hover:border-accent/50 hover:shadow-[0_0_25px_rgba(245,200,0,0.35)] active:scale-[0.98] transition-all duration-300 sm:hover:-translate-y-1 text-center whitespace-nowrap shrink-0 touch-manipulation transform-gpu"
-            >
-              Explore Services
-            </button>
-          </div>
-        </motion.div>
+              onClick={() => setCurrentIndex(index)}
+              aria-label={`Go to slide ${index + 1}`}
+              className={`h-1.5 rounded-full transition-all duration-500 ${
+                index === currentIndex
+                  ? "w-8 bg-accent"
+                  : "w-2 bg-white/40 hover:bg-white/70"
+              }`}
+            />
+          ))}
+        </div>
+      </section>
 
-        {/* Stats Content */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-          className="hidden lg:flex flex-col gap-6 items-end"
-        >
-          <div className="grid grid-cols-2 gap-4 w-full max-w-md">
+      {/* ── Sleek Platform Stats Bar (Clean & Professional Social Proof) ── */}
+      <div className="relative z-20 bg-surface/95 border-y border-white/[0.08] py-8 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center divide-y md:divide-y-0 md:divide-x divide-white/[0.08]">
             {[
               { label: "Happy Clients", value: formatCount(stats.happyClients) },
               { label: "Expert Stylists", value: formatCount(stats.expertStylists) },
               { label: "Salon Branches", value: formatCount(stats.salonBranches, "") },
-              { label: "Years Experience", value: formatCount(stats.yearsExperience, "+") },
+              {
+                label: "Years Experience",
+                value: stats.yearsExperience > 0 ? `${stats.yearsExperience}+` : "1+",
+              },
             ].map((stat, i) => (
-              <div key={i} className="glass-card p-6 flex flex-col items-center justify-center text-center hover-glow group">
-                <div className="text-3xl font-black text-white group-hover:text-accent transition-colors duration-300">
+              <div key={i} className="flex flex-col items-center justify-center p-3">
+                <div className="text-3xl sm:text-4xl font-display font-black text-accent tracking-tight">
                   {stat.value}
                 </div>
-                <div className="text-sm text-white/60 font-medium mt-1 uppercase tracking-wider">
+                <div className="text-xs sm:text-sm text-white/70 font-medium uppercase tracking-wider mt-1">
                   {stat.label}
                 </div>
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
       </div>
-
-      {/* Decorative Bottom Gradient */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-primary to-transparent z-10 pointer-events-none" />
-    </section>
+    </>
   );
 };
 
