@@ -1102,6 +1102,7 @@ export const getStaffDashboard = async (req, res) => {
     });
 
     const profile = {
+      staffId: staff._id,
       staffName: staff.full_name,
       salonName: staff.salon_id?.name || "N/A",
       managerName: manager ? manager.full_name : "N/A",
@@ -1121,7 +1122,29 @@ export const getStaffDashboard = async (req, res) => {
       .populate("customer_id", "name phone")
       .populate("service_ids", "service_name")
       .populate("service_id", "service_name")
-      .sort({ appointment_date: -1 });
+      .sort({ appointment_date: -1 })
+      .lean();
+
+    const apptIds = appointments.map((a) => a._id);
+    const apptServices = await AppointmentService.find({
+      appointment_id: { $in: apptIds }
+    })
+      .populate("service_id", "service_name base_price duration")
+      .populate("staff_id", "full_name specification image")
+      .lean();
+
+    const apptServiceMap = {};
+    apptServices.forEach((as) => {
+      const aid = as.appointment_id.toString();
+      if (!apptServiceMap[aid]) {
+        apptServiceMap[aid] = [];
+      }
+      apptServiceMap[aid].push(as);
+    });
+
+    appointments.forEach((a) => {
+      a.appointment_services = apptServiceMap[a._id.toString()] || [];
+    });
 
     res.json({
       profile,
