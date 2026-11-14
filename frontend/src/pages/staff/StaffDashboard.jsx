@@ -297,9 +297,18 @@ const StaffDashboard = () => {
                 </Table.Head>
                 <Table.Body>
                   {filteredAppointments.map((app) => {
-                    const servicesList = app.service_ids?.length 
-                      ? app.service_ids.map(s => typeof s === "object" ? (s.service_name || "Service") : s).join(", ")
-                      : (app.service_id?.service_name || "N/A");
+                    const currentStaffIdStr = String(profile?.staffId || user?._id || user?.id || "");
+                    const assignedServices = (app.appointment_services || []).filter((as) => {
+                      const asStaffId = typeof as.staff_id === "object" ? as.staff_id?._id : as.staff_id;
+                      return asStaffId && currentStaffIdStr && String(asStaffId) === currentStaffIdStr;
+                    });
+
+                    const servicesList = assignedServices.length > 0
+                      ? assignedServices.map((as) => as.service_id?.service_name || "Service").join(", ")
+                      : app.service_ids?.length 
+                        ? app.service_ids.map(s => typeof s === "object" ? (s.service_name || "Service") : s).join(", ")
+                        : (app.service_id?.service_name || "N/A");
+
                     const customerName = app.customer_id?.name || app.guest_name || "Guest";
                     const displayDate = app.appointment_date || "N/A";
                     const isConfirmed = app.status?.toLowerCase() === "confirmed";
@@ -320,10 +329,34 @@ const StaffDashboard = () => {
                             </div>
                           </div>
                         </Table.Td>
-                        <Table.Td className="text-muted-2 text-xs font-medium max-w-[220px] truncate">{servicesList}</Table.Td>
+                        <Table.Td className="text-muted-2 text-xs font-medium max-w-[220px] truncate" title={servicesList}>
+                          {servicesList}
+                        </Table.Td>
                         <Table.Td>
                           <div className="font-extrabold text-white text-xs">{displayDate}</div>
-                          <div className="text-[0.7rem] text-accent font-semibold mt-0.5">{app.start_time} - {app.end_time}</div>
+                          {assignedServices.length > 0 ? (
+                            <div className="flex flex-col gap-0.5 mt-0.5">
+                              {assignedServices.map((as, idx) => {
+                                const slot = as.service_start_time && as.service_end_time
+                                  ? `${as.service_start_time} - ${as.service_end_time}`
+                                  : `${app.start_time} - ${app.end_time}`;
+                                return (
+                                  <div key={idx} className="text-[0.7rem] text-accent font-semibold flex items-center gap-1">
+                                    <span>{slot}</span>
+                                    {assignedServices.length > 1 && as.service_id?.service_name && (
+                                      <span className="text-[0.65rem] text-muted-2 font-normal truncate max-w-[120px]">
+                                        ({as.service_id.service_name})
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-[0.7rem] text-accent font-semibold mt-0.5">
+                              {app.start_time} - {app.end_time}
+                            </div>
+                          )}
                         </Table.Td>
                         <Table.Td>{getStatusBadge(app.status)}</Table.Td>
                         <Table.Td>
