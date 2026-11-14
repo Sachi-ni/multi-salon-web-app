@@ -7,7 +7,7 @@ import Table from "../../components/ui/Table";
 import EmptyState from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
-import { Scissors, Clock, MapPin, Search, LayoutGrid, List, Plus, Coins, Pencil, Trash2, MoreVertical, Power } from "lucide-react";
+import { Scissors, Clock, MapPin, Search, LayoutGrid, List, Plus, Coins, Star, Pencil, Trash2, MoreVertical, Power } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 
@@ -136,6 +136,11 @@ const ServiceCard = ({ service, index, onEdit, onDelete, onToggleStatus }) => {
               Duration:
             </span>
             <span className="text-white font-extrabold">{formatDuration(service.duration)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs mb-4">
+            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+            <span className="text-white font-bold">{Number(service.rating || 0).toFixed(1)}</span>
+            <span className="text-neutral-500">({service.ratingCount || 0})</span>
           </div>
         </div>
       </div>

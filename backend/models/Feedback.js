@@ -39,6 +39,32 @@ const feedbackSchema = new mongoose.Schema({
     min: 1,
     max: 5
   },
+  serviceRatings: [{
+    service_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Service",
+      required: true
+    },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5
+    }
+  }],
+  staffRatings: [{
+    staff_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Staff",
+      required: true
+    },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5
+    }
+  }],
   comment: {
     type: String,
     default: ""

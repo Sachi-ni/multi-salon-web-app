@@ -17,6 +17,7 @@ import {
   Pencil,
   Trash2,
   Power,
+  Star,
   ChevronDown,
   LayoutGrid,
   List,
@@ -175,11 +176,22 @@ const ServiceCard = ({ service, index, onEdit, onDelete, onToggleStatus }) => {
           )}
 
           {/* Details */}
-          <div className="flex items-center gap-4 text-xs mb-2">
-            <div className="flex items-center gap-1.5 bg-surface-2/60 px-3 py-1.5 rounded-lg border border-border">
+          <div className="bg-surface-2/60 border border-border/70 rounded-xl p-3 flex items-center justify-between text-xs mb-3">
+            <span className="text-neutral-400 font-medium flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-blue-400" />
-              <span className="text-white font-bold">{formatDuration(service.duration)}</span>
-            </div>
+              Duration:
+            </span>
+            <span className="text-white font-extrabold">{formatDuration(service.duration)}</span>
+          </div>
+          <div className="flex items-center justify-between rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2.5 text-xs mb-1">
+            <span className="text-neutral-400 font-medium flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              Service Rating
+            </span>
+            <span className="flex items-center gap-1.5 text-white font-extrabold">
+              {Number(service.rating || 0).toFixed(1)}
+              <span className="text-neutral-500 font-medium">({service.ratingCount || 0})</span>
+            </span>
           </div>
         </div>
       </div>
@@ -656,6 +668,7 @@ const Services = () => {
             <Table.Th>Service Name</Table.Th>
             <Table.Th>Salon Branch</Table.Th>
             <Table.Th>Duration</Table.Th>
+            <Table.Th>Rating</Table.Th>
             <Table.Th align="right">Base Price</Table.Th>
             <Table.Th align="right">Actions</Table.Th>
           </Table.Head>
@@ -675,6 +688,13 @@ const Services = () => {
                   </Table.Td>
                   <Table.Td className="text-neutral-300 text-xs">{salonName}</Table.Td>
                   <Table.Td className="text-xs text-neutral-400">{s.duration} mins</Table.Td>
+                  <Table.Td className="text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                      <span className="text-white font-bold">{Number(s.rating || 0).toFixed(1)}</span>
+                      <span className="text-neutral-500">({s.ratingCount || 0})</span>
+                    </div>
+                  </Table.Td>
                   <Table.Td align="right" className="text-amber-400 font-extrabold text-xs">
                     LKR {Number(s.base_price).toLocaleString()}
                   </Table.Td>
