@@ -14,6 +14,14 @@ const LandingNavbar = () => {
   const [activeLink, setActiveLink] = useState("#home");
 
   useEffect(() => {
+    if (location.pathname === "/" || location.pathname === "") {
+      setActiveLink(location.hash || "#home");
+    } else {
+      setActiveLink(location.pathname);
+    }
+  }, [location.pathname, location.hash]);
+
+  useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
     };
@@ -36,11 +44,36 @@ const LandingNavbar = () => {
     { name: "Contact", href: "/contact" },
   ];
 
+  const isHomePage = location.pathname === "/" || location.pathname === "";
+
+  const isLinkActive = (link) => {
+    if (isHomePage) {
+      if (link.href === "#home") {
+        return activeLink === "#home" || !activeLink || activeLink === "/";
+      }
+      return activeLink === link.href || (location.hash && location.hash === link.href);
+    }
+    return link.href === location.pathname;
+  };
+
   const scrollToSection = (href) => {
     setIsMobileMenuOpen(false);
-    setActiveLink(href);
+
+    if (href === "#home" || href === "/") {
+      setActiveLink("#home");
+      if (location.pathname !== "/") {
+        navigate("/");
+      } else {
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      }
+      return;
+    }
 
     if (href.startsWith("/")) {
+      setActiveLink(href);
       navigate(href);
       return;
     }
@@ -52,6 +85,7 @@ const LandingNavbar = () => {
 
     const element = document.querySelector(href);
     if (element) {
+      setActiveLink(href);
       const offsetTop = element.getBoundingClientRect().top + window.scrollY - 80;
       window.scrollTo({
         top: offsetTop,
@@ -93,17 +127,15 @@ const LandingNavbar = () => {
               : "bg-white/[0.06] border border-white/[0.08] backdrop-blur-xl"
           }`}>
             {navLinks.map((link) => {
-              const isActive =
-                activeLink === link.href ||
-                (link.href.startsWith("/") && location.pathname === link.href);
+              const isActive = isLinkActive(link);
               return (
                 <button
                   key={link.name}
                   onClick={() => scrollToSection(link.href)}
-                  className={`relative px-4 py-2 rounded-full text-[13px] font-semibold tracking-wide transition-all duration-300 ${
+                  className={`relative px-4 py-2 rounded-full text-sm font-semibold tracking-wide transition-all duration-300 ${
                     isActive
-                      ? "text-primary"
-                      : "text-white/70 hover:text-white"
+                      ? "text-primary font-bold"
+                      : "text-white/80 hover:text-white"
                   }`}
                 >
                   {isActive && (
@@ -232,9 +264,7 @@ const LandingNavbar = () => {
               {/* Nav Links */}
               <nav className="px-4 py-4 flex flex-col gap-1">
                 {navLinks.map((link, i) => {
-                  const isActive =
-                    activeLink === link.href ||
-                    (link.href.startsWith("/") && location.pathname === link.href);
+                  const isActive = isLinkActive(link);
                   return (
                     <motion.button
                       key={link.name}
