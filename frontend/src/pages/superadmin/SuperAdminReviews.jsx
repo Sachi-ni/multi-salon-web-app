@@ -24,6 +24,27 @@ function StarDisplay({ rating, max = 5, size = "w-4 h-4" }) {
   );
 }
 
+const getServiceRatings = (feedback) => feedback.serviceRatings?.length
+  ? feedback.serviceRatings.map((entry) => ({
+      name: entry.service_id?.service_name || "Service",
+      rating: entry.rating
+    }))
+  : [{ name: feedback.service_id?.service_name || "Service", rating: feedback.serviceRating || 0 }];
+
+const getStaffRatings = (feedback) => feedback.staffRatings?.length
+  ? feedback.staffRatings.map((entry) => ({
+      name: entry.staff_id?.full_name || "Staff",
+      rating: entry.rating
+    }))
+  : [{ name: feedback.staff_id?.full_name || "Staff", rating: feedback.staffRating || 0 }];
+
+const getFeedbackRating = (feedback) => {
+  const ratings = [...getServiceRatings(feedback), ...getStaffRatings(feedback)]
+    .map((entry) => entry.rating)
+    .filter((rating) => rating > 0);
+  return ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0;
+};
+
 export default function SuperAdminReviews() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [salons, setSalons] = useState([]);
@@ -53,15 +74,17 @@ export default function SuperAdminReviews() {
   // Aggregated Ratings Stats
   const stats = useMemo(() => {
     if (!feedbacks.length) return null;
-    const totalService = feedbacks.reduce((acc, curr) => acc + (curr.serviceRating || 0), 0);
-    const totalStaff = feedbacks.reduce((acc, curr) => acc + (curr.staffRating || 0), 0);
-    const avgService = (totalService / feedbacks.length).toFixed(1);
-    const avgStaff = (totalStaff / feedbacks.length).toFixed(1);
-    const overall = (((totalService + totalStaff) / 2) / feedbacks.length).toFixed(1);
+    const serviceRatings = feedbacks.flatMap(getServiceRatings).map((entry) => entry.rating);
+    const staffRatings = feedbacks.flatMap(getStaffRatings).map((entry) => entry.rating);
+    const totalService = serviceRatings.reduce((acc, rating) => acc + rating, 0);
+    const totalStaff = staffRatings.reduce((acc, rating) => acc + rating, 0);
+    const avgService = (totalService / serviceRatings.length).toFixed(1);
+    const avgStaff = (totalStaff / staffRatings.length).toFixed(1);
+    const overall = (feedbacks.reduce((sum, feedback) => sum + getFeedbackRating(feedback), 0) / feedbacks.length).toFixed(1);
 
-    const count5 = feedbacks.filter(f => Math.round((f.serviceRating + f.staffRating) / 2) === 5).length;
-    const count4 = feedbacks.filter(f => Math.round((f.serviceRating + f.staffRating) / 2) === 4).length;
-    const count3 = feedbacks.filter(f => Math.round((f.serviceRating + f.staffRating) / 2) === 3).length;
+    const count5 = feedbacks.filter(f => Math.round(getFeedbackRating(f)) === 5).length;
+    const count4 = feedbacks.filter(f => Math.round(getFeedbackRating(f)) === 4).length;
+    const count3 = feedbacks.filter(f => Math.round(getFeedbackRating(f)) === 3).length;
 
     return { avgService, avgStaff, overall, count: feedbacks.length, count5, count4, count3 };
   }, [feedbacks]);
@@ -70,7 +93,7 @@ export default function SuperAdminReviews() {
   const filteredFeedbacks = useMemo(() => {
     return feedbacks.filter(f => {
       // Rating filter
-      const avgRating = Math.round(((f.serviceRating || 0) + (f.staffRating || 0)) / 2);
+      const avgRating = Math.round(getFeedbackRating(f));
       if (ratingFilter === "5" && avgRating !== 5) return false;
       if (ratingFilter === "4" && avgRating !== 4) return false;
       if (ratingFilter === "3" && avgRating !== 3) return false;
@@ -263,7 +286,7 @@ export default function SuperAdminReviews() {
             {filteredFeedbacks.map((f, i) => {
               const customerName = f.customer_id?.name || "Guest Customer";
               const salonName = salons.find(s => s._id === f.salon_id)?.name || "Salon Branch";
-              const avgScore = (((f.serviceRating || 0) + (f.staffRating || 0)) / 2).toFixed(1);
+              const avgScore = getFeedbackRating(f).toFixed(1);
 
               return (
                 <motion.div 
@@ -303,20 +326,21 @@ export default function SuperAdminReviews() {
 
                   {/* Ratings Breakdown Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="bg-surface-2/60 border border-border/70 rounded-xl p-3.5 flex items-center justify-between">
-                      <div>
-                        <span className="text-[0.65rem] font-bold text-neutral-400 uppercase tracking-wider block mb-0.5">Service Reviewed</span>
-                        <span className="text-xs font-extrabold text-white">{f.service_id?.service_name || "General Service"}</span>
-                      </div>
-                      <StarDisplay rating={f.serviceRating || 5} />
+                    <div className="space-y-3">
+                      {getServiceRatings(f).map((entry) => (
+                        <div key={entry.name} className="bg-surface-2/60 border border-border/70 rounded-xl p-3.5 flex items-center justify-between">
+                          <span className="text-xs font-extrabold text-white">{entry.name}</span>
+                          <StarDisplay rating={entry.rating} />
+                        </div>
+                      ))}
                     </div>
-
-                    <div className="bg-surface-2/60 border border-border/70 rounded-xl p-3.5 flex items-center justify-between">
-                      <div>
-                        <span className="text-[0.65rem] font-bold text-neutral-400 uppercase tracking-wider block mb-0.5">Staff Reviewed</span>
-                        <span className="text-xs font-extrabold text-white">{f.staff_id?.full_name || "Stylist"}</span>
-                      </div>
-                      <StarDisplay rating={f.staffRating || 5} />
+                    <div className="space-y-3">
+                      {getStaffRatings(f).map((entry) => (
+                        <div key={entry.name} className="bg-surface-2/60 border border-border/70 rounded-xl p-3.5 flex items-center justify-between">
+                          <span className="text-xs font-extrabold text-white">{entry.name}</span>
+                          <StarDisplay rating={entry.rating} />
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -359,12 +383,20 @@ export default function SuperAdminReviews() {
                   </Table.Td>
                   <Table.Td className="text-neutral-300 text-xs">{salonName}</Table.Td>
                   <Table.Td className="text-xs text-neutral-300">
-                    <p className="font-bold text-white">{f.service_id?.service_name || "Service"}</p>
-                    <StarDisplay rating={f.serviceRating || 5} size="w-3 h-3" />
+                    {getServiceRatings(f).map((entry) => (
+                      <div key={entry.name} className="mb-1 last:mb-0">
+                        <p className="font-bold text-white">{entry.name}</p>
+                        <StarDisplay rating={entry.rating} size="w-3 h-3" />
+                      </div>
+                    ))}
                   </Table.Td>
                   <Table.Td className="text-xs text-neutral-300">
-                    <p className="font-bold text-white">{f.staff_id?.full_name || "Staff"}</p>
-                    <StarDisplay rating={f.staffRating || 5} size="w-3 h-3" />
+                    {getStaffRatings(f).map((entry) => (
+                      <div key={entry.name} className="mb-1 last:mb-0">
+                        <p className="font-bold text-white">{entry.name}</p>
+                        <StarDisplay rating={entry.rating} size="w-3 h-3" />
+                      </div>
+                    ))}
                   </Table.Td>
                   <Table.Td className="text-xs text-neutral-300 italic max-w-xs truncate">
                     {f.comment ? `"${f.comment}"` : "No comment written"}

@@ -36,23 +36,54 @@ const attachRatings = async (staffList) => {
   try {
     const staffIds = staffList.map((s) => s._id);
     if (staffIds.length === 0) return staffList;
+    const staffIdStrings = staffIds.map((id) => id.toString());
 
-    const agg = await Feedback.aggregate([
-      { $match: { staff_id: { $in: staffIds } } },
-      {
-        $group: {
-          _id: "$staff_id",
-          avgRating: { $avg: "$staffRating" },
-          count: { $sum: 1 },
+    const [legacyRatings, multipleRatings] = await Promise.all([
+      Feedback.aggregate([
+        {
+          $match: {
+            $expr: { $in: [{ $toString: "$staff_id" }, staffIdStrings] },
+            $or: [{ staffRatings: { $exists: false } }, { staffRatings: { $size: 0 } }],
+          },
         },
-      },
+        {
+          $group: {
+            _id: "$staff_id",
+            total: { $sum: "$staffRating" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      Feedback.aggregate([
+        { $unwind: "$staffRatings" },
+        {
+          $match: {
+            $expr: { $in: [{ $toString: "$staffRatings.staff_id" }, staffIdStrings] },
+          },
+        },
+        {
+          $group: {
+            _id: "$staffRatings.staff_id",
+            total: { $sum: "$staffRatings.rating" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
 
     const ratingMap = {};
-    agg.forEach((r) => {
-      ratingMap[r._id.toString()] = {
-        rating: Number(r.avgRating.toFixed(1)) || 0,
-        ratingCount: r.count,
+    [...legacyRatings, ...multipleRatings].forEach((rating) => {
+      const key = rating._id.toString();
+      const current = ratingMap[key] || { total: 0, ratingCount: 0 };
+      ratingMap[key] = {
+        total: current.total + rating.total,
+        ratingCount: current.ratingCount + rating.count,
+      };
+    });
+    Object.keys(ratingMap).forEach((key) => {
+      ratingMap[key] = {
+        rating: Number((ratingMap[key].total / ratingMap[key].ratingCount).toFixed(1)) || 0,
+        ratingCount: ratingMap[key].ratingCount,
       };
     });
 
@@ -355,6 +386,7 @@ export const getStaff = async (req, res) => {
     // Attach average staff rating from Feedback collection (super-admin & manager views)
     formattedStaff = await attachRatings(formattedStaff);
 
+    res.set("Cache-Control", "no-store");
     res.json(formattedStaff);
   } catch (error) {
     res.status(500).json({

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Scissors } from "lucide-react";
+import { Scissors, Star } from "lucide-react";
 import { getServices } from "../../../services/serviceService";
 
 const Services = () => {
@@ -30,7 +30,14 @@ const Services = () => {
               <p className="text-accent text-xs font-bold uppercase tracking-wider mb-2">{service.category_id?.category_name || service.salon_id?.name || "Salon service"}</p>
               <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-accent transition-colors">{service.service_name}</h3>
               <p className="text-white/60 leading-relaxed min-h-12">{service.description || "No description provided."}</p>
-              <div className="mt-5 pt-4 border-t border-border flex items-center justify-between text-sm"><span className="text-accent font-extrabold">LKR {Number(service.base_price || 0).toLocaleString()}</span><span className="text-white/60">{service.duration} min</span></div>
+              <div className="mt-5 pt-4 border-t border-border flex items-center justify-between text-sm">
+                <span className="text-accent font-extrabold">LKR {Number(service.base_price || 0).toLocaleString()}</span>
+                <span className="flex items-center gap-1 text-white/60">
+                  <Star className="w-3.5 h-3.5 text-accent fill-accent" />
+                  {Number(service.rating || 0).toFixed(1)} ({service.ratingCount || 0})
+                </span>
+                <span>{service.duration} min</span>
+              </div>
             </motion.div>
           ))}
         </div>

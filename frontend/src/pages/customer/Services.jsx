@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getSalons, getSalonServices } from "../../services/salonService";
-import { Scissors } from "lucide-react";
+import { Scissors, Star } from "lucide-react";
 import LandingNavbar from "./landing-sections/LandingNavbar";
 import Footer from "./landing-sections/Footer";
 
@@ -96,7 +96,13 @@ export default function CustomerServices() {
                 
                 <div className="flex items-center justify-between pt-4 border-t border-border">
                   <span className="text-white/60 text-sm font-medium">{s.duration} min</span>
-                  <span className="text-accent font-black text-lg">LKR {s.base_price}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1 text-sm text-white">
+                      <Star className="w-4 h-4 text-accent fill-accent" />
+                      {Number(s.rating || 0).toFixed(1)} ({s.ratingCount || 0})
+                    </span>
+                    <span className="text-accent font-black text-lg">LKR {s.base_price}</span>
+                  </div>
                 </div>
               </div>
             ))}

@@ -3,8 +3,72 @@ import ServiceCategory from "../models/ServiceCategory.js";
 import Salon from "../models/Salon.js";
 import Appointment from "../models/Appointment.js";
 import Staff from "../models/Staff.js";
+import Feedback from "../models/Feedback.js";
 
 // ── Services CRUD ──
+
+const attachRatings = async (services) => {
+  const serviceIds = services.map((service) => service._id);
+  if (serviceIds.length === 0) return services;
+  const serviceIdStrings = serviceIds.map((id) => id.toString());
+
+  const [legacyRatings, multipleRatings] = await Promise.all([
+    Feedback.aggregate([
+      {
+        $match: {
+          $expr: { $in: [{ $toString: "$service_id" }, serviceIdStrings] },
+          $or: [{ serviceRatings: { $exists: false } }, { serviceRatings: { $size: 0 } }],
+        },
+      },
+      {
+        $group: {
+          _id: "$service_id",
+          total: { $sum: "$serviceRating" },
+          ratingCount: { $sum: 1 },
+        },
+      },
+    ]),
+    Feedback.aggregate([
+      { $unwind: "$serviceRatings" },
+      {
+        $match: {
+          $expr: { $in: [{ $toString: "$serviceRatings.service_id" }, serviceIdStrings] },
+        },
+      },
+      {
+        $group: {
+          _id: "$serviceRatings.service_id",
+          total: { $sum: "$serviceRatings.rating" },
+          ratingCount: { $sum: 1 },
+        },
+      },
+    ]),
+  ]);
+
+  const ratingTotals = new Map();
+  [...legacyRatings, ...multipleRatings].forEach((rating) => {
+    const key = rating._id.toString();
+    const current = ratingTotals.get(key) || { total: 0, ratingCount: 0 };
+    ratingTotals.set(key, {
+      total: current.total + rating.total,
+      ratingCount: current.ratingCount + rating.ratingCount,
+    });
+  });
+  const ratingMap = new Map(
+    [...ratingTotals.entries()].map(([key, rating]) => [
+      key,
+      {
+        rating: Number((rating.total / rating.ratingCount).toFixed(1)) || 0,
+        ratingCount: rating.ratingCount,
+      },
+    ])
+  );
+
+  return services.map((service) => ({
+    ...service.toObject(),
+    ...(ratingMap.get(service._id.toString()) || { rating: 0, ratingCount: 0 }),
+  }));
+};
 
 export const createService = async (req, res) => {
   try {
@@ -66,7 +130,8 @@ export const getServices = async (req, res) => {
     const services = await Service.find(filter)
       .populate("category_id")
       .populate("salon_id", "name location");
-    res.json(services);
+    res.set("Cache-Control", "no-store");
+    res.json(await attachRatings(services));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
