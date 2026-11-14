@@ -1,5 +1,6 @@
 import Bill from '../models/Bill.js';
 import Appointment from '../models/Appointment.js';
+import AppointmentService from '../models/AppointmentService.js';
 import Salon from '../models/Salon.js';
 import Salary from '../models/Salary.js';
 import Service from '../models/Service.js';
@@ -249,40 +250,85 @@ export const getStaffOperationalMetrics = async (req, res) => {
       matchConditions.appointment_date = { $gte: startDateStr, $lte: endDateStr };
     }
 
-    const metrics = await Appointment.aggregate([
-      {
-        $match: matchConditions,
-      },
-      {
-        $lookup: {
-          from: "staffs",
-          localField: "staff_id",
-          foreignField: "_id",
-          as: "staff",
-        },
-      },
-      { $unwind: "$staff" },
-      {
-        $group: {
-          _id: "$staff._id",
-          name: { $first: "$staff.full_name" },
-          role: { $first: "$staff.role" },
-          salon_id: { $first: "$salon_id" },
-          totalBookings: { $sum: 1 },
-          completedBookings: {
-            $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
-          },
-          cancelledBookings: {
-            $sum: { $cond: [{ $in: ["$status", ["cancelled", "rejected"]] }, 1, 0] },
-          },
-          revenue: {
-            $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$total_price", 0] },
-          },
-        },
-      },
-      { $sort: { revenue: -1, completedBookings: -1, name: 1 } },
-    ]);
+    const appointments = await Appointment.find(matchConditions)
+      .populate("staff_id", "full_name role")
+      .lean();
 
+    const apptIds = appointments.map((a) => a._id);
+    const apptServices = await AppointmentService.find({
+      appointment_id: { $in: apptIds },
+    })
+      .populate("staff_id", "full_name role")
+      .lean();
+
+    const apptServiceMap = {};
+    apptServices.forEach((as) => {
+      const aid = as.appointment_id.toString();
+      if (!apptServiceMap[aid]) apptServiceMap[aid] = [];
+      apptServiceMap[aid].push(as);
+    });
+
+    const staffMap = {};
+
+    appointments.forEach((appt) => {
+      const servicesForAppt = apptServiceMap[appt._id.toString()] || [];
+      const statusLower = String(appt.status || "").toLowerCase().trim();
+      const isCompleted = statusLower === "completed";
+      const isCancelled = statusLower === "cancelled" || statusLower === "rejected";
+
+      if (servicesForAppt.length > 0) {
+        // Multi-service: attribute per service staff
+        servicesForAppt.forEach((svc) => {
+          if (!svc.staff_id) return;
+          const sId = (svc.staff_id._id || svc.staff_id).toString();
+          if (!staffMap[sId]) {
+            staffMap[sId] = {
+              _id: sId,
+              name: svc.staff_id.full_name || "Staff",
+              role: svc.staff_id.role || "Staff",
+              salon_id: appt.salon_id,
+              totalBookings: 0,
+              completedBookings: 0,
+              cancelledBookings: 0,
+              revenue: 0,
+            };
+          }
+          staffMap[sId].totalBookings += 1;
+          if (isCompleted) {
+            staffMap[sId].completedBookings += 1;
+            staffMap[sId].revenue += (svc.sub_price || (appt.total_price / servicesForAppt.length) || 0);
+          }
+          if (isCancelled) {
+            staffMap[sId].cancelledBookings += 1;
+          }
+        });
+      } else if (appt.staff_id) {
+        // Single staff appointment
+        const sId = (appt.staff_id._id || appt.staff_id).toString();
+        if (!staffMap[sId]) {
+          staffMap[sId] = {
+            _id: sId,
+            name: appt.staff_id.full_name || "Staff",
+            role: appt.staff_id.role || "Staff",
+            salon_id: appt.salon_id,
+            totalBookings: 0,
+            completedBookings: 0,
+            cancelledBookings: 0,
+            revenue: 0,
+          };
+        }
+        staffMap[sId].totalBookings += 1;
+        if (isCompleted) {
+          staffMap[sId].completedBookings += 1;
+          staffMap[sId].revenue += (appt.total_price || 0);
+        }
+        if (isCancelled) {
+          staffMap[sId].cancelledBookings += 1;
+        }
+      }
+    });
+
+    const metrics = Object.values(staffMap).sort((a, b) => b.revenue - a.revenue || b.completedBookings - a.completedBookings);
     res.json(metrics);
   } catch (error) {
     res.status(500).json({ message: error.message });

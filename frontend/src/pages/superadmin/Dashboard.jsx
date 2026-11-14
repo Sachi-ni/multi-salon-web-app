@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   Building2, Users, Calendar, Wallet, Plus, Download, 
   ArrowRight, Store, UserPlus, CalendarPlus, DollarSign, 
-  ShieldCheck, ChevronRight, UserCheck, Phone, Mail, MapPin, Search
+  ShieldCheck, ChevronRight, UserCheck, Phone, Mail, MapPin, Search, CheckCircle
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { getSalons } from "../../services/salonService";
@@ -20,6 +20,16 @@ import Table from "../../components/ui/Table";
 import Skeleton from "../../components/ui/Skeleton";
 import { API_BASE } from "../../config";
 
+const DATE_RANGE_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "7days", label: "7 Days" },
+  { value: "30days", label: "30 Days" },
+  { value: "90days", label: "90 Days" },
+  { value: "year", label: "This Year" },
+  { value: "all", label: "All Time" },
+];
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -29,6 +39,8 @@ export default function Dashboard() {
   const [appointments, setAppointments] = useState([]);
   const [revenueStats, setRevenueStats] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [dateRange, setDateRange] = useState("30days");
+  const [appointmentStatusFilter, setAppointmentStatusFilter] = useState("All");
 
   const getSalonManagerInfo = useCallback((salon) => {
     let name = salon.managerName;
@@ -68,48 +80,93 @@ export default function Dashboard() {
     });
   }, [salons, searchTerm, getSalonManagerInfo]);
 
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [salonsRes, staffRes, apptsRes, revRes] = await Promise.allSettled([
+        getSalons(),
+        getStaff(),
+        getSalonAppointments("all"),
+        getRevenueStats(dateRange)
+      ]);
+
+      if (salonsRes.status === "fulfilled") setSalons(salonsRes.value.data || []);
+      if (staffRes.status === "fulfilled") setStaff(staffRes.value.data || []);
+      if (apptsRes.status === "fulfilled") setAppointments(apptsRes.value.data || []);
+      if (revRes.status === "fulfilled") setRevenueStats(revRes.value.data || null);
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [dateRange]);
+
   useEffect(() => {
-    let isMounted = true;
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        const [salonsRes, staffRes, apptsRes, revRes] = await Promise.allSettled([
-          getSalons(),
-          getStaff(),
-          getSalonAppointments("all"),
-          getRevenueStats("30days")
-        ]);
-
-        if (isMounted) {
-          if (salonsRes.status === "fulfilled") setSalons(salonsRes.value.data || []);
-          if (staffRes.status === "fulfilled") setStaff(staffRes.value.data || []);
-          if (apptsRes.status === "fulfilled") setAppointments(apptsRes.value.data || []);
-          if (revRes.status === "fulfilled") setRevenueStats(revRes.value.data || null);
-        }
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
     fetchDashboardData();
-    return () => { isMounted = false; };
-  }, []);
+  }, [fetchDashboardData]);
 
-  // Compute monthly appointments
-  const monthlyAppointmentsCount = useMemo(() => {
+  // Compute date-filtered appointments according to selected date range
+  const { filteredAppointments, selectedPeriodLabel } = useMemo(() => {
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const todayStr = toYMD(now);
 
-    return appointments.filter(a => {
-      const d = new Date(a.appointment_date || a.createdAt);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    }).length;
-  }, [appointments]);
+    let startStr = "1970-01-01";
+    let endStr = todayStr;
 
+    if (dateRange === "today") {
+      startStr = todayStr;
+      endStr = todayStr;
+    } else if (dateRange === "yesterday") {
+      const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      startStr = toYMD(yd);
+      endStr = toYMD(yd);
+    } else if (dateRange === "7days") {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      startStr = toYMD(d);
+    } else if (dateRange === "30days") {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+      startStr = toYMD(d);
+    } else if (dateRange === "90days") {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89);
+      startStr = toYMD(d);
+    } else if (dateRange === "year") {
+      startStr = `${now.getFullYear()}-01-01`;
+    } else if (dateRange === "all") {
+      startStr = "1970-01-01";
+      endStr = "2099-12-31";
+    }
 
+    const filtered = appointments.filter(a => {
+      const aDate = String(a.appointment_date || a.createdAt || "").split("T")[0].trim();
+      if (!aDate) return false;
+      return aDate >= startStr && aDate <= endStr;
+    });
+
+    const label = DATE_RANGE_OPTIONS.find(o => o.value === dateRange)?.label || "Selected Period";
+    return { filteredAppointments: filtered, selectedPeriodLabel: label };
+  }, [appointments, dateRange]);
+
+  const completedAppointments = useMemo(() => {
+    return filteredAppointments.filter(a => String(a.status || "").toLowerCase().trim() === "completed");
+  }, [filteredAppointments]);
+
+  const completedRevenue = useMemo(() => {
+    return completedAppointments.reduce((sum, a) => sum + (Number(a.total_price) || 0), 0);
+  }, [completedAppointments]);
+
+  const displayedAppointments = useMemo(() => {
+    let list = filteredAppointments.length > 0 || dateRange !== "all" ? filteredAppointments : appointments;
+    if (appointmentStatusFilter !== "All") {
+      list = list.filter(a => String(a.status || "").toLowerCase().trim() === appointmentStatusFilter.toLowerCase());
+    }
+    return [...list].sort((a, b) => {
+      const dateA = String(a.appointment_date || (a.createdAt && a.createdAt.split("T")[0]) || "").trim();
+      const dateB = String(b.appointment_date || (b.createdAt && b.createdAt.split("T")[0]) || "").trim();
+      if (dateB !== dateA) return dateB.localeCompare(dateA);
+      return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+    });
+  }, [filteredAppointments, appointments, appointmentStatusFilter, dateRange]);
 
   // Stats definition
   const stats = [
@@ -130,19 +187,19 @@ export default function Dashboard() {
       path: "/Staff"
     },
     {
-      icon: Calendar,
-      label: "Appointments",
-      value: loading ? "—" : appointments.length.toString(),
-      trend: `${monthlyAppointmentsCount} this month`,
-      subtitle: "total bookings",
-      path: "/Appointments"
+      icon: CheckCircle,
+      label: "Completed Bookings",
+      value: loading ? "—" : completedAppointments.length.toString(),
+      trend: `${filteredAppointments.length} total in period`,
+      subtitle: `${selectedPeriodLabel}`,
+      path: "/Analytics"
     },
     {
       icon: Wallet,
       label: "Platform Revenue",
-      value: loading ? "—" : `LKR ${(revenueStats?.grossRevenue || 0).toLocaleString()}`,
+      value: loading ? "—" : `LKR ${(completedRevenue > 0 ? completedRevenue : (revenueStats?.grossRevenue || 0)).toLocaleString()}`,
       trend: revenueStats?.grossGrowth ? `${revenueStats.grossGrowth >= 0 ? "+" : ""}${revenueStats.grossGrowth}%` : "Stable",
-      subtitle: "last 30 days",
+      subtitle: `${selectedPeriodLabel}`,
       path: "/Analytics"
     },
   ];
@@ -177,6 +234,21 @@ export default function Dashboard() {
         title="Super Admin Dashboard"
         subtitle="Overview of platform performance, salons, staff, and bookings"
       >
+        <div className="flex flex-wrap items-center bg-surface-2 border border-border rounded-xl p-1 gap-0.5">
+          {DATE_RANGE_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setDateRange(opt.value)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+                dateRange === opt.value
+                  ? "bg-accent text-primary shadow-glow-sm"
+                  : "text-muted-2 hover:text-white hover:bg-surface-3"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
         <Button variant="ghost" size="sm" icon={Download} onClick={() => navigate("/Analytics")}>
           Export Data
         </Button>
@@ -217,21 +289,44 @@ export default function Dashboard() {
       {/* Main Insights Grid (Chart + Quick Actions & System Health) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Recent Appointments Card (Replaces weekly chart) */}
+        {/* Recent Appointments Card */}
         <Card className="lg:col-span-2 flex flex-col">
-          <Card.Header className="flex items-center justify-between pb-3 border-b border-border mb-3">
+          <Card.Header className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-border mb-3 gap-3">
             <div>
               <Card.Title className="flex items-center gap-2 text-base font-extrabold text-white">
                 <Calendar className="w-5 h-5 text-accent" />
                 Recent Appointments
               </Card.Title>
               <Card.Subtitle className="text-xs text-muted-2">
-                Latest customer bookings across all salon branches
+                {displayedAppointments.length} bookings populated for {selectedPeriodLabel} ({completedAppointments.length} completed)
               </Card.Subtitle>
             </div>
-            <Button variant="ghost" size="xs" icon={ArrowRight} onClick={() => navigate("/Appointments")}>
-              View All
-            </Button>
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center bg-surface-2 border border-border rounded-lg p-0.5">
+                {["All", "Completed", "Confirmed", "Pending"].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setAppointmentStatusFilter(status)}
+                    className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all duration-150 ${
+                      appointmentStatusFilter === status
+                        ? "bg-accent text-primary shadow-glow-sm"
+                        : "text-muted-2 hover:text-white hover:bg-surface-3"
+                    }`}
+                  >
+                    {status}
+                    {status === "Completed" && (
+                      <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500/20 text-emerald-300 font-extrabold">
+                        {completedAppointments.length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <Button variant="ghost" size="xs" icon={ArrowRight} onClick={() => navigate("/Appointments")}>
+                View All
+              </Button>
+            </div>
           </Card.Header>
 
           {loading ? (
@@ -241,8 +336,10 @@ export default function Dashboard() {
               <Skeleton className="w-full h-11 rounded-xl" />
               <Skeleton className="w-full h-11 rounded-xl" />
             </div>
-          ) : appointments.length === 0 ? (
-            <div className="py-12 text-center text-muted-2 text-xs">No recent appointments found.</div>
+          ) : displayedAppointments.length === 0 ? (
+            <div className="py-12 text-center text-muted-2 text-xs">
+              No {appointmentStatusFilter !== "All" ? appointmentStatusFilter.toLowerCase() : ""} appointments found for {selectedPeriodLabel}.
+            </div>
           ) : (
             <Table className="w-full">
               <Table.Head>
@@ -253,7 +350,7 @@ export default function Dashboard() {
                 <Table.Th align="right" className="w-[14%]">Amount</Table.Th>
               </Table.Head>
               <Table.Body>
-                {appointments.slice(0, 6).map((appt, i) => {
+                {displayedAppointments.slice(0, 8).map((appt, i) => {
                   const customerName = appt.customer_name || appt.customer_id?.name || appt.guest_name || "Guest";
                   const salonName = appt.salon_id?.name || appt.salon_name || "Salon Branch";
                   const price = appt.total_price || appt.service_id?.price || 0;

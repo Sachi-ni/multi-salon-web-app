@@ -245,7 +245,7 @@ export default function Analytics() {
     }
 
     const filteredAppointments = appointments.filter(a => {
-      const aDate = a.appointment_date || (a.createdAt && a.createdAt.split("T")[0]);
+      const aDate = String(a.appointment_date || a.createdAt || "").split("T")[0].trim();
       if (!aDate) return false;
       return aDate >= startStr && aDate <= endStr;
     });
@@ -253,12 +253,22 @@ export default function Analytics() {
     const filteredCustomers = customers.filter(c => {
       const custDate = c.registration_date || c.createdAt;
       if (!custDate) return true;
-      const cDateStr = String(custDate).split("T")[0];
+      const cDateStr = String(custDate).split("T")[0].trim();
       return cDateStr >= startStr && cDateStr <= endStr;
     });
 
     return { filteredAppointments, filteredCustomers, startStr, endStr };
   }, [appointments, customers, dateRange]);
+
+  /* ── Status check helpers ── */
+  const isCompletedStatus = useCallback((status) => {
+    return String(status || "").toLowerCase().trim() === "completed";
+  }, []);
+
+  const isCancelledStatus = useCallback((status) => {
+    const s = String(status || "").toLowerCase().trim();
+    return s === "cancelled" || s === "rejected";
+  }, []);
 
   /* ── KPI Calculations ── */
   const kpis = useMemo(() => {
@@ -271,12 +281,12 @@ export default function Analytics() {
     const activeUsers = activeUserIds.size;
 
     const totalBookings = filteredAppointments.length;
-    const completedBookings = filteredAppointments.filter(a => a.status === "completed").length;
-    const cancelledBookings = filteredAppointments.filter(a => a.status === "cancelled" || a.status === "rejected").length;
+    const completedBookings = filteredAppointments.filter(a => isCompletedStatus(a.status)).length;
+    const cancelledBookings = filteredAppointments.filter(a => isCancelledStatus(a.status)).length;
 
     const computedRevenue = filteredAppointments
-      .filter(a => a.status === "completed")
-      .reduce((sum, a) => sum + (a.total_price || 0), 0);
+      .filter(a => isCompletedStatus(a.status))
+      .reduce((sum, a) => sum + (Number(a.total_price) || 0), 0);
 
     const completionRate = totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 0;
 
@@ -291,7 +301,7 @@ export default function Analytics() {
       monthlyGrowth: revenueStats?.grossGrowth || 0,
       completionRate
     };
-  }, [filteredData, customers, revenueStats]);
+  }, [filteredData, customers, revenueStats, isCompletedStatus, isCancelledStatus]);
 
   /* ── Charts Data ── */
   const chartsData = useMemo(() => {
@@ -300,14 +310,14 @@ export default function Analytics() {
     // 1. Revenue & Booking Trend
     const trendMap = {};
     filteredAppointments.forEach(a => {
-      const date = a.appointment_date || (a.createdAt && a.createdAt.split("T")[0]);
+      const date = String(a.appointment_date || a.createdAt || "").split("T")[0].trim();
       if (!date) return;
       if (!trendMap[date]) trendMap[date] = { date, revenue: 0, completed: 0, cancelled: 0, pending: 0 };
 
-      if (a.status === "completed") {
-        trendMap[date].revenue += (a.total_price || 0);
+      if (isCompletedStatus(a.status)) {
+        trendMap[date].revenue += (Number(a.total_price) || 0);
         trendMap[date].completed += 1;
-      } else if (a.status === "cancelled" || a.status === "rejected") {
+      } else if (isCancelledStatus(a.status)) {
         trendMap[date].cancelled += 1;
       } else {
         trendMap[date].pending += 1;
@@ -319,7 +329,7 @@ export default function Analytics() {
     const userGrowthMap = {};
     filteredCustomers.forEach(c => {
       const custDate = c.registration_date || c.createdAt;
-      const date = custDate ? custDate.split("T")[0] : null;
+      const date = custDate ? String(custDate).split("T")[0].trim() : null;
       if (!date) return;
       if (!userGrowthMap[date]) userGrowthMap[date] = { date, newUsers: 0 };
       userGrowthMap[date].newUsers += 1;
@@ -329,11 +339,19 @@ export default function Analytics() {
     // 3. Top Services
     const serviceMap = {};
     filteredAppointments.forEach(a => {
-      if (a.status === "completed" && a.service_ids && a.service_ids.length > 0) {
-        a.service_ids.forEach(s => {
-          const sName = s?.service_name || s?.name || "Unknown Service";
+      if (!isCompletedStatus(a.status)) return;
+
+      const services = (Array.isArray(a.appointment_services) && a.appointment_services.length > 0)
+        ? a.appointment_services.map(as => as.service_id)
+        : (Array.isArray(a.service_ids) && a.service_ids.length > 0)
+          ? a.service_ids
+          : a.service_id ? [a.service_id] : [];
+
+      if (services.length > 0) {
+        services.forEach(s => {
+          const sName = s?.service_name || s?.name || "Service";
           if (!serviceMap[sName]) serviceMap[sName] = { name: sName, revenue: 0, count: 0 };
-          const avgPrice = a.total_price / a.service_ids.length;
+          const avgPrice = (Number(a.total_price) || 0) / services.length;
           serviceMap[sName].revenue += avgPrice;
           serviceMap[sName].count += 1;
         });
@@ -346,23 +364,24 @@ export default function Analytics() {
     // 4. Booking Status Pie
     const statusData = [
       { name: "Completed", value: kpis.completedBookings },
-      { name: "Pending", value: kpis.totalBookings - kpis.completedBookings - kpis.cancelledBookings },
+      { name: "Pending", value: Math.max(0, kpis.totalBookings - kpis.completedBookings - kpis.cancelledBookings) },
       { name: "Cancelled", value: kpis.cancelledBookings },
     ].filter(d => d.value > 0);
 
     // 5. Revenue by Salon
     const salonRevMap = {};
     filteredAppointments.forEach(a => {
-      if (a.status === "completed" && a.salon_id) {
-        const salonName = salons.find(s => s._id === (a.salon_id?._id || a.salon_id))?.name || "Unknown";
+      if (isCompletedStatus(a.status) && a.salon_id) {
+        const sId = typeof a.salon_id === "object" ? a.salon_id?._id : a.salon_id;
+        const salonName = a.salon_id?.name || a.salon_name || salons.find(s => String(s._id) === String(sId))?.name || "Salon Branch";
         if (!salonRevMap[salonName]) salonRevMap[salonName] = 0;
-        salonRevMap[salonName] += (a.total_price || 0);
+        salonRevMap[salonName] += (Number(a.total_price) || 0);
       }
     });
     const salonRevenueData = Object.keys(salonRevMap).map(k => ({ name: k, value: salonRevMap[k] }));
 
     return { trendData, userGrowthData, topServicesData, statusData, salonRevenueData };
-  }, [filteredData, kpis, salons]);
+  }, [filteredData, kpis, salons, isCompletedStatus, isCancelledStatus]);
 
   const formatCurrency = (val) => `Rs. ${val.toLocaleString()}`;
 

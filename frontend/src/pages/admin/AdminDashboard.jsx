@@ -5,7 +5,6 @@ import { getSalon } from "../../services/salonService";
 import { getSalonAppointments } from "../../services/appointmentService";
 import { getStaff } from "../../services/staffService";
 import { getSalonFeedback } from "../../services/feedbackService";
-import { getDailyReport } from "../../services/billingService";
 
 import {
   Calendar,
@@ -30,6 +29,16 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 
+const DATE_RANGE_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "7days", label: "7 Days" },
+  { value: "30days", label: "30 Days" },
+  { value: "90days", label: "90 Days" },
+  { value: "year", label: "This Year" },
+  { value: "all", label: "All Time" },
+];
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const params = useParams();
@@ -44,44 +53,101 @@ const AdminDashboard = () => {
   const [appointments, setAppointments] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [feedbacks, setFeedbacks] = useState([]);
-  const [reportData, setReportData] = useState(null);
+  const [dateRange, setDateRange] = useState("30days");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Compute date-filtered appointments according to selected date range
+  const { filteredAppointments, selectedPeriodLabel } = useMemo(() => {
+    const now = new Date();
+    const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const todayStr = toYMD(now);
+
+    let start = "1970-01-01";
+    let end = todayStr;
+
+    if (dateRange === "today") {
+      start = todayStr;
+      end = todayStr;
+    } else if (dateRange === "yesterday") {
+      const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      start = toYMD(yd);
+      end = toYMD(yd);
+    } else if (dateRange === "7days") {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      start = toYMD(d);
+    } else if (dateRange === "30days") {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+      start = toYMD(d);
+    } else if (dateRange === "90days") {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89);
+      start = toYMD(d);
+    } else if (dateRange === "year") {
+      start = `${now.getFullYear()}-01-01`;
+    } else if (dateRange === "all") {
+      start = "1970-01-01";
+      end = "2099-12-31";
+    }
+
+    const filtered = appointments.filter(a => {
+      const aDate = String(a.appointment_date || a.createdAt || "").split("T")[0].trim();
+      if (!aDate) return false;
+      return aDate >= start && aDate <= end;
+    });
+
+    const label = DATE_RANGE_OPTIONS.find(o => o.value === dateRange)?.label || "Selected Period";
+    return { filteredAppointments: filtered, selectedPeriodLabel: label };
+  }, [appointments, dateRange]);
+
+  const completedCount = useMemo(() => {
+    return filteredAppointments.filter(a => String(a.status || "").toLowerCase().trim() === "completed").length;
+  }, [filteredAppointments]);
+
+  const confirmedCount = useMemo(() => {
+    return filteredAppointments.filter(a => String(a.status || "").toLowerCase().trim() === "confirmed").length;
+  }, [filteredAppointments]);
+
+  const pendingCount = useMemo(() => {
+    return filteredAppointments.filter(a => String(a.status || "").toLowerCase().trim() === "pending").length;
+  }, [filteredAppointments]);
+
+  // Total Projected Revenue (Completed + Confirmed in selected period)
+  const totalRevenue = useMemo(() => {
+    const valid = filteredAppointments.filter(a => ["completed", "confirmed"].includes(String(a.status || "").toLowerCase().trim()));
+    return valid.reduce((sum, a) => sum + (Number(a.total_price || a.service_id?.base_price) || 0), 0);
+  }, [filteredAppointments]);
+
+  const displayedAppointments = useMemo(() => {
+    let list = filteredAppointments.length > 0 || dateRange !== "all" ? filteredAppointments : appointments;
+    if (statusFilter !== "All") {
+      list = list.filter(a => String(a.status || "").toLowerCase().trim() === statusFilter.toLowerCase());
+    }
+    return [...list].sort((a, b) => {
+      const dateA = String(a.appointment_date || (a.createdAt && a.createdAt.split("T")[0]) || "").trim();
+      const dateB = String(b.appointment_date || (b.createdAt && b.createdAt.split("T")[0]) || "").trim();
+      if (dateB !== dateA) return dateB.localeCompare(dateA);
+      return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+    });
+  }, [filteredAppointments, appointments, statusFilter, dateRange]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const today = new Date();
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(today.getDate() - 30);
-
-      const startStr = [
-        thirtyDaysAgo.getFullYear(),
-        String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0'),
-        String(thirtyDaysAgo.getDate()).padStart(2, '0')
-      ].join('-');
-      const endStr = [
-        today.getFullYear(),
-        String(today.getMonth() + 1).padStart(2, '0'),
-        String(today.getDate()).padStart(2, '0')
-      ].join('-');
-
-      const [salonRes, apptRes, staffRes, feedbackRes, reportRes] = await Promise.allSettled([
+      const [salonRes, apptRes, staffRes, feedbackRes] = await Promise.allSettled([
         getSalon(salonId),
         getSalonAppointments(salonId),
         getStaff(salonId),
         getSalonFeedback(salonId),
-        getDailyReport(startStr, endStr, salonId),
       ]);
 
       if (salonRes.status === "fulfilled") setSalon(salonRes.value.data);
       if (apptRes.status === "fulfilled") setAppointments(apptRes.value.data || []);
       if (staffRes.status === "fulfilled") setStaffList(staffRes.value.data || []);
       if (feedbackRes.status === "fulfilled") setFeedbacks(feedbackRes.value.data || []);
-      if (reportRes.status === "fulfilled") setReportData(reportRes.value.data);
 
     } catch (err) {
       console.error("Failed to load dashboard data:", err);
@@ -101,17 +167,6 @@ const AdminDashboard = () => {
     const total = feedbacks.reduce((acc, curr) => acc + ((curr.serviceRating + curr.staffRating) / 2), 0);
     return (total / feedbacks.length).toFixed(1);
   }, [feedbacks]);
-
-  // Total Projected Revenue (Completed + Confirmed)
-  const totalRevenue = useMemo(() => {
-    if (reportData?.totalProjectedRevenue) return reportData.totalProjectedRevenue;
-    const valid = appointments.filter(a => ["completed", "confirmed"].includes(a.status?.toLowerCase()));
-    return valid.reduce((sum, a) => sum + (a.total_price || a.service_id?.base_price || 0), 0);
-  }, [appointments, reportData]);
-
-  const recentAppointments = useMemo(() => {
-    return appointments.slice(0, 6);
-  }, [appointments]);
 
   const getServiceSummary = (appt) => {
     if (appt.appointment_services?.length) {
@@ -165,13 +220,30 @@ const AdminDashboard = () => {
         subtitle={`Welcome back, ${salon?.name || "Salon Manager"}!`}
         backTo={user?.role === "super-admin" ? "/superAdminDashboard" : undefined}
       >
-        <Button
-          variant="primary"
-          icon={CalendarPlus}
-          onClick={() => navigate(`/salon-admin/${salonId}/AddAppointment`)}
-        >
-          New Appointment
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center bg-surface-2 border border-border rounded-xl p-1 gap-0.5">
+            {DATE_RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setDateRange(opt.value)}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+                  dateRange === opt.value
+                    ? "bg-amber-400 text-black font-black shadow-glow-sm"
+                    : "text-neutral-400 hover:text-white hover:bg-surface-3"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <Button
+            variant="primary"
+            icon={CalendarPlus}
+            onClick={() => navigate(`/salon-admin/${salonId}/AddAppointment`)}
+          >
+            New Appointment
+          </Button>
+        </div>
       </PageHeader>
 
       {error && (
@@ -227,7 +299,7 @@ const AdminDashboard = () => {
               </div>
             </div>
             <h3 className="text-xl font-black text-amber-400 leading-none">LKR {totalRevenue.toLocaleString()}</h3>
-            <p className="text-2xs text-neutral-400 mt-2 font-medium">Earned + Confirmed bookings</p>
+            <p className="text-2xs text-neutral-400 mt-2 font-medium">Earned + Confirmed ({selectedPeriodLabel})</p>
           </div>
         </motion.div>
 
@@ -239,9 +311,9 @@ const AdminDashboard = () => {
                 <Calendar className="w-5 h-5" />
               </div>
             </div>
-            <h3 className="text-xl font-black text-white leading-none">{appointments.length}</h3>
+            <h3 className="text-xl font-black text-white leading-none">{filteredAppointments.length}</h3>
             <p className="text-2xs text-neutral-400 mt-2 font-medium">
-              {appointments.filter(a => a.status === "pending").length} Pending · {appointments.filter(a => a.status === "confirmed").length} Confirmed
+              {completedCount} Completed · {confirmedCount} Confirmed · {pendingCount} Pending
             </p>
           </div>
         </motion.div>
@@ -273,7 +345,7 @@ const AdminDashboard = () => {
         </motion.div>
       </div>
 
-      {/* Recent Appointments Table Card (replaces 7-Day Booking & Revenue Trend) */}
+      {/* Recent Appointments Table Card */}
       <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -281,21 +353,46 @@ const AdminDashboard = () => {
               <Calendar className="w-5 h-5 text-amber-400" />
               Recent Appointments
             </h3>
-            <p className="text-xs text-neutral-400 mt-0.5">Latest customer bookings for your branch</p>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              {displayedAppointments.length} bookings for {selectedPeriodLabel} ({completedCount} completed)
+            </p>
           </div>
 
-          <button
-            onClick={() => navigate(`/salon-admin/${salonId}/adminAppointments`)}
-            className="px-3.5 py-2 rounded-xl bg-surface-2 border border-border text-xs text-amber-400 font-extrabold hover:border-amber-400/40 hover:bg-amber-400/10 transition-all flex items-center gap-1.5"
-          >
-            <span>View All</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-surface-2 border border-border rounded-xl p-1 gap-1 text-xs">
+              {["All", "Completed", "Confirmed", "Pending"].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all text-xs ${
+                    statusFilter === status
+                      ? "bg-amber-400 text-black font-black"
+                      : "text-neutral-400 hover:text-white"
+                  }`}
+                >
+                  {status}
+                  {status === "Completed" && completedCount > 0 && (
+                    <span className="ml-1 text-[10px] px-1 py-0.2 bg-black/20 rounded-full font-black">
+                      {completedCount}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => navigate(`/salon-admin/${salonId}/adminAppointments`)}
+              className="px-3.5 py-2 rounded-xl bg-surface-2 border border-border text-xs text-amber-400 font-extrabold hover:border-amber-400/40 hover:bg-amber-400/10 transition-all flex items-center gap-1.5"
+            >
+              <span>View All</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
-        {recentAppointments.length === 0 ? (
+        {displayedAppointments.length === 0 ? (
           <div className="p-8 bg-surface-2/50 border border-border rounded-xl text-center text-neutral-400 text-xs">
-            No recent appointments found for this branch.
+            No {statusFilter !== "All" ? statusFilter.toLowerCase() : ""} appointments found for {selectedPeriodLabel.toLowerCase()}.
           </div>
         ) : (
           <Table className="w-full">
@@ -307,7 +404,7 @@ const AdminDashboard = () => {
               <Table.Th align="right" className="w-[13%]">Amount</Table.Th>
             </Table.Head>
             <Table.Body>
-              {recentAppointments.map((a) => {
+              {displayedAppointments.slice(0, 8).map((a) => {
                 const customerName = a.customer_id?.name || a.guest_name || "Guest Customer";
                 const serviceSummary = getServiceSummary(a);
                 const totalPrice = a.total_price || a.service_id?.base_price || 0;

@@ -176,7 +176,7 @@ export default function AdminAnalytics() {
     }
 
     const filteredAppointments = appointments.filter(a => {
-      const aDate = a.appointment_date || (a.createdAt && a.createdAt.split("T")[0]);
+      const aDate = String(a.appointment_date || a.createdAt || "").split("T")[0].trim();
       if (!aDate) return false;
       return aDate >= startStr && aDate <= endStr;
     });
@@ -191,13 +191,19 @@ export default function AdminAnalytics() {
   const kpis = useMemo(() => {
     const { filteredAppointments, salonCustomers, startStr, endStr } = filteredData;
 
+    const isCompleted = (status) => String(status || "").toLowerCase().trim() === "completed";
+    const isCancelled = (status) => {
+      const s = String(status || "").toLowerCase().trim();
+      return s === "cancelled" || s === "rejected";
+    };
+
     const totalBookings = filteredAppointments.length;
-    const completedBookings = filteredAppointments.filter(a => a.status === "completed").length;
-    const cancelledBookings = filteredAppointments.filter(a => a.status === "cancelled" || a.status === "rejected").length;
+    const completedBookings = filteredAppointments.filter(a => isCompleted(a.status)).length;
+    const cancelledBookings = filteredAppointments.filter(a => isCancelled(a.status)).length;
 
     const totalRevenue = filteredAppointments
-      .filter(a => a.status === "completed")
-      .reduce((sum, a) => sum + (a.total_price || 0), 0);
+      .filter(a => isCompleted(a.status))
+      .reduce((sum, a) => sum + (Number(a.total_price) || 0), 0);
 
     const avgBookingValue = completedBookings > 0 ? Math.round(totalRevenue / completedBookings) : 0;
 
@@ -227,17 +233,20 @@ export default function AdminAnalytics() {
   const chartsData = useMemo(() => {
     const { filteredAppointments, salonCustomers } = filteredData;
 
+    const isCompleted = (status) => String(status || "").toLowerCase().trim() === "completed";
+    const isCancelled = (status) => ["cancelled", "rejected"].includes(String(status || "").toLowerCase().trim());
+
     // 1. Trend Map
     const trendMap = {};
     filteredAppointments.forEach(a => {
-      const date = a.appointment_date || (a.createdAt && a.createdAt.split("T")[0]);
+      const date = String(a.appointment_date || a.createdAt || "").split("T")[0].trim();
       if (!date) return;
       if (!trendMap[date]) trendMap[date] = { date, revenue: 0, completed: 0, cancelled: 0, pending: 0 };
 
-      if (a.status === "completed") {
-        trendMap[date].revenue += (a.total_price || 0);
+      if (isCompleted(a.status)) {
+        trendMap[date].revenue += (Number(a.total_price) || 0);
         trendMap[date].completed += 1;
-      } else if (a.status === "cancelled" || a.status === "rejected") {
+      } else if (isCancelled(a.status)) {
         trendMap[date].cancelled += 1;
       } else {
         trendMap[date].pending += 1;
@@ -266,27 +275,37 @@ export default function AdminAnalytics() {
     });
 
     filteredAppointments.forEach(a => {
-      if (a.status === "completed") {
+      if (isCompleted(a.status)) {
         if (a.appointment_services && a.appointment_services.length > 0) {
           const staffSeenInThisBooking = new Set();
           a.appointment_services.forEach(asv => {
             const rawId = typeof asv?.staff_id === 'object' ? asv.staff_id?._id : asv?.staff_id;
             const sid = rawId ? String(rawId) : null;
-            if (sid && staffMap[sid]) {
+            if (sid) {
+              if (!staffMap[sid]) {
+                const sObj = staff.find(st => String(st._id) === sid);
+                const sName = asv.staff_id?.full_name || sObj?.full_name || sObj?.name || "Stylist";
+                staffMap[sid] = { _id: sid, name: sName, completed: 0, revenue: 0 };
+              }
               if (!staffSeenInThisBooking.has(sid)) {
                 staffMap[sid].completed += 1;
                 staffSeenInThisBooking.add(sid);
               }
-              const rev = asv.sub_price !== undefined ? asv.sub_price : (a.total_price / a.appointment_services.length);
+              const rev = asv.sub_price !== undefined ? Number(asv.sub_price) : ((Number(a.total_price) || 0) / a.appointment_services.length);
               staffMap[sid].revenue += rev;
             }
           });
         } else if (a.staff_id) {
           const rawId = typeof a.staff_id === 'object' ? a.staff_id._id : a.staff_id;
           const sid = rawId ? String(rawId) : null;
-          if (sid && staffMap[sid]) {
+          if (sid) {
+            if (!staffMap[sid]) {
+              const sObj = staff.find(st => String(st._id) === sid);
+              const sName = a.staff_id?.full_name || sObj?.full_name || sObj?.name || "Stylist";
+              staffMap[sid] = { _id: sid, name: sName, completed: 0, revenue: 0 };
+            }
             staffMap[sid].completed += 1;
-            staffMap[sid].revenue += (a.total_price || 0);
+            staffMap[sid].revenue += (Number(a.total_price) || 0);
           }
         }
       }
@@ -300,34 +319,49 @@ export default function AdminAnalytics() {
 
     // 3. Top Services
     const serviceMap = {};
-    services.forEach(s => serviceMap[s._id] = { name: s.service_name || s.name || "Unknown", revenue: 0, count: 0 });
+    services.forEach(s => {
+      const sId = String(s._id);
+      serviceMap[sId] = { name: s.service_name || s.name || "Unknown", revenue: 0, count: 0 };
+    });
+
     filteredAppointments.forEach(a => {
-      if (a.status === "completed" && a.service_ids && a.service_ids.length > 0) {
-        const avg = a.total_price / a.service_ids.length;
-        a.service_ids.forEach(s => {
-          const sid = typeof s === 'object' ? s._id : s;
-          if (serviceMap[sid]) {
+      if (isCompleted(a.status)) {
+        const apptServices = (Array.isArray(a.appointment_services) && a.appointment_services.length > 0)
+          ? a.appointment_services.map(as => as.service_id)
+          : (Array.isArray(a.service_ids) && a.service_ids.length > 0)
+            ? a.service_ids
+            : a.service_id ? [a.service_id] : [];
+
+        if (apptServices.length > 0) {
+          const avg = (Number(a.total_price) || 0) / apptServices.length;
+          apptServices.forEach(s => {
+            const sid = typeof s === 'object' ? String(s._id) : String(s);
+            const sName = typeof s === 'object' ? (s.service_name || s.name) : (services.find(srv => String(srv._id) === sid)?.service_name || "Service");
+            if (!serviceMap[sid]) {
+              serviceMap[sid] = { name: sName, revenue: 0, count: 0 };
+            }
             serviceMap[sid].revenue += avg;
             serviceMap[sid].count += 1;
-          }
-        });
+          });
+        }
       }
     });
     const topServicesData = Object.values(serviceMap)
+      .filter(s => s.count > 0 || s.revenue > 0)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
 
     // 4. Status Data
     const statusData = [
       { name: "Completed", value: kpis.completedBookings },
-      { name: "Pending", value: kpis.totalBookings - kpis.completedBookings - kpis.cancelledBookings },
+      { name: "Pending", value: Math.max(0, kpis.totalBookings - kpis.completedBookings - kpis.cancelledBookings) },
       { name: "Cancelled", value: kpis.cancelledBookings },
     ].filter(d => d.value > 0);
 
     // 5. Customer Growth
     const custMap = {};
     salonCustomers.forEach(c => {
-      const date = c.createdAt ? c.createdAt.split("T")[0] : null;
+      const date = c.createdAt ? String(c.createdAt).split("T")[0].trim() : null;
       if (!date) return;
       if (!custMap[date]) custMap[date] = 0;
       custMap[date] += 1;
@@ -339,10 +373,18 @@ export default function AdminAnalytics() {
 
   /* ── Recent Activity ── */
   const recentActivity = useMemo(() => {
-    return [...appointments]
-      .sort((a, b) => new Date(b.createdAt || b.updatedAt || 0) - new Date(a.createdAt || a.updatedAt || 0))
+    const list = filteredData.filteredAppointments.length > 0 || dateRange !== "all" 
+      ? filteredData.filteredAppointments 
+      : appointments;
+    return [...list]
+      .sort((a, b) => {
+        const dateA = String(a.appointment_date || (a.createdAt && a.createdAt.split("T")[0]) || "").trim();
+        const dateB = String(b.appointment_date || (b.createdAt && b.createdAt.split("T")[0]) || "").trim();
+        if (dateB !== dateA) return dateB.localeCompare(dateA);
+        return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+      })
       .slice(0, 8);
-  }, [appointments]);
+  }, [filteredData.filteredAppointments, appointments, dateRange]);
 
   const formatCurrency = (val) => `Rs. ${val.toLocaleString()}`;
 
