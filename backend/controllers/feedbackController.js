@@ -9,16 +9,13 @@ import Admin from "../models/Admin.js";
 
 export const submitFeedback = async (req, res) => {
   try {
-    const { appointment_id, serviceRating, staffRating, comment } = req.body;
+    const { appointment_id, serviceRating, staffRating, serviceRatings, staffRatings, comment } = req.body;
 
-    if (!appointment_id || serviceRating == null || staffRating == null) {
-      return res.status(400).json({ message: "appointment_id, serviceRating, and staffRating are required." });
+    if (!appointment_id) {
+      return res.status(400).json({ message: "appointment_id is required." });
     }
 
     const ratingValues = [1, 2, 3, 4, 5];
-    if (!ratingValues.includes(Number(serviceRating)) || !ratingValues.includes(Number(staffRating))) {
-      return res.status(400).json({ message: "Ratings must be integers between 1 and 5." });
-    }
 
     const appointment = await Appointment.findById(appointment_id);
     if (!appointment) {
@@ -37,20 +34,75 @@ export const submitFeedback = async (req, res) => {
       return res.status(400).json({ message: "Feedback has already been submitted for this appointment." });
     }
 
-    let staffId = appointment.staff_id;
-    if (!staffId) {
-      const asv = await AppointmentService.findOne({ appointment_id });
-      staffId = asv?.staff_id || null;
+    const appointmentServices = await AppointmentService.find({ appointment_id })
+      .select("service_id staff_id")
+      .lean();
+    const serviceIds = [...new Set(
+      appointmentServices.map((service) => service.service_id?.toString()).filter(Boolean)
+    )];
+    if (serviceIds.length === 0 && appointment.service_id) {
+      serviceIds.push(appointment.service_id.toString());
+    }
+
+    const staffIds = [...new Set(
+      appointmentServices.map((service) => service.staff_id?.toString()).filter(Boolean)
+    )];
+    if (staffIds.length === 0 && appointment.staff_id) {
+      staffIds.push(appointment.staff_id.toString());
+    }
+    if (serviceIds.length === 0 || staffIds.length === 0) {
+      return res.status(400).json({
+        message: "Feedback requires at least one assigned service and staff member."
+      });
+    }
+
+    const normalizeRatings = (ratings, validIds, fallbackRating, key) => {
+      const source = Array.isArray(ratings) && ratings.length > 0
+        ? ratings
+        : validIds.map((id) => ({ [`${key}_id`]: id, rating: fallbackRating }));
+
+      if (source.length !== validIds.length || source.some((entry) => (
+        !validIds.includes(String(entry[`${key}_id`]))
+        || !ratingValues.includes(Number(entry.rating))
+      ))) {
+        return null;
+      }
+
+      return source.map((entry) => ({
+        [`${key}_id`]: entry[`${key}_id`],
+        rating: Number(entry.rating)
+      }));
+    };
+
+    const normalizedServiceRatings = normalizeRatings(
+      serviceRatings,
+      serviceIds,
+      serviceRating,
+      "service"
+    );
+    const normalizedStaffRatings = normalizeRatings(
+      staffRatings,
+      staffIds,
+      staffRating,
+      "staff"
+    );
+
+    if (!normalizedServiceRatings || !normalizedStaffRatings) {
+      return res.status(400).json({
+        message: "Provide a valid rating for every service and staff member in the appointment."
+      });
     }
 
     const feedback = await Feedback.create({
       appointment_id,
       salon_id: appointment.salon_id,
       customer_id: appointment.customer_id,
-      service_id: appointment.service_id,
-      staff_id: staffId,
-      serviceRating,
-      staffRating,
+      service_id: normalizedServiceRatings[0].service_id,
+      staff_id: normalizedStaffRatings[0].staff_id,
+      serviceRating: normalizedServiceRatings[0].rating,
+      staffRating: normalizedStaffRatings[0].rating,
+      serviceRatings: normalizedServiceRatings,
+      staffRatings: normalizedStaffRatings,
       comment: comment?.trim() || ""
     });
 
@@ -73,8 +125,11 @@ export const getMyFeedback = async (req, res) => {
       .populate("salon_id", "name")
       .populate("service_id", "service_name")
       .populate("staff_id", "full_name")
+      .populate("serviceRatings.service_id", "service_name")
+      .populate("staffRatings.staff_id", "full_name")
       .sort({ createdAt: -1 });
 
+    res.set("Cache-Control", "no-store");
     res.status(200).json(feedbacks);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -91,14 +146,24 @@ export const getPublicFeedback = async (req, res) => {
       .limit(10)
       .lean();
 
-    res.json(feedbacks.map((feedback) => ({
-      id: feedback._id,
-      name: feedback.customer_id?.name || "Customer",
-      image: feedback.customer_id?.image || "",
-      salon: feedback.salon_id?.name || "",
-      text: feedback.comment,
-      rating: Math.round(((feedback.serviceRating || 0) + (feedback.staffRating || 0)) / 2),
-    })));
+    res.json(feedbacks.map((feedback) => {
+      const ratings = [
+        ...(feedback.serviceRatings?.map((entry) => entry.rating) || [feedback.serviceRating]),
+        ...(feedback.staffRatings?.map((entry) => entry.rating) || [feedback.staffRating]),
+      ].filter((rating) => Number.isFinite(rating));
+      const rating = ratings.length
+        ? Math.round(ratings.reduce((sum, value) => sum + value, 0) / ratings.length)
+        : 0;
+
+      return {
+        id: feedback._id,
+        name: feedback.customer_id?.name || "Customer",
+        image: feedback.customer_id?.image || "",
+        salon: feedback.salon_id?.name || "",
+        text: feedback.comment,
+        rating,
+      };
+    }));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -115,16 +180,34 @@ export const getSalonFeedback = async (req, res) => {
     }
 
     const filter = {};
+    const relationFilters = [];
     if (salon_id !== "all") {
       filter.salon_id = salon_id;
     }
-    if (req.query.staffId) filter.staff_id = req.query.staffId;
-    if (req.query.serviceId) filter.service_id = req.query.serviceId;
+    if (req.query.staffId) {
+      relationFilters.push({
+        $or: [
+          { staff_id: req.query.staffId },
+          { "staffRatings.staff_id": req.query.staffId }
+        ]
+      });
+    }
+    if (req.query.serviceId) {
+      relationFilters.push({
+        $or: [
+          { service_id: req.query.serviceId },
+          { "serviceRatings.service_id": req.query.serviceId }
+        ]
+      });
+    }
+    if (relationFilters.length > 0) filter.$and = relationFilters;
 
     const rawFeedbacks = await Feedback.find(filter)
       .populate("appointment_id", "appointment_date start_time status")
       .populate("service_id", "service_name")
       .populate("staff_id", "full_name")
+      .populate("serviceRatings.service_id", "service_name")
+      .populate("staffRatings.staff_id", "full_name")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -146,6 +229,7 @@ export const getSalonFeedback = async (req, res) => {
       }
     }
 
+    res.set("Cache-Control", "no-store");
     res.status(200).json(rawFeedbacks);
   } catch (err) {
     res.status(500).json({ message: err.message });

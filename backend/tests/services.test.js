@@ -1,9 +1,12 @@
 import request from "supertest";
 import app from "./testApp.js";
+import mongoose from "mongoose";
 import Service from "../models/Service.js";
 import Salon from "../models/Salon.js";
 import ServiceCategory from "../models/ServiceCategory.js";
 import Staff from "../models/Staff.js";
+import Customer from "../models/Customer.js";
+import Feedback from "../models/Feedback.js";
 import generateToken from "../utils/generateToken.js";
 
 test("service writes use the manager salon and validate related records", async () => {
@@ -44,4 +47,48 @@ test("service writes use the manager salon and validate related records", async 
   expect(categoryResponse.status).toBe(201);
   expect(categoryResponse.body.role).toBeUndefined();
   expect(await Service.countDocuments()).toBe(1);
+});
+
+test("service listings include feedback rating and count", async () => {
+  const salon = await Salon.create({ name: "Rated Salon" });
+  const service = await Service.create({
+    service_name: "Rated Cut",
+    base_price: 30,
+    duration: 30,
+    salon_id: salon._id,
+  });
+  const customer = await Customer.create({
+    name: "Customer",
+    email: "service-rating-customer@gmail.com",
+    password_hash: "unused",
+  });
+
+  await Feedback.create([
+    {
+      appointment_id: new mongoose.Types.ObjectId(),
+      salon_id: salon._id,
+      customer_id: customer._id,
+      service_id: service._id,
+      staff_id: new mongoose.Types.ObjectId(),
+      serviceRating: 4,
+      staffRating: 5,
+    },
+    {
+      appointment_id: new mongoose.Types.ObjectId(),
+      salon_id: salon._id,
+      customer_id: customer._id,
+      service_id: service._id,
+      staff_id: new mongoose.Types.ObjectId(),
+      serviceRating: 5,
+      staffRating: 4,
+    },
+  ]);
+
+  const response = await request(app)
+    .get(`/api/services?salonId=${salon._id}`)
+    .set("Authorization", `Bearer ${generateToken({ _id: customer._id, role: "customer" })}`);
+
+  expect(response.status).toBe(200);
+  expect(response.body[0].rating).toBe(4.5);
+  expect(response.body[0].ratingCount).toBe(2);
 });

@@ -335,7 +335,7 @@ function App() {
         } />
 
         <Route path="/book" element={
-          <CustomerLayout><BookAppointment /></CustomerLayout>
+          <CustomerLayout useLandingNavbar><BookAppointment /></CustomerLayout>
         } />
 
         <Route path="/my-appointments" element={

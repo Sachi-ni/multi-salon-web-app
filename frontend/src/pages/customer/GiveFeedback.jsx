@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { getAppointment } from "../../services/appointmentService";
 import { submitFeedback } from "../../services/feedbackService";
@@ -67,8 +67,8 @@ export default function GiveFeedback() {
 
   const [appointment, setAppointment] = useState(location.state?.appointment || null);
   const [loading, setLoading] = useState(!location.state?.appointment);
-  const [serviceRating, setServiceRating] = useState(5);
-  const [staffRating, setStaffRating] = useState(5);
+  const [serviceRatings, setServiceRatings] = useState({});
+  const [staffRatings, setStaffRatings] = useState({});
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -84,6 +84,59 @@ export default function GiveFeedback() {
       .catch((err) => setError(err.response?.data?.message || "Unable to load appointment details."))
       .finally(() => setLoading(false));
   }, [appointment, appointmentId]);
+
+  const serviceTargets = useMemo(() => appointment?.appointment_services?.length
+    ? appointment.appointment_services
+      .filter((item) => item.service_id?._id)
+      .reduce((targets, item) => {
+        const id = item.service_id._id.toString();
+        if (!targets.some((target) => target.id === id)) {
+          targets.push({ id, name: item.service_id.service_name || "Service" });
+        }
+        return targets;
+      }, [])
+    : appointment?.service_id?._id
+      ? [{ id: appointment.service_id._id.toString(), name: appointment.service_id.service_name || "Service" }]
+      : [], [appointment]);
+
+  const staffTargets = useMemo(() => appointment?.appointment_services?.length
+    ? appointment.appointment_services
+      .filter((item) => item.staff_id?._id)
+      .reduce((targets, item) => {
+        const id = item.staff_id._id.toString();
+        if (!targets.some((target) => target.id === id)) {
+          targets.push({ id, name: item.staff_id.full_name || "Staff" });
+        }
+        return targets;
+      }, [])
+    : appointment?.staff_id?._id
+      ? [{ id: appointment.staff_id._id.toString(), name: appointment.staff_id.full_name || "Staff" }]
+      : [], [appointment]);
+
+  const ratingPairs = useMemo(() => {
+    if (appointment?.appointment_services?.length) {
+      return appointment.appointment_services
+        .filter((item) => item.service_id?._id || item.staff_id?._id)
+        .map((item) => ({
+          service: item.service_id?._id
+            ? { id: item.service_id._id.toString(), name: item.service_id.service_name || "Service" }
+            : null,
+          staff: item.staff_id?._id
+            ? { id: item.staff_id._id.toString(), name: item.staff_id.full_name || "Staff" }
+            : null,
+        }));
+    }
+
+    return serviceTargets.map((service, index) => ({
+      service,
+      staff: staffTargets[index] || null,
+    }));
+  }, [appointment, serviceTargets, staffTargets]);
+
+  useEffect(() => {
+    setServiceRatings(Object.fromEntries(serviceTargets.map((target) => [target.id, 5])));
+    setStaffRatings(Object.fromEntries(staffTargets.map((target) => [target.id, 5])));
+  }, [serviceTargets, staffTargets]);
 
   const formatTime = (time) => {
     if (!time) return "";
@@ -101,10 +154,20 @@ export default function GiveFeedback() {
     setError("");
 
     try {
+      const submittedServiceRatings = serviceTargets.map((target) => ({
+        service_id: target.id,
+        rating: serviceRatings[target.id] || 5
+      }));
+      const submittedStaffRatings = staffTargets.map((target) => ({
+        staff_id: target.id,
+        rating: staffRatings[target.id] || 5
+      }));
       await submitFeedback({
         appointment_id: appointment._id,
-        serviceRating,
-        staffRating,
+        serviceRating: submittedServiceRatings[0]?.rating || 5,
+        staffRating: submittedStaffRatings[0]?.rating || 5,
+        serviceRatings: submittedServiceRatings,
+        staffRatings: submittedStaffRatings,
         comment
       });
       setSubmitted(true);
@@ -244,20 +307,18 @@ export default function GiveFeedback() {
             {appointment.salon_id?.name || "Salon"}
           </p>
 
-          <div className="grid gap-4 sm:grid-cols-2 mb-6">
-            <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-2 text-muted-2 text-xs uppercase tracking-widest mb-2">
-                <Scissors className="w-3.5 h-3.5 text-[#d4af37]" />
-                Service
-              </div>
-              <p className="text-white font-bold text-lg">{appointment.service_id?.service_name}</p>
+          <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-4 border border-white/5 mb-6">
+            <div className="grid grid-cols-2 border-b border-white/10 pb-2 text-xs font-bold uppercase tracking-widest text-muted-2">
+              <span>Service</span>
+              <span>Staff</span>
             </div>
-            <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-4 border border-white/5">
-              <div className="flex items-center gap-2 text-muted-2 text-xs uppercase tracking-widest mb-2">
-                <User className="w-3.5 h-3.5 text-[#d4af37]" />
-                Staff
-              </div>
-              <p className="text-white font-bold text-lg">{appointment.staff_id?.full_name}</p>
+            <div className="mt-2 space-y-2">
+              {ratingPairs.map((pair, index) => (
+                <div key={`${pair.service?.id || "service"}-${pair.staff?.id || "staff"}-summary-${index}`} className="grid grid-cols-2 border-b border-white/10 pb-2 text-white font-bold last:border-b-0 last:pb-0">
+                  <span>{pair.service?.name || "Service"}</span>
+                  <span>{pair.staff?.name || "Staff"}</span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -287,21 +348,26 @@ export default function GiveFeedback() {
         >
           {/* Ratings Section */}
           <div className="space-y-8">
-            <StarRating
-              value={serviceRating}
-              onChange={setServiceRating}
-              label="Service Rating"
-              icon={Scissors}
-            />
-
-            <div className="border-t border-white/5" />
-
-            <StarRating
-              value={staffRating}
-              onChange={setStaffRating}
-              label="Staff Rating"
-              icon={User}
-            />
+            {ratingPairs.map((pair, index) => (
+              <div key={`${pair.service?.id || "service"}-${pair.staff?.id || "staff"}-${index}`} className="space-y-8 border-b border-white/10 pb-8 last:border-b-0 last:pb-0">
+                {pair.service && (
+                  <StarRating
+                    value={serviceRatings[pair.service.id] || 5}
+                    onChange={(value) => setServiceRatings((current) => ({ ...current, [pair.service.id]: value }))}
+                    label={pair.service.name}
+                    icon={Scissors}
+                  />
+                )}
+                {pair.staff && (
+                  <StarRating
+                    value={staffRatings[pair.staff.id] || 5}
+                    onChange={(value) => setStaffRatings((current) => ({ ...current, [pair.staff.id]: value }))}
+                    label={pair.staff.name}
+                    icon={User}
+                  />
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="border-t border-white/5" />

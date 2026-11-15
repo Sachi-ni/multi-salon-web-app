@@ -12,7 +12,6 @@ import Customer from "./models/Customer.js";
 import Appointment from "./models/Appointment.js";
 import Admin from "./models/Admin.js";
 import Bill from "./models/Bill.js";
-import Review from "./models/Review.js";
 import Feedback from "./models/Feedback.js";
 import Notification from "./models/Notification.js";
 import AppointmentService from "./models/AppointmentService.js";
@@ -52,7 +51,6 @@ const seed = async () => {
       Appointment.deleteMany({}),
       Admin.deleteMany({}),
       Bill.deleteMany({}),
-      Review.deleteMany({}),
       Feedback.deleteMany({}),
       Notification.deleteMany({}),
       AppointmentService.deleteMany({})
@@ -714,7 +712,7 @@ const seed = async () => {
         createdBills.push(bill);
       }
 
-      // Feedback & Review creation
+      // Feedback creation
       if (spec.feedback) {
         const fb = await Feedback.create({
           appointment_id: app._id,
@@ -728,12 +726,6 @@ const seed = async () => {
         });
         createdFeedbacks.push(fb);
 
-        await Review.create({
-          appointment_id: app._id,
-          rating: spec.feedback.serviceRating,
-          comment: spec.feedback.comment,
-          review_date: new Date(spec.date)
-        });
       }
 
       // Notifications
@@ -750,26 +742,8 @@ const seed = async () => {
 
     console.log(`Created ${createdAppointments.length} appointments.`);
     console.log(`Created ${createdBills.length} billing records.`);
-    console.log(`Created ${createdFeedbacks.length} feedback & review entries.`);
+    console.log(`Created ${createdFeedbacks.length} feedback entries.`);
     console.log(`Created ${createdNotifications.length} notification items.`);
-
-    // 10+ Additional direct reviews for platform showcase
-    console.log("Adding additional platform review entries...");
-    const extraReviewsData = [
-      { rating: 5, comment: "Amazing ambience and world-class service in Colombo!", date: new Date() },
-      { rating: 5, comment: "The bridal package in Kandy was perfection.", date: new Date() },
-      { rating: 4, comment: "Very relaxing massage experience inside Galle Fort.", date: new Date() },
-      { rating: 5, comment: "Staff is highly skilled, very courteous and clean salon.", date: new Date() },
-      { rating: 5, comment: "Fast booking and seamless payment. Best salon network!", date: new Date() }
-    ];
-    for (let i = 0; i < extraReviewsData.length; i++) {
-      await Review.create({
-        appointment_id: createdAppointments[i] ? createdAppointments[i]._id : null,
-        rating: extraReviewsData[i].rating,
-        comment: extraReviewsData[i].comment,
-        review_date: extraReviewsData[i].date
-      });
-    }
 
     console.log("\n=======================================================");
     console.log("DATABASE SEED SUMMARY:");
@@ -782,7 +756,7 @@ const seed = async () => {
     console.log(`• Admin Accounts:      ${adminsData.length}`);
     console.log(`• Appointments:        ${createdAppointments.length}`);
     console.log(`• Bills / Invoices:    ${createdBills.length}`);
-    console.log(`• Feedbacks / Reviews: ${createdFeedbacks.length + extraReviewsData.length}`);
+    console.log(`• Feedbacks:          ${createdFeedbacks.length}`);
     console.log(`• Notifications:       ${createdNotifications.length}`);
     console.log("=======================================================\n");
 

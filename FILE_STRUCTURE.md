@@ -43,7 +43,6 @@ backend/
 │   ├── Attendance.js
 │   ├── Bill.js
 │   ├── Customer.js
-│   ├── Review.js
 │   ├── Salary.js
 │   ├── Salon.js
 │   ├── Service.js
@@ -56,7 +55,6 @@ backend/
 │   ├── billRoutes.js
 │   ├── customerRoutes.js
 │   ├── revenueRoutes.js
-│   ├── reviewRoutes.js
 │   ├── salonRoutes.js
 │   ├── serviceRoutes.js
 │   └── staffRoutes.js

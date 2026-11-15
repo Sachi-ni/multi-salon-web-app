@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { getSalonServices } from "../../../services/salonService";
+import { getPublicStaff } from "../../../services/staffService";
 
-export default function StepSelectService({ booking, onNext, onBack }) {
+export default function StepSelectService({ booking, staffBooking = false, onNext, onBack }) {
   const [services, setServices] = useState([]);
   // Initialize selected from booking state (support both old single and new multi format)
   const [selected, setSelected] = useState(() => {
@@ -19,13 +20,33 @@ export default function StepSelectService({ booking, onNext, onBack }) {
       setLoading(false);
       return;
     }
-    getSalonServices(booking.salonId)
-      .then(res => setServices(res.data || []))
+    const servicesRequest = getSalonServices(booking.salonId);
+    const staffRequest = staffBooking
+      ? getPublicStaff(booking.staffId)
+      : Promise.resolve(null);
+
+    Promise.all([servicesRequest, staffRequest])
+      .then(([res, staffRes]) => {
+        const selectedStaffServices = staffRes?.data?.[0]?.services || [];
+        const staffServiceIds = staffBooking
+          ? (selectedStaffServices.length
+            ? selectedStaffServices.map((service) => String(service._id))
+            : (booking.staffServiceIds || []))
+          : null;
+        const availableServices = (res.data || []).filter((service) =>
+          !staffServiceIds || staffServiceIds.includes(String(service._id))
+        );
+        setServices(availableServices);
+        setSelected((current) => current.filter((id) =>
+          availableServices.some((service) => service._id === id && service.status === "Active")
+        ));
+      })
       .catch(() => setError("Failed to load services."))
       .finally(() => setLoading(false));
-  }, [booking?.salonId]);
+  }, [booking?.salonId, booking?.staffId, booking?.staffServiceIds, staffBooking]);
 
   const toggle = (id) => {
+    if (services.some((service) => service._id === id && service.status === "Inactive")) return;
     setSelected(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
@@ -71,12 +92,14 @@ export default function StepSelectService({ booking, onNext, onBack }) {
       <div className="space-y-3">
         {services.map(s => {
           const isSelected = selected.includes(s._id);
+          const isInactive = s.status === "Inactive";
           const durationHours = Math.ceil(s.duration / 60);
           return (
             <div
               key={s._id}
               onClick={() => toggle(s._id)}
-              className={`p-4 rounded-xl border cursor-pointer transition-all duration-200
+              className={`p-4 rounded-xl border transition-all duration-200
+                ${isInactive ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
                 ${isSelected
                   ? "border-accent bg-accent-dim shadow-glow-sm"
                   : "border-border bg-surface-2 hover:border-border-hover"
@@ -95,6 +118,7 @@ export default function StepSelectService({ booking, onNext, onBack }) {
                   </div>
                   <div>
                     <p className="font-bold text-white text-sm">{s.service_name}</p>
+                    {isInactive && <p className="text-danger text-xs font-bold mt-0.5">Currently unavailable</p>}
                     {s.description && (
                       <p className="text-muted-2 text-xs mt-0.5 max-w-md">{s.description}</p>
                     )}

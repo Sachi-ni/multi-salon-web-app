@@ -20,7 +20,7 @@ export const getStaff = (salonId) =>
     params: salonId ? { salonId } : {},
   });
 
-export const getTeam = (salonId, serviceId) => {
+export const getTeam = (salonId, serviceId, staffId) => {
   const params = new URLSearchParams();
 
   if (salonId) {
@@ -31,8 +31,15 @@ export const getTeam = (salonId, serviceId) => {
     params.append("serviceId", serviceId);
   }
 
+  if (staffId) {
+    params.append("staffId", staffId);
+  }
+
   return API.get(`/team/public?${params.toString()}`);
 };
+
+export const getPublicStaff = (staffId) =>
+  API.get("/team/public", { params: { staffId } });
 
 export const createStaff = (data) =>
   API.post("/staff", data);

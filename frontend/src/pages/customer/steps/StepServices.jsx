@@ -9,13 +9,21 @@ export default function StepServices({ booking, onNext, onBack }) {
 
   useEffect(() => {
     getSalonServices(booking.salonId)
-      .then(res => setServices(res.data))
+      .then(res => {
+        const availableServices = res.data || [];
+        setServices(availableServices);
+        setSelected((current) => current.filter((id) =>
+          availableServices.some((service) => service._id === id && service.status === "Active")
+        ));
+      })
       .catch(() => setError("Failed to load services."))
       .finally(() => setLoading(false));
   }, []);
 
-  const toggle = (id) =>
+  const toggle = (id) => {
+    if (services.some((service) => service._id === id && service.status === "Inactive")) return;
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
   const handleNext = () => {
     const chosen = services
@@ -44,11 +52,13 @@ export default function StepServices({ booking, onNext, onBack }) {
       <div className="space-y-3">
         {services.map(s => {
           const isSelected = selected.includes(s._id);
+          const isInactive = s.status === "Inactive";
           return (
             <div
               key={s._id}
               onClick={() => toggle(s._id)}
-              className={`p-4 rounded-xl border cursor-pointer transition-all duration-200
+              className={`p-4 rounded-xl border transition-all duration-200
+                ${isInactive ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
                 ${isSelected
                   ? "border-accent bg-accent-dim shadow-glow-sm"
                   : "border-border bg-surface-2 hover:border-border-hover"
@@ -66,6 +76,7 @@ export default function StepServices({ booking, onNext, onBack }) {
                   </div>
                   <div>
                     <p className="font-bold text-white text-sm">{s.service_name}</p>
+                    {isInactive && <p className="text-danger text-xs font-bold mt-0.5">Currently unavailable</p>}
                     {s.description && <p className="text-muted-2 text-xs mt-0.5">{s.description}</p>}
                   </div>
                 </div>

@@ -126,6 +126,15 @@ export const getAvailableStaff = async (req, res) => {
       .populate("salon_id", "name")
       .populate("services", "service_name");
 
+    const activeServices = await Service.countDocuments({
+      _id: { $in: serviceIdList },
+      salon_id: salonId,
+      status: "Active",
+    });
+    if (activeServices !== serviceIdList.length) {
+      return res.status(400).json({ message: "One or more selected services are inactive and cannot be booked." });
+    }
+
     let result = staffList.map(staff => ({
       staff_id: staff._id,
       full_name: staff.full_name,
@@ -274,9 +283,13 @@ export const getAvailableSlots = async (req, res) => {
     if (!salon) return res.status(404).json({ message: "Salon is unavailable" });
 
     // 1. Get total duration from all selected services
-    const services = await Service.find({ _id: { $in: serviceIdList } });
-    if (services.length === 0) {
-      return res.status(404).json({ message: "No services found" });
+    const services = await Service.find({
+      _id: { $in: serviceIdList },
+      salon_id: salonId,
+      status: "Active",
+    });
+    if (services.length !== serviceIdList.length) {
+      return res.status(400).json({ message: "One or more selected services are inactive and cannot be booked." });
     }
     const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
     const requiredSlots = Math.ceil(totalDuration / 60); // e.g. 120min = 2 slots
@@ -1957,7 +1970,7 @@ export const updateAppointmentDetails = async (req, res) => {
         return res.status(400).json({ message: `Start time (${sStart}) must be before end time (${sEnd}).` });
       }
 
-      const service = await Service.findOne({ _id: sId, salon_id: salonId }).lean();
+      const service = await Service.findOne({ _id: sId, salon_id: salonId, status: "Active" }).lean();
       if (!service) {
         return res.status(400).json({ message: "Selected service is not available at this salon." });
       }
@@ -2296,7 +2309,7 @@ export const updateStaffAssignment = async (req, res) => {
         });
       }
 
-      const service = await Service.findOne({ _id: svc.service_id, salon_id: salonId }).lean();
+      const service = await Service.findOne({ _id: svc.service_id, salon_id: salonId, status: "Active" }).lean();
       if (!service) {
         return res.status(400).json({ message: "Selected service is not available at this salon" });
       }
@@ -2626,7 +2639,7 @@ export const reassignStaff = async (req, res) => {
       const staff = await Staff.findOne({ _id: assignment.staff_id, salon_id: appointment.salon_id, status: "Active" }).lean();
       if (!staff) return res.status(400).json({ message: "Selected staff member is not active in this salon" });
 
-      const service = await Service.findOne({ _id: existing.service_id, salon_id: appointment.salon_id }).select("base_price").lean();
+      const service = await Service.findOne({ _id: existing.service_id, salon_id: appointment.salon_id, status: "Active" }).select("base_price").lean();
       if (!service) return res.status(400).json({ message: "Appointment service is no longer available" });
       const canPerformService = staff.services?.some(
         (serviceId) => String(serviceId) === String(existing.service_id)

@@ -46,7 +46,7 @@ Handles generation of invoices for completed appointments and aggregates revenue
 
 ### 1.7 Feedback, Reviews & Notifications
 Collects customer feedback on services and alerts administrators of new bookings via an internal notification system.
-* **Database Models:** `backend/models/Feedback.js`, `backend/models/Review.js`, `backend/models/Notification.js`
+* **Database Models:** `backend/models/Feedback.js`, `backend/models/Notification.js`
 * **Backend Controllers:** `backend/controllers/feedbackController.js`, `backend/controllers/notificationController.js`
 * **Frontend Pages:** Customer landing sections and Admin notification dropdowns.
 
