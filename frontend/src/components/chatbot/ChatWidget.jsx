@@ -5,11 +5,30 @@ import { MessageCircle, X, Send, Sparkles } from "lucide-react";
 import { sendChatMessage } from "../../services/chatService";
 import "./ChatWidget.css";
 
-/* ── Markdown-lite renderer (bold, italic, links, line breaks) ── */
+/* ── Markdown-lite renderer (headings, hr, bold, italic, links, line breaks) ── */
 function renderBotText(text) {
   if (!text) return null;
 
-  return text.split("\n").map((line, i) => {
+  const lines = text.split("\n");
+  return lines.map((rawLine, i) => {
+    const trimmed = rawLine.trim();
+
+    // Horizontal divider
+    if (trimmed === "---" || trimmed === "***" || trimmed === "___") {
+      return <hr key={i} className="my-2 border-white/10" />;
+    }
+
+    let line = rawLine;
+    let isHeading = false;
+
+    if (line.startsWith("### ")) {
+      isHeading = true;
+      line = line.slice(4);
+    } else if (line.startsWith("## ")) {
+      isHeading = true;
+      line = line.slice(3);
+    }
+
     const parts = [];
     let remaining = line;
     let key = 0;
@@ -41,7 +60,7 @@ function renderBotText(text) {
         const url = firstMatch.match[2];
         const linkText = firstMatch.match[1];
         const isInternal = url.startsWith("/");
-        const linkStyle = { color: "#f5c800", fontWeight: 600, textDecoration: "underline" };
+        const linkStyle = { color: "#f5c800", fontWeight: 700, textDecoration: "underline" };
         
         if (isInternal) {
           parts.push(
@@ -65,10 +84,18 @@ function renderBotText(text) {
       remaining = remaining.slice(firstMatch.index + firstMatch.match[0].length);
     }
 
+    if (isHeading) {
+      return (
+        <div key={i} className="font-bold text-amber-400 mt-2 mb-1 text-[13px] flex items-center gap-1.5">
+          {parts}
+        </div>
+      );
+    }
+
     return (
       <React.Fragment key={i}>
         {parts}
-        {i < text.split("\n").length - 1 && <br />}
+        {i < lines.length - 1 && <br />}
       </React.Fragment>
     );
   });
@@ -175,7 +202,7 @@ export default function ChatWidget() {
   // Send message
   const handleSend = async (text) => {
     const msgText = (text || input).trim();
-    if (!msgText) return;
+    if (!msgText || isTyping) return;
 
     // Add user message
     setMessages((prev) => [...prev, { from: "user", text: msgText }]);
@@ -193,7 +220,7 @@ export default function ChatWidget() {
           { from: "bot", text: reply, quickReplies: quickReplies || [] },
         ]);
         setIsTyping(false);
-      }, 600 + Math.random() * 400);
+      }, 500);
     } catch (err) {
       console.error("Chat error:", err);
       setTimeout(() => {
@@ -202,11 +229,11 @@ export default function ChatWidget() {
           {
             from: "bot",
             text: "Sorry, I'm having trouble connecting right now. Please try again in a moment.",
-            quickReplies: ["Try Again"],
+            quickReplies: ["✨ Style Consultant", "Our Services", "Try Again"],
           },
         ]);
         setIsTyping(false);
-      }, 500);
+      }, 400);
     }
   };
 
@@ -310,7 +337,8 @@ export default function ChatWidget() {
                           <button
                             key={j}
                             className="chat-quick-btn"
-                            onClick={() => handleSend(qr)}
+                            onClick={() => !isTyping && handleSend(qr)}
+                            disabled={isTyping}
                           >
                             {qr}
                           </button>

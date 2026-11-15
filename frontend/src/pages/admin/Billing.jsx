@@ -11,8 +11,7 @@ import {
   ChevronRight,
   Coins,
   TrendingUp,
-  Download,
-  Printer
+  Download
 } from "lucide-react";
 
 import jsPDF from "jspdf";
@@ -375,8 +374,8 @@ const Billing = () => {
             onClick={exportPDF}
             className="px-4 py-2 rounded-xl bg-amber-400 text-black text-xs font-black hover:bg-amber-300 transition-all flex items-center gap-1.5 shadow-sm"
           >
-            <Printer className="w-4 h-4" />
-            Print PDF
+            <Download className="w-4 h-4" />
+            Download PDF
           </button>
           <button
             onClick={exportExcel}
