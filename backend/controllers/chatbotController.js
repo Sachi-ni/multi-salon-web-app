@@ -3,26 +3,20 @@ import Service from "../models/Service.js";
 import mongoose from "mongoose";
 
 /* ── Intent Detection ── */
+// Specific domain intents are placed first so inquiries like "Hi, what are your prices?"
+// are correctly routed to pricing rather than being hijacked by generic greetings.
 const INTENTS = [
-  {
-    name: "greeting",
-    keywords: ["hi", "hello", "hey", "howdy", "good morning", "good afternoon", "good evening", "sup", "yo", "hola"],
-  },
-  {
-    name: "services",
-    keywords: ["service", "services", "treatment", "treatments", "what do you offer", "offer", "menu", "what can i get"],
-  },
   {
     name: "pricing",
     keywords: ["price", "prices", "pricing", "cost", "how much", "rate", "rates", "charge", "charges", "fee", "fees", "expensive", "cheap", "affordable"],
   },
   {
     name: "booking",
-    keywords: ["book", "booking", "appointment", "schedule", "reserve", "reservation", "slot", "available"],
+    keywords: ["book", "booking", "appointment", "schedule", "reserve", "reservation", "slot", "available", "make an appointment"],
   },
   {
     name: "hours",
-    keywords: ["hour", "hours", "open", "close", "closing", "opening", "time", "timing", "when open", "when close", "working hours", "operation"],
+    keywords: ["hour", "hours", "open", "close", "closing", "opening", "time", "timing", "when open", "when close", "working hours", "operation", "operating hours"],
   },
   {
     name: "location",
@@ -30,7 +24,22 @@ const INTENTS = [
   },
   {
     name: "branches",
-    keywords: ["branch", "branches", "salon", "salons", "outlets", "locations", "how many"],
+    keywords: ["branch", "branches", "salon", "salons", "outlets", "locations", "how many branches"],
+  },
+  {
+    name: "consultant",
+    keywords: [
+      "style consultant", "consultant", "hairstyle", "hair style", "haircut", "hair cut",
+      "hair care", "haircare", "routine", "shampoo", "conditioner", "curly", "coily", "straight",
+      "wavy", "frizzy", "thin hair", "thick hair", "scalp", "dandruff", "split ends",
+      "wedding hair", "keratin", "recommend a style", "what style", "which haircut",
+      "face shape", "hair advice", "style advice", "treatment recommendation", "recommend",
+      "hair loss", "hair fall", "damaged hair", "dry hair", "oily scalp", "balayage", "blowout"
+    ],
+  },
+  {
+    name: "services",
+    keywords: ["service", "services", "treatment", "treatments", "what do you offer", "offer", "menu", "what can i get", "catalog"],
   },
   {
     name: "cancel",
@@ -38,30 +47,38 @@ const INTENTS = [
   },
   {
     name: "contact",
-    keywords: ["contact", "phone", "email", "call", "reach", "number", "mail", "talk to someone", "support", "help"],
-  },
-  {
-    name: "consultant",
-    keywords: [
-      "style consultant", "consultant", "hairstyle", "hair style", "haircut", "hair cut",
-      "hair care", "haircare", "routine", "shampoo", "conditioner", "curly", "straight",
-      "wavy", "frizzy", "thin hair", "thick hair", "scalp", "dandruff", "split ends",
-      "wedding hair", "keratin", "recommend a style", "what style", "which haircut",
-      "face shape", "hair advice", "style advice", "treatment recommendation", "recommend"
-    ],
+    keywords: ["contact", "phone", "email", "call", "reach", "number", "mail", "talk to someone", "support", "help", "customer service"],
   },
   {
     name: "thanks",
     keywords: ["thank", "thanks", "thank you", "thx", "appreciate", "great", "awesome", "perfect", "nice"],
   },
+  {
+    name: "greeting",
+    keywords: ["hi", "hello", "hey", "howdy", "good morning", "good afternoon", "good evening", "sup", "yo", "hola"],
+  },
 ];
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 function detectIntent(message) {
   const lower = message.toLowerCase().trim();
 
+  // Fast-track exact quick reply matches
+  if (lower.includes("style consultant") || lower === "✨ style consultant") return "consultant";
+  if (lower === "our services" || lower === "services") return "services";
+  if (lower === "pricing" || lower === "prices") return "pricing";
+  if (lower === "salon locations" || lower === "locations") return "location";
+  if (lower === "book appointment" || lower === "book now") return "booking";
+  if (lower === "working hours" || lower === "hours") return "hours";
+  if (lower === "contact us" || lower === "contact") return "contact";
+
   for (const intent of INTENTS) {
     for (const keyword of intent.keywords) {
-      if (lower.includes(keyword)) {
+      const escaped = escapeRegex(keyword);
+      // Word boundaries ensure short keywords like "hi" don't falsely match inside words like "chic" or "which"
+      const regex = new RegExp(`(^|\\b)${escaped}(\\b|$)`, "i");
+      if (regex.test(lower)) {
         return intent.name;
       }
     }
@@ -87,103 +104,103 @@ async function handleGreeting() {
 
 async function handleServices() {
   try {
-    const services = await Service.find({}).populate("salon_id", "name").lean();
+    const services = await Service.find({ status: "Active" }).populate("salon_id", "name").lean().maxTimeMS(3000);
 
     if (!services.length) {
       return {
         text: "We're currently updating our service menu. Please check back soon or visit one of our branches for details!",
-        quickReplies: ["Salon Locations", "Contact Us"],
+        quickReplies: ["Salon Locations", "Contact Us", "Back to Menu"],
       };
     }
 
     // Group services by salon
     const grouped = {};
     services.forEach((s) => {
-      const salonName = s.salon_id?.name || "General";
+      const salonName = s.salon_id?.name || "All Branches";
       if (!grouped[salonName]) grouped[salonName] = [];
       grouped[salonName].push(s);
     });
 
-    let text = "Here are our available services:\n\n";
+    let text = "✨ **Our Available Salon Services:**\n\n";
     for (const [salon, svcs] of Object.entries(grouped)) {
-      text += `**📍 ${salon}:**\n`;
+      text += `📍 **${salon}:**\n`;
       svcs.forEach((s) => {
-        text += `  • ${s.service_name} — LKR ${s.base_price.toLocaleString()} (${s.duration} min)\n`;
+        text += `  • **${s.service_name}** — LKR ${Number(s.base_price || 0).toLocaleString()} (${s.duration || 30} min)\n`;
       });
       text += "\n";
     }
-    text += "Would you like to book an appointment?";
+    text += "Ready to book your transformation?\n👉 [Click here to Book an Appointment](/book)";
 
     return {
       text,
-      quickReplies: ["Book Appointment", "Pricing", "Back to Menu"],
+      quickReplies: ["Book Appointment", "Pricing", "✨ Style Consultant", "Back to Menu"],
     };
   } catch (err) {
     console.error("Chatbot services error:", err);
     return {
       text: "Sorry, I had trouble loading our services. Please try again in a moment.",
-      quickReplies: ["Try Again", "Contact Us"],
+      quickReplies: ["Try Again", "Contact Us", "Back to Menu"],
     };
   }
 }
 
 async function handlePricing() {
   try {
-    const services = await Service.find({}).populate("salon_id", "name").lean();
+    const services = await Service.find({ status: "Active" }).populate("salon_id", "name").lean().maxTimeMS(3000);
 
     if (!services.length) {
       return {
         text: "Pricing information is currently being updated. Please contact us for details!",
-        quickReplies: ["Contact Us", "Salon Locations"],
+        quickReplies: ["Contact Us", "Salon Locations", "Back to Menu"],
       };
     }
 
-    let text = "💰 **Our Pricing:**\n\n";
-    const sorted = [...services].sort((a, b) => a.base_price - b.base_price);
+    let text = "💰 **SalonHub Service Pricing:**\n\n";
+    const sorted = [...services].sort((a, b) => (a.base_price || 0) - (b.base_price || 0));
     sorted.forEach((s) => {
       const salon = s.salon_id?.name || "";
-      text += `• **${s.service_name}** — LKR ${s.base_price.toLocaleString()} _(${s.duration} min)_${salon ? ` — ${salon}` : ""}\n`;
+      text += `• **${s.service_name}** — LKR ${Number(s.base_price || 0).toLocaleString()} _(${s.duration || 30} min)_${salon ? ` — *${salon}*` : ""}\n`;
     });
-    text += "\nPrices may vary. Book now for the best experience!";
+    text += "\n*Prices are all-inclusive. Book now to reserve your spot!*\n👉 [Click here to Book an Appointment](/book)";
 
     return {
       text,
-      quickReplies: ["Book Appointment", "Our Services", "Back to Menu"],
+      quickReplies: ["Book Appointment", "Our Services", "✨ Style Consultant", "Back to Menu"],
     };
   } catch (err) {
     console.error("Chatbot pricing error:", err);
     return {
       text: "Sorry, I couldn't load pricing right now. Please try again.",
-      quickReplies: ["Try Again", "Contact Us"],
+      quickReplies: ["Try Again", "Contact Us", "Back to Menu"],
     };
   }
 }
 
 async function handleBooking() {
   return {
-    text: "Great choice! 🗓️ You can book an appointment through our booking page. Choose your preferred salon, service, staff, date, and time!\n\n👉 [Click here to book now](/book)\n\nIf you already have an account, you can also view your appointments in **My Appointments**.",
-    quickReplies: ["Our Services", "Salon Locations", "Back to Menu"],
+    text: "Great choice! 🗓️ You can book an appointment through our online booking portal in seconds:\n\n1. Select your preferred Salon branch\n2. Pick your desired service & stylist\n3. Choose your date & convenient time slot\n\n👉 [Click here to Book an Appointment](/book)\n\nIf you already booked, check **My Appointments** to view or manage your schedule.",
+    quickReplies: ["Our Services", "Salon Locations", "✨ Style Consultant", "Back to Menu"],
   };
 }
 
 async function handleHours() {
   try {
-    const salons = await Salon.find({}).lean();
+    const salons = await Salon.find({ status: { $ne: "deactivated" } }).lean().maxTimeMS(3000);
 
     if (!salons.length) {
       return {
         text: "Operating hours will be available soon. Please contact us directly!",
-        quickReplies: ["Contact Us"],
+        quickReplies: ["Contact Us", "Back to Menu"],
       };
     }
 
-    let text = "🕐 **Our Working Hours:**\n\n";
+    let text = "🕐 **Our Salon Working Hours:**\n\n";
     salons.forEach((s) => {
-      const open = s.open_time || "9:00 AM";
-      const close = s.close_time || "6:00 PM";
-      text += `📍 **${s.name}**\n   ⏰ ${open} — ${close}\n\n`;
+      const open = s.open_time || "08:30";
+      const close = s.close_time || "20:00";
+      text += `📍 **${s.name}**\n   ⏰ Open: ${open} — Close: ${close}\n\n`;
     });
-    text += "We look forward to seeing you!";
+    text += "Walk-ins and advance bookings are warmly welcome!";
 
     return {
       text,
@@ -193,26 +210,26 @@ async function handleHours() {
     console.error("Chatbot hours error:", err);
     return {
       text: "Sorry, I couldn't load hours. Please try again.",
-      quickReplies: ["Try Again", "Contact Us"],
+      quickReplies: ["Try Again", "Contact Us", "Back to Menu"],
     };
   }
 }
 
 async function handleLocation() {
   try {
-    const salons = await Salon.find({}).lean();
+    const salons = await Salon.find({ status: { $ne: "deactivated" } }).lean().maxTimeMS(3000);
 
     if (!salons.length) {
       return {
         text: "Location details will be available shortly. Please contact us!",
-        quickReplies: ["Contact Us"],
+        quickReplies: ["Contact Us", "Back to Menu"],
       };
     }
 
     let text = "📍 **Our Salon Locations:**\n\n";
     salons.forEach((s) => {
       text += `🏪 **${s.name}**\n   📌 ${s.location || "Location to be updated"}\n`;
-      if (s.phone) text += `   📞 ${s.phone}\n`;
+      if (s.phone) text += `   📞 Phone: ${s.phone}\n`;
       text += "\n";
     });
 
@@ -224,20 +241,20 @@ async function handleLocation() {
     console.error("Chatbot location error:", err);
     return {
       text: "Sorry, I couldn't load locations. Please try again.",
-      quickReplies: ["Try Again", "Contact Us"],
+      quickReplies: ["Try Again", "Contact Us", "Back to Menu"],
     };
   }
 }
 
 async function handleBranches() {
   try {
-    const salons = await Salon.find({}).lean();
+    const salons = await Salon.find({ status: { $ne: "deactivated" } }).lean().maxTimeMS(3000);
 
-    let text = `We have **${salons.length} salon branch${salons.length !== 1 ? "es" : ""}**:\n\n`;
+    let text = `We have **${salons.length} salon branch${salons.length !== 1 ? "es" : ""}** available:\n\n`;
     salons.forEach((s, i) => {
       text += `${i + 1}. **${s.name}** — ${s.location || "Location TBD"}\n`;
     });
-    text += "\nVisit any of our branches for a premium salon experience!";
+    text += "\nVisit any of our branches for a luxurious salon experience!";
 
     return {
       text,
@@ -247,33 +264,33 @@ async function handleBranches() {
     console.error("Chatbot branches error:", err);
     return {
       text: "Sorry, I couldn't load branch info. Please try again.",
-      quickReplies: ["Try Again", "Contact Us"],
+      quickReplies: ["Try Again", "Contact Us", "Back to Menu"],
     };
   }
 }
 
 async function handleCancel() {
   return {
-    text: "To cancel or reschedule an appointment:\n\n1. Go to **My Appointments** from the navigation menu\n2. Find the appointment you want to modify\n3. Click the **Cancel** button\n\n👉 [Go to My Appointments](/my-appointments)\n\nIf you need further assistance, please contact us directly.",
+    text: "To cancel or reschedule an existing appointment:\n\n1. Go to **My Appointments** from the customer portal\n2. Locate your scheduled booking\n3. Click the **Cancel** button\n\n👉 [Go to My Appointments](/my-appointments)\n\nNeed immediate help? Reach out to our front desk directly.",
     quickReplies: ["Contact Us", "Book Appointment", "Back to Menu"],
   };
 }
 
 async function handleContact() {
   try {
-    const salons = await Salon.find({}).lean();
+    const salons = await Salon.find({ status: { $ne: "deactivated" } }).lean().maxTimeMS(3000);
 
-    let text = "📞 **Contact Us:**\n\n";
+    let text = "📞 **Contact SalonHub:**\n\n";
     if (salons.length > 0) {
       salons.forEach((s) => {
         text += `🏪 **${s.name}**\n`;
         if (s.phone) text += `   📱 ${s.phone}\n`;
         if (s.email) text += `   📧 ${s.email}\n`;
-        if (s.contact_info) text += `   ℹ️ ${s.contact_info}\n`;
+        if (s.location) text += `   📍 ${s.location}\n`;
         text += "\n";
       });
     }
-    text += "You can also reach us through the **Contact** section on our website. We're happy to help! 😊";
+    text += "You can also message us through the website or visit our reception desk during operating hours!";
 
     return {
       text,
@@ -283,21 +300,21 @@ async function handleContact() {
     console.error("Chatbot contact error:", err);
     return {
       text: "Sorry, I couldn't load contact info. Please try again.",
-      quickReplies: ["Try Again"],
+      quickReplies: ["Try Again", "Back to Menu"],
     };
   }
 }
 
 function handleThanks() {
   return {
-    text: "You're welcome! 😊 Is there anything else I can help you with?",
+    text: "You're very welcome! 😊 It's my pleasure to help. Is there anything else you'd like to explore?",
     quickReplies: ["✨ Style Consultant", "Our Services", "Book Appointment", "Salon Locations", "No, thanks!"],
   };
 }
 
 function handleFallback() {
   return {
-    text: "I'm sorry, I didn't quite understand that. 🤔 Here are some things I can help you with:",
+    text: "I'm sorry, I didn't quite catch that. 🤔 Here are some quick topics I can help you with:",
     quickReplies: [
       "✨ Style Consultant",
       "Our Services",
@@ -316,7 +333,7 @@ const HAIR_PROFILES = {
     name: "Straight Hair",
     keywords: ["straight"],
     hairstyles: [
-      "✂️ **Sleek French Bob**: Sharp jaw-length cut that gives fine or straight strands instant thickness and modern chic.",
+      "✂️ **Sleek French Bob**: Sharp jaw-length cut that gives straight strands instant thickness and modern chic.",
       "✂️ **Long Fluid Layers with Curtain Bangs**: Adds dynamic movement and body without sacrificing length.",
       "✂️ **Glass Hair Blunt Cut**: Sleek, mirror-shine cut designed to turn heads at any event."
     ],
@@ -392,12 +409,12 @@ const HAIR_PROFILES = {
 const OCCASIONS = {
   wedding: {
     name: "Wedding / Special Event",
-    keywords: ["wedding", "bride", "bridal", "groom", "party", "event", "ceremony", "formal", "prom", "ball", "function"],
+    keywords: ["wedding", "bride", "bridal", "groom", "party", "event", "ceremony", "formal", "prom", "ball", "function", "special event"],
     tip: "Focus on all-day long-lasting hold, romantic tendrils, and radiant mirror-like shine."
   },
   everyday: {
     name: "Everyday Chic",
-    keywords: ["everyday", "daily", "casual", "low maintenance", "simple", "quick", "easy", "effortless"],
+    keywords: ["everyday", "daily", "casual", "low maintenance", "simple", "quick", "easy", "effortless", "chic"],
     tip: "Focus on wash-and-go simplicity that looks effortlessly polished in under 5 minutes."
   },
   work: {
@@ -427,18 +444,22 @@ ${servicesContext || "Haircuts, Keratin Smoothing Treatment, Deep Conditioning H
 Please provide a personalized, chic, and practical response:
 1. ✂️ **Recommended Hairstyles**: Suggest 1-2 cuts/styles that will flatter their hair profile or occasion, explaining why.
 2. 🧴 **Custom Hair Care Routine**: Give 2-3 specific morning/evening/wash steps.
-3. 🌟 **SalonHub Service Match**: Pick 1-2 matching services from our actual database above with prices.
+3. 🌟 **SalonHub Service Match**: Pick 1-2 matching services from our actual database above with prices in LKR.
 4. Keep the tone warm, welcoming, and high-end with markdown headings and emojis. Keep length concise (around 150-250 words).
 5. Conclude with: "👉 [Book This Service Now](/book)"`;
 
-  const modelsToTry = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"];
+  const modelsToTry = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-3.5-flash"];
   for (const model of modelsToTry) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6500);
+
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             contents: [{ parts: [{ text: systemPrompt }] }],
             generationConfig: {
@@ -448,6 +469,7 @@ Please provide a personalized, chic, and practical response:
           }),
         }
       );
+      clearTimeout(timeoutId);
 
       if (res.ok) {
         const data = await res.json();
@@ -458,6 +480,63 @@ Please provide a personalized, chic, and practical response:
     } catch (err) {
       // Try next model
     }
+  }
+  return null;
+}
+
+/* ── General Freeform Assistant using Gemini AI ── */
+async function callGeminiGeneral(userMessage, servicesContext, salonsContext) {
+  if (!process.env.GEMINI_API_KEY || !process.env.GEMINI_API_KEY.trim()) {
+    return null;
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY.trim();
+  const systemPrompt = `You are the friendly, professional virtual assistant for SalonHub, a premium multi-salon management web platform.
+A client asks: "${userMessage}".
+
+SalonHub Context:
+- Salons: ${salonsContext || "AURA (Gampaha), Salon 89"}
+- Popular Services: ${servicesContext || "Hair Cutting, Keratin Smoothing Treatment, Deep Conditioning Hair Spa, Facials, Makeup"}
+- Online Booking: Clients can select branch, service, stylist, date & time slot at /book.
+- Payments: Cash, Card, and Online transfers accepted at salons.
+
+Instructions:
+1. Provide a direct, polite, helpful answer in 2-4 sentences.
+2. If relevant, mention matching services with prices in LKR.
+3. Keep the tone warm, welcoming, and professional with friendly emojis.
+4. Conclude with: "👉 [Click here to Book an Appointment](/book)"
+5. Output ONLY your direct conversational message to the client. Do NOT output any analysis, reasoning steps, or preamble.`;
+
+  const modelsToTry = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-3.5-flash"];
+  for (const model of modelsToTry) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6500);
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: systemPrompt }] }],
+            generationConfig: {
+              temperature: 0.6,
+              maxOutputTokens: 1000,
+            },
+          }),
+        }
+      );
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          return data.candidates[0].content.parts[0].text;
+        }
+      }
+    } catch (_) {}
   }
   return null;
 }
@@ -525,7 +604,7 @@ async function handleConsultant(message) {
   let matchingServicesText = "";
   try {
     if (mongoose.connection.readyState === 1) {
-      const services = await Service.find({}).populate("salon_id", "name").lean().maxTimeMS(2500);
+      const services = await Service.find({ status: "Active" }).populate("salon_id", "name").lean().maxTimeMS(2500);
       if (services && services.length > 0) {
         // Find services matching category keywords
         const matchedSvcs = services.filter((s) => {
@@ -535,7 +614,7 @@ async function handleConsultant(message) {
 
         const targetList = matchedSvcs.length > 0 ? matchedSvcs : services.slice(0, 3);
         matchingServicesText = targetList
-          .map((s) => `• **${s.service_name}** — LKR ${s.base_price.toLocaleString()} (${s.duration} min)${s.salon_id?.name ? ` at _${s.salon_id.name}_` : ""}`)
+          .map((s) => `• **${s.service_name}** — LKR ${Number(s.base_price || 0).toLocaleString()} (${s.duration || 30} min)${s.salon_id?.name ? ` at _${s.salon_id.name}_` : ""}`)
           .join("\n");
       }
     }
@@ -590,6 +669,36 @@ async function handleConsultant(message) {
   };
 }
 
+/* ── Fallback Handler with Smart AI Support ── */
+async function handleSmartFallback(message) {
+  let servicesContext = "";
+  let salonsContext = "";
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const [services, salons] = await Promise.all([
+        Service.find({ status: "Active" }).select("service_name base_price duration").lean().limit(8).maxTimeMS(2500),
+        Salon.find({ status: { $ne: "deactivated" } }).select("name location phone").lean().limit(5).maxTimeMS(2500)
+      ]);
+      if (services?.length) {
+        servicesContext = services.map(s => `${s.service_name}: LKR ${s.base_price}`).join(", ");
+      }
+      if (salons?.length) {
+        salonsContext = salons.map(s => `${s.name} (${s.location})`).join(", ");
+      }
+    }
+  } catch (_) {}
+
+  const aiReply = await callGeminiGeneral(message, servicesContext, salonsContext);
+  if (aiReply) {
+    return {
+      text: aiReply,
+      quickReplies: ["Book Appointment", "✨ Style Consultant", "Our Services", "Back to Menu"],
+    };
+  }
+
+  return handleFallback();
+}
+
 /* ── Main Controller ── */
 export const handleChatMessage = async (req, res) => {
   try {
@@ -599,13 +708,30 @@ export const handleChatMessage = async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
+    const lower = message.toLowerCase().trim();
+
+    // Direct navigation triggers
+    if (lower === "back to menu" || lower === "menu" || lower === "start over" || lower === "try again" || lower === "reset") {
+      const response = await handleGreeting();
+      return res.json({
+        reply: response.text,
+        quickReplies: response.quickReplies || [],
+        intent: "greeting",
+      });
+    }
+
+    if (lower === "no, thanks!" || lower === "no, thanks" || lower === "no thanks") {
+      return res.json({
+        reply: "Alright! Have a wonderful day! ✨ Feel free to chat anytime you need salon assistance or styling advice.",
+        quickReplies: ["✨ Style Consultant", "Back to Menu"],
+        intent: "thanks",
+      });
+    }
+
     const intent = detectIntent(message);
 
     let response;
     switch (intent) {
-      case "greeting":
-        response = await handleGreeting();
-        break;
       case "consultant":
         response = await handleConsultant(message);
         break;
@@ -636,19 +762,11 @@ export const handleChatMessage = async (req, res) => {
       case "thanks":
         response = handleThanks();
         break;
+      case "greeting":
+        response = await handleGreeting();
+        break;
       default:
-        response = handleFallback();
-    }
-
-    // Handle "Back to Menu" / "No, thanks!" quick replies
-    if (message.toLowerCase().includes("back to menu") || message.toLowerCase().includes("try again")) {
-      response = await handleGreeting();
-    }
-    if (message.toLowerCase().includes("no, thanks")) {
-      response = {
-        text: "Alright! Have a wonderful day! ✨ Feel free to chat anytime you need help.",
-        quickReplies: ["✨ Style Consultant", "Back to Menu"],
-      };
+        response = await handleSmartFallback(message);
     }
 
     return res.json({
