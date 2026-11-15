@@ -395,7 +395,7 @@ export const getStaff = async (req, res) => {
   }
 };
 
-const getActiveTeamFilter = async ({ salonId, serviceId }) => {
+const getActiveTeamFilter = async ({ salonId, serviceId, staffId }) => {
   const activeSalonIds = await Salon.find({
     status: { $not: /^deactivated$/i },
     isPaused: { $ne: true },
@@ -408,6 +408,7 @@ const getActiveTeamFilter = async ({ salonId, serviceId }) => {
 
   if (salonId) filter.salon_id = { $eq: salonId, $in: activeSalonIds };
   if (serviceId) filter.services = serviceId;
+  if (staffId) filter._id = staffId;
   return filter;
 };
 
@@ -415,8 +416,9 @@ export const getPublicTeam = async (req, res) => {
   try {
     const filter = await getActiveTeamFilter(req.query);
     const staff = await Staff.find(filter)
-      .select("full_name role image salon_id")
-      .populate("salon_id", "name");
+      .select("full_name role image salon_id services")
+      .populate("salon_id", "name")
+      .populate("services", "service_name");
 
     res.json(staff.map((member) => ({
       _id: member._id,
@@ -424,6 +426,7 @@ export const getPublicTeam = async (req, res) => {
       role: member.role,
       image: member.image,
       salon: member.salon_id ? { _id: member.salon_id._id, name: member.salon_id.name } : null,
+      services: member.services.map((service) => ({ _id: service._id, service_name: service.service_name })),
     })));
   } catch (error) {
     res.status(500).json({ message: error.message });

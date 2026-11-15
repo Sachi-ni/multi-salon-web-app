@@ -20,6 +20,7 @@ export default function BookAppointment() {
         serviceId: "", serviceName: "", serviceDuration: 0, servicePrice: 0,
         totalDuration: 0, totalPrice: 0,
         staffId: "", staffName: "", staffSpecification: "",
+        staffServiceIds: [],
         startTime: "", endTime: "",
       };
     } catch {
@@ -30,6 +31,7 @@ export default function BookAppointment() {
         serviceId: "", serviceName: "", serviceDuration: 0, servicePrice: 0,
         totalDuration: 0, totalPrice: 0,
         staffId: "", staffName: "", staffSpecification: "",
+        staffServiceIds: [],
         startTime: "", endTime: "",
       };
     }
@@ -125,6 +127,7 @@ export default function BookAppointment() {
         staffId: staff._id || staff.staff_id,
         staffName: staff.name || staff.full_name,
         staffSpecification: staff.specification || "",
+        staffServiceIds: (staff.services || []).map((service) => String(service._id || service)),
       }));
       setStep(0);
     } else if (location.state?.salon) {
@@ -332,7 +335,7 @@ export default function BookAppointment() {
 
           {/* Staff entry keeps the selected staff fixed. */}
           {isStaffBooking && step === 1 && (
-            <StepSelectService booking={booking} onNext={next} onBack={back} />
+            <StepSelectService booking={booking} staffBooking onNext={next} onBack={back} />
           )}
 
           {/* Step 2 — Services */}
